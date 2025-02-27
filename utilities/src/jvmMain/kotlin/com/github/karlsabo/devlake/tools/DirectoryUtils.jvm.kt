@@ -1,0 +1,25 @@
+package com.github.karlsabo.devlake.tools
+
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+
+actual fun getApplicationDirectory(): Path {
+    val userHome = Path(System.getProperty("user.home"))
+    val appName = "DevLakeUtils"
+
+    val directory = when (System.getProperty("os.name").lowercase()) {
+        in listOf("mac os x", "mac os", "macos", "macosx") -> Path(userHome, "Library", "Application Support", appName)
+        in listOf("windows") -> {
+            val appDataEnv = System.getenv("APPDATA")
+            val appData: Path = if (appDataEnv != null) Path(appDataEnv) else Path(userHome, "AppData", "Roaming")
+            Path(appData, appName)
+        }
+
+        else -> {
+            Path(userHome, ".local", "share", appName)
+        }
+    }
+    if (!SystemFileSystem.exists(directory)) SystemFileSystem.createDirectories(directory)
+
+    return directory
+}
