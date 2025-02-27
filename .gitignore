@@ -8,3 +8,6 @@ build
 
 weekly-summary.md
 **/summary-publisher-config.json
+
+.DS_Store
+
