@@ -39,55 +39,57 @@ fun main() {
     val userAndTeamConfig = loadUserAndTeamConfig()
     if (userAndTeamConfig == null || userAndTeamConfig.users.isEmpty() || userAndTeamConfig.users[0].id == "Example1 ID") {
         println("Users config file $devLakeUserAndTeamsConfigPath does not exist, please populate it.")
-        saveUserConfig(
-            DevLakeUserAndTeamsConfig(
-                listOf(
-                    User(
-                        id = "Example1 ID",
-                        email = "example1@example.local",
-                        name = "Example Name",
+        if (!SystemFileSystem.exists(devLakeUserAndTeamsConfigPath)) {
+            saveUserConfig(
+                DevLakeUserAndTeamsConfig(
+                    listOf(
+                        User(
+                            id = "Example1 ID",
+                            email = "example1@example.local",
+                            name = "Example Name",
+                        ),
+                        User(
+                            id = "Example2 ID",
+                            email = "example2@example.local",
+                            name = "Example2 Name",
+                        )
                     ),
-                    User(
-                        id = "Example2 ID",
-                        email = "example2@example.local",
-                        name = "Example2 Name",
-                    )
-                ),
-                listOf(
-                    UserAccount(
-                        userId = "Example1 ID",
-                        accountId = "github:GithubAccount:1:1234",
+                    listOf(
+                        UserAccount(
+                            userId = "Example1 ID",
+                            accountId = "github:GithubAccount:1:1234",
+                        ),
+                        UserAccount(
+                            userId = "Example2 ID",
+                            accountId = "github:GithubAccount:1:1235",
+                        )
                     ),
-                    UserAccount(
-                        userId = "Example2 ID",
-                        accountId = "github:GithubAccount:1:1235",
-                    )
-                ),
-                listOf(
-                    Team(
-                        id = 1,
-                        name = "Example Team",
-                        alias = "example-team",
+                    listOf(
+                        Team(
+                            id = 1,
+                            name = "Example Team",
+                            alias = "example-team",
+                        ),
+                        Team(
+                            id = 2,
+                            name = "Example Team 2",
+                            alias = "example-team-2",
+                        ),
                     ),
-                    Team(
-                        id = 2,
-                        name = "Example Team 2",
-                        alias = "example-team-2",
+                    listOf(
+                        TeamUser(
+                            teamId = 1,
+                            userId = "Example1 ID",
+                        ),
+                        TeamUser(
+                            teamId = 2,
+                            userId = "Example2 ID",
+                        )
                     ),
-                ),
-                listOf(
-                    TeamUser(
-                        teamId = 1,
-                        userId = "Example1 ID",
-                    ),
-                    TeamUser(
-                        teamId = 2,
-                        userId = "Example2 ID",
-                    )
-                ),
+                )
             )
-        )
-        return@main
+        }
+        return
     }
 
     DataSourceManagerDb(devLakeDataSourceDbConfig).use { dataSource ->
