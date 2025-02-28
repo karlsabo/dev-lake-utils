@@ -3,6 +3,15 @@ package com.github.karlsabo.devlake.tools
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 
+/**
+ * Returns the application directory path based on the operating system.
+ *
+ * On macOS: `~/Library/Application Support/DevLakeUtils`
+ * On Windows: `%APPDATA%\DevLakeUtils`
+ * On Linux: `~/.local/share/DevLakeUtils`
+ *
+ * @return Path to the application directory.
+ */
 actual fun getApplicationDirectory(): Path {
     val userHome = Path(System.getProperty("user.home"))
     val appName = "DevLakeUtils"
