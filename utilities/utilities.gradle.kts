@@ -61,3 +61,12 @@ kotlin {
         }
     }
 }
+
+tasks.register<JavaExec>("createUsersAndTeams") {
+    group = "application"
+    mainClass.set("com.github.karlsabo.devlake.CreateUsersAndTeamsKt")
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("main").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
+

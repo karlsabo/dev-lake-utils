@@ -14,17 +14,8 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.sql.Connection
-
-@Serializable
-data class DevLakeUserAndTeamsConfig(
-    val users: List<User>,
-    val userAccounts: List<UserAccount>,
-    val teams: List<Team>,
-    val teamUsers: List<TeamUser>
-)
 
 val devLakeDataSourceDbConfigPath = Path(getApplicationDirectory(), "dev-lake-datasource-db-config.json")
 val textSummarizerConfigPath = Path(getApplicationDirectory(), "text-summarizer-openai-config.json")

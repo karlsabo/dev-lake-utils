@@ -59,7 +59,7 @@ data class Issue(
 fun Issue.isIssueOrBug(): Boolean {
     if (type == null) return false
     return when (type.lowercase()) {
-        "bug", "issue", "story", "subtask", "artifact" -> true
+        "bug", "issue", "story", "subtask", "artifact", "task" -> true
         "epic", "theme", "parent artifact" -> false
         else -> {
             val message = "Unhandled issue type $type, Info: $issueKey, $title"
