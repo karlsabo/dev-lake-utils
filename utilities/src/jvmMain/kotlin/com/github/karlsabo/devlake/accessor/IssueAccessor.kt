@@ -69,7 +69,10 @@ fun Issue.isIssueOrBug(): Boolean {
     }
 }
 
+fun Issue.isCompleted(): Boolean {
+    return resolutionDate != null
+}
+
 fun Issue.isMilestone(): Boolean {
     return type != null && type.lowercase() == "epic"
-
 }

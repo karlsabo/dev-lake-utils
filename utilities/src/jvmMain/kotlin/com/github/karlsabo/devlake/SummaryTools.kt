@@ -49,18 +49,22 @@ fun ProjectSummary.toSlackMarkdown(): String {
 
     if (milestones.isNotEmpty()) {
         val issueCount = issues.count { it.isIssueOrBug() }
-        val closedIssueCount = issues.count { it.isIssueOrBug() && it.resolutionDate != null }
+        val closedIssueCount = issues.count { it.isIssueOrBug() && it.isCompleted() }
         val closedIssuePercentage = if (issueCount == 0) {
             0
         } else {
             (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
+        }
+        println("For project ${project.title}, $closedIssueCount of $issueCount issues are closed, or $closedIssuePercentage%")
+        issues.filter { it.isIssueOrBug() && !it.isCompleted() }.forEach {
+            println("\t${it.issueKey} ${it.title} ${it.resolutionDate}, status=${it.status}, completed=${it.isCompleted()}")
         }
         repeat(closedIssuePercentage / 10) { summary.append("🟩") }
         repeat(10 - closedIssuePercentage / 10) { summary.append("⬜") }
         summary.append(" $closedIssuePercentage%")
 
         val netIssuesResolved =
-            durationIssues.count { it.resolutionDate != null } - durationIssues.count { it.resolutionDate == null }
+            durationIssues.count { it.isCompleted() } - durationIssues.count { !it.isCompleted() }
         if (netIssuesResolved == 0) {
             summary.append(" ⚖️ 0")
         } else if (netIssuesResolved > 0) {
@@ -73,7 +77,7 @@ fun ProjectSummary.toSlackMarkdown(): String {
         // ignore story points for now
         if (false) {
             val totalStoryPoints = issues.sumOf { it.storyPoint ?: 0.0 }
-            val completedStoryPoints = issues.filter { it.resolutionDate != null }.sumOf { it.storyPoint ?: 0.0 }
+            val completedStoryPoints = issues.filter { it.isCompleted() }.sumOf { it.storyPoint ?: 0.0 }
             val storyPointsPercentage = if (totalStoryPoints == 0.0) {
                 0
             } else {
@@ -90,7 +94,7 @@ fun ProjectSummary.toSlackMarkdown(): String {
     summary.append(this.durationProgressSummary)
     summary.appendLine()
     summary.appendLine()
-    val issuesResolved = durationIssues.filter { it.resolutionDate != null }
+    val issuesResolved = durationIssues.filter { it.isCompleted() }
     if (issuesResolved.isNotEmpty()) {
         summary.appendLine(
             "📍 Issues resolved: ${
@@ -98,7 +102,7 @@ fun ProjectSummary.toSlackMarkdown(): String {
             }"
         )
     }
-    val issuesOpened = durationIssues.filter { it.resolutionDate == null }
+    val issuesOpened = durationIssues.filter { !it.isCompleted() }
     if (issuesOpened.isNotEmpty()) {
         summary.appendLine(
             "📩 Issues opened: ${
@@ -215,7 +219,7 @@ suspend fun createSummary(
             issues
         WHERE
             issues.id LIKE '%page%'
-            AND issues.resolution_date >= ?
+            AND issues.created_date >= ?
         """.trimIndent()
         ).use { ps ->
             ps.setDate(1, timeInPastSql)

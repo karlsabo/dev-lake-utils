@@ -31,7 +31,7 @@ fun DevLakeSummary.toSlackMarkup(): String {
     pagerDutyAlerts.forEach {
         alerts.add("- <${it.url}|${it.key}>: ${it.description}")
     }
-    if (alerts.isEmpty()) alerts.add("- No pages! :tada:")
+    if (alerts.isEmpty()) alerts.add("- No pages! 🎉")
     alerts.forEach { slackSummary.appendLine(it) }
     return slackSummary.toString()
 }
