@@ -21,6 +21,16 @@ kotlin {
     }
 
     sourceSets {
+        getByName("commonMain") {
+            dependencies {
+                // Test
+                implementation(kotlin("test"))
+
+                // Coroutines
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${libs.versions.kotlinxCoroutines.get()}")
+            }
+        }
+
         getByName("jvmMain") {
             dependencies {
                 implementation(project(":utilities"))
@@ -58,4 +68,12 @@ compose.desktop {
             packageVersion = "1.0.0"
         }
     }
+}
+
+tasks.register<JavaExec>("runMetricsDemo") {
+    group = "run"
+    mainClass.set("com.github.karlsabo.devlake.metrics.MetricsDemoKt")
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
