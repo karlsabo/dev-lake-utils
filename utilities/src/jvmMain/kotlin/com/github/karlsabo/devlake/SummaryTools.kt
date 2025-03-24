@@ -18,6 +18,7 @@ import kotlinx.serialization.Serializable
 import java.sql.Date
 import javax.sql.DataSource
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -55,12 +56,25 @@ fun ProjectSummary.toSlackMarkdown(): String {
         } else {
             (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
         }
+
+        val closedIssueCountThisWeek = durationIssues.count { it.isIssueOrBug() && it.isCompleted() }
+        val closedIssuePercentageThisWeek = if (durationIssues.isEmpty()) {
+            0
+        } else {
+            (closedIssueCountThisWeek / issueCount.toDouble() * 100).roundToInt()
+        }
+        val barCountThisWeek = ceil(closedIssuePercentageThisWeek/10.0).roundToInt()
+
         println("For project ${project.title}, $closedIssueCount of $issueCount issues are closed, or $closedIssuePercentage%")
         issues.filter { it.isIssueOrBug() && !it.isCompleted() }.forEach {
             println("\t${it.issueKey} ${it.title} ${it.resolutionDate}, status=${it.status}, completed=${it.isCompleted()}")
         }
-        repeat(closedIssuePercentage / 10) { summary.append("🟩") }
-        repeat(10 - closedIssuePercentage / 10) { summary.append("⬜") }
+
+        val totalBarCount = 10
+        val closedIssueBarCount = closedIssuePercentage / totalBarCount
+        repeat(closedIssueBarCount - barCountThisWeek) { summary.append("🟦") }
+        repeat(barCountThisWeek) { summary.append("🟨") }
+        repeat(totalBarCount - closedIssueBarCount) { summary.append("⬜") }
         summary.append(" $closedIssuePercentage%")
 
         val netIssuesResolved =
