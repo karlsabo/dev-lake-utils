@@ -68,3 +68,11 @@ compose.desktop {
         }
     }
 }
+
+tasks.register<JavaExec>("runSummaryDemo") {
+    group = "run"
+    mainClass.set("com.github.karlsabo.devlake.tools.SummaryDemoKt")
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
