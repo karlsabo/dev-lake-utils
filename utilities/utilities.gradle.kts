@@ -1,7 +1,11 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
+    `maven-publish`
 }
+
+group = parent!!.group
+version = parent!!.version
 
 repositories {
     mavenCentral()
@@ -70,3 +74,8 @@ tasks.register<JavaExec>("createUsersAndTeams") {
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
 
+publishing {
+    repositories {
+        mavenLocal()
+    }
+}

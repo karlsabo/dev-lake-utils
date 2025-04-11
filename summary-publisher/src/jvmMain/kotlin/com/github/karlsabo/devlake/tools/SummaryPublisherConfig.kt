@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.tools
 
+import com.github.karlsabo.devlake.DEV_LAKE_APP_NAME
 import com.github.karlsabo.devlake.dto.Project
 import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
@@ -16,7 +17,7 @@ data class SummaryPublisherConfig(
     val projects: List<Project> = emptyList<Project>(),
 )
 
-val summaryPublisherConfigPath = Path(getApplicationDirectory(), "summary-publisher-config.json")
+val summaryPublisherConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "summary-publisher-config.json")
 
 fun loadSummaryPublisherConfig(): SummaryPublisherConfig {
     SystemFileSystem.source(summaryPublisherConfigPath).buffered().readText().let {

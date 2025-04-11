@@ -48,60 +48,58 @@ fun ProjectSummary.toSlackMarkdown(): String {
         summary.appendLine("*${project.title}*")
     }
 
-    if (milestones.isNotEmpty()) {
-        val issueCount = issues.count { it.isIssueOrBug() }
-        val closedIssueCount = issues.count { it.isIssueOrBug() && it.isCompleted() }
-        val closedIssuePercentage = if (issueCount == 0) {
+    val issueCount = issues.count { it.isIssueOrBug() }
+    val closedIssueCount = issues.count { it.isIssueOrBug() && it.isCompleted() }
+    val closedIssuePercentage = if (issueCount == 0) {
+        0
+    } else {
+        (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
+    }
+
+    val closedIssueCountThisWeek = durationIssues.count { it.isIssueOrBug() && it.isCompleted() }
+    val closedIssuePercentageThisWeek = if (durationIssues.isEmpty()) {
+        0
+    } else {
+        (closedIssueCountThisWeek / issueCount.toDouble() * 100).roundToInt()
+    }
+    val barCountThisWeek = ceil(closedIssuePercentageThisWeek / 10.0).roundToInt()
+
+    println("For project ${project.title}, $closedIssueCount of $issueCount issues are closed, or $closedIssuePercentage%")
+    issues.filter { it.isIssueOrBug() && !it.isCompleted() }.forEach {
+        println("\t${it.issueKey} ${it.title} ${it.resolutionDate}, status=${it.status}, completed=${it.isCompleted()}")
+    }
+
+    val totalBarCount = 10
+    val closedIssueBarCount = closedIssuePercentage / totalBarCount
+    repeat(closedIssueBarCount - barCountThisWeek) { summary.append("🟦") }
+    repeat(barCountThisWeek) { summary.append("🟨") }
+    repeat(totalBarCount - closedIssueBarCount) { summary.append("⬜") }
+    summary.append(" $closedIssuePercentage%")
+
+    val netIssuesResolved =
+        durationIssues.count { it.isCompleted() } - durationIssues.count { !it.isCompleted() }
+    if (netIssuesResolved == 0) {
+        summary.append(" ⚖️ 0")
+    } else if (netIssuesResolved > 0) {
+        summary.append(" 📉 -${abs(netIssuesResolved)}")
+    } else {
+        summary.append(" 📈 +${abs(netIssuesResolved)}")
+    }
+    summary.appendLine(" net issues this week")
+
+    // ignore story points for now
+    if (false) {
+        val totalStoryPoints = issues.sumOf { it.storyPoint ?: 0.0 }
+        val completedStoryPoints = issues.filter { it.isCompleted() }.sumOf { it.storyPoint ?: 0.0 }
+        val storyPointsPercentage = if (totalStoryPoints == 0.0) {
             0
         } else {
-            (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
+            (completedStoryPoints / totalStoryPoints * 100).roundToInt()
         }
-
-        val closedIssueCountThisWeek = durationIssues.count { it.isIssueOrBug() && it.isCompleted() }
-        val closedIssuePercentageThisWeek = if (durationIssues.isEmpty()) {
-            0
-        } else {
-            (closedIssueCountThisWeek / issueCount.toDouble() * 100).roundToInt()
-        }
-        val barCountThisWeek = ceil(closedIssuePercentageThisWeek/10.0).roundToInt()
-
-        println("For project ${project.title}, $closedIssueCount of $issueCount issues are closed, or $closedIssuePercentage%")
-        issues.filter { it.isIssueOrBug() && !it.isCompleted() }.forEach {
-            println("\t${it.issueKey} ${it.title} ${it.resolutionDate}, status=${it.status}, completed=${it.isCompleted()}")
-        }
-
-        val totalBarCount = 10
-        val closedIssueBarCount = closedIssuePercentage / totalBarCount
-        repeat(closedIssueBarCount - barCountThisWeek) { summary.append("🟦") }
-        repeat(barCountThisWeek) { summary.append("🟨") }
-        repeat(totalBarCount - closedIssueBarCount) { summary.append("⬜") }
-        summary.append(" $closedIssuePercentage%")
-
-        val netIssuesResolved =
-            durationIssues.count { it.isCompleted() } - durationIssues.count { !it.isCompleted() }
-        if (netIssuesResolved == 0) {
-            summary.append(" ⚖️ 0")
-        } else if (netIssuesResolved > 0) {
-            summary.append(" 📉 -${abs(netIssuesResolved)}")
-        } else {
-            summary.append(" 📈 +${abs(netIssuesResolved)}")
-        }
-        summary.appendLine(" net issues this week")
-
-        // ignore story points for now
-        if (false) {
-            val totalStoryPoints = issues.sumOf { it.storyPoint ?: 0.0 }
-            val completedStoryPoints = issues.filter { it.isCompleted() }.sumOf { it.storyPoint ?: 0.0 }
-            val storyPointsPercentage = if (totalStoryPoints == 0.0) {
-                0
-            } else {
-                (completedStoryPoints / totalStoryPoints * 100).roundToInt()
-            }
-            summary.append("[")
-            repeat(storyPointsPercentage / 10) { summary.append("=") }
-            repeat(10 - storyPointsPercentage / 10) { summary.append(" ") }
-            summary.append("] $storyPointsPercentage% story points complete\n")
-        }
+        summary.append("[")
+        repeat(storyPointsPercentage / 10) { summary.append("=") }
+        repeat(10 - storyPointsPercentage / 10) { summary.append(" ") }
+        summary.append("] $storyPointsPercentage% story points complete\n")
     }
 
     summary.appendLine()
@@ -213,13 +211,14 @@ suspend fun createSummary(
                 .getPullRequestsByAuthorIdAndAfterMergedDate(it.id, Clock.System.now().minus(duration))
         )
     }
+    projectSummaries.sortBy { it.project.title?.replaceFirst(Regex("""^[^\p{L}\p{N}]+"""), "") }
     projectSummaries.forEach { projectSummary ->
         miscPullRequests = miscPullRequests.subtract(projectSummary.durationMergedPullRequests).toMutableSet()
     }
     val miscProject = Project(
         id = 123456789101112L,
         title = "📋 Other (Misc)",
-        topLevelIssueKeys = miscIssueSet.map { it.issueKey },
+        topLevelIssueIds = miscIssueSet.map { it.id },
     )
     projectSummaries.add(miscProject.createSummary(dataSource, textSummarizer, duration, true))
 
@@ -267,9 +266,14 @@ suspend fun Project.createSummary(
     parentIssuesAreChildren: Boolean = false
 ): ProjectSummary {
     val issueAccessor = IssueAccessorDb(source)
-    val parentIssues =
-        if (topLevelIssueKeys.isEmpty()) emptyList<Issue>() else issueAccessor.getIssuesByKey(this.topLevelIssueKeys)
-    val parentIssueIds = parentIssues.map { it.id }
+    val parentIssues = if (topLevelIssueKeys.isEmpty())
+        mutableListOf<Issue>()
+    else
+        issueAccessor.getIssuesByKey(this.topLevelIssueKeys)
+            .toMutableList()
+    if (topLevelIssueIds.isNotEmpty())
+        parentIssues += issueAccessor.getIssuesById(topLevelIssueIds)
+    val parentIssueIds = parentIssues.map { it.id } + topLevelIssueIds
     val childIssues = if (parentIssuesAreChildren) parentIssues else issueAccessor.getAllChildIssues(parentIssueIds)
 
     val resolvedChildIssues =

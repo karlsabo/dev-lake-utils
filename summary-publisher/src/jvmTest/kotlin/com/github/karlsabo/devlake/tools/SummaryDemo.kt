@@ -25,7 +25,7 @@ fun main() = runBlocking {
             loadUserAndTeamConfig()!!.users,
             summaryConfig.summaryName,
         )
-        val slackMarkDown = summaryLast7Days?.toSlackMarkup() ?: "* Failed to load summary"
+        val slackMarkDown = summaryLast7Days.toSlackMarkup()
         println(slackMarkDown)
     }
 }

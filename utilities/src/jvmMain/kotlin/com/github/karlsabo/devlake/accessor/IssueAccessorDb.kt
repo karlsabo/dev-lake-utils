@@ -47,6 +47,23 @@ class IssueAccessorDb(private val dataSource: DataSource) : IssueAccessor {
         }
     }
 
+    override fun getIssuesById(issueIds: List<String>): List<Issue> {
+        dataSource.connection.use { connection ->
+            val statement = connection.prepareStatement(
+                "SELECT * FROM issues WHERE ID IN (${issueIds.joinToString(",") { "?" }})"
+            )
+            issueIds.forEachIndexed { index, key ->
+                statement.setString(index + 1, key)
+            }
+            val resultSet = statement.executeQuery()
+            val issues = mutableListOf<Issue>()
+            while (resultSet.next()) {
+                issues.add(resultSet.toIssue())
+            }
+            return issues
+        }
+    }
+
     override fun getIssuesByCreatorId(creatorId: String): List<Issue> {
         dataSource.connection.use { connection ->
             val statement = connection.prepareStatement("SELECT * FROM issues WHERE creator_id = ?")

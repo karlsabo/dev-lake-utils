@@ -13,4 +13,5 @@ data class Project(
     val projectContributors: List<String>? = emptyList<String>(),
     val productManager: String? = null,
     val topLevelIssueKeys: List<String> = emptyList<String>(),
+    val topLevelIssueIds: List<String> = emptyList<String>(),
 )
