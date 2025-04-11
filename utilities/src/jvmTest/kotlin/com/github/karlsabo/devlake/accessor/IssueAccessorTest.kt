@@ -44,7 +44,7 @@ class IssueAccessorTest {
             )
             assertNotNull(issues)
             issues.forEach {
-                println(it)
+                println("${it.id} ${it.title}")
             }
         }
     }

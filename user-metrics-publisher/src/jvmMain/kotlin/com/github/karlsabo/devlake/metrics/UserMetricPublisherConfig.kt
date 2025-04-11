@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.tools
 
+import com.github.karlsabo.devlake.DEV_LAKE_APP_NAME
 import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
 import kotlinx.io.buffered
@@ -15,7 +16,7 @@ data class UserMetricPublisherConfig(
     val metricInformationPostfix: String = "",
 )
 
-val userMetricPublisherConfigPath = Path(getApplicationDirectory(), "user-metric-publisher-config.json")
+val userMetricPublisherConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "user-metric-publisher-config.json")
 
 fun loadUserMetricPublisherConfig(): UserMetricPublisherConfig {
     SystemFileSystem.source(userMetricPublisherConfigPath).buffered().readText().let {

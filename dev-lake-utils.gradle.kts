@@ -5,3 +5,6 @@ plugins {
     kotlin("plugin.serialization") version libs.versions.kotlin apply false
     kotlin("jvm") version libs.versions.kotlin apply false
 }
+
+group = "com.github.karlsabo.devlake"
+version = "0.1.0-SNAPSHOT"

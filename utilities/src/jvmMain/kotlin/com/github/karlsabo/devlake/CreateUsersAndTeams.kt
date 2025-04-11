@@ -17,8 +17,9 @@ import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import java.sql.Connection
 
-val devLakeDataSourceDbConfigPath = Path(getApplicationDirectory(), "dev-lake-datasource-db-config.json")
-val textSummarizerConfigPath = Path(getApplicationDirectory(), "text-summarizer-openai-config.json")
+const val DEV_LAKE_APP_NAME = "DevLakeUtils"
+val devLakeDataSourceDbConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "dev-lake-datasource-db-config.json")
+val textSummarizerConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "text-summarizer-openai-config.json")
 
 fun main() {
     val dataSourceConfigNoSecrets = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)
@@ -221,7 +222,7 @@ private fun createUser(
     }
 }
 
-private val devLakeUserAndTeamsConfigPath = Path(getApplicationDirectory(), "users-and-teams.json")
+private val devLakeUserAndTeamsConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "users-and-teams.json")
 fun loadUserAndTeamConfig(): DevLakeUserAndTeamsConfig? {
     if (!SystemFileSystem.exists(devLakeUserAndTeamsConfigPath)) {
         return null

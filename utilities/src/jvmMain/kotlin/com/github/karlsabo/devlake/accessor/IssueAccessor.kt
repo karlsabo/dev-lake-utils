@@ -14,6 +14,7 @@ interface IssueAccessor {
     fun getIssuesByParentIssueId(parentIssueId: String): List<Issue>
     fun getChildIssues(issueIds: List<String>): List<Issue>
     fun getAllChildIssues(issueIds: List<String>): Set<Issue>
+    fun getIssuesById(issueIds: List<String>): List<Issue>
 }
 
 @Serializable

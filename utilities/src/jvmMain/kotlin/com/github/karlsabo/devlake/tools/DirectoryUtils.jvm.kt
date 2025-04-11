@@ -12,9 +12,8 @@ import kotlinx.io.files.SystemFileSystem
  *
  * @return Path to the application directory.
  */
-actual fun getApplicationDirectory(): Path {
+actual fun getApplicationDirectory(appName:String): Path {
     val userHome = Path(System.getProperty("user.home"))
-    val appName = "DevLakeUtils"
 
     val directory = when (System.getProperty("os.name").lowercase()) {
         in listOf("mac os x", "mac os", "macos", "macosx") -> Path(userHome, "Library", "Application Support", appName)
