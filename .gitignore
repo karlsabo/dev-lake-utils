@@ -11,3 +11,6 @@ weekly-summary.md
 
 .DS_Store
 
+/.idea/artifacts/summary_publisher_jvm.xml
+/.idea/artifacts/user_metrics_publisher_jvm.xml
+/.idea/artifacts/utilities_jvm_0_1_0_SNAPSHOT.xml
