@@ -1,6 +1,16 @@
 package com.github.karlsabo.devlake
 
-import com.github.karlsabo.devlake.accessor.*
+import com.github.karlsabo.devlake.accessor.Issue
+import com.github.karlsabo.devlake.accessor.IssueAccessorDb
+import com.github.karlsabo.devlake.accessor.IssueChangelog
+import com.github.karlsabo.devlake.accessor.IssueChangelogAccessorDb
+import com.github.karlsabo.devlake.accessor.PullRequest
+import com.github.karlsabo.devlake.accessor.PullRequestAccessorDb
+import com.github.karlsabo.devlake.accessor.User
+import com.github.karlsabo.devlake.accessor.UserAccountAccessorDb
+import com.github.karlsabo.devlake.accessor.isCompleted
+import com.github.karlsabo.devlake.accessor.isIssueOrBug
+import com.github.karlsabo.devlake.accessor.isMilestone
 import com.github.karlsabo.devlake.dto.DevLakeSummary
 import com.github.karlsabo.devlake.dto.PagerDutyAlert
 import com.github.karlsabo.devlake.dto.Project
@@ -29,11 +39,23 @@ data class Milestone(
     val issues: Set<Issue>,
 )
 
+/**
+ * Represents a summarized view of a project's details and related data.
+ *
+ * @property project The project associated with this summary.
+ * @property durationProgressSummary A textual representation of the project's progress over time.
+ * @property issues A set of issues related to the project.
+ * @property issueChangeLogs A set of changelogs associated with the project's issues.
+ * @property durationIssues A subset of issues filtered by duration.
+ * @property durationMergedPullRequests A set of pull requests that were merged within a specific duration.
+ * @property milestones A set of milestones relevant to the project.
+ */
 @Serializable
 data class ProjectSummary(
     val project: Project,
     val durationProgressSummary: String,
     val issues: Set<Issue>,
+    val issueChangeLogs: List<IssueChangelog>,
     val durationIssues: Set<Issue>,
     val durationMergedPullRequests: Set<PullRequest>,
     val milestones: Set<Milestone>,
@@ -309,10 +331,19 @@ suspend fun Project.createSummary(
             }.toSet()
     }
 
+    val issueChangelogAccessor = IssueChangelogAccessorDb(source)
+    val issueIds = (parentIssues + childIssues).map { it.id }.toSet()
+    val issueChangelogs =
+        if (issueIds.isEmpty())
+            emptyList()
+        else
+            issueChangelogAccessor.getPaginatedChangelogsByIssueIds(issueIds, 10, 0)
+
     return ProjectSummary(
         this,
         summary,
         childIssues.filter { it.isIssueOrBug() }.toSet(),
+        issueChangelogs,
         childIssues.filter {
             it.isIssueOrBug()
                     && (it.resolutionDate != null && it.resolutionDate >= Clock.System.now().minus(duration)

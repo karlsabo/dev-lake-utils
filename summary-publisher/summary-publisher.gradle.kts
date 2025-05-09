@@ -76,3 +76,11 @@ tasks.register<JavaExec>("runSummaryDemo") {
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
+
+tasks.register<JavaExec>("runSummaryDetailDemo") {
+    group = "run"
+    mainClass.set("com.github.karlsabo.devlake.tools.SummaryDetailDemoKt")
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
