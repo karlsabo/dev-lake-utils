@@ -2,19 +2,41 @@ package com.github.karlsabo.devlake.tools
 
 
 import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.material.Button
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
+import androidx.compose.material.TextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.*
+import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.devlake.accessor.PipelineAccessorDb
 import com.github.karlsabo.devlake.accessor.Status
 import com.github.karlsabo.devlake.createSummary
@@ -23,19 +45,28 @@ import com.github.karlsabo.devlake.dto.DevLakeSummary
 import com.github.karlsabo.devlake.dto.toSlackMarkup
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
 import com.github.karlsabo.devlake.textSummarizerConfigPath
-import com.github.karlsabo.ds.*
-import com.github.karlsabo.text.*
-import com.mikepenz.markdown.compose.Markdown
-import com.mikepenz.markdown.m2.markdownColor
-import com.mikepenz.markdown.m2.markdownTypography
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.gson.*
+import com.github.karlsabo.ds.DataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.DataSourceManagerDb
+import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.saveDataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.text.TextSummarizerOpenAi
+import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
+import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
+import com.github.karlsabo.text.saveTextSummarizerOpenAiNoSecrets
+import com.github.karlsabo.text.toTextSummarizerOpenAiConfig
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
+import io.ktor.serialization.gson.gson
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock.System
 import kotlinx.datetime.TimeZone
@@ -287,21 +318,6 @@ fun main() = application {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 8.dp)
-                                    )
-                                }
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(end = 8.dp)
-                                ) {
-                                    Markdown(
-                                        content = slackMarkDown,
-                                        typography = markdownTypography(
-                                            h1 = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold),
-                                            h2 = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
-                                            h3 = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-                                        ),
-                                        colors = markdownColor(),
                                     )
                                 }
                             }

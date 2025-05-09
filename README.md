@@ -13,9 +13,16 @@
   - [Slow query by parent\_issue\_id](#slow-query-by-parent_issue_id)
 
 # TODO
-- [ ] Add logging
-- [ ] Add dependency injection
-- [ ] Consider consolidating into a single configuration file
+
+* [ ] Update project tracking
+  * [X] Test Zapier sending a top message and then adding replies
+  * For each project, make it a reply
+  * Add more details to the project
+  * Add a flag to add verbose milestone details
+    * Last update to the milestone, percent complete, etc. Like a 'project'
+* [ ] Add logging
+* [ ] Add dependency injection
+* [ ] Consider consolidating into a single configuration file
 
 # Overview
 
