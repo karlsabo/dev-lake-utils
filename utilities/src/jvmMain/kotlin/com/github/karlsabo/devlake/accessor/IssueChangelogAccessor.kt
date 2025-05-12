@@ -6,7 +6,13 @@ import kotlinx.serialization.Serializable
 interface IssueChangelogAccessor {
     fun getChangelogsByIssueId(issueId: String): List<IssueChangelog>
     fun getChangelogById(changelogId: String): IssueChangelog?
-    fun getPaginatedChangelogsByIssueIds(issueIds: Set<String>, limit: Int, offset: Int): List<IssueChangelog>
+    fun getPaginatedChangelogsByIssueIdsAndField(
+        issueIds: Set<String>,
+        fieldNames: Set<String>,
+        excludedAuthorNames: Set<String>,
+        limit: Int,
+        offset: Int
+    ): List<IssueChangelog>
 }
 
 @Serializable

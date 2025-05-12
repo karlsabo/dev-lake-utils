@@ -23,12 +23,6 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -42,9 +36,11 @@ import com.github.karlsabo.devlake.accessor.Status
 import com.github.karlsabo.devlake.createSummary
 import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
 import com.github.karlsabo.devlake.dto.DevLakeSummary
-import com.github.karlsabo.devlake.dto.toSlackMarkup
+import com.github.karlsabo.devlake.dto.toTerseSlackMarkup
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
 import com.github.karlsabo.devlake.textSummarizerConfigPath
+import com.github.karlsabo.devlake.toSlackMarkdown
+import com.github.karlsabo.devlake.toVerboseSlackMarkdown
 import com.github.karlsabo.ds.DataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
@@ -241,7 +237,7 @@ fun main() = application {
 
         var isSendingSlackMessage by remember { mutableStateOf(false) }
 
-        var slackMarkDown by remember { mutableStateOf("Loading summary") }
+        var zapierJson by remember { mutableStateOf("Loading summary") }
         val scope = rememberCoroutineScope()
         var summaryLast7Days: DevLakeSummary? by remember { mutableStateOf(null) }
 
@@ -257,7 +253,19 @@ fun main() = application {
                         loadUserAndTeamConfig()!!.users,
                         summaryConfig.summaryName,
                     )
-                    slackMarkDown = summaryLast7Days?.toSlackMarkup() ?: "* Failed to load summary"
+                    val zapierProjectSummary = ZapierProjectSummary(
+                        summaryLast7Days?.toTerseSlackMarkup() ?: "* Failed to laod summary",
+                        summaryLast7Days?.projectSummaries?.map {
+                            if (it.project.isVerboseMilestones)
+                                it.toVerboseSlackMarkdown()
+                            else
+                                it.toSlackMarkdown()
+                        } ?: emptyList()
+                    )
+                    zapierJson = Json { prettyPrint = true }.encodeToString(
+                        ZapierProjectSummary.serializer(),
+                        zapierProjectSummary
+                    )
                 }
                 isLoadingSummary = false
             }
@@ -274,7 +282,7 @@ fun main() = application {
                             scope.launch {
                                 isSendingSlackMessage = true
                                 val success = sendToZap(
-                                    slackMarkDown,
+                                    Json.decodeFromString(ZapierProjectSummary.serializer(), zapierJson),
                                     summaryConfig.zapierSummaryUrl
                                 )
                                 isSendingSlackMessage = false
@@ -312,9 +320,8 @@ fun main() = application {
                                         .padding(end = 8.dp)
                                 ) {
                                     TextField(
-                                        value = slackMarkDown,
-                                        onValueChange = { slackMarkDown = it },
-                                        label = { Text("Edit Slack Markdown (doesn't render accurately because the UI only supports Markdown") },
+                                        value = zapierJson,
+                                        onValueChange = { zapierJson = it },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 8.dp)
@@ -330,9 +337,9 @@ fun main() = application {
 }
 
 @Serializable
-data class SlackMessage(val message: String)
+data class ZapierProjectSummary(val message: String, val projectMessages: List<String>)
 
-suspend fun sendToZap(slackMessage: String, zapierSummaryUrl: String): Boolean {
+suspend fun sendToZap(zapierProjectSummary: ZapierProjectSummary, zapierSummaryUrl: String): Boolean {
     val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             gson()
@@ -341,7 +348,7 @@ suspend fun sendToZap(slackMessage: String, zapierSummaryUrl: String): Boolean {
     val response: HttpResponse = client.post(zapierSummaryUrl) {
         header(HttpHeaders.Referrer, "https://hooks.zapier.com")
         contentType(ContentType.Application.Json)
-        setBody(Json.encodeToString(SlackMessage.serializer(), SlackMessage(slackMessage)))
+        setBody(Json.encodeToString(ZapierProjectSummary.serializer(), zapierProjectSummary))
     }
 
     println("response=$response, body=${response.body<String>()}")
