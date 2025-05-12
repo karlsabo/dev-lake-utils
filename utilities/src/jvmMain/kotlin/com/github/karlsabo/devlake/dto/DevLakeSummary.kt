@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.dto
 
 import com.github.karlsabo.devlake.ProjectSummary
 import com.github.karlsabo.devlake.toSlackMarkdown
+import com.github.karlsabo.devlake.toTerseSlackMarkdown
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
@@ -13,6 +14,26 @@ data class DevLakeSummary(
     val projectSummaries: List<ProjectSummary>,
     val pagerDutyAlerts: List<PagerDutyAlert>,
 )
+
+fun DevLakeSummary.toTerseSlackMarkup(): String {
+    val slackSummary = StringBuilder()
+    slackSummary.appendLine()
+    slackSummary.appendLine("*$summaryName update $startDate - $endDate*")
+    slackSummary.appendLine()
+    projectSummaries.forEach {
+        slackSummary.appendLine(it.toTerseSlackMarkdown())
+        slackSummary.appendLine()
+    }
+    slackSummary.appendLine()
+    slackSummary.appendLine("📟 *Pager Duty Alerts*")
+    val alerts = mutableListOf<String>()
+    pagerDutyAlerts.forEach {
+        alerts.add("- <${it.url}|${it.key}>: ${it.description}")
+    }
+    if (alerts.isEmpty()) alerts.add("- No pages! 🎉")
+    alerts.forEach { slackSummary.appendLine(it) }
+    return slackSummary.toString()
+}
 
 fun DevLakeSummary.toSlackMarkup(): String {
     val slackSummary = StringBuilder()

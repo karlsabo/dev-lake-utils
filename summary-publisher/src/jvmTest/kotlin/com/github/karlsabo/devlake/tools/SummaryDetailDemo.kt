@@ -2,7 +2,10 @@ package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.devlake.createSummary
 import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
+import com.github.karlsabo.devlake.dto.toTerseSlackMarkup
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
+import com.github.karlsabo.devlake.toSlackMarkdown
+import com.github.karlsabo.devlake.toVerboseSlackMarkdown
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
@@ -23,12 +26,25 @@ fun main() = runBlocking {
             loadUserAndTeamConfig()!!.users,
             summaryConfig.summaryName,
         )
-        summaryLast7Days.projectSummaries.forEach { project ->
-            println("Project: ${project.project.title}")
-            println("Issue count = ${project.issues.size}")
-            println("changelogs: ")
-            project.issueChangeLogs.forEach { comment -> println("\tChangelog: $comment") }
 
+        println("Terse summary:")
+        println(summaryLast7Days.toTerseSlackMarkup())
+        println()
+
+        summaryLast7Days.projectSummaries.forEach {
+            if (it.project.isVerboseMilestones)
+                println(it.toVerboseSlackMarkdown())
+            else
+                println(it.toSlackMarkdown())
+            println()
         }
+
+//        summaryLast7Days.projectSummaries.forEach { project ->
+//            println("Project: ${project.project.title}")
+//            println("Issue count = ${project.issues.size}")
+//            println("changelogs: ")
+//            project.issueChangeLogs.forEach { comment -> println("\tChangelog: $comment") }
+//
+//        }
     }
 }

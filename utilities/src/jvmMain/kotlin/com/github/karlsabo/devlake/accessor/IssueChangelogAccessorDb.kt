@@ -32,15 +32,20 @@ class IssueChangelogAccessorDb(private val source: DataSource) : IssueChangelogA
         }
     }
 
-    override fun getPaginatedChangelogsByIssueIds(
+    override fun getPaginatedChangelogsByIssueIdsAndField(
         issueIds: Set<String>,
+        fieldNames: Set<String>,
+        excludedAuthornames: Set<String>,
         limit: Int,
         offset: Int
     ): List<IssueChangelog> {
         if (issueIds.isEmpty()) return emptyList()
         val sql = """
             SELECT * FROM issue_changelogs
-            WHERE issue_id IN (${issueIds.joinToString(",") { "?" }})
+            WHERE 
+                issue_id IN (${issueIds.joinToString(",") { "?" }})
+                AND field_name IN (${fieldNames.joinToString(",") { "?" }})
+                AND author_name NOT IN (${excludedAuthornames.joinToString(",") { "?" }})
             ORDER BY created_date DESC
             LIMIT ? OFFSET ?
         """.trimIndent()
@@ -48,6 +53,12 @@ class IssueChangelogAccessorDb(private val source: DataSource) : IssueChangelogA
             connection.prepareStatement(sql).use { stmt ->
                 var index = 1
                 for (id in issueIds) {
+                    stmt.setString(index++, id)
+                }
+                for (id in fieldNames) {
+                    stmt.setString(index++, id)
+                }
+                for (id in excludedAuthornames) {
                     stmt.setString(index++, id)
                 }
                 stmt.setInt(index++, limit)

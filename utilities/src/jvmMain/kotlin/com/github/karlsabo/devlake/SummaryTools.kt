@@ -37,6 +37,9 @@ import kotlin.time.Duration.Companion.days
 data class Milestone(
     val issue: Issue,
     val issues: Set<Issue>,
+    val issueChangeLogs: Set<IssueChangelog>,
+    val durationIssues: Set<Issue>,
+    val durationMergedPullRequests: Set<PullRequest>,
 )
 
 /**
@@ -55,11 +58,108 @@ data class ProjectSummary(
     val project: Project,
     val durationProgressSummary: String,
     val issues: Set<Issue>,
-    val issueChangeLogs: List<IssueChangelog>,
     val durationIssues: Set<Issue>,
     val durationMergedPullRequests: Set<PullRequest>,
     val milestones: Set<Milestone>,
 )
+
+/**
+ * Converts the project summary into a detailed Slack-compatible Markdown string.
+ *
+ * The Markdown string includes prominently displayed project titles (wrapped with Slack-specific
+ * formatting), progress bars, milestones with associated issues, and updates. The formatted string
+ * provides a comprehensive overview of the project's status, milestones, issue resolutions, and
+ * other changes.
+ *
+ * @return A formatted Markdown string that represents the project's verbose summary,
+ *         tailored for Slack communication.
+ */
+fun ProjectSummary.toVerboseSlackMarkdown(): String {
+    val summary = StringBuilder()
+    summary.appendLine()
+    if (project.links != null && project.links.isNotEmpty()) {
+        summary.appendLine("*<${project.links[0]}|${project.title}>*")
+    } else {
+        summary.appendLine("*${project.title}*")
+    }
+
+    summary.appendLine(createSlackMarkdownProgressBar(issues, durationIssues))
+
+    summary.append(this.durationProgressSummary)
+    summary.appendLine()
+
+    if (milestones.isNotEmpty()) {
+        summary.appendLine("🛣️ *Milestones*")
+        summary.appendLine()
+        this.milestones.sortedBy { it.issue.title }.forEach { milestone ->
+            if (milestone.issue.resolutionDate != null && milestone.issue.resolutionDate < Clock.System.now()
+                    .minus(14.days)
+            ) return@forEach
+
+            val complete = if (milestone.issue.resolutionDate == null) "" else "✅ "
+            summary.appendLine("*$complete<${milestone.issue.url}|${milestone.issue.title}>: ${milestone.issue.assigneeName}*")
+            summary.append(createSlackMarkdownProgressBar(milestone.issues, milestone.durationIssues))
+
+            if (milestone.issue.resolutionDate == null) {
+                val issuesResolved = milestone.durationIssues.filter { it.isCompleted() }
+                if (issuesResolved.isNotEmpty()) {
+                    summary.appendLine(
+                        "📍 Issues resolved: ${
+                            issuesResolved.joinToString(", ") { "<${it.url}|${it.issueKey}>" }
+                        }"
+                    )
+                } else {
+                    val changeCharacterLimit = 100
+                    val lastChange = milestone.issueChangeLogs.sortedByDescending { it.createdDate }.firstOrNull()
+                    val lastChangeDate = lastChange?.createdDate
+                    val lastIssue = milestone.issues.sortedByDescending { it.resolutionDate }.firstOrNull()
+                    val lastIssueResolutionDate = lastIssue?.resolutionDate
+
+                    if (lastChangeDate != null && (lastIssueResolutionDate == null || lastChange.createdDate > lastIssue.resolutionDate)) {
+                        val dateStr = lastChangeDate.toLocalDateTime(TimeZone.of("America/New_York")).date
+                        val warningEmoji = if (lastChangeDate < Clock.System.now().minus(14.days)) "⚠️ ⚠️ " else ""
+                        val changeDescription =
+                            "${lastChange.originalToValue}".take(changeCharacterLimit) + if ("${lastChange.fieldName} to ${lastChange.originalToValue}".length > changeCharacterLimit) "..." else ""
+                        summary.appendLine("${warningEmoji}🗓️ Last comment: *${lastChange.authorName}* at $dateStr \"$changeDescription\"")
+                    } else if (lastIssueResolutionDate != null) {
+                        val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
+                        val warningEmoji =
+                            if (lastIssueResolutionDate < Clock.System.now().minus(14.days)) " ⚠️ ⚠️" else ""
+                        summary.appendLine(
+                            "$warningEmoji 🗓️ Last issue: *${lastIssue.assigneeName}* at $dateStr \"${
+                                lastIssue.title?.take(
+                                    changeCharacterLimit
+                                )
+                            }${if ((lastIssue.title?.length ?: 0) > changeCharacterLimit) "..." else ""}\""
+                        )
+                    } else {
+                        summary.appendLine("‼️⚠️ No updates available")
+                    }
+                }
+                val issuesOpened = milestone.durationIssues.filter { !it.isCompleted() }
+                if (issuesOpened.isNotEmpty()) {
+                    summary.appendLine(
+                        "📩 Issues opened: ${
+                            issuesOpened.joinToString(", ") { "<${it.url}|${it.issueKey}>" }
+                        }"
+                    )
+                }
+                if (milestone.durationMergedPullRequests.isNotEmpty()) {
+                    summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.pullRequestKey}>" }}")
+                }
+                summary.appendLine()
+            }
+        }
+    }
+    return summary.toString()
+}
+
+fun ProjectSummary.toTerseSlackMarkdown(): String {
+    val summary = StringBuilder()
+    summary.appendLine(project.title)
+    summary.appendLine(createSlackMarkdownProgressBar(issues, durationIssues))
+    return summary.toString()
+}
 
 fun ProjectSummary.toSlackMarkdown(): String {
     val summary = StringBuilder()
@@ -70,44 +170,7 @@ fun ProjectSummary.toSlackMarkdown(): String {
         summary.appendLine("*${project.title}*")
     }
 
-    val issueCount = issues.count { it.isIssueOrBug() }
-    val closedIssueCount = issues.count { it.isIssueOrBug() && it.isCompleted() }
-    val closedIssuePercentage = if (issueCount == 0) {
-        0
-    } else {
-        (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
-    }
-
-    val closedIssueCountThisWeek = durationIssues.count { it.isIssueOrBug() && it.isCompleted() }
-    val closedIssuePercentageThisWeek = if (durationIssues.isEmpty()) {
-        0
-    } else {
-        (closedIssueCountThisWeek / issueCount.toDouble() * 100).roundToInt()
-    }
-    val barCountThisWeek = ceil(closedIssuePercentageThisWeek / 10.0).roundToInt()
-
-    println("For project ${project.title}, $closedIssueCount of $issueCount issues are closed, or $closedIssuePercentage%")
-    issues.filter { it.isIssueOrBug() && !it.isCompleted() }.forEach {
-        println("\t${it.issueKey} ${it.title} ${it.resolutionDate}, status=${it.status}, completed=${it.isCompleted()}")
-    }
-
-    val totalBarCount = 10
-    val closedIssueBarCount = closedIssuePercentage / totalBarCount
-    repeat(closedIssueBarCount - barCountThisWeek) { summary.append("🟦") }
-    repeat(barCountThisWeek) { summary.append("🟨") }
-    repeat(totalBarCount - closedIssueBarCount) { summary.append("⬜") }
-    summary.append(" $closedIssuePercentage%")
-
-    val netIssuesResolved =
-        durationIssues.count { it.isCompleted() } - durationIssues.count { !it.isCompleted() }
-    if (netIssuesResolved == 0) {
-        summary.append(" ⚖️ 0")
-    } else if (netIssuesResolved > 0) {
-        summary.append(" 📉 -${abs(netIssuesResolved)}")
-    } else {
-        summary.append(" 📈 +${abs(netIssuesResolved)}")
-    }
-    summary.appendLine(" net issues this week")
+    summary.appendLine(createSlackMarkdownProgressBar(issues, durationIssues))
 
     // ignore story points for now
     if (false) {
@@ -171,6 +234,44 @@ fun ProjectSummary.toSlackMarkdown(): String {
         }
     }
     return summary.toString()
+}
+
+private fun createSlackMarkdownProgressBar(issues: Set<Issue>, durationIssues: Set<Issue>): String {
+    val progressBar = StringBuilder()
+    val issueCount = issues.count { it.isIssueOrBug() }
+    val closedIssueCount = issues.count { it.isIssueOrBug() && it.isCompleted() }
+    val closedIssuePercentage = if (issueCount == 0) {
+        0
+    } else {
+        (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
+    }
+
+    val closedIssueCountThisWeek = durationIssues.count { it.isIssueOrBug() && it.isCompleted() }
+    val closedIssuePercentageThisWeek = if (durationIssues.isEmpty()) {
+        0
+    } else {
+        (closedIssueCountThisWeek / issueCount.toDouble() * 100).roundToInt()
+    }
+    val barCountThisWeek = ceil(closedIssuePercentageThisWeek / 10.0).roundToInt()
+
+    val totalBarCount = 10
+    val closedIssueBarCount = closedIssuePercentage / totalBarCount
+    repeat(closedIssueBarCount - barCountThisWeek) { progressBar.append("🟦") }
+    repeat(barCountThisWeek) { progressBar.append("🟨") }
+    repeat(totalBarCount - closedIssueBarCount) { progressBar.append("⬜") }
+    progressBar.append(" $closedIssuePercentage%")
+
+    val netIssuesResolved =
+        durationIssues.count { it.isCompleted() } - durationIssues.count { !it.isCompleted() }
+    if (netIssuesResolved == 0) {
+        progressBar.append(" ⚖️ 0")
+    } else if (netIssuesResolved > 0) {
+        progressBar.append(" 📉 -${abs(netIssuesResolved)}")
+    } else {
+        progressBar.append(" 📈 +${abs(netIssuesResolved)}")
+    }
+    progressBar.appendLine(" net issues this week")
+    return progressBar.toString()
 }
 
 suspend fun createSummary(
@@ -314,36 +415,55 @@ suspend fun Project.createSummary(
         "* No updates in the last ${duration.inWholeDays} days*"
     }
 
-    val mergedPrs = PullRequestAccessorDb(source).getPullRequestsMergedSinceWithIssueKey(
+    val pullRequestAccessorDb = PullRequestAccessorDb(source)
+    val mergedPrs = pullRequestAccessorDb.getPullRequestsMergedSinceWithIssueKey(
         childIssues.map { it.issueKey },
         duration
     ).toSet()
 
+    val issueChangelogAccessor = IssueChangelogAccessorDb(source)
+
     val milestones = if (parentIssuesAreChildren) {
-        emptySet<Milestone>()
+        emptySet()
     } else {
         parentIssues.plus(childIssues).toSet()
-            .filter { it.isMilestone() }.map {
+            .filter { it.isMilestone() }.map { milestoneIssue ->
+                val issues =
+                    issueAccessor.getAllChildIssues(listOf(milestoneIssue.id)).filter { issue -> issue.isIssueOrBug() }
+                        .toSet()
+                val milestonePrs = pullRequestAccessorDb.getPullRequestsMergedSinceWithIssueKey(
+                    issues.map { issue -> issue.issueKey },
+                    duration
+                ).toSet()
                 Milestone(
-                    it,
-                    issueAccessor.getAllChildIssues(listOf(it.id)).filter { it.isIssueOrBug() }.toSet(),
+                    milestoneIssue,
+                    issues,
+                    issueChangelogAccessor.getPaginatedChangelogsByIssueIdsAndField(
+                        issues.map { it.id }.toSet() + milestoneIssue.id,
+                        setOf("Recent Comment"),
+                        setOf("Automation for Jira"), // KARLFIXME load from a config
+                        10,
+                        0
+                    )
+                        .toSet(),
+                    issues.filter { issue ->
+                        issue.isIssueOrBug()
+                                && (issue.resolutionDate != null
+                                && issue.resolutionDate >= Clock.System.now().minus(duration)
+                                || issue.createdDate != null && issue.createdDate >= Clock.System.now().minus(duration))
+                    }
+                        .toSet(),
+                    milestonePrs,
                 )
             }.toSet()
     }
 
-    val issueChangelogAccessor = IssueChangelogAccessorDb(source)
     val issueIds = (parentIssues + childIssues).map { it.id }.toSet()
-    val issueChangelogs =
-        if (issueIds.isEmpty())
-            emptyList()
-        else
-            issueChangelogAccessor.getPaginatedChangelogsByIssueIds(issueIds, 10, 0)
 
     return ProjectSummary(
         this,
         summary,
         childIssues.filter { it.isIssueOrBug() }.toSet(),
-        issueChangelogs,
         childIssues.filter {
             it.isIssueOrBug()
                     && (it.resolutionDate != null && it.resolutionDate >= Clock.System.now().minus(duration)
