@@ -14,7 +14,9 @@ import kotlinx.serialization.json.Json
 data class SummaryPublisherConfig(
     val zapierSummaryUrl: String = "https://example.local",
     val summaryName: String = "Project",
-    val projects: List<Project> = emptyList<Project>(),
+    val projects: List<Project> = emptyList(),
+    val isMiscellaneousProjectIncluded: Boolean = true,
+    val isPagerDutyIncluded: Boolean = true,
 )
 
 val summaryPublisherConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "summary-publisher-config.json")
