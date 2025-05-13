@@ -92,3 +92,16 @@ tasks.register<JavaExec>("runUiDemo") {
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
+
+tasks.register<JavaExec>("runSummaryPublisherWithConfig") {
+    group = "run"
+    mainClass.set("com.github.karlsabo.devlake.tools.SummaryPublisherKt")
+
+    val argLine: String? = project.findProperty("args") as String?
+    if (argLine != null) {
+        args = argLine.split("\\s+".toRegex())
+    }
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("main").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
