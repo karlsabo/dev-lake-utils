@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake
 
+import com.github.karlsabo.devlake.accessor.AccountAccessorDb
 import com.github.karlsabo.devlake.accessor.Issue
 import com.github.karlsabo.devlake.accessor.IssueAccessorDb
 import com.github.karlsabo.devlake.accessor.IssueChangelog
@@ -35,6 +36,7 @@ import kotlin.time.Duration.Companion.days
 
 @Serializable
 data class Milestone(
+    val owner: User?,
     val issue: Issue,
     val issues: Set<Issue>,
     val issueChangeLogs: Set<IssueChangelog>,
@@ -48,7 +50,6 @@ data class Milestone(
  * @property project The project associated with this summary.
  * @property durationProgressSummary A textual representation of the project's progress over time.
  * @property issues A set of issues related to the project.
- * @property issueChangeLogs A set of changelogs associated with the project's issues.
  * @property durationIssues A subset of issues filtered by duration.
  * @property durationMergedPullRequests A set of pull requests that were merged within a specific duration.
  * @property milestones A set of milestones relevant to the project.
@@ -113,16 +114,19 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     val lastIssue = milestone.issues.sortedByDescending { it.resolutionDate }.firstOrNull()
                     val lastIssueResolutionDate = lastIssue?.resolutionDate
 
+                    var isStatusRecent: Boolean
                     if (lastChangeDate != null && (lastIssueResolutionDate == null || lastChange.createdDate > lastIssue.resolutionDate)) {
                         val dateStr = lastChangeDate.toLocalDateTime(TimeZone.of("America/New_York")).date
-                        val warningEmoji = if (lastChangeDate < Clock.System.now().minus(14.days)) "⚠️ ⚠️ " else ""
+                        isStatusRecent = lastChangeDate >= Clock.System.now().minus(14.days)
+                        val warningEmoji = if (!isStatusRecent) "⚠️ ⚠️ " else ""
                         val changeDescription =
                             "${lastChange.originalToValue}".take(changeCharacterLimit) + if ("${lastChange.fieldName} to ${lastChange.originalToValue}".length > changeCharacterLimit) "..." else ""
                         summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: *${lastChange.authorName}* \"$changeDescription\"")
                     } else if (lastIssueResolutionDate != null) {
                         val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
+                        isStatusRecent = lastIssueResolutionDate >= Clock.System.now().minus(14.days)
                         val warningEmoji =
-                            if (lastIssueResolutionDate < Clock.System.now().minus(14.days)) "⚠️ ⚠️ " else ""
+                            if (!isStatusRecent) "⚠️ ⚠️ " else ""
                         summary.appendLine(
                             "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.issueKey}> \"${
                                 lastIssue.title?.take(
@@ -131,7 +135,15 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                             }${if ((lastIssue.title?.length ?: 0) > changeCharacterLimit) "..." else ""}\""
                         )
                     } else {
+                        isStatusRecent = false
                         summary.appendLine("‼️⚠️ No comments or closed issues")
+                    }
+                    if (!isStatusRecent) {
+                        if (milestone.owner == null) {
+                            summary.appendLine("Karl or Jenna, there hasn't been any activity for two weeks, and this Epic doesn't have an owner")
+                        } else {
+                            summary.appendLine("${milestone.owner.name}(${milestone.owner.slackId}), there hasn't been any activity for two weeks, please add a commitment status update comment on the Epic")
+                        }
                     }
                 }
                 val issuesOpened = milestone.durationIssues.filter { !it.isCompleted() }
@@ -291,7 +303,7 @@ suspend fun createSummary(
     coroutineScope {
         val projectJobs = projects.map { project ->
             async(Dispatchers.Default) {
-                val projectSummary = project.createSummary(dataSource, textSummarizer, duration)
+                val projectSummary = project.createSummary(users.toSet(), dataSource, textSummarizer, duration)
                 mutex.withLock {
                     projectSummaries.add(projectSummary)
                 }
@@ -347,7 +359,7 @@ suspend fun createSummary(
         topLevelIssueIds = miscIssueSet.map { it.id },
     )
     if (isMiscellaneousProjectIncluded) {
-        projectSummaries.add(miscProject.createSummary(dataSource, textSummarizer, duration, true))
+        projectSummaries.add(miscProject.createSummary(users.toSet(), dataSource, textSummarizer, duration, true))
     }
 
     val pagerDutyAlertList: List<PagerDutyAlert>? = if (isPagerDutyIncluded) {
@@ -393,11 +405,13 @@ suspend fun createSummary(
 }
 
 suspend fun Project.createSummary(
+    users: Set<User>,
     source: DataSource,
     textSummarizer: TextSummarizer,
     duration: Duration,
     parentIssuesAreChildren: Boolean = false
 ): ProjectSummary {
+    val accountAccessor = AccountAccessorDb(source)
     val issueAccessor = IssueAccessorDb(source)
     val parentIssues = if (topLevelIssueKeys.isEmpty())
         mutableListOf<Issue>()
@@ -445,7 +459,16 @@ suspend fun Project.createSummary(
                     issues.map { issue -> issue.issueKey },
                     duration
                 ).toSet()
+
+                val owner = if (milestoneIssue.assigneeId != null) {
+                    val accountById = accountAccessor.getAccountById(milestoneIssue.assigneeId)
+                    users.firstOrNull { it.email == accountById?.email }
+                } else {
+                    null
+                }
+
                 Milestone(
+                    owner,
                     milestoneIssue,
                     issues,
                     issueChangelogAccessor.getPaginatedChangelogsByIssueIdsAndField(
@@ -467,8 +490,6 @@ suspend fun Project.createSummary(
                 )
             }.toSet()
     }
-
-    val issueIds = (parentIssues + childIssues).map { it.id }.toSet()
 
     return ProjectSummary(
         this,
