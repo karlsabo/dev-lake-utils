@@ -2,8 +2,8 @@ package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.devlake.DEV_LAKE_APP_NAME
 import com.github.karlsabo.devlake.dto.Project
-import io.ktor.utils.io.*
-import io.ktor.utils.io.core.*
+import io.ktor.utils.io.core.writeText
+import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -19,8 +19,8 @@ data class SummaryPublisherConfig(
 
 val summaryPublisherConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "summary-publisher-config.json")
 
-fun loadSummaryPublisherConfig(): SummaryPublisherConfig {
-    SystemFileSystem.source(summaryPublisherConfigPath).buffered().readText().let {
+fun loadSummaryPublisherConfig(configPath: Path = summaryPublisherConfigPath): SummaryPublisherConfig {
+    SystemFileSystem.source(configPath).buffered().readText().let {
         return Json.decodeFromString(SummaryPublisherConfig.serializer(), it)
     }
 }

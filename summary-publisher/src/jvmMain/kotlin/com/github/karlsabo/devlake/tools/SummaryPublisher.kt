@@ -69,6 +69,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock.System
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -77,7 +78,10 @@ import kotlin.time.Duration.Companion.hours
 
 data class ProjectSummaryHolder(val projectSummary: ProjectSummary, val message: String)
 
-fun main() = application {
+fun main(args: Array<String>) = application {
+    val configParameter = args.find { it.startsWith("--config=") }?.substringAfter("=")
+    val configFilePath: Path = configParameter?.let { Path(configParameter) } ?: summaryPublisherConfigPath
+
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var summaryConfig by remember { mutableStateOf(SummaryPublisherConfig()) }
@@ -96,9 +100,9 @@ fun main() = application {
     var isConfigLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        println("Loading configuration")
+        println("Loading configuration $configFilePath")
         try {
-            summaryConfig = loadSummaryPublisherConfig()
+            summaryConfig = loadSummaryPublisherConfig(configFilePath)
         } catch (error: Exception) {
             println("Error loading summary config $error")
             errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
