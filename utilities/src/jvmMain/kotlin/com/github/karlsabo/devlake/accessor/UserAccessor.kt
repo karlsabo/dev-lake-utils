@@ -19,4 +19,5 @@ data class User(
     val rawDataRemark: String? = null,
     val email: String? = null,
     val name: String,
+    val slackId: String? = null,
 )
