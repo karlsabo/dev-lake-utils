@@ -76,15 +76,13 @@ data class ProjectSummary(
  */
 fun ProjectSummary.toVerboseSlackMarkdown(): String {
     val summary = StringBuilder()
-    summary.appendLine()
     if (project.links != null && project.links.isNotEmpty()) {
         summary.appendLine("*<${project.links[0]}|${project.title}>*")
     } else {
         summary.appendLine("*${project.title}*")
     }
 
-    summary.appendLine(createSlackMarkdownProgressBar(issues, durationIssues))
-
+    summary.append(createSlackMarkdownProgressBar(issues, durationIssues))
     summary.append(this.durationProgressSummary)
     summary.appendLine()
 
@@ -120,20 +118,20 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         val warningEmoji = if (lastChangeDate < Clock.System.now().minus(14.days)) "⚠️ ⚠️ " else ""
                         val changeDescription =
                             "${lastChange.originalToValue}".take(changeCharacterLimit) + if ("${lastChange.fieldName} to ${lastChange.originalToValue}".length > changeCharacterLimit) "..." else ""
-                        summary.appendLine("${warningEmoji}🗓️ Last comment: *${lastChange.authorName}* at $dateStr \"$changeDescription\"")
+                        summary.appendLine("${warningEmoji}🗓️ Last update  $dateStr: *${lastChange.authorName}* \"$changeDescription\"")
                     } else if (lastIssueResolutionDate != null) {
                         val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         val warningEmoji =
-                            if (lastIssueResolutionDate < Clock.System.now().minus(14.days)) " ⚠️ ⚠️" else ""
+                            if (lastIssueResolutionDate < Clock.System.now().minus(14.days)) "⚠️ ⚠️ " else ""
                         summary.appendLine(
-                            "$warningEmoji 🗓️ Last issue: *${lastIssue.assigneeName}* at $dateStr \"${
+                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.issueKey}>\"${
                                 lastIssue.title?.take(
                                     changeCharacterLimit
                                 )
                             }${if ((lastIssue.title?.length ?: 0) > changeCharacterLimit) "..." else ""}\""
                         )
                     } else {
-                        summary.appendLine("‼️⚠️ No updates available")
+                        summary.appendLine("‼️⚠️ No comments or closed issues")
                     }
                 }
                 val issuesOpened = milestone.durationIssues.filter { !it.isCompleted() }
@@ -163,14 +161,13 @@ fun ProjectSummary.toTerseSlackMarkdown(): String {
 
 fun ProjectSummary.toSlackMarkdown(): String {
     val summary = StringBuilder()
-    summary.appendLine()
     if (project.links != null && project.links.isNotEmpty()) {
         summary.appendLine("*<${project.links[0]}|${project.title}>*")
     } else {
         summary.appendLine("*${project.title}*")
     }
 
-    summary.appendLine(createSlackMarkdownProgressBar(issues, durationIssues))
+    summary.append(createSlackMarkdownProgressBar(issues, durationIssues))
 
     // ignore story points for now
     if (false) {

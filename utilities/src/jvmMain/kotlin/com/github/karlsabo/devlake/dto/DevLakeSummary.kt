@@ -17,14 +17,12 @@ data class DevLakeSummary(
 
 fun DevLakeSummary.toTerseSlackMarkup(): String {
     val slackSummary = StringBuilder()
-    slackSummary.appendLine()
     slackSummary.appendLine("*$summaryName update $startDate - $endDate*")
     slackSummary.appendLine()
-    projectSummaries.forEach {
-        slackSummary.appendLine(it.toTerseSlackMarkdown())
-        slackSummary.appendLine()
-    }
-    slackSummary.appendLine()
+    projectSummaries.joinToString("") {
+        it.toTerseSlackMarkdown()
+    }.let { slackSummary.append(it) }
+
     slackSummary.appendLine("📟 *Pager Duty Alerts*")
     val alerts = mutableListOf<String>()
     pagerDutyAlerts.forEach {

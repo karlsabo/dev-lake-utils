@@ -1,28 +1,31 @@
 package com.github.karlsabo.devlake.tools
 
 
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -31,6 +34,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.github.karlsabo.devlake.ProjectSummary
 import com.github.karlsabo.devlake.accessor.PipelineAccessorDb
 import com.github.karlsabo.devlake.accessor.Status
 import com.github.karlsabo.devlake.createSummary
@@ -46,11 +50,10 @@ import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.saveDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
-import com.github.karlsabo.text.TextSummarizerOpenAi
+import com.github.karlsabo.text.TextSummarizerFake
 import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
 import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
 import com.github.karlsabo.text.saveTextSummarizerOpenAiNoSecrets
-import com.github.karlsabo.text.toTextSummarizerOpenAiConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -72,6 +75,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+
+data class ProjectSummaryHolder(val projectSummary: ProjectSummary, val message: String)
 
 fun main() = application {
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
@@ -173,6 +178,8 @@ fun main() = application {
     var isShowPipelineError by remember { mutableStateOf(false) }
     var pipelineErrorMessage by remember { mutableStateOf("Pipeline is out of date") }
 
+    var projectSummaries by remember { mutableStateOf(listOf<ProjectSummaryHolder>()) }
+
     LaunchedEffect(Unit) {
         DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
             val pipelineAccessor = PipelineAccessorDb(dataSourceManager.getOrCreateDataSource())
@@ -237,7 +244,7 @@ fun main() = application {
 
         var isSendingSlackMessage by remember { mutableStateOf(false) }
 
-        var zapierJson by remember { mutableStateOf("Loading summary") }
+        var topLevelSummary by remember { mutableStateOf("Loading summary") }
         val scope = rememberCoroutineScope()
         var summaryLast7Days: DevLakeSummary? by remember { mutableStateOf(null) }
 
@@ -247,25 +254,19 @@ fun main() = application {
                 DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
                     summaryLast7Days = createSummary(
                         dataSourceManager.getOrCreateDataSource(),
-                        TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
+                        TextSummarizerFake(),// TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
                         summaryConfig.projects,
                         7.days,
                         loadUserAndTeamConfig()!!.users,
                         summaryConfig.summaryName,
                     )
-                    val zapierProjectSummary = ZapierProjectSummary(
-                        summaryLast7Days?.toTerseSlackMarkup() ?: "* Failed to laod summary",
-                        summaryLast7Days?.projectSummaries?.map {
-                            if (it.project.isVerboseMilestones)
-                                it.toVerboseSlackMarkdown()
-                            else
-                                it.toSlackMarkdown()
-                        } ?: emptyList()
-                    )
-                    zapierJson = Json { prettyPrint = true }.encodeToString(
-                        ZapierProjectSummary.serializer(),
-                        zapierProjectSummary
-                    )
+                    topLevelSummary = summaryLast7Days?.toTerseSlackMarkup() ?: "* Failed to generate a summary"
+                    projectSummaries
+                    projectSummaries = summaryLast7Days?.projectSummaries?.map {
+                        val message =
+                            if (it.project.isVerboseMilestones) it.toVerboseSlackMarkdown() else it.toSlackMarkdown()
+                        ProjectSummaryHolder(it, message)
+                    } ?: emptyList<ProjectSummaryHolder>()
                 }
                 isLoadingSummary = false
             }
@@ -282,7 +283,7 @@ fun main() = application {
                             scope.launch {
                                 isSendingSlackMessage = true
                                 val success = sendToZap(
-                                    Json.decodeFromString(ZapierProjectSummary.serializer(), zapierJson),
+                                    ZapierProjectSummary(topLevelSummary, projectSummaries.map { it.message }),
                                     summaryConfig.zapierSummaryUrl
                                 )
                                 isSendingSlackMessage = false
@@ -297,35 +298,41 @@ fun main() = application {
                             Text(publishButtonText)
                         }
                     }
-                    Box {
-                        VerticalScrollbar(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .fillMaxHeight(),
-                            adapter = rememberScrollbarAdapter(scrollState) // Attach the same scroll state
-                        )
+                    TextField(
+                        value = topLevelSummary,
+                        onValueChange = { topLevelSummary = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    )
 
-                        Column(
-                            modifier = Modifier.verticalScroll(scrollState).padding(end = 12.dp)
-                        ) {
+                    LazyColumn {
+                        itemsIndexed(
+                            items = projectSummaries,
+                            key = { _, summary -> summary.projectSummary.project.id }
+                        ) { index, summaryHolder ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(end = 8.dp)
+                                TextField(
+                                    value = summaryHolder.message,
+                                    onValueChange = { newValue ->
+                                        projectSummaries = projectSummaries.toMutableList().also {
+                                            it[index] = it[index].copy(message = newValue)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Button(
+                                    onClick = {
+                                        projectSummaries = projectSummaries.toMutableList().also { it.removeAt(index) }
+                                    },
+                                    modifier = Modifier.padding(start = 8.dp)
                                 ) {
-                                    TextField(
-                                        value = zapierJson,
-                                        onValueChange = { zapierJson = it },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp)
-                                    )
+                                    Text("Delete")
                                 }
                             }
                         }
