@@ -12,7 +12,7 @@ data class DevLakeSummary(
     val endDate: LocalDate,
     val summaryName: String,
     val projectSummaries: List<ProjectSummary>,
-    val pagerDutyAlerts: List<PagerDutyAlert>,
+    val pagerDutyAlerts: List<PagerDutyAlert>?,
 )
 
 fun DevLakeSummary.toTerseSlackMarkup(): String {
@@ -23,13 +23,15 @@ fun DevLakeSummary.toTerseSlackMarkup(): String {
         it.toTerseSlackMarkdown()
     }.let { slackSummary.append(it) }
 
-    slackSummary.appendLine("📟 *Pager Duty Alerts*")
-    val alerts = mutableListOf<String>()
-    pagerDutyAlerts.forEach {
-        alerts.add("- <${it.url}|${it.key}>: ${it.description}")
+    if (pagerDutyAlerts != null) {
+        slackSummary.appendLine("📟 *Pager Duty Alerts*")
+        val alerts = mutableListOf<String>()
+        pagerDutyAlerts.forEach {
+            alerts.add("- <${it.url}|${it.key}>: ${it.description}")
+        }
+        if (alerts.isEmpty()) alerts.add("- No pages! 🎉")
+        alerts.forEach { slackSummary.appendLine(it) }
     }
-    if (alerts.isEmpty()) alerts.add("- No pages! 🎉")
-    alerts.forEach { slackSummary.appendLine(it) }
     return slackSummary.toString()
 }
 
@@ -43,15 +45,17 @@ fun DevLakeSummary.toSlackMarkup(): String {
         slackSummary.appendLine(it.toSlackMarkdown())
         slackSummary.appendLine("━━━━━━━━━━━━━━━━━━")
     }
-    slackSummary.appendLine()
-    slackSummary.appendLine("📟 *Pager Duty Alerts*")
-    slackSummary.appendLine()
-    val alerts = mutableListOf<String>()
-    pagerDutyAlerts.forEach {
-        alerts.add("- <${it.url}|${it.key}>: ${it.description}")
+    if (pagerDutyAlerts != null) {
+        slackSummary.appendLine()
+        slackSummary.appendLine("📟 *Pager Duty Alerts*")
+        slackSummary.appendLine()
+        val alerts = mutableListOf<String>()
+        pagerDutyAlerts.forEach {
+            alerts.add("- <${it.url}|${it.key}>: ${it.description}")
+        }
+        if (alerts.isEmpty()) alerts.add("- No pages! 🎉")
+        alerts.forEach { slackSummary.appendLine(it) }
     }
-    if (alerts.isEmpty()) alerts.add("- No pages! 🎉")
-    alerts.forEach { slackSummary.appendLine(it) }
     return slackSummary.toString()
 }
 
@@ -68,15 +72,17 @@ fun DevLakeSummary.toMarkdown(): String {
     }
     markdownSummary.appendLine()
 
-    markdownSummary.appendLine()
-    markdownSummary.appendLine("## Pager Duty Alerts")
-    markdownSummary.appendLine()
-    val alerts = mutableListOf<String>()
-    pagerDutyAlerts.forEach {
-        alerts.add("""* [${it.key}](${it.url}): ${it.description}""")
+    if (pagerDutyAlerts != null) {
+        markdownSummary.appendLine()
+        markdownSummary.appendLine("## Pager Duty Alerts")
+        markdownSummary.appendLine()
+        val alerts = mutableListOf<String>()
+        pagerDutyAlerts.forEach {
+            alerts.add("""* [${it.key}](${it.url}): ${it.description}""")
+        }
+        if (alerts.isEmpty()) alerts.add("* No pages! :tada:")
+        alerts.forEach { markdownSummary.appendLine(it) }
     }
-    if (alerts.isEmpty()) alerts.add("* No pages! :tada:")
-    alerts.forEach { markdownSummary.appendLine(it) }
 
     return markdownSummary.toString()
 }

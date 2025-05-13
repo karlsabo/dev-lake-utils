@@ -262,6 +262,8 @@ fun main(args: Array<String>) = application {
                         7.days,
                         loadUserAndTeamConfig()!!.users,
                         summaryConfig.summaryName,
+                        summaryConfig.isMiscellaneousProjectIncluded,
+                        summaryConfig.isMiscellaneousProjectIncluded,
                     )
                     topLevelSummary = summaryLast7Days?.toTerseSlackMarkup() ?: "* Failed to generate a summary"
                     projectSummaries

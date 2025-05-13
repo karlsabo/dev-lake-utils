@@ -277,7 +277,9 @@ suspend fun createSummary(
     projects: List<Project>,
     duration: Duration,
     users: List<User>,
-    summaryName: String
+    summaryName: String,
+    isMiscellaneousProjectIncluded: Boolean,
+    isPagerDutyIncluded: Boolean,
 ): DevLakeSummary {
     val timeInPast = Clock.System.now().minus(duration)
     val timeInPastSql = Date(timeInPast.toEpochMilliseconds())
@@ -299,21 +301,25 @@ suspend fun createSummary(
         val issueAccessor = IssueAccessorDb(dataSource)
         val userAccountAccessor = UserAccountAccessorDb(dataSource)
 
-        val userJobs = users.map {
-            async(Dispatchers.Default) {
-                val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
-                userAccounts.forEach {
-                    val issuesForUser = issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
-                        it.accountId,
-                        Clock.System.now().minus(duration)
-                    )
-                    mutex.withLock {
-                        miscIssueSet.addAll(
-                            issuesForUser
+        val userJobs = if (isMiscellaneousProjectIncluded) {
+            users.map {
+                async(Dispatchers.Default) {
+                    val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
+                    userAccounts.forEach {
+                        val issuesForUser = issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
+                            it.accountId,
+                            Clock.System.now().minus(duration)
                         )
+                        mutex.withLock {
+                            miscIssueSet.addAll(
+                                issuesForUser
+                            )
+                        }
                     }
                 }
             }
+        } else {
+            emptyList()
         }
 
         projectJobs.joinAll()
@@ -340,12 +346,15 @@ suspend fun createSummary(
         title = "📋 Other (Misc)",
         topLevelIssueIds = miscIssueSet.map { it.id },
     )
-    projectSummaries.add(miscProject.createSummary(dataSource, textSummarizer, duration, true))
+    if (isMiscellaneousProjectIncluded) {
+        projectSummaries.add(miscProject.createSummary(dataSource, textSummarizer, duration, true))
+    }
 
-    val pagerDutyAlertList = mutableListOf<PagerDutyAlert>()
-    dataSource.connection.use { conn ->
-        conn.prepareStatement(
-            """
+    val pagerDutyAlertList: List<PagerDutyAlert>? = if (isPagerDutyIncluded) {
+        val alertList = mutableListOf<PagerDutyAlert>()
+        dataSource.connection.use { conn ->
+            conn.prepareStatement(
+                """
         SELECT
             *
         FROM
@@ -354,20 +363,24 @@ suspend fun createSummary(
             issues.id LIKE '%page%'
             AND issues.created_date >= ?
         """.trimIndent()
-        ).use { ps ->
-            ps.setDate(1, timeInPastSql)
-            ps.executeQuery().use { rs ->
-                while (rs.next()) {
-                    pagerDutyAlertList.add(
-                        PagerDutyAlert(
-                            rs.getString("issue_key"),
-                            rs.getString("description"),
-                            rs.getString("url")
+            ).use { ps ->
+                ps.setDate(1, timeInPastSql)
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        alertList.add(
+                            PagerDutyAlert(
+                                rs.getString("issue_key"),
+                                rs.getString("description"),
+                                rs.getString("url")
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
+        alertList
+    } else {
+        null
     }
 
     return DevLakeSummary(
