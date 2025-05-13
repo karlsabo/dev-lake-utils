@@ -140,9 +140,9 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     }
                     if (!isStatusRecent) {
                         if (milestone.owner == null) {
-                            summary.appendLine("Karl or Jenna, there hasn't been any activity for two weeks, and this Epic doesn't have an owner")
+                            summary.appendLine("There hasn't been any activity for two weeks, and this Epic doesn't have an owner")
                         } else {
-                            summary.appendLine("${milestone.owner.name}(${milestone.owner.slackId}), there hasn't been any activity for two weeks, please add a commitment status update comment on the Epic")
+                            summary.appendLine("${milestone.owner.name} <@${milestone.owner.slackId}>, there hasn't been any activity for two weeks, please add a commitment status update comment on the Epic")
                         }
                     }
                 }
@@ -460,9 +460,12 @@ suspend fun Project.createSummary(
                     duration
                 ).toSet()
 
-                val owner = if (milestoneIssue.assigneeId != null) {
-                    val accountById = accountAccessor.getAccountById(milestoneIssue.assigneeId)
-                    users.firstOrNull { it.email == accountById?.email }
+                val owner = if (milestoneIssue.assigneeId != null && milestoneIssue.assigneeId.isNotBlank()) {
+                    val account = accountAccessor.getAccountById(milestoneIssue.assigneeId)
+                    users.firstOrNull { it.email == account?.email }
+                } else if (projectLeadUserId != null) {
+                    val account = accountAccessor.getAccountByEmail(projectLeadUserId)
+                    users.firstOrNull { it.email == account?.email }
                 } else {
                     null
                 }
