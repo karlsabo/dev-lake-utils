@@ -118,13 +118,13 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         val warningEmoji = if (lastChangeDate < Clock.System.now().minus(14.days)) "⚠️ ⚠️ " else ""
                         val changeDescription =
                             "${lastChange.originalToValue}".take(changeCharacterLimit) + if ("${lastChange.fieldName} to ${lastChange.originalToValue}".length > changeCharacterLimit) "..." else ""
-                        summary.appendLine("${warningEmoji}🗓️ Last update  $dateStr: *${lastChange.authorName}* \"$changeDescription\"")
+                        summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: *${lastChange.authorName}* \"$changeDescription\"")
                     } else if (lastIssueResolutionDate != null) {
                         val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         val warningEmoji =
                             if (lastIssueResolutionDate < Clock.System.now().minus(14.days)) "⚠️ ⚠️ " else ""
                         summary.appendLine(
-                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.issueKey}>\"${
+                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.issueKey}> \"${
                                 lastIssue.title?.take(
                                     changeCharacterLimit
                                 )
