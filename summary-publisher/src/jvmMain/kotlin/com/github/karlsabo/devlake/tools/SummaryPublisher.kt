@@ -11,9 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.MaterialTheme
@@ -298,23 +297,25 @@ fun main() = application {
                             Text(publishButtonText)
                         }
                     }
-                    TextField(
-                        value = topLevelSummary,
-                        onValueChange = { topLevelSummary = it },
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(scrollState)
                             .padding(8.dp)
-                    )
+                    ) {
+                        TextField(
+                            value = topLevelSummary,
+                            onValueChange = { topLevelSummary = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                        )
 
-                    LazyColumn {
-                        itemsIndexed(
-                            items = projectSummaries,
-                            key = { _, summary -> summary.projectSummary.project.id }
-                        ) { index, summaryHolder ->
+                        projectSummaries.forEachIndexed { index, summaryHolder ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TextField(
@@ -328,14 +329,48 @@ fun main() = application {
                                 )
                                 Button(
                                     onClick = {
-                                        projectSummaries = projectSummaries.toMutableList().also { it.removeAt(index) }
+                                        projectSummaries =
+                                            projectSummaries.toMutableList().also { it.removeAt(index) }
                                     },
                                     modifier = Modifier.padding(start = 8.dp)
                                 ) {
                                     Text("Delete")
                                 }
                             }
+
                         }
+//                        LazyColumn {
+//                            itemsIndexed(
+//                                items = projectSummaries,
+//                                key = { _, summary -> summary.projectSummary.project.id }
+//                            ) { index, summaryHolder ->
+//                                Row(
+//                                    modifier = Modifier
+//                                        .fillMaxWidth()
+//                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+//                                    verticalAlignment = Alignment.CenterVertically
+//                                ) {
+//                                    TextField(
+//                                        value = summaryHolder.message,
+//                                        onValueChange = { newValue ->
+//                                            projectSummaries = projectSummaries.toMutableList().also {
+//                                                it[index] = it[index].copy(message = newValue)
+//                                            }
+//                                        },
+//                                        modifier = Modifier.weight(1f),
+//                                    )
+//                                    Button(
+//                                        onClick = {
+//                                            projectSummaries =
+//                                                projectSummaries.toMutableList().also { it.removeAt(index) }
+//                                        },
+//                                        modifier = Modifier.padding(start = 8.dp)
+//                                    ) {
+//                                        Text("Delete")
+//                                    }
+//                                }
+//                            }
+//                        }
                     }
                 }
             }
