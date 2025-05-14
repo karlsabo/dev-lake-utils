@@ -9,7 +9,6 @@ import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
 import com.github.karlsabo.text.TextSummarizerFake
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
 import kotlin.time.Duration.Companion.days
 
 fun main() = runBlocking {
@@ -24,6 +23,8 @@ fun main() = runBlocking {
             7.days,
             loadUserAndTeamConfig()!!.users,
             summaryConfig.summaryName,
+            summaryConfig.isTerseSummaryUsed,
+            summaryConfig.isPagerDutyIncluded,
         )
         val slackMarkDown = summaryLast7Days.toSlackMarkup()
         println(slackMarkDown)

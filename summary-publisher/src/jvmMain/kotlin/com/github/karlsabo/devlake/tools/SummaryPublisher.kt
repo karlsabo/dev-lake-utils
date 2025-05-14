@@ -39,20 +39,22 @@ import com.github.karlsabo.devlake.accessor.Status
 import com.github.karlsabo.devlake.createSummary
 import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
 import com.github.karlsabo.devlake.dto.DevLakeSummary
+import com.github.karlsabo.devlake.dto.toSlackMarkup
 import com.github.karlsabo.devlake.dto.toTerseSlackMarkup
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
 import com.github.karlsabo.devlake.textSummarizerConfigPath
-import com.github.karlsabo.devlake.toSlackMarkdown
+import com.github.karlsabo.devlake.toSlackMarkup
 import com.github.karlsabo.devlake.toVerboseSlackMarkdown
 import com.github.karlsabo.ds.DataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.saveDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
-import com.github.karlsabo.text.TextSummarizerFake
+import com.github.karlsabo.text.TextSummarizerOpenAi
 import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
 import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
 import com.github.karlsabo.text.saveTextSummarizerOpenAiNoSecrets
+import com.github.karlsabo.text.toTextSummarizerOpenAiConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -257,7 +259,7 @@ fun main(args: Array<String>) = application {
                 DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
                     summaryLast7Days = createSummary(
                         dataSourceManager.getOrCreateDataSource(),
-                        TextSummarizerFake(),// TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
+                        TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
                         summaryConfig.projects,
                         7.days,
                         loadUserAndTeamConfig()!!.users,
@@ -265,11 +267,13 @@ fun main(args: Array<String>) = application {
                         summaryConfig.isMiscellaneousProjectIncluded,
                         summaryConfig.isMiscellaneousProjectIncluded,
                     )
-                    topLevelSummary = summaryLast7Days?.toTerseSlackMarkup() ?: "* Failed to generate a summary"
+                    val slackSummary =
+                        if (summaryConfig.isTerseSummaryUsed) summaryLast7Days?.toTerseSlackMarkup() else summaryLast7Days?.toSlackMarkup()
+                    topLevelSummary = slackSummary ?: "* Failed to generate a summary"
                     projectSummaries
                     projectSummaries = summaryLast7Days?.projectSummaries?.map {
                         val message =
-                            if (it.project.isVerboseMilestones) it.toVerboseSlackMarkdown() else it.toSlackMarkdown()
+                            if (it.project.isVerboseMilestones) it.toVerboseSlackMarkdown() else it.toSlackMarkup()
                         ProjectSummaryHolder(it, message)
                     } ?: emptyList<ProjectSummaryHolder>()
                 }
