@@ -55,6 +55,7 @@ data class Issue(
     val originalProject: String? = null,
     val urgency: String? = null,
     val isSubtask: Boolean? = null,
+    val dueDate: Instant? = null,
 )
 
 fun Issue.isIssueOrBug(): Boolean {

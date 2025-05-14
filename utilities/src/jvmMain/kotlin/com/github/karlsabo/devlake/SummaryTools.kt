@@ -36,7 +36,7 @@ import kotlin.time.Duration.Companion.days
 
 @Serializable
 data class Milestone(
-    val owner: User?,
+    val assignee: User?,
     val issue: Issue,
     val issues: Set<Issue>,
     val issueChangeLogs: Set<IssueChangelog>,
@@ -62,6 +62,7 @@ data class ProjectSummary(
     val durationIssues: Set<Issue>,
     val durationMergedPullRequests: Set<PullRequest>,
     val milestones: Set<Milestone>,
+    val isTagMilestoneAssignees: Boolean,
 )
 
 /**
@@ -136,13 +137,23 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         )
                     } else {
                         isStatusRecent = false
-                        summary.appendLine("‼️⚠️ No comments or closed issues")
                     }
-                    if (!isStatusRecent) {
-                        if (milestone.owner == null) {
-                            summary.appendLine("There hasn't been any activity for two weeks, and this Epic doesn't have an owner")
+
+                    if (milestone.issue.dueDate == null) {
+                        if (milestone.assignee == null) {
+                            summary.appendLine("‼️⚠️ This milestone doesn't have a due date.")
                         } else {
-                            summary.appendLine("${milestone.owner.name} <@${milestone.owner.slackId}>, there hasn't been any activity for two weeks, please add a commitment status update comment on the Epic")
+                            summary.append(milestone.assignee.name)
+                            if (isTagMilestoneAssignees) summary.append(" <@${milestone.assignee.slackId}>")
+                            summary.appendLine(", please add a due date on the Epic")
+                        }
+                    } else if (!isStatusRecent && milestone.issue.dueDate.minus(90.days) < Clock.System.now()) {
+                        if (milestone.assignee == null) {
+                            summary.appendLine("‼️⚠️ There hasn't been any activity for two weeks, and this Epic doesn't have an assignee")
+                        } else {
+                            summary.append(milestone.assignee.name)
+                            if (isTagMilestoneAssignees) summary.append(" <@${milestone.assignee.slackId}>")
+                            summary.appendLine(", there hasn't been any activity for two weeks, please add a status update comment on the Epic.")
                         }
                     }
                 }
@@ -171,7 +182,7 @@ fun ProjectSummary.toTerseSlackMarkdown(): String {
     return summary.toString()
 }
 
-fun ProjectSummary.toSlackMarkdown(): String {
+fun ProjectSummary.toSlackMarkup(): String {
     val summary = StringBuilder()
     if (project.links != null && project.links.isNotEmpty()) {
         summary.appendLine("*<${project.links[0]}|${project.title}>*")
@@ -219,8 +230,6 @@ fun ProjectSummary.toSlackMarkdown(): String {
     if (durationMergedPullRequests.isNotEmpty()) {
         summary.appendLine("🔹 PRs merged: ${durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.pullRequestKey}>" }}")
     }
-    summary.appendLine()
-
 
     if (milestones.isNotEmpty()) {
         val milestoneSummary = StringBuilder()
@@ -298,12 +307,14 @@ suspend fun createSummary(
 
     val mutex = Mutex()
     val projectSummaries = mutableListOf<ProjectSummary>()
-    var miscIssueSet = mutableSetOf<Issue>()
+    val miscIssueSet = mutableSetOf<Issue>()
+    val miscPrSet = mutableSetOf<PullRequest>()
 
     coroutineScope {
         val projectJobs = projects.map { project ->
             async(Dispatchers.Default) {
-                val projectSummary = project.createSummary(users.toSet(), dataSource, textSummarizer, duration)
+                val projectSummary =
+                    project.createSummary(users.toSet(), dataSource, textSummarizer, duration, emptySet())
                 mutex.withLock {
                     projectSummaries.add(projectSummary)
                 }
@@ -311,6 +322,7 @@ suspend fun createSummary(
         }
 
         val issueAccessor = IssueAccessorDb(dataSource)
+        val pullRequestAccessor = PullRequestAccessorDb(dataSource)
         val userAccountAccessor = UserAccountAccessorDb(dataSource)
 
         val userJobs = if (isMiscellaneousProjectIncluded) {
@@ -323,9 +335,19 @@ suspend fun createSummary(
                             Clock.System.now().minus(duration)
                         )
                         mutex.withLock {
-                            miscIssueSet.addAll(
-                                issuesForUser
-                            )
+                            miscIssueSet.addAll(issuesForUser)
+                        }
+                    }
+                }
+                async(Dispatchers.Default) {
+                    val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
+                    userAccounts.forEach {
+                        val prsForUser = pullRequestAccessor.getPullRequestsByAuthorIdAndAfterMergedDate(
+                            it.accountId,
+                            Clock.System.now().minus(duration)
+                        )
+                        mutex.withLock {
+                            miscPrSet.addAll(prsForUser)
                         }
                     }
                 }
@@ -338,7 +360,8 @@ suspend fun createSummary(
         userJobs.joinAll()
     }
     projectSummaries.forEach { projectSummary ->
-        miscIssueSet = miscIssueSet.subtract(projectSummary.issues).toMutableSet()
+        miscIssueSet.removeAll(projectSummary.issues)
+        miscPrSet.removeAll(projectSummary.durationMergedPullRequests)
     }
 
     val pullRequestAccessor = PullRequestAccessorDb(dataSource)
@@ -359,7 +382,16 @@ suspend fun createSummary(
         topLevelIssueIds = miscIssueSet.map { it.id },
     )
     if (isMiscellaneousProjectIncluded) {
-        projectSummaries.add(miscProject.createSummary(users.toSet(), dataSource, textSummarizer, duration, true))
+        projectSummaries.add(
+            miscProject.createSummary(
+                users.toSet(),
+                dataSource,
+                textSummarizer,
+                duration,
+                miscPrSet,
+                true
+            )
+        )
     }
 
     val pagerDutyAlertList: List<PagerDutyAlert>? = if (isPagerDutyIncluded) {
@@ -409,7 +441,8 @@ suspend fun Project.createSummary(
     source: DataSource,
     textSummarizer: TextSummarizer,
     duration: Duration,
-    parentIssuesAreChildren: Boolean = false
+    pullRequests: Set<PullRequest>,
+    parentIssuesAreChildren: Boolean = false,
 ): ProjectSummary {
     val accountAccessor = AccountAccessorDb(source)
     val issueAccessor = IssueAccessorDb(source)
@@ -443,7 +476,8 @@ suspend fun Project.createSummary(
     val mergedPrs = pullRequestAccessorDb.getPullRequestsMergedSinceWithIssueKey(
         childIssues.map { it.issueKey },
         duration
-    ).toSet()
+    ).toMutableSet()
+    mergedPrs.addAll(pullRequests)
 
     val issueChangelogAccessor = IssueChangelogAccessorDb(source)
 
@@ -506,5 +540,6 @@ suspend fun Project.createSummary(
             .toSet(),
         mergedPrs,
         milestones,
+        isTagMilestoneOwners,
     )
 }

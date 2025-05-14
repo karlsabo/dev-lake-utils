@@ -1,7 +1,7 @@
 package com.github.karlsabo.devlake.dto
 
 import com.github.karlsabo.devlake.ProjectSummary
-import com.github.karlsabo.devlake.toSlackMarkdown
+import com.github.karlsabo.devlake.toSlackMarkup
 import com.github.karlsabo.devlake.toTerseSlackMarkdown
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
@@ -42,7 +42,7 @@ fun DevLakeSummary.toSlackMarkup(): String {
     slackSummary.appendLine()
     slackSummary.appendLine("━━━━━━━━━━━━━━━━━━")
     projectSummaries.forEach {
-        slackSummary.appendLine(it.toSlackMarkdown())
+        slackSummary.append(it.toSlackMarkup())
         slackSummary.appendLine("━━━━━━━━━━━━━━━━━━")
     }
     if (pagerDutyAlerts != null) {
@@ -68,9 +68,8 @@ fun DevLakeSummary.toMarkdown(): String {
     markdownSummary.appendLine("## Projects")
     markdownSummary.appendLine()
     projectSummaries.forEach {
-        markdownSummary.appendLine(it.toSlackMarkdown())
+        markdownSummary.appendLine(it.toSlackMarkup())
     }
-    markdownSummary.appendLine()
 
     if (pagerDutyAlerts != null) {
         markdownSummary.appendLine()
