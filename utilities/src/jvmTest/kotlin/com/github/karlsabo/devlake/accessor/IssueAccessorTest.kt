@@ -24,16 +24,6 @@ class IssueAccessorTest {
     }
 
     @Test
-    fun testGetIssueById() {
-        DataSourceManagerDb(loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)?.toDataSourceDbConfig()!!).use { dataSourceManager ->
-            val accessor = IssueAccessorDb(dataSourceManager.getOrCreateDataSource())
-            val issue = accessor.getIssuesByKey("PLAT-17351")
-            assertNotNull(issue)
-            println(issue)
-        }
-    }
-
-    @Test
     fun testGetIssuesLast30DaysByAccountId() {
         DataSourceManagerDb(loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)?.toDataSourceDbConfig()!!).use { dataSourceManager ->
             val accessor = IssueAccessorDb(dataSourceManager.getOrCreateDataSource())

@@ -55,29 +55,37 @@ class PullRequestAccessorDb(private val dataSource: DataSource) : PullRequestAcc
         val pullRequests = mutableListOf<PullRequest>()
         val now = Clock.System.now()
         val pastDate = now.minus(sinceInclusive)
-        val sql = """
+        val sql = StringBuilder(
+            """
             SELECT 
                 * 
             FROM
                 pull_requests 
             WHERE
                 merged_date >= ?
-                AND (head_ref LIKE ?
-                 OR title like ?
-                 OR description like ?)
+                AND (
             """.trimIndent()
+        )
+
+        issueKeys.forEachIndexed { index, issueKey ->
+            sql.append("(head_ref LIKE ? OR title LIKE ? OR description LIKE ?)")
+            if (index != issueKeys.lastIndex) sql.append(" OR ")
+        }
+        sql.append(")")
 
         dataSource.connection.use { connection ->
-            connection.prepareStatement(sql).use { statement ->
+            connection.prepareStatement(sql.toString()).use { statement ->
+                var index = 1
+                statement.setTimestamp(index++, Timestamp(pastDate.toEpochMilliseconds()))
                 issueKeys.forEach { issueKey ->
-                    statement.setTimestamp(1, Timestamp(pastDate.toEpochMilliseconds()))
-                    statement.setString(2, "%$issueKey%")
-                    statement.setString(3, "%$issueKey%")
-                    statement.setString(4, "%$issueKey%")
-                    statement.executeQuery().use { resultSet ->
-                        while (resultSet.next()) {
-                            pullRequests.add(resultSet.toPullRequest())
-                        }
+                    val issueLike = "%$issueKey%"
+                    statement.setString(index++, issueLike)
+                    statement.setString(index++, issueLike)
+                    statement.setString(index++, issueLike)
+                }
+                statement.executeQuery().use { resultSet ->
+                    while (resultSet.next()) {
+                        pullRequests.add(resultSet.toPullRequest())
                     }
                 }
             }

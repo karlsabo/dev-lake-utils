@@ -1,12 +1,15 @@
 package com.github.karlsabo.text
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.gson.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.headers
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.serialization.gson.gson
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.io.println
@@ -18,17 +21,11 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
 
         val instructions =
             """
-        You are a concise summarizer, categorize and summarize the work output. 
-        Summarize the input data as a markdown list with bullet points. 
-        Avoid overly technical details but maintain relevance. Focus on outcomes, milestones, and any significant impact. 
-        Keep it concise with a single level of nested bullet points. Only use bullet points, no other markdown styling. 
-        Don't use nested bullets. 
-        Don't use peoples names. 
-        Do not embellish or add additional information such as 'ensuring system reliability', 'streamlining management and development'.
-        All these events have occurred, these are closed Jira tickets, merged GitHub Pull requests, and resolved pager duty alerts, ensure you use the correct tense. 
-        Make the bullet summary terse, and short. Don't say something like 'merged a pull request'.
-        Reduce the number of bullet points you create by combining similar items. 
-        Do everything you can to reduce down to 5 bullets, keeping the most important, impactful, and relevant items.
+        Summarize the provided work output (tickets, PRs, alerts) into a single-level markdown bullet list (max 5 bullets).
+        Focus on outcomes, milestones, and impact. Use past tense for completed actions.
+        Combine similar or less critical items to meet the 5-bullet limit, prioritizing relevance and impact.
+        Keep summaries terse, avoiding technical jargon, names, and generic phrases (e.g., "improving efficiency," "streamlining").
+        Do not use phrases describing the action type (e.g., "closed ticket," "merged PR").
         """.trimIndent()
 
         HttpClient {
