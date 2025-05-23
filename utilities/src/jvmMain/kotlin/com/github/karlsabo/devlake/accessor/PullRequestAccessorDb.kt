@@ -52,6 +52,8 @@ class PullRequestAccessorDb(private val dataSource: DataSource) : PullRequestAcc
         issueKeys: List<String>,
         sinceInclusive: Duration
     ): List<PullRequest> {
+        if(issueKeys.isEmpty()) return emptyList()
+
         val pullRequests = mutableListOf<PullRequest>()
         val now = Clock.System.now()
         val pastDate = now.minus(sinceInclusive)
