@@ -122,7 +122,6 @@ class IssueAccessorDb(private val dataSource: DataSource) : IssueAccessor {
         val childIssues = mutableSetOf<Issue>()
         var parentIssueIds: List<String> = issueIds
         while (parentIssueIds.isNotEmpty()) {
-            println("Getting child issues for $parentIssueIds")
             val issues = getChildIssues(parentIssueIds)
             childIssues.addAll(issues)
             parentIssueIds = issues.filter { !it.isIssueOrBug() }.map { it.id }
@@ -186,7 +185,8 @@ class IssueAccessorDb(private val dataSource: DataSource) : IssueAccessor {
             component = getString("component"),
             originalProject = getString("original_project"),
             urgency = getString("urgency"),
-            isSubtask = getBoolean("is_subtask")
+            isSubtask = getBoolean("is_subtask"),
+            dueDate = getTimestamp("due_date")?.toInstant()?.toKotlinInstant(),
         )
     }
 }

@@ -1,6 +1,17 @@
 package com.github.karlsabo.devlake
 
-import com.github.karlsabo.devlake.accessor.*
+import com.github.karlsabo.devlake.accessor.AccountAccessorDb
+import com.github.karlsabo.devlake.accessor.Issue
+import com.github.karlsabo.devlake.accessor.IssueAccessorDb
+import com.github.karlsabo.devlake.accessor.IssueChangelog
+import com.github.karlsabo.devlake.accessor.IssueChangelogAccessorDb
+import com.github.karlsabo.devlake.accessor.PullRequest
+import com.github.karlsabo.devlake.accessor.PullRequestAccessorDb
+import com.github.karlsabo.devlake.accessor.User
+import com.github.karlsabo.devlake.accessor.UserAccountAccessorDb
+import com.github.karlsabo.devlake.accessor.isCompleted
+import com.github.karlsabo.devlake.accessor.isIssueOrBug
+import com.github.karlsabo.devlake.accessor.isMilestone
 import com.github.karlsabo.devlake.dto.DevLakeSummary
 import com.github.karlsabo.devlake.dto.PagerDutyAlert
 import com.github.karlsabo.devlake.dto.Project
@@ -25,10 +36,24 @@ import kotlin.time.Duration.Companion.days
 
 @Serializable
 data class Milestone(
+    val assignee: User?,
     val issue: Issue,
     val issues: Set<Issue>,
+    val issueChangeLogs: Set<IssueChangelog>,
+    val durationIssues: Set<Issue>,
+    val durationMergedPullRequests: Set<PullRequest>,
 )
 
+/**
+ * Represents a summarized view of a project's details and related data.
+ *
+ * @property project The project associated with this summary.
+ * @property durationProgressSummary A textual representation of the project's progress over time.
+ * @property issues A set of issues related to the project.
+ * @property durationIssues A subset of issues filtered by duration.
+ * @property durationMergedPullRequests A set of pull requests that were merged within a specific duration.
+ * @property milestones A set of milestones relevant to the project.
+ */
 @Serializable
 data class ProjectSummary(
     val project: Project,
@@ -37,55 +62,135 @@ data class ProjectSummary(
     val durationIssues: Set<Issue>,
     val durationMergedPullRequests: Set<PullRequest>,
     val milestones: Set<Milestone>,
+    val isTagMilestoneAssignees: Boolean,
 )
 
-fun ProjectSummary.toSlackMarkdown(): String {
+/**
+ * Converts the project summary into a detailed Slack-compatible Markdown string.
+ *
+ * The Markdown string includes prominently displayed project titles (wrapped with Slack-specific
+ * formatting), progress bars, milestones with associated issues, and updates. The formatted string
+ * provides a comprehensive overview of the project's status, milestones, issue resolutions, and
+ * other changes.
+ *
+ * @return A formatted Markdown string that represents the project's verbose summary,
+ *         tailored for Slack communication.
+ */
+fun ProjectSummary.toVerboseSlackMarkdown(): String {
     val summary = StringBuilder()
-    summary.appendLine()
     if (project.links != null && project.links.isNotEmpty()) {
         summary.appendLine("*<${project.links[0]}|${project.title}>*")
     } else {
         summary.appendLine("*${project.title}*")
     }
 
-    val issueCount = issues.count { it.isIssueOrBug() }
-    val closedIssueCount = issues.count { it.isIssueOrBug() && it.isCompleted() }
-    val closedIssuePercentage = if (issueCount == 0) {
-        0
+    summary.append(createSlackMarkdownProgressBar(issues, durationIssues))
+    summary.append(this.durationProgressSummary)
+    summary.appendLine()
+
+    if (milestones.isNotEmpty()) {
+        summary.appendLine("🛣️ *Milestones*")
+        summary.appendLine()
+        this.milestones.sortedBy { it.issue.title }.forEach { milestone ->
+            if (milestone.issue.resolutionDate != null && milestone.issue.resolutionDate < Clock.System.now()
+                    .minus(14.days)
+            ) return@forEach
+
+            val complete = if (milestone.issue.resolutionDate == null) "" else "✅ "
+            summary.appendLine("*$complete<${milestone.issue.url}|${milestone.issue.title}>: ${milestone.issue.assigneeName}*")
+            summary.append(createSlackMarkdownProgressBar(milestone.issues, milestone.durationIssues))
+
+            if (milestone.issue.resolutionDate == null) {
+                val issuesResolved = milestone.durationIssues.filter { it.isCompleted() }
+                if (issuesResolved.isNotEmpty()) {
+                    summary.appendLine(
+                        "📍 Issues resolved: ${
+                            issuesResolved.joinToString(", ") { "<${it.url}|${it.issueKey}>" }
+                        }"
+                    )
+                } else {
+                    val changeCharacterLimit = 100
+                    val lastChange = milestone.issueChangeLogs.sortedByDescending { it.createdDate }.firstOrNull()
+                    val lastChangeDate = lastChange?.createdDate
+                    val lastIssue = milestone.issues.sortedByDescending { it.resolutionDate }.firstOrNull()
+                    val lastIssueResolutionDate = lastIssue?.resolutionDate
+
+                    var isStatusRecent: Boolean
+                    if (lastChangeDate != null && (lastIssueResolutionDate == null || lastChange.createdDate > lastIssue.resolutionDate)) {
+                        val dateStr = lastChangeDate.toLocalDateTime(TimeZone.of("America/New_York")).date
+                        isStatusRecent = lastChangeDate >= Clock.System.now().minus(14.days)
+                        val warningEmoji = if (!isStatusRecent) "⚠️ ⚠️ " else ""
+                        val changeDescription =
+                            "${lastChange.originalToValue}".take(changeCharacterLimit) + if ("${lastChange.fieldName} to ${lastChange.originalToValue}".length > changeCharacterLimit) "..." else ""
+                        summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: *${lastChange.authorName}* \"$changeDescription\"")
+                    } else if (lastIssueResolutionDate != null) {
+                        val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
+                        isStatusRecent = lastIssueResolutionDate >= Clock.System.now().minus(14.days)
+                        val warningEmoji =
+                            if (!isStatusRecent) "⚠️ ⚠️ " else ""
+                        summary.appendLine(
+                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.issueKey}> \"${
+                                lastIssue.title?.take(
+                                    changeCharacterLimit
+                                )
+                            }${if ((lastIssue.title?.length ?: 0) > changeCharacterLimit) "..." else ""}\""
+                        )
+                    } else {
+                        isStatusRecent = false
+                    }
+
+                    if (milestone.issue.dueDate == null) {
+                        if (milestone.assignee == null) {
+                            summary.appendLine("‼️⚠️ This milestone doesn't have a due date.")
+                        } else {
+                            summary.append(milestone.assignee.name)
+                            if (isTagMilestoneAssignees) summary.append(" <@${milestone.assignee.slackId}>")
+                            summary.appendLine(", please add a due date on the Epic")
+                        }
+                    } else if (!isStatusRecent && milestone.issue.dueDate.minus(90.days) < Clock.System.now()) {
+                        if (milestone.assignee == null) {
+                            summary.appendLine("‼️⚠️ There hasn't been any activity for two weeks, and this Epic doesn't have an assignee")
+                        } else {
+                            summary.append(milestone.assignee.name)
+                            if (isTagMilestoneAssignees) summary.append(" <@${milestone.assignee.slackId}>")
+                            summary.appendLine(", there hasn't been any activity for two weeks, please add a status update comment on the Epic.")
+                        }
+                    }
+                }
+                val issuesOpened = milestone.durationIssues.filter { !it.isCompleted() }
+                if (issuesOpened.isNotEmpty()) {
+                    summary.appendLine(
+                        "📩 Issues opened: ${
+                            issuesOpened.joinToString(", ") { "<${it.url}|${it.issueKey}>" }
+                        }"
+                    )
+                }
+                if (milestone.durationMergedPullRequests.isNotEmpty()) {
+                    summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.pullRequestKey}>" }}")
+                }
+                summary.appendLine()
+            }
+        }
+    }
+    return summary.toString()
+}
+
+fun ProjectSummary.toTerseSlackMarkdown(): String {
+    val summary = StringBuilder()
+    summary.appendLine(project.title)
+    summary.appendLine(createSlackMarkdownProgressBar(issues, durationIssues))
+    return summary.toString()
+}
+
+fun ProjectSummary.toSlackMarkup(): String {
+    val summary = StringBuilder()
+    if (project.links != null && project.links.isNotEmpty()) {
+        summary.appendLine("*<${project.links[0]}|${project.title}>*")
     } else {
-        (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
+        summary.appendLine("*${project.title}*")
     }
 
-    val closedIssueCountThisWeek = durationIssues.count { it.isIssueOrBug() && it.isCompleted() }
-    val closedIssuePercentageThisWeek = if (durationIssues.isEmpty()) {
-        0
-    } else {
-        (closedIssueCountThisWeek / issueCount.toDouble() * 100).roundToInt()
-    }
-    val barCountThisWeek = ceil(closedIssuePercentageThisWeek / 10.0).roundToInt()
-
-    println("For project ${project.title}, $closedIssueCount of $issueCount issues are closed, or $closedIssuePercentage%")
-    issues.filter { it.isIssueOrBug() && !it.isCompleted() }.forEach {
-        println("\t${it.issueKey} ${it.title} ${it.resolutionDate}, status=${it.status}, completed=${it.isCompleted()}")
-    }
-
-    val totalBarCount = 10
-    val closedIssueBarCount = closedIssuePercentage / totalBarCount
-    repeat(closedIssueBarCount - barCountThisWeek) { summary.append("🟦") }
-    repeat(barCountThisWeek) { summary.append("🟨") }
-    repeat(totalBarCount - closedIssueBarCount) { summary.append("⬜") }
-    summary.append(" $closedIssuePercentage%")
-
-    val netIssuesResolved =
-        durationIssues.count { it.isCompleted() } - durationIssues.count { !it.isCompleted() }
-    if (netIssuesResolved == 0) {
-        summary.append(" ⚖️ 0")
-    } else if (netIssuesResolved > 0) {
-        summary.append(" 📉 -${abs(netIssuesResolved)}")
-    } else {
-        summary.append(" 📈 +${abs(netIssuesResolved)}")
-    }
-    summary.appendLine(" net issues this week")
+    summary.append(createSlackMarkdownProgressBar(issues, durationIssues))
 
     // ignore story points for now
     if (false) {
@@ -125,8 +230,6 @@ fun ProjectSummary.toSlackMarkdown(): String {
     if (durationMergedPullRequests.isNotEmpty()) {
         summary.appendLine("🔹 PRs merged: ${durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.pullRequestKey}>" }}")
     }
-    summary.appendLine()
-
 
     if (milestones.isNotEmpty()) {
         val milestoneSummary = StringBuilder()
@@ -151,25 +254,67 @@ fun ProjectSummary.toSlackMarkdown(): String {
     return summary.toString()
 }
 
+private fun createSlackMarkdownProgressBar(issues: Set<Issue>, durationIssues: Set<Issue>): String {
+    val progressBar = StringBuilder()
+    val issueCount = issues.count { it.isIssueOrBug() }
+    val closedIssueCount = issues.count { it.isIssueOrBug() && it.isCompleted() }
+    val closedIssuePercentage = if (issueCount == 0) {
+        0
+    } else {
+        (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
+    }
+
+    val closedIssueCountThisWeek = durationIssues.count { it.isIssueOrBug() && it.isCompleted() }
+    val closedIssuePercentageThisWeek = if (durationIssues.isEmpty()) {
+        0
+    } else {
+        (closedIssueCountThisWeek / issueCount.toDouble() * 100).roundToInt()
+    }
+    val barCountThisWeek = ceil(closedIssuePercentageThisWeek / 10.0).roundToInt()
+
+    val totalBarCount = 10
+    val closedIssueBarCount = closedIssuePercentage / totalBarCount
+    repeat(closedIssueBarCount - barCountThisWeek) { progressBar.append("🟦") }
+    repeat(barCountThisWeek) { progressBar.append("🟨") }
+    repeat(totalBarCount - closedIssueBarCount) { progressBar.append("⬜") }
+    progressBar.append(" $closedIssuePercentage%")
+
+    val netIssuesResolved =
+        durationIssues.count { it.isCompleted() } - durationIssues.count { !it.isCompleted() }
+    if (netIssuesResolved == 0) {
+        progressBar.append(" ⚖️ 0")
+    } else if (netIssuesResolved > 0) {
+        progressBar.append(" 📉 -${abs(netIssuesResolved)}")
+    } else {
+        progressBar.append(" 📈 +${abs(netIssuesResolved)}")
+    }
+    progressBar.appendLine(" net issues this week")
+    return progressBar.toString()
+}
+
 suspend fun createSummary(
     dataSource: DataSource,
     textSummarizer: TextSummarizer,
     projects: List<Project>,
     duration: Duration,
     users: List<User>,
-    summaryName: String
+    summaryName: String,
+    isMiscellaneousProjectIncluded: Boolean,
+    isPagerDutyIncluded: Boolean,
 ): DevLakeSummary {
     val timeInPast = Clock.System.now().minus(duration)
     val timeInPastSql = Date(timeInPast.toEpochMilliseconds())
 
     val mutex = Mutex()
     val projectSummaries = mutableListOf<ProjectSummary>()
-    var miscIssueSet = mutableSetOf<Issue>()
+    val miscIssueSet = mutableSetOf<Issue>()
+    val miscPrSet = mutableSetOf<PullRequest>()
 
     coroutineScope {
         val projectJobs = projects.map { project ->
             async(Dispatchers.Default) {
-                val projectSummary = project.createSummary(dataSource, textSummarizer, duration)
+                val projectSummary =
+                    project.createSummary(users.toSet(), dataSource, textSummarizer, duration, emptySet())
                 mutex.withLock {
                     projectSummaries.add(projectSummary)
                 }
@@ -177,30 +322,46 @@ suspend fun createSummary(
         }
 
         val issueAccessor = IssueAccessorDb(dataSource)
+        val pullRequestAccessor = PullRequestAccessorDb(dataSource)
         val userAccountAccessor = UserAccountAccessorDb(dataSource)
 
-        val userJobs = users.map {
-            async(Dispatchers.Default) {
-                val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
-                userAccounts.forEach {
-                    val issuesForUser = issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
-                        it.accountId,
-                        Clock.System.now().minus(duration)
-                    )
-                    mutex.withLock {
-                        miscIssueSet.addAll(
-                            issuesForUser
+        val userJobs = if (isMiscellaneousProjectIncluded) {
+            users.map {
+                async(Dispatchers.Default) {
+                    val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
+                    userAccounts.forEach {
+                        val issuesForUser = issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
+                            it.accountId,
+                            Clock.System.now().minus(duration)
                         )
+                        mutex.withLock {
+                            miscIssueSet.addAll(issuesForUser)
+                        }
+                    }
+                }
+                async(Dispatchers.Default) {
+                    val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
+                    userAccounts.forEach {
+                        val prsForUser = pullRequestAccessor.getPullRequestsByAuthorIdAndAfterMergedDate(
+                            it.accountId,
+                            Clock.System.now().minus(duration)
+                        )
+                        mutex.withLock {
+                            miscPrSet.addAll(prsForUser)
+                        }
                     }
                 }
             }
+        } else {
+            emptyList()
         }
 
         projectJobs.joinAll()
         userJobs.joinAll()
     }
     projectSummaries.forEach { projectSummary ->
-        miscIssueSet = miscIssueSet.subtract(projectSummary.issues).toMutableSet()
+        miscIssueSet.removeAll(projectSummary.issues)
+        miscPrSet.removeAll(projectSummary.durationMergedPullRequests)
     }
 
     val pullRequestAccessor = PullRequestAccessorDb(dataSource)
@@ -220,12 +381,24 @@ suspend fun createSummary(
         title = "📋 Other (Misc)",
         topLevelIssueIds = miscIssueSet.map { it.id },
     )
-    projectSummaries.add(miscProject.createSummary(dataSource, textSummarizer, duration, true))
+    if (isMiscellaneousProjectIncluded) {
+        projectSummaries.add(
+            miscProject.createSummary(
+                users.toSet(),
+                dataSource,
+                textSummarizer,
+                duration,
+                miscPrSet,
+                true
+            )
+        )
+    }
 
-    val pagerDutyAlertList = mutableListOf<PagerDutyAlert>()
-    dataSource.connection.use { conn ->
-        conn.prepareStatement(
-            """
+    val pagerDutyAlertList: List<PagerDutyAlert>? = if (isPagerDutyIncluded) {
+        val alertList = mutableListOf<PagerDutyAlert>()
+        dataSource.connection.use { conn ->
+            conn.prepareStatement(
+                """
         SELECT
             *
         FROM
@@ -234,20 +407,24 @@ suspend fun createSummary(
             issues.id LIKE '%page%'
             AND issues.created_date >= ?
         """.trimIndent()
-        ).use { ps ->
-            ps.setDate(1, timeInPastSql)
-            ps.executeQuery().use { rs ->
-                while (rs.next()) {
-                    pagerDutyAlertList.add(
-                        PagerDutyAlert(
-                            rs.getString("issue_key"),
-                            rs.getString("description"),
-                            rs.getString("url")
+            ).use { ps ->
+                ps.setDate(1, timeInPastSql)
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        alertList.add(
+                            PagerDutyAlert(
+                                rs.getString("issue_key"),
+                                rs.getString("description"),
+                                rs.getString("url")
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
+        alertList
+    } else {
+        null
     }
 
     return DevLakeSummary(
@@ -260,11 +437,14 @@ suspend fun createSummary(
 }
 
 suspend fun Project.createSummary(
+    users: Set<User>,
     source: DataSource,
     textSummarizer: TextSummarizer,
     duration: Duration,
-    parentIssuesAreChildren: Boolean = false
+    pullRequests: Set<PullRequest>,
+    parentIssuesAreChildren: Boolean = false,
 ): ProjectSummary {
+    val accountAccessor = AccountAccessorDb(source)
     val issueAccessor = IssueAccessorDb(source)
     val parentIssues = if (topLevelIssueKeys.isEmpty())
         mutableListOf<Issue>()
@@ -292,19 +472,58 @@ suspend fun Project.createSummary(
         "* No updates in the last ${duration.inWholeDays} days*"
     }
 
-    val mergedPrs = PullRequestAccessorDb(source).getPullRequestsMergedSinceWithIssueKey(
+    val pullRequestAccessorDb = PullRequestAccessorDb(source)
+    val mergedPrs = pullRequestAccessorDb.getPullRequestsMergedSinceWithIssueKey(
         childIssues.map { it.issueKey },
         duration
-    ).toSet()
+    ).toMutableSet()
+    mergedPrs.addAll(pullRequests)
+
+    val issueChangelogAccessor = IssueChangelogAccessorDb(source)
 
     val milestones = if (parentIssuesAreChildren) {
-        emptySet<Milestone>()
+        emptySet()
     } else {
         parentIssues.plus(childIssues).toSet()
-            .filter { it.isMilestone() }.map {
+            .filter { it.isMilestone() }.map { milestoneIssue ->
+                val issues =
+                    issueAccessor.getAllChildIssues(listOf(milestoneIssue.id)).filter { issue -> issue.isIssueOrBug() }
+                        .toSet()
+                val milestonePrs = pullRequestAccessorDb.getPullRequestsMergedSinceWithIssueKey(
+                    issues.map { issue -> issue.issueKey },
+                    duration
+                ).toSet()
+
+                val owner = if (milestoneIssue.assigneeId != null && milestoneIssue.assigneeId.isNotBlank()) {
+                    val account = accountAccessor.getAccountById(milestoneIssue.assigneeId)
+                    users.firstOrNull { it.email == account?.email }
+                } else if (projectLeadUserId != null) {
+                    val account = accountAccessor.getAccountByEmail(projectLeadUserId)
+                    users.firstOrNull { it.email == account?.email }
+                } else {
+                    null
+                }
+
                 Milestone(
-                    it,
-                    issueAccessor.getAllChildIssues(listOf(it.id)).filter { it.isIssueOrBug() }.toSet(),
+                    owner,
+                    milestoneIssue,
+                    issues,
+                    issueChangelogAccessor.getPaginatedChangelogsByIssueIdsAndField(
+                        issues.map { it.id }.toSet() + milestoneIssue.id,
+                        setOf("Recent Comment"),
+                        setOf("Automation for Jira"), // KARLFIXME load from a config
+                        10,
+                        0
+                    )
+                        .toSet(),
+                    issues.filter { issue ->
+                        issue.isIssueOrBug()
+                                && (issue.resolutionDate != null
+                                && issue.resolutionDate >= Clock.System.now().minus(duration)
+                                || issue.createdDate != null && issue.createdDate >= Clock.System.now().minus(duration))
+                    }
+                        .toSet(),
+                    milestonePrs,
                 )
             }.toSet()
     }
@@ -321,5 +540,6 @@ suspend fun Project.createSummary(
             .toSet(),
         mergedPrs,
         milestones,
+        isTagMilestoneOwners,
     )
 }

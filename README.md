@@ -13,9 +13,10 @@
   - [Slow query by parent\_issue\_id](#slow-query-by-parent_issue_id)
 
 # TODO
-- [ ] Add logging
-- [ ] Add dependency injection
-- [ ] Consider consolidating into a single configuration file
+
+* [ ] Add logging
+* [ ] Add dependency injection
+* [ ] Consider consolidating into a single configuration file
 
 # Overview
 
@@ -83,12 +84,14 @@ is as follows:
     {
       "id": "name@example.local",
       "email": "name@example.local",
-      "name": "John Doe"
+      "name": "John Doe",
+      "slackId": "memberId01"
     },
     {
       "id": "otherperson@example.local",
       "email": "otherperson@example.local",
-      "name": "Jane Doe"
+      "name": "Jane Doe",
+      "slackId": "memberId02"
     }
   ],
   "userAccounts": [
@@ -170,7 +173,9 @@ is as follows:
       "productManager": "m@example.local",
       "topLevelIssueKeys": [
         "JIRA-234"
-      ]
+      ],
+      "isVerboseMilestones": true,
+      "isTagMilestoneOwners": true
     }
   ]
 }

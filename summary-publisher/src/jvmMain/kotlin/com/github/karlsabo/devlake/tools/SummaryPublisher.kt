@@ -1,52 +1,89 @@
 package com.github.karlsabo.devlake.tools
 
 
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.material.Button
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
+import androidx.compose.material.TextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.*
+import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+import com.github.karlsabo.devlake.ProjectSummary
 import com.github.karlsabo.devlake.accessor.PipelineAccessorDb
 import com.github.karlsabo.devlake.accessor.Status
 import com.github.karlsabo.devlake.createSummary
 import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
 import com.github.karlsabo.devlake.dto.DevLakeSummary
 import com.github.karlsabo.devlake.dto.toSlackMarkup
+import com.github.karlsabo.devlake.dto.toTerseSlackMarkup
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
 import com.github.karlsabo.devlake.textSummarizerConfigPath
-import com.github.karlsabo.ds.*
-import com.github.karlsabo.text.*
-import com.mikepenz.markdown.compose.Markdown
-import com.mikepenz.markdown.m2.markdownColor
-import com.mikepenz.markdown.m2.markdownTypography
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.gson.*
+import com.github.karlsabo.devlake.toSlackMarkup
+import com.github.karlsabo.devlake.toVerboseSlackMarkdown
+import com.github.karlsabo.ds.DataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.DataSourceManagerDb
+import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.saveDataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.text.TextSummarizerOpenAi
+import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
+import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
+import com.github.karlsabo.text.saveTextSummarizerOpenAiNoSecrets
+import com.github.karlsabo.text.toTextSummarizerOpenAiConfig
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
+import io.ktor.serialization.gson.gson
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock.System
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 
-fun main() = application {
+data class ProjectSummaryHolder(val projectSummary: ProjectSummary, val message: String)
+
+fun main(args: Array<String>) = application {
+    val configParameter = args.find { it.startsWith("--config=") }?.substringAfter("=")
+    val configFilePath: Path = configParameter?.let { Path(configParameter) } ?: summaryPublisherConfigPath
+
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var summaryConfig by remember { mutableStateOf(SummaryPublisherConfig()) }
@@ -65,9 +102,9 @@ fun main() = application {
     var isConfigLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        println("Loading configuration")
+        println("Loading configuration $configFilePath")
         try {
-            summaryConfig = loadSummaryPublisherConfig()
+            summaryConfig = loadSummaryPublisherConfig(configFilePath)
         } catch (error: Exception) {
             println("Error loading summary config $error")
             errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
@@ -146,6 +183,8 @@ fun main() = application {
     var isShowPipelineError by remember { mutableStateOf(false) }
     var pipelineErrorMessage by remember { mutableStateOf("Pipeline is out of date") }
 
+    var projectSummaries by remember { mutableStateOf(listOf<ProjectSummaryHolder>()) }
+
     LaunchedEffect(Unit) {
         DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
             val pipelineAccessor = PipelineAccessorDb(dataSourceManager.getOrCreateDataSource())
@@ -210,7 +249,7 @@ fun main() = application {
 
         var isSendingSlackMessage by remember { mutableStateOf(false) }
 
-        var slackMarkDown by remember { mutableStateOf("Loading summary") }
+        var topLevelSummary by remember { mutableStateOf("Loading summary") }
         val scope = rememberCoroutineScope()
         var summaryLast7Days: DevLakeSummary? by remember { mutableStateOf(null) }
 
@@ -225,8 +264,18 @@ fun main() = application {
                         7.days,
                         loadUserAndTeamConfig()!!.users,
                         summaryConfig.summaryName,
+                        summaryConfig.isMiscellaneousProjectIncluded,
+                        summaryConfig.isMiscellaneousProjectIncluded,
                     )
-                    slackMarkDown = summaryLast7Days?.toSlackMarkup() ?: "* Failed to load summary"
+                    val slackSummary =
+                        if (summaryConfig.isTerseSummaryUsed) summaryLast7Days?.toTerseSlackMarkup() else summaryLast7Days?.toSlackMarkup()
+                    topLevelSummary = slackSummary ?: "* Failed to generate a summary"
+                    projectSummaries
+                    projectSummaries = summaryLast7Days?.projectSummaries?.map {
+                        val message =
+                            if (it.project.isVerboseMilestones) it.toVerboseSlackMarkdown() else it.toSlackMarkup()
+                        ProjectSummaryHolder(it, message)
+                    } ?: emptyList<ProjectSummaryHolder>()
                 }
                 isLoadingSummary = false
             }
@@ -243,7 +292,7 @@ fun main() = application {
                             scope.launch {
                                 isSendingSlackMessage = true
                                 val success = sendToZap(
-                                    slackMarkDown,
+                                    ZapierProjectSummary(topLevelSummary, projectSummaries.map { it.message }),
                                     summaryConfig.zapierSummaryUrl
                                 )
                                 isSendingSlackMessage = false
@@ -258,54 +307,80 @@ fun main() = application {
                             Text(publishButtonText)
                         }
                     }
-                    Box {
-                        VerticalScrollbar(
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(scrollState)
+                            .padding(8.dp)
+                    ) {
+                        TextField(
+                            value = topLevelSummary,
+                            onValueChange = { topLevelSummary = it },
                             modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .fillMaxHeight(),
-                            adapter = rememberScrollbarAdapter(scrollState) // Attach the same scroll state
+                                .fillMaxWidth()
+                                .padding(8.dp)
                         )
 
-                        Column(
-                            modifier = Modifier.verticalScroll(scrollState).padding(end = 12.dp)
-                        ) {
+                        projectSummaries.forEachIndexed { index, summaryHolder ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(end = 8.dp)
+                                TextField(
+                                    value = summaryHolder.message,
+                                    onValueChange = { newValue ->
+                                        projectSummaries = projectSummaries.toMutableList().also {
+                                            it[index] = it[index].copy(message = newValue)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Button(
+                                    onClick = {
+                                        projectSummaries =
+                                            projectSummaries.toMutableList().also { it.removeAt(index) }
+                                    },
+                                    modifier = Modifier.padding(start = 8.dp)
                                 ) {
-                                    TextField(
-                                        value = slackMarkDown,
-                                        onValueChange = { slackMarkDown = it },
-                                        label = { Text("Edit Slack Markdown (doesn't render accurately because the UI only supports Markdown") },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp)
-                                    )
-                                }
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(end = 8.dp)
-                                ) {
-                                    Markdown(
-                                        content = slackMarkDown,
-                                        typography = markdownTypography(
-                                            h1 = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold),
-                                            h2 = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
-                                            h3 = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-                                        ),
-                                        colors = markdownColor(),
-                                    )
+                                    Text("Delete")
                                 }
                             }
+
                         }
+//                        LazyColumn {
+//                            itemsIndexed(
+//                                items = projectSummaries,
+//                                key = { _, summary -> summary.projectSummary.project.id }
+//                            ) { index, summaryHolder ->
+//                                Row(
+//                                    modifier = Modifier
+//                                        .fillMaxWidth()
+//                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+//                                    verticalAlignment = Alignment.CenterVertically
+//                                ) {
+//                                    TextField(
+//                                        value = summaryHolder.message,
+//                                        onValueChange = { newValue ->
+//                                            projectSummaries = projectSummaries.toMutableList().also {
+//                                                it[index] = it[index].copy(message = newValue)
+//                                            }
+//                                        },
+//                                        modifier = Modifier.weight(1f),
+//                                    )
+//                                    Button(
+//                                        onClick = {
+//                                            projectSummaries =
+//                                                projectSummaries.toMutableList().also { it.removeAt(index) }
+//                                        },
+//                                        modifier = Modifier.padding(start = 8.dp)
+//                                    ) {
+//                                        Text("Delete")
+//                                    }
+//                                }
+//                            }
+//                        }
                     }
                 }
             }
@@ -314,9 +389,9 @@ fun main() = application {
 }
 
 @Serializable
-data class SlackMessage(val message: String)
+data class ZapierProjectSummary(val message: String, val projectMessages: List<String>)
 
-suspend fun sendToZap(slackMessage: String, zapierSummaryUrl: String): Boolean {
+suspend fun sendToZap(zapierProjectSummary: ZapierProjectSummary, zapierSummaryUrl: String): Boolean {
     val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             gson()
@@ -325,7 +400,7 @@ suspend fun sendToZap(slackMessage: String, zapierSummaryUrl: String): Boolean {
     val response: HttpResponse = client.post(zapierSummaryUrl) {
         header(HttpHeaders.Referrer, "https://hooks.zapier.com")
         contentType(ContentType.Application.Json)
-        setBody(Json.encodeToString(SlackMessage.serializer(), SlackMessage(slackMessage)))
+        setBody(Json.encodeToString(ZapierProjectSummary.serializer(), zapierProjectSummary))
     }
 
     println("response=$response, body=${response.body<String>()}")
