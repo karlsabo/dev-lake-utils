@@ -14,12 +14,6 @@
 
 # TODO
 
-* [ ] Update project tracking
-  * [X] Test Zapier sending a top message and then adding replies
-  * For each project, make it a reply
-  * Add more details to the project
-  * Add a flag to add verbose milestone details
-    * Last update to the milestone, percent complete, etc. Like a 'project'
 * [ ] Add logging
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
@@ -90,12 +84,14 @@ is as follows:
     {
       "id": "name@example.local",
       "email": "name@example.local",
-      "name": "John Doe"
+      "name": "John Doe",
+      "slackId": "memberId01"
     },
     {
       "id": "otherperson@example.local",
       "email": "otherperson@example.local",
-      "name": "Jane Doe"
+      "name": "Jane Doe",
+      "slackId": "memberId02"
     }
   ],
   "userAccounts": [
@@ -177,7 +173,9 @@ is as follows:
       "productManager": "m@example.local",
       "topLevelIssueKeys": [
         "JIRA-234"
-      ]
+      ],
+      "isVerboseMilestones": true,
+      "isTagMilestoneOwners": true
     }
   ]
 }
