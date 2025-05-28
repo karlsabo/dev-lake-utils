@@ -219,6 +219,8 @@ ALTER TABLE issues
 ;
 ```
 
-# Backing up DevLake
-`mysqldump --verbose --host=127.0.0.1 --port=4306 -uroot -p --single-transaction --ignore-table=lake._devlake_locking_stub lake > ~/lake.sql`
+# Backup and recover DevLake
+Make sure to choose the correct exposed port from your `docker-compose.yml`
 
+`mysqldump --verbose --host=127.0.0.1 --port=4306 -uroot -p --single-transaction --ignore-table=lake._devlake_locking_stub lake > ~/lake.sql`
+`mysql --host=127.0.0.1 --port=4306 -uroot -p lake < lake.sql`
