@@ -218,3 +218,7 @@ ALTER TABLE issues
     ADD INDEX idx_issues_parent_issue_id (parent_issue_id)
 ;
 ```
+
+# Backing up DevLake
+`mysqldump --verbose --host=127.0.0.1 --port=4306 -uroot -p --single-transaction --ignore-table=lake._devlake_locking_stub lake > ~/lake.sql`
+
