@@ -8,8 +8,7 @@ import com.github.karlsabo.devlake.tools.getApplicationDirectory
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
-import io.ktor.utils.io.*
-import io.ktor.utils.io.core.*
+import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -25,7 +24,7 @@ fun main() {
     val dataSourceConfigNoSecrets = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)
     if (dataSourceConfigNoSecrets == null) {
         println("Failed to load dev lake data source db config, populate $devLakeDataSourceDbConfigPath")
-        return@main
+        return
     }
     val devLakeDataSourceDbConfig = dataSourceConfigNoSecrets.toDataSourceDbConfig()
     val userAndTeamConfig = loadUserAndTeamConfig()
@@ -144,7 +143,7 @@ private fun createUser(
         ps.setString(2, user.email)
         ps.setString(3, user.name)
         val executeUpdate = ps.executeUpdate()
-        println("Updated user ${user} count = $executeUpdate")
+        println("Updated user $user count = $executeUpdate")
     }
 
     // create team_users mapping
@@ -161,7 +160,7 @@ private fun createUser(
                 user_id = VALUES(user_id)
             """.trimIndent()
         ).use { ps ->
-            ps.setLong(1, team.teamId.toLong())
+            ps.setLong(1, team.teamId)
             ps.setString(2, team.userId)
             val executeUpdate = ps.executeUpdate()
             println("Added team_users for ${user.email} count = $executeUpdate")
@@ -178,7 +177,7 @@ private fun createUser(
     ).use {
         it.setString(1, user.id)
         teamUsers.forEachIndexed { index, team ->
-            it.setLong(index + 2, team.teamId.toLong())
+            it.setLong(index + 2, team.teamId)
         }
         val executeUpdate = it.executeUpdate()
         println("Deleted old team_users for ${user.email} count = $executeUpdate")
@@ -228,7 +227,7 @@ fun loadUserAndTeamConfig(): DevLakeUserAndTeamsConfig? {
         return null
     }
     return try {
-        Json.decodeFromString<DevLakeUserAndTeamsConfig>(
+        Json.decodeFromString(
             DevLakeUserAndTeamsConfig.serializer(),
             SystemFileSystem.source(devLakeUserAndTeamsConfigPath).buffered().readText(),
         )
@@ -238,10 +237,12 @@ fun loadUserAndTeamConfig(): DevLakeUserAndTeamsConfig? {
     }
 }
 
+private val json = Json { prettyPrint = true; encodeDefaults = true }
+
 private fun saveUserConfig(userConfig: DevLakeUserAndTeamsConfig) {
     SystemFileSystem.sink(devLakeUserAndTeamsConfigPath).buffered().use {
         it.writeString(
-            Json { prettyPrint = true; encodeDefaults = true }.encodeToString(
+            json.encodeToString(
                 DevLakeUserAndTeamsConfig.serializer(),
                 userConfig,
             )
