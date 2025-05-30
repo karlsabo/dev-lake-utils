@@ -13,7 +13,11 @@
   - [Slow query by parent\_issue\_id](#slow-query-by-parent_issue_id)
 
 # TODO
-
+* [ ] Jira
+  * Load a config file for Jira
+  * Hit some JQL to load all children
+  * Filter to Epics only
+  * Load the last comment from that Epic
 * [ ] Add logging
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
@@ -223,4 +227,5 @@ ALTER TABLE issues
 Make sure to choose the correct exposed port from your `docker-compose.yml`
 
 `mysqldump --verbose --host=127.0.0.1 --port=4306 -uroot -p --single-transaction --ignore-table=lake._devlake_locking_stub lake > ~/lake.sql`
+
 `mysql --host=127.0.0.1 --port=4306 -uroot -p lake < lake.sql`

@@ -39,6 +39,7 @@ import kotlinx.datetime.Clock.System
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.days
@@ -61,7 +62,10 @@ fun main() = application {
         } catch (error: Exception) {
             errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
                     "Please update the configuration file:\n${userMetricPublisherConfigPath}."
-            saveUserMetricPublisherConfig(UserMetricPublisherConfig())
+            java.lang.System.err.println(errorMessage)
+            if (!SystemFileSystem.exists(userMetricPublisherConfigPath)) {
+                saveUserMetricPublisherConfig(UserMetricPublisherConfig())
+            }
             isDisplayErrorDialog = true
         }
         println("Config = $config")

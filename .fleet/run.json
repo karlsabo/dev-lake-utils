@@ -1,0 +1,34 @@
+{
+    "configurations": [
+        {
+            "type": "gradle",
+            "name": "Metrics Publisher Run",
+            "tasks": ["user-metrics-publisher:run"],
+            "args": ["--info"]
+        },
+        {
+            "type": "gradle",
+            "name": "Summary Publisher Run",
+            "tasks": ["summary-publisher:run"],
+            "args": ["--info"]
+        },
+        {
+            "type": "gradle",
+            "name": "CUR Summary Publisher Run",
+            "tasks": ["summary-publisher:run"],
+            "args": ["--args=\"--config=$USER_HOME$/Library/Application Support/DevLakeUtils/summary-publisher-config-cur.json\""]
+        },
+        {
+            "type": "gradle",
+            "name": "Read Audit Summary Publisher Run",
+            "tasks": ["summary-publisher:run"],
+            "args": ["--args=\"--config=$USER_HOME$/Library/Application Support/DevLakeUtils/summary-publisher-config-read-audit.json\""]
+        },
+        {
+            "type": "gradle",
+            "name": "Read Audit Summary Demo",
+            "tasks": ["summary-publisher:runSummaryDetailDemo"],
+            "args": ["--args=\"--config=$USER_HOME$/Library/Application Support/DevLakeUtils/summary-publisher-config-read-audit.json\""]
+        }
+    ]
+}

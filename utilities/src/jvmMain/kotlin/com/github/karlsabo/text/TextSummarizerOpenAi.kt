@@ -15,8 +15,12 @@ import kotlinx.serialization.json.Json
 import kotlin.io.println
 import kotlin.use
 
+private val json = Json {
+    ignoreUnknownKeys = true
+}
+
 class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : TextSummarizer {
-    override suspend fun summarize(inputText: String): String {
+    override suspend fun summarize(text: String): String {
         val model = "gpt-4o-mini"
 
         val instructions =
@@ -40,7 +44,7 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
                         "role" to "system",
                         "content" to instructions,
                     ),
-                    mapOf("role" to "user", "content" to inputText)
+                    mapOf("role" to "user", "content" to text)
                 ),
                 "temperature" to 0,
                 "max_tokens" to 250
@@ -60,9 +64,7 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
             println("responseText: $responseText")
 
 
-            val openAiResponse: OpenAIResponse = Json {
-                ignoreUnknownKeys = true
-            }.decodeFromString(OpenAIResponse.serializer(), responseText)
+            val openAiResponse: OpenAIResponse = json.decodeFromString(OpenAIResponse.serializer(), responseText)
             println("openAiResponse=$openAiResponse")
             val summary: String = if (openAiResponse.choices != null) {
                 println("Choices:")
