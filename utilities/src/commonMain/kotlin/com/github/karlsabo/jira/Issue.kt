@@ -1,7 +1,9 @@
 package com.github.karlsabo.jira
 
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.serialization.KSerializer
@@ -10,7 +12,14 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 @Serializable
 data class Issue(
@@ -47,6 +56,7 @@ data class Issue(
     val originalProject: String? = null,
     val urgency: String? = null,
     val isSubtask: Boolean? = null,
+    val dueDate: Instant? = null,
 )
 
 fun JsonObject.toIssue(): Issue {
@@ -87,8 +97,15 @@ fun JsonObject.toIssue(): Issue {
         originalProject = fields["project"]?.takeIf { it !is JsonNull }?.jsonObject?.get("key")?.jsonPrimitive?.content,
         urgency = fields["customfield_11202"]?.takeIf { it !is JsonNull }?.jsonObject?.get("value")?.jsonPrimitive?.content,
         isSubtask = fields["issuetype"]?.takeIf { it !is JsonNull }?.jsonObject?.get("subtask")?.jsonPrimitive?.booleanOrNull,
+        dueDate = fields["duedate"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.let {
+            LocalDateTime(
+                LocalDate.parse(it),
+                LocalTime(0, 0, 0, 0)
+            ).toInstant(TimeZone.UTC)
+        }
     )
 }
+
 fun parseOffsetDateTime(raw: String): Instant {
     val dateTimePart = raw.substring(0, 23) // "2025-03-29T15:17:30.431"
     val offsetPart = raw.substring(23)      // "-0400"
@@ -100,7 +117,7 @@ fun parseOffsetDateTime(raw: String): Instant {
     val totalOffsetMinutes = offsetHours * 60 + offsetMinutes.toInt()
 
     val instantEpochMillis = local.toInstant(TimeZone.UTC).toEpochMilliseconds() -
-            (totalOffsetMinutes * 60_000)
+        (totalOffsetMinutes * 60_000)
 
     return Instant.fromEpochMilliseconds(instantEpochMillis)
 }

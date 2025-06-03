@@ -1,21 +1,60 @@
 package com.github.karlsabo.jira
 
 import com.github.karlsabo.Credentials
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.auth.*
-import io.ktor.client.plugins.auth.providers.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.*
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.auth.Auth
+import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
+import io.ktor.client.plugins.auth.providers.basic
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.encodeURLParameter
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.readText
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+private val json = Json { ignoreUnknownKeys = true }
 
 data class JiraApiRestConfig(
     val credentials: Credentials,
     val domain: String,
 )
+
+@Serializable
+data class JiraConfig(
+    val domain: String,
+    val username: String,
+    val apiKeyPath: String,
+)
+
+@Serializable
+data class JiraSecret(val jiraApiKey: String)
+
+fun loadJiraConfig(configFilePath: Path): JiraApiRestConfig {
+    val config = SystemFileSystem.source(Path(configFilePath)).buffered().use { source ->
+        json.decodeFromString<JiraConfig>(source.readText())
+    }
+    val secretConfig = SystemFileSystem.source(Path(config.apiKeyPath)).buffered().use { source ->
+        json.decodeFromString<JiraSecret>(source.readText())
+    }
+
+    return JiraApiRestConfig(
+        Credentials(
+            config.username,
+            secretConfig.jiraApiKey,
+        ),
+        config.domain,
+    )
+}
 
 class JiraApiRest(private val config: JiraApiRestConfig) : JiraApi {
     private val client: HttpClient = HttpClient(CIO) {
