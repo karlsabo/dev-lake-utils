@@ -5,6 +5,7 @@ import com.github.karlsabo.devlake.accessor.Issue
 import com.github.karlsabo.devlake.accessor.IssueAccessorDb
 import com.github.karlsabo.devlake.accessor.IssueChangelog
 import com.github.karlsabo.devlake.accessor.IssueChangelogAccessorDb
+import com.github.karlsabo.devlake.accessor.IssueComment
 import com.github.karlsabo.devlake.accessor.PullRequest
 import com.github.karlsabo.devlake.accessor.PullRequestAccessorDb
 import com.github.karlsabo.devlake.accessor.User
@@ -15,6 +16,8 @@ import com.github.karlsabo.devlake.accessor.isMilestone
 import com.github.karlsabo.devlake.dto.DevLakeSummary
 import com.github.karlsabo.devlake.dto.PagerDutyAlert
 import com.github.karlsabo.devlake.dto.Project
+import com.github.karlsabo.jira.JiraApi
+import com.github.karlsabo.jira.toPlainText
 import com.github.karlsabo.text.TextSummarizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -26,6 +29,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
+import java.net.URI
 import java.sql.Date
 import javax.sql.DataSource
 import kotlin.math.abs
@@ -40,6 +44,7 @@ data class Milestone(
     val issue: Issue,
     val issues: Set<Issue>,
     val issueChangeLogs: Set<IssueChangelog>,
+    val milestoneComments: Set<IssueComment>,
     val durationIssues: Set<Issue>,
     val durationMergedPullRequests: Set<PullRequest>,
 )
@@ -78,7 +83,7 @@ data class ProjectSummary(
  */
 fun ProjectSummary.toVerboseSlackMarkdown(): String {
     val summary = StringBuilder()
-    if (project.links != null && project.links.isNotEmpty()) {
+    if (!project.links.isNullOrEmpty()) {
         summary.appendLine("*<${project.links[0]}|${project.title}>*")
     } else {
         summary.appendLine("*${project.title}*")
@@ -115,7 +120,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     val lastIssue = milestone.issues.sortedByDescending { it.resolutionDate }.firstOrNull()
                     val lastIssueResolutionDate = lastIssue?.resolutionDate
 
-                    var isStatusRecent: Boolean
+                    val isStatusRecent: Boolean
                     if (lastChangeDate != null && (lastIssueResolutionDate == null || lastChange.createdDate > lastIssue.resolutionDate)) {
                         val dateStr = lastChangeDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         isStatusRecent = lastChangeDate >= Clock.System.now().minus(14.days)
@@ -184,7 +189,7 @@ fun ProjectSummary.toTerseSlackMarkdown(): String {
 
 fun ProjectSummary.toSlackMarkup(): String {
     val summary = StringBuilder()
-    if (project.links != null && project.links.isNotEmpty()) {
+    if (!project.links.isNullOrEmpty()) {
         summary.appendLine("*<${project.links[0]}|${project.title}>*")
     } else {
         summary.appendLine("*${project.title}*")
@@ -294,6 +299,7 @@ private fun createSlackMarkdownProgressBar(issues: Set<Issue>, durationIssues: S
 
 suspend fun createSummary(
     dataSource: DataSource,
+    jiraApi: JiraApi?,
     textSummarizer: TextSummarizer,
     projects: List<Project>,
     duration: Duration,
@@ -314,7 +320,7 @@ suspend fun createSummary(
         val projectJobs = projects.map { project ->
             async(Dispatchers.Default) {
                 val projectSummary =
-                    project.createSummary(users.toSet(), dataSource, textSummarizer, duration, emptySet())
+                    project.createSummary(users.toSet(), dataSource, jiraApi, textSummarizer, duration, emptySet())
                 mutex.withLock {
                     projectSummaries.add(projectSummary)
                 }
@@ -326,7 +332,7 @@ suspend fun createSummary(
         val userAccountAccessor = UserAccountAccessorDb(dataSource)
 
         val userJobs = if (isMiscellaneousProjectIncluded) {
-            users.map {
+            val issueJobs = users.map {
                 async(Dispatchers.Default) {
                     val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
                     userAccounts.forEach {
@@ -339,6 +345,8 @@ suspend fun createSummary(
                         }
                     }
                 }
+            }
+            val prJobs = users.map {
                 async(Dispatchers.Default) {
                     val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
                     userAccounts.forEach {
@@ -352,6 +360,7 @@ suspend fun createSummary(
                     }
                 }
             }
+            issueJobs + prJobs
         } else {
             emptyList()
         }
@@ -386,6 +395,7 @@ suspend fun createSummary(
             miscProject.createSummary(
                 users.toSet(),
                 dataSource,
+                jiraApi,
                 textSummarizer,
                 duration,
                 miscPrSet,
@@ -439,6 +449,7 @@ suspend fun createSummary(
 suspend fun Project.createSummary(
     users: Set<User>,
     source: DataSource,
+    jiraApi: JiraApi?,
     textSummarizer: TextSummarizer,
     duration: Duration,
     pullRequests: Set<PullRequest>,
@@ -447,14 +458,25 @@ suspend fun Project.createSummary(
     val accountAccessor = AccountAccessorDb(source)
     val issueAccessor = IssueAccessorDb(source)
     val parentIssues = if (topLevelIssueKeys.isEmpty())
-        mutableListOf<Issue>()
+        mutableListOf()
     else
         issueAccessor.getIssuesByKey(this.topLevelIssueKeys)
             .toMutableList()
     if (topLevelIssueIds.isNotEmpty())
         parentIssues += issueAccessor.getIssuesById(topLevelIssueIds)
     val parentIssueIds = parentIssues.map { it.id } + topLevelIssueIds
-    val childIssues = if (parentIssuesAreChildren) parentIssues else issueAccessor.getAllChildIssues(parentIssueIds)
+    val childIssues: MutableList<Issue> =
+        if (parentIssuesAreChildren) parentIssues else issueAccessor.getAllChildIssues(parentIssueIds).toMutableList()
+
+    if (jqlToPullChildIssues != null && jiraApi != null) {
+        val jiraIssues = jiraApi.runJql(jqlToPullChildIssues)
+        jiraIssues.forEach { jiraIssue ->
+            if (childIssues.none { it.issueKey == jiraIssue.issueKey }) {
+                childIssues.add(jiraIssue.toIssue())
+            }
+        }
+        childIssues.addAll(jiraIssues.map { it.toIssue() })
+    }
 
     val resolvedChildIssues =
         childIssues.filter { it.resolutionDate != null && it.resolutionDate >= Clock.System.now().minus(duration) }
@@ -504,6 +526,12 @@ suspend fun Project.createSummary(
                     null
                 }
 
+                val milestoneCommentSet = mutableSetOf<IssueComment>()
+                if (jqlToPullChildIssues != null && jiraApi != null) {
+                    milestoneCommentSet.addAll(
+                        jiraApi.getRecentComments(milestoneIssue.issueKey, 5).map { it.toIssueComment() })
+                }
+
                 Milestone(
                     owner,
                     milestoneIssue,
@@ -514,13 +542,13 @@ suspend fun Project.createSummary(
                         setOf("Automation for Jira"), // KARLFIXME load from a config
                         10,
                         0
-                    )
-                        .toSet(),
+                    ).toSet(),
+                    milestoneCommentSet,
                     issues.filter { issue ->
                         issue.isIssueOrBug()
-                                && (issue.resolutionDate != null
-                                && issue.resolutionDate >= Clock.System.now().minus(duration)
-                                || issue.createdDate != null && issue.createdDate >= Clock.System.now().minus(duration))
+                            && (issue.resolutionDate != null
+                            && issue.resolutionDate >= Clock.System.now().minus(duration)
+                            || issue.createdDate != null && issue.createdDate >= Clock.System.now().minus(duration))
                     }
                         .toSet(),
                     milestonePrs,
@@ -534,12 +562,65 @@ suspend fun Project.createSummary(
         childIssues.filter { it.isIssueOrBug() }.toSet(),
         childIssues.filter {
             it.isIssueOrBug()
-                    && (it.resolutionDate != null && it.resolutionDate >= Clock.System.now().minus(duration)
-                    || it.createdDate != null && it.createdDate >= Clock.System.now().minus(duration))
+                && (it.resolutionDate != null && it.resolutionDate >= Clock.System.now().minus(duration)
+                || it.createdDate != null && it.createdDate >= Clock.System.now().minus(duration))
         }
             .toSet(),
         mergedPrs,
         milestones,
         isTagMilestoneOwners,
+    )
+}
+
+private fun com.github.karlsabo.jira.Issue.toIssue(): Issue {
+    val uri = URI(this.url!!)
+    val url = uri.scheme + "://" + uri.authority + "/browse/${this.issueKey}"
+    return Issue(
+        id = this.id,
+        url = url,
+        iconUrl = this.iconUrl,
+        issueKey = this.issueKey,
+        title = this.title,
+        description = this.description,
+        epicKey = this.epicKey,
+        type = this.type,
+        originalType = this.originalType,
+        status = this.status,
+        originalStatus = this.originalStatus,
+        resolutionDate = this.resolutionDate,
+        createdDate = this.createdDate,
+        updatedDate = this.updatedDate,
+        leadTimeMinutes = this.leadTimeMinutes,
+        parentIssueId = this.parentIssueId,
+        priority = this.priority,
+        storyPoint = this.storyPoint,
+        originalEstimateMinutes = this.originalEstimateMinutes,
+        timeSpentMinutes = this.timeSpentMinutes,
+        timeRemainingMinutes = this.timeRemainingMinutes,
+        creatorId = this.creatorId,
+        creatorName = this.creatorName,
+        assigneeId = this.assigneeId,
+        assigneeName = this.assigneeName,
+        severity = this.severity,
+        component = this.component,
+        originalProject = this.originalProject,
+        urgency = this.urgency,
+        isSubtask = this.isSubtask,
+        rawDataParams = null,
+        rawDataTable = null,
+        rawDataId = null,
+        rawDataRemark = null,
+        dueDate = this.dueDate,
+    )
+}
+
+private fun com.github.karlsabo.jira.Comment.toIssueComment(): IssueComment {
+    return IssueComment(
+        id = this.id,
+        issueId = this.id,
+        accountId = this.author.accountId,
+        body = this.body.toPlainText(),
+        createdDate = this.created,
+        updatedDate = this.updated,
     )
 }

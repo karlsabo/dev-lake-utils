@@ -1,6 +1,13 @@
 [*.{kt,kts}]
 ij_kotlin_packages_to_use_import_on_demand =
+ij_kotlin_code_style = KotlinStyleGuide
+ij_kotlin_wrap_parameters = chop_down_if_long
+ij_kotlin_right_margin = 120
+ij_kotlin_align_multiline_parameters = true
 
 [*.java]
 ij_java_packages_to_use_import_on_demand =
 ij_java_class_count_to_use_import_on_demand = 50
+ij_java_wrap_parameters = chop_down_if_long
+ij_java_right_margin = 120
+ij_java_align_multiline_parameters = true

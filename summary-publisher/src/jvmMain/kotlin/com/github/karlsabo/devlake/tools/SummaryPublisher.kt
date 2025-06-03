@@ -259,6 +259,7 @@ fun main(args: Array<String>) = application {
                 DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
                     summaryLast7Days = createSummary(
                         dataSourceManager.getOrCreateDataSource(),
+                        null, // KARLFIXME add Jira API calls
                         TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
                         summaryConfig.projects,
                         7.days,
