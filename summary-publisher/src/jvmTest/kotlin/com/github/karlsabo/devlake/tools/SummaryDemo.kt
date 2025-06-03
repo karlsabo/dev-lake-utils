@@ -18,6 +18,7 @@ fun main() = runBlocking {
     DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
         val summaryLast7Days = createSummary(
             dataSourceManager.getOrCreateDataSource(),
+            null,
             textSummarizer,
             summaryConfig.projects,
             7.days,

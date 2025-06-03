@@ -16,4 +16,5 @@ data class Project(
     val topLevelIssueIds: List<String> = emptyList(),
     val isVerboseMilestones: Boolean = false,
     val isTagMilestoneOwners: Boolean = false,
+    val jqlToPullChildIssues: String? = null,
 )
