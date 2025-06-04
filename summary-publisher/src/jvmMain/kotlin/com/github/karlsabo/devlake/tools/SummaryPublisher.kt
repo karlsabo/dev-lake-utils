@@ -33,6 +33,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.github.karlsabo.Credentials
 import com.github.karlsabo.devlake.ProjectSummary
 import com.github.karlsabo.devlake.accessor.PipelineAccessorDb
 import com.github.karlsabo.devlake.accessor.Status
@@ -41,6 +42,7 @@ import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
 import com.github.karlsabo.devlake.dto.DevLakeSummary
 import com.github.karlsabo.devlake.dto.toSlackMarkup
 import com.github.karlsabo.devlake.dto.toTerseSlackMarkup
+import com.github.karlsabo.devlake.jiraConfigPath
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
 import com.github.karlsabo.devlake.textSummarizerConfigPath
 import com.github.karlsabo.devlake.toSlackMarkup
@@ -50,6 +52,11 @@ import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.saveDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.jira.JiraApiRestConfig
+import com.github.karlsabo.jira.JiraConfig
+import com.github.karlsabo.jira.JiraRestApi
+import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.jira.saveJiraConfig
 import com.github.karlsabo.text.TextSummarizerOpenAi
 import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
 import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
@@ -92,6 +99,14 @@ fun main(args: Array<String>) = application {
             TextSummarizerOpenAiConfigNoSecrets("invalid")
         )
     }
+    var jiraConfig by remember {
+        mutableStateOf(
+            JiraApiRestConfig(
+                Credentials("username", "password"),
+                "company.atlassian.net"
+            )
+        )
+    }
     var dataSourceConfigNoSecrets by remember {
         mutableStateOf<DataSourceDbConfigNoSecrets?>(
             DataSourceDbConfigNoSecrets(
@@ -108,7 +123,7 @@ fun main(args: Array<String>) = application {
         } catch (error: Exception) {
             println("Error loading summary config $error")
             errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
-                    "Please update the configuration file:\n${summaryPublisherConfigPath}."
+                "Please update the configuration file:\n${summaryPublisherConfigPath}."
             if (!SystemFileSystem.exists(summaryPublisherConfigPath)) {
                 saveSummaryPublisherConfig(SummaryPublisherConfig())
             }
@@ -120,7 +135,7 @@ fun main(args: Array<String>) = application {
             } catch (error: Exception) {
                 println("Error loading datasource config $error")
                 errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
-                        "Please update the configuration file:\n${devLakeDataSourceDbConfigPath}."
+                    "Please update the configuration file:\n${devLakeDataSourceDbConfigPath}."
                 if (!SystemFileSystem.exists(devLakeDataSourceDbConfigPath)) {
                     saveDataSourceDbConfigNoSecrets(
                         devLakeDataSourceDbConfigPath,
@@ -135,7 +150,7 @@ fun main(args: Array<String>) = application {
                 } catch (error: Exception) {
                     println("Error loading text summarizer config $error")
                     errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
-                            "Please update the configuration file:\n${textSummarizerConfigPath}."
+                        "Please update the configuration file:\n${textSummarizerConfigPath}."
                     if (!SystemFileSystem.exists(textSummarizerConfigPath)) {
                         saveTextSummarizerOpenAiNoSecrets(
                             textSummarizerConfigPath,
@@ -143,6 +158,22 @@ fun main(args: Array<String>) = application {
                         )
                     }
                     isDisplayErrorDialog = true
+                }
+            }
+            if (!isDisplayErrorDialog) {
+                try {
+                    jiraConfig = loadJiraConfig(jiraConfigPath)
+                } catch (error: Exception) {
+                    isDisplayErrorDialog = true
+                    println("Error loading Jira config ${error.message}")
+                    errorMessage =
+                        "Failed to load Jira config: ${error.message}.\nCreating a new configuration.\nPlease update the configuration ${jiraConfigPath}"
+                    if (!SystemFileSystem.exists(jiraConfigPath)) {
+                        saveJiraConfig(
+                            JiraConfig("example.atlassian.net", "username", "apiKeyPath"),
+                            jiraConfigPath
+                        )
+                    }
                 }
             }
         }
@@ -259,7 +290,7 @@ fun main(args: Array<String>) = application {
                 DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
                     summaryLast7Days = createSummary(
                         dataSourceManager.getOrCreateDataSource(),
-                        null, // KARLFIXME add Jira API calls
+                        JiraRestApi(jiraConfig),
                         TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
                         summaryConfig.projects,
                         7.days,

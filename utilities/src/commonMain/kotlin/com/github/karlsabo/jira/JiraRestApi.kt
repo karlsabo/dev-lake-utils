@@ -15,6 +15,7 @@ import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
@@ -56,7 +57,13 @@ fun loadJiraConfig(configFilePath: Path): JiraApiRestConfig {
     )
 }
 
-class JiraApiRest(private val config: JiraApiRestConfig) : JiraApi {
+fun saveJiraConfig(config: JiraConfig, configPath: Path) {
+    SystemFileSystem.sink(configPath, false).buffered().use { sink ->
+        sink.writeString(json.encodeToString(JiraConfig.serializer(), config))
+    }
+}
+
+class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
     private val client: HttpClient = HttpClient(CIO) {
         install(Auth) {
             basic {

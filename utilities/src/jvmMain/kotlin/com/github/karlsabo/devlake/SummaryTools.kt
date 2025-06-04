@@ -114,7 +114,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         }"
                     )
                 } else {
-                    val changeCharacterLimit = 100
+                    val changeCharacterLimit = 200
                     val lastChange = milestone.issueChangeLogs.sortedByDescending { it.createdDate }.firstOrNull()
                     val lastChangeDate = lastChange?.createdDate
                     val lastIssue = milestone.issues.sortedByDescending { it.resolutionDate }.firstOrNull()
@@ -133,7 +133,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         // Changelog is the most recent
                         val dateStr = lastChangeDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         isStatusRecent = lastChangeDate >= Clock.System.now().minus(14.days)
-                        val warningEmoji = if (!isStatusRecent) "⚠️ ⚠️ " else ""
+                        val warningEmoji = if (!isStatusRecent) "⚠️ " else ""
                         val changeDescription =
                             "${lastChange.originalToValue}".take(changeCharacterLimit) + if ("${lastChange.fieldName} to ${lastChange.originalToValue}".length > changeCharacterLimit) "..." else ""
                         summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: *${lastChange.authorName}* \"$changeDescription\"")
@@ -144,17 +144,17 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         // Comment is the most recent
                         val dateStr = lastCommentDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         isStatusRecent = lastCommentDate >= Clock.System.now().minus(14.days)
-                        val warningEmoji = if (!isStatusRecent) "⚠️ ⚠️ " else ""
+                        val warningEmoji = if (!isStatusRecent) "⚠️ " else ""
                         val commentBody = lastComment.body?.take(changeCharacterLimit) ?: ""
                         val commentDescription =
                             commentBody + if ((lastComment.body?.length ?: 0) > changeCharacterLimit) "..." else ""
-                        summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: Comment \"$commentDescription\"")
+                        summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: \"$commentDescription\"")
                     } else if (lastIssueResolutionDate != null) {
                         // Issue resolution is the most recent
                         val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         isStatusRecent = lastIssueResolutionDate >= Clock.System.now().minus(14.days)
                         val warningEmoji =
-                            if (!isStatusRecent) "⚠️ ⚠️ " else ""
+                            if (!isStatusRecent) "⚠️ " else ""
                         summary.appendLine(
                             "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.issueKey}> \"${
                                 lastIssue.title?.take(
@@ -168,7 +168,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
 
                     if (milestone.issue.dueDate == null) {
                         if (milestone.assignee == null) {
-                            summary.appendLine("‼️⚠️ This milestone doesn't have a due date.")
+                            summary.appendLine("‼️⚠️ This milestone doesn't have a due date or an assignee.")
                         } else {
                             summary.append(milestone.assignee.name)
                             if (isTagMilestoneAssignees) summary.append(" <@${milestone.assignee.slackId}>")
@@ -540,6 +540,7 @@ suspend fun Project.createSummary(
                 val owner = if (milestoneIssue.assigneeId != null && milestoneIssue.assigneeId.isNotBlank()) {
                     val account = accountAccessor.getAccountById(milestoneIssue.assigneeId)
                     users.firstOrNull { it.email == account?.email }
+                        ?: users.firstOrNull { it.name == milestoneIssue.assigneeName }
                 } else if (projectLeadUserId != null) {
                     val account = accountAccessor.getAccountByEmail(projectLeadUserId)
                     users.firstOrNull { it.email == account?.email }
@@ -596,6 +597,8 @@ suspend fun Project.createSummary(
 private fun com.github.karlsabo.jira.Issue.toIssue(): Issue {
     val uri = URI(this.url!!)
     val url = uri.scheme + "://" + uri.authority + "/browse/${this.issueKey}"
+    // TODO should look in _tool_jira_accounts tables
+    val assigneeIdTranslated = if (assigneeId != null) "jira:JiraAccount:1:${this.assigneeId}" else null
     return Issue(
         id = this.id,
         url = url,
@@ -620,8 +623,7 @@ private fun com.github.karlsabo.jira.Issue.toIssue(): Issue {
         timeRemainingMinutes = this.timeRemainingMinutes,
         creatorId = this.creatorId,
         creatorName = this.creatorName,
-        // TODO should look in _tool_jira_accounts tables
-        assigneeId = "jira:JiraAccount:1:${this.assigneeId}",
+        assigneeId = assigneeIdTranslated,
         assigneeName = this.assigneeName,
         severity = this.severity,
         component = this.component,

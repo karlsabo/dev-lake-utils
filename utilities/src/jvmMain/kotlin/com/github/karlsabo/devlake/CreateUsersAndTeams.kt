@@ -19,6 +19,7 @@ import java.sql.Connection
 const val DEV_LAKE_APP_NAME = "DevLakeUtils"
 val devLakeDataSourceDbConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "dev-lake-datasource-db-config.json")
 val textSummarizerConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "text-summarizer-openai-config.json")
+val jiraConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "jira-rest-config.json")
 
 fun main() {
     val dataSourceConfigNoSecrets = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)
