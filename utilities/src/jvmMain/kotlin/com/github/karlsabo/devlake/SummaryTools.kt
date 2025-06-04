@@ -83,11 +83,7 @@ data class ProjectSummary(
  */
 fun ProjectSummary.toVerboseSlackMarkdown(): String {
     val summary = StringBuilder()
-    if (!project.links.isNullOrEmpty()) {
-        summary.appendLine("*<${project.links[0]}|${project.title}>*")
-    } else {
-        summary.appendLine("*${project.title}*")
-    }
+    createTitle(summary)
 
     summary.append(createSlackMarkdownProgressBar(issues, durationIssues))
     summary.append(this.durationProgressSummary)
@@ -202,6 +198,14 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
     return summary.toString()
 }
 
+private fun ProjectSummary.createTitle(summary: StringBuilder) {
+    if (!project.links.isNullOrEmpty()) {
+        summary.appendLine("*<${project.links[0]}|${project.title}>*")
+    } else {
+        summary.appendLine("*${project.title}*")
+    }
+}
+
 fun ProjectSummary.toTerseSlackMarkdown(): String {
     val summary = StringBuilder()
     summary.appendLine(project.title)
@@ -211,28 +215,9 @@ fun ProjectSummary.toTerseSlackMarkdown(): String {
 
 fun ProjectSummary.toSlackMarkup(): String {
     val summary = StringBuilder()
-    if (!project.links.isNullOrEmpty()) {
-        summary.appendLine("*<${project.links[0]}|${project.title}>*")
-    } else {
-        summary.appendLine("*${project.title}*")
-    }
+    createTitle(summary)
 
     summary.append(createSlackMarkdownProgressBar(issues, durationIssues))
-
-    // ignore story points for now
-    if (false) {
-        val totalStoryPoints = issues.sumOf { it.storyPoint ?: 0.0 }
-        val completedStoryPoints = issues.filter { it.isCompleted() }.sumOf { it.storyPoint ?: 0.0 }
-        val storyPointsPercentage = if (totalStoryPoints == 0.0) {
-            0
-        } else {
-            (completedStoryPoints / totalStoryPoints * 100).roundToInt()
-        }
-        summary.append("[")
-        repeat(storyPointsPercentage / 10) { summary.append("=") }
-        repeat(10 - storyPointsPercentage / 10) { summary.append(" ") }
-        summary.append("] $storyPointsPercentage% story points complete\n")
-    }
 
     summary.appendLine()
     summary.append(this.durationProgressSummary)
@@ -354,9 +339,9 @@ suspend fun createSummary(
         val userAccountAccessor = UserAccountAccessorDb(dataSource)
 
         val userJobs = if (isMiscellaneousProjectIncluded) {
-            val issueJobs = users.map {
+            val issueJobs = users.map { user ->
                 async(Dispatchers.Default) {
-                    val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
+                    val userAccounts = userAccountAccessor.getUserAccountByUserId(user.id)
                     userAccounts.forEach {
                         val issuesForUser = issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
                             it.accountId,
@@ -368,9 +353,9 @@ suspend fun createSummary(
                     }
                 }
             }
-            val prJobs = users.map {
+            val prJobs = users.map { user ->
                 async(Dispatchers.Default) {
-                    val userAccounts = userAccountAccessor.getUserAccountByUserId(it.id)
+                    val userAccounts = userAccountAccessor.getUserAccountByUserId(user.id)
                     userAccounts.forEach {
                         val prsForUser = pullRequestAccessor.getPullRequestsByAuthorIdAndAfterMergedDate(
                             it.accountId,
