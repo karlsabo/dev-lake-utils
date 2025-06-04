@@ -120,15 +120,37 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     val lastIssue = milestone.issues.sortedByDescending { it.resolutionDate }.firstOrNull()
                     val lastIssueResolutionDate = lastIssue?.resolutionDate
 
+                    // Check for the most recent update from changelogs, issue resolutions, or comments
+                    val lastComment = milestone.milestoneComments.sortedByDescending { it.createdDate }.firstOrNull()
+                    val lastCommentDate = lastComment?.createdDate
+
                     val isStatusRecent: Boolean
-                    if (lastChangeDate != null && (lastIssueResolutionDate == null || lastChange.createdDate > lastIssue.resolutionDate)) {
+                    // Determine which is the most recent update: changelog, issue resolution, or comment
+                    if (lastChangeDate != null &&
+                        (lastIssueResolutionDate == null || lastChange.createdDate > lastIssue.resolutionDate) &&
+                        (lastCommentDate == null || lastChange.createdDate > lastCommentDate)
+                    ) {
+                        // Changelog is the most recent
                         val dateStr = lastChangeDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         isStatusRecent = lastChangeDate >= Clock.System.now().minus(14.days)
                         val warningEmoji = if (!isStatusRecent) "⚠️ ⚠️ " else ""
                         val changeDescription =
                             "${lastChange.originalToValue}".take(changeCharacterLimit) + if ("${lastChange.fieldName} to ${lastChange.originalToValue}".length > changeCharacterLimit) "..." else ""
                         summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: *${lastChange.authorName}* \"$changeDescription\"")
+                    } else if (lastCommentDate != null &&
+                        (lastIssueResolutionDate == null || lastCommentDate > lastIssue.resolutionDate) &&
+                        (lastChangeDate == null || lastCommentDate > lastChangeDate)
+                    ) {
+                        // Comment is the most recent
+                        val dateStr = lastCommentDate.toLocalDateTime(TimeZone.of("America/New_York")).date
+                        isStatusRecent = lastCommentDate >= Clock.System.now().minus(14.days)
+                        val warningEmoji = if (!isStatusRecent) "⚠️ ⚠️ " else ""
+                        val commentBody = lastComment.body?.take(changeCharacterLimit) ?: ""
+                        val commentDescription =
+                            commentBody + if ((lastComment.body?.length ?: 0) > changeCharacterLimit) "..." else ""
+                        summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: Comment \"$commentDescription\"")
                     } else if (lastIssueResolutionDate != null) {
+                        // Issue resolution is the most recent
                         val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         isStatusRecent = lastIssueResolutionDate >= Clock.System.now().minus(14.days)
                         val warningEmoji =
@@ -475,7 +497,6 @@ suspend fun Project.createSummary(
                 childIssues.add(jiraIssue.toIssue())
             }
         }
-        childIssues.addAll(jiraIssues.map { it.toIssue() })
     }
 
     val resolvedChildIssues =
@@ -599,7 +620,8 @@ private fun com.github.karlsabo.jira.Issue.toIssue(): Issue {
         timeRemainingMinutes = this.timeRemainingMinutes,
         creatorId = this.creatorId,
         creatorName = this.creatorName,
-        assigneeId = this.assigneeId,
+        // TODO should look in _tool_jira_accounts tables
+        assigneeId = "jira:JiraAccount:1:${this.assigneeId}",
         assigneeName = this.assigneeName,
         severity = this.severity,
         component = this.component,
