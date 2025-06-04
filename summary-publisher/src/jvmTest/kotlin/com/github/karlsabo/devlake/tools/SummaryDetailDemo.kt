@@ -11,7 +11,7 @@ import com.github.karlsabo.devlake.toVerboseSlackMarkdown
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
-import com.github.karlsabo.jira.JiraApiRest
+import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
 import com.github.karlsabo.text.TextSummarizerFake
 import kotlinx.coroutines.runBlocking
@@ -24,7 +24,7 @@ fun main(args: Array<String>) {
 
     runBlocking {
         val jiraApi =
-            JiraApiRest(loadJiraConfig(Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "jira-rest-config.json")))
+            JiraRestApi(loadJiraConfig(Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "jira-rest-config.json")))
 
         val textSummarizer = TextSummarizerFake()
         val summaryConfig = loadSummaryPublisherConfig(configFilePath)
