@@ -75,6 +75,15 @@ tasks.register<JavaExec>("createUsersAndTeams") {
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
 
+tasks.register<JavaExec>("gitHubApiDemo") {
+    group = "application"
+    mainClass.set("com.github.karlsabo.github.GitHubApiDemoKt")
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
+
+
 publishing {
     repositories {
         mavenLocal()
