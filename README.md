@@ -13,11 +13,6 @@
   - [Slow query by parent\_issue\_id](#slow-query-by-parent_issue_id)
 
 # TODO
-* [ ] Jira
-  * Load a config file for Jira
-  * Hit some JQL to load all children
-  * Filter to Epics only
-  * Load the last comment from that Epic
 * [ ] Add logging
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
