@@ -77,3 +77,11 @@ tasks.register<JavaExec>("runMetricsDemo") {
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
+
+tasks.register<JavaExec>("runUserEpicsDemo") {
+    group = "run"
+    mainClass.set("com.github.karlsabo.devlake.metrics.UserEpicsDemoKt")
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
