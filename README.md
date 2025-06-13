@@ -13,6 +13,11 @@
   - [Slow query by parent\_issue\_id](#slow-query-by-parent_issue_id)
 
 # TODO
+
+* [ ] Remove DevLake
+  * metrics publisher
+  * summary publisher
+* [ ] Create native executables
 * [ ] Add logging
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file

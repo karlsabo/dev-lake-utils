@@ -1,18 +1,6 @@
 package com.github.karlsabo.devlake
 
-import com.github.karlsabo.devlake.accessor.AccountAccessorDb
-import com.github.karlsabo.devlake.accessor.Issue
-import com.github.karlsabo.devlake.accessor.IssueAccessorDb
-import com.github.karlsabo.devlake.accessor.IssueChangelog
-import com.github.karlsabo.devlake.accessor.IssueChangelogAccessorDb
-import com.github.karlsabo.devlake.accessor.IssueComment
-import com.github.karlsabo.devlake.accessor.PullRequest
-import com.github.karlsabo.devlake.accessor.PullRequestAccessorDb
-import com.github.karlsabo.devlake.accessor.User
-import com.github.karlsabo.devlake.accessor.UserAccountAccessorDb
-import com.github.karlsabo.devlake.accessor.isCompleted
-import com.github.karlsabo.devlake.accessor.isIssueOrBug
-import com.github.karlsabo.devlake.accessor.isMilestone
+import com.github.karlsabo.devlake.accessor.*
 import com.github.karlsabo.devlake.dto.DevLakeSummary
 import com.github.karlsabo.devlake.dto.PagerDutyAlert
 import com.github.karlsabo.devlake.dto.Project
@@ -377,6 +365,8 @@ suspend fun createSummary(
     }
     projectSummaries.forEach { projectSummary ->
         miscIssueSet.removeAll(projectSummary.issues)
+        miscIssueSet.removeAll(projectSummary.milestones.map { it.issue })
+        miscIssueSet.removeAll(projectSummary.milestones.flatMap { it.issues })
         miscPrSet.removeAll(projectSummary.durationMergedPullRequests)
     }
 

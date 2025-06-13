@@ -62,9 +62,9 @@ fun Issue.isIssueOrBug(): Boolean {
     if (type == null) return false
     return when (type.lowercase()) {
         "bug", "issue", "story", "subtask", "artifact", "task", "vulnerability" -> true
-        "epic", "theme", "parent artifact" -> false
+        "epic", "theme", "parent artifact", "r&d initiative" -> false
         else -> {
-            val message = "Unhandled issue type $type, Info: $issueKey, $title"
+            val message = "Unhandled issue type `$type`, Info: $issueKey, $title"
             print(message)
             throw RuntimeException(message)
         }
