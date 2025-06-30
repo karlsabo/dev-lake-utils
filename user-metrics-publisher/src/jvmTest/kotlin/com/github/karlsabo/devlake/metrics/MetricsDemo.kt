@@ -15,7 +15,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.time.measureTime
 
 
-fun main(): Unit {
+fun main() {
     val jiraConfig = loadJiraConfig(jiraConfigPath)
     val gitHubConfig = loadGitHubConfig(gitHubConfigPath)
     runBlocking {
@@ -27,7 +27,12 @@ fun main(): Unit {
                 val user = users!!.users.firstOrNull { it.id == userId }
                     ?: throw Exception("User not found: $userId in ${users.users}")
                 measureTime {
-                    val userMetrics = createUserMetrics(user, JiraRestApi(jiraConfig), GitHubRestApi(gitHubConfig))
+                    val userMetrics = createUserMetrics(
+                        user,
+                        config.organizationIds,
+                        JiraRestApi(jiraConfig),
+                        GitHubRestApi(gitHubConfig)
+                    )
                     synchronized(metrics) {
                         metrics.add(userMetrics)
                     }

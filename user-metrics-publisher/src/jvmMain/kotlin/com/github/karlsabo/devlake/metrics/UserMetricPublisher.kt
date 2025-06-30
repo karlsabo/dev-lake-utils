@@ -125,7 +125,6 @@ fun main() = application {
         var publishButtonEnabled by remember { mutableStateOf(true) }
         val scrollState = rememberScrollState()
 
-        var isLoadingMetrics by remember { mutableStateOf(true) }
         var metrics by remember { mutableStateOf(mutableListOf<UserMetrics>()) }
         var metricsPreviewText by remember { mutableStateOf("Loading...") }
         val scope = rememberCoroutineScope()
@@ -138,7 +137,7 @@ fun main() = application {
                         measureTime {
                             val user = userAndTeamsConfig!!.users.firstOrNull { it.id == userId }
                                 ?: throw Exception("User not found: $userId in ${userAndTeamsConfig!!.users}")
-                            val userMetrics = createUserMetrics(user, jiraApi!!, gitHubApi!!)
+                            val userMetrics = createUserMetrics(user, config.organizationIds, jiraApi!!, gitHubApi!!)
                             synchronized(metrics) {
                                 metrics.add(userMetrics)
                             }
@@ -158,7 +157,6 @@ fun main() = application {
                 }
 
                 println("Metrics loaded")
-                isLoadingMetrics = false
             }
         }
 
@@ -292,22 +290,29 @@ fun UserMetrics.toSlackMarkdown(): String {
     return builder.toString()
 }
 
-suspend fun createUserMetrics(user: User, jiraApi: JiraApi, gitHubApi: GitHubApi): UserMetrics {
+suspend fun createUserMetrics(
+    user: User,
+    organizationIds: List<String>,
+    jiraApi: JiraApi,
+    gitHubApi: GitHubApi,
+): UserMetrics {
     val startOfThisYear = System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         .run { Instant.parse("${year}-01-01T00:00:00Z") }
 
     val pullRequestsPastWeek = mutableListOf<GitHubPullRequest>()
-    val issuesClosedPastWeek = mutableListOf<com.github.karlsabo.jira.Issue>()
+    val issuesClosedPastWeek = mutableListOf<Issue>()
 
     pullRequestsPastWeek.addAll(
         gitHubApi.getMergedPullRequests(
             user.gitHubId!!,
+            organizationIds,
             System.now().minus(7.days),
             System.now(),
         )
     )
     val prCountYtd = gitHubApi.getMergedPullRequestCount(
         user.gitHubId!!,
+        organizationIds,
         startOfThisYear,
         System.now(),
     )

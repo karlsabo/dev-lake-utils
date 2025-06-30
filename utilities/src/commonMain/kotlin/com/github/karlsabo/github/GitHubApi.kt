@@ -9,12 +9,17 @@ interface GitHubApi {
     /**
      * Retrieves the count of pull requests merged by a specific user within a given date range.
      *
-     * @param gitHubId The GitHub username
+     * @param gitHubUserId The GitHub username
      * @param startDate The start date of the range (inclusive)
      * @param endDate The end date of the range (inclusive)
      * @return The number of merged pull requests
      */
-    suspend fun getMergedPullRequestCount(gitHubId: String, startDate: Instant, endDate: Instant): UInt
+    suspend fun getMergedPullRequestCount(
+        gitHubUserId: String,
+        organizationIds: List<String>,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt
 
     /**
      * Gets the details of pull requests by a user that have been merged within a specified date range.
@@ -26,6 +31,7 @@ interface GitHubApi {
      */
     suspend fun getMergedPullRequests(
         gitHubUserId: String,
+        organizationIds: List<String>,
         startDate: Instant,
         endDate: Instant,
     ): List<GitHubPullRequest>
