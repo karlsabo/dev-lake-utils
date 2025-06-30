@@ -25,4 +25,18 @@ interface GitHubApi {
      * @return List of pull request details
      */
     suspend fun getClosedPullRequests(username: String, startDate: Instant, endDate: Instant): List<GitHubPullRequest>
+
+    /**
+     * Gets the details of pull requests by a user that have been merged within a specified date range.
+     *
+     * @param gitHubUserId The GitHub user ID
+     * @param startDate The start date (inclusive)
+     * @param endDate The end date (inclusive)
+     * @return List of pull request details
+     */
+    suspend fun getPullRequestsByAuthorIdAndAfterMergedDate(
+        gitHubUserId: String,
+        startDate: Instant,
+        endDate: Instant,
+    ): List<GitHubPullRequest>
 }

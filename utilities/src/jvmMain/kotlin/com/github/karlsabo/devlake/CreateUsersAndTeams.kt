@@ -4,10 +4,10 @@ import com.github.karlsabo.devlake.accessor.Team
 import com.github.karlsabo.devlake.accessor.TeamUser
 import com.github.karlsabo.devlake.accessor.User
 import com.github.karlsabo.devlake.accessor.UserAccount
-import com.github.karlsabo.devlake.tools.getApplicationDirectory
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.tools.getApplicationDirectory
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -20,6 +20,7 @@ const val DEV_LAKE_APP_NAME = "DevLakeUtils"
 val devLakeDataSourceDbConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "dev-lake-datasource-db-config.json")
 val textSummarizerConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "text-summarizer-openai-config.json")
 val jiraConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "jira-rest-config.json")
+val gitHubConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "github-config.json")
 
 fun main() {
     val dataSourceConfigNoSecrets = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)

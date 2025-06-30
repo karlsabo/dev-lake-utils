@@ -12,6 +12,7 @@ import kotlin.time.Duration.Companion.days
  * 1. Load GitHub configuration
  * 2. Get PR count for a user for the past year
  * 3. Get PRs for a user for the last week
+ * 4. Get merged PRs by author ID within a date range
  */
 fun main(args: Array<String>) {
     println("GitHub API Demo")
@@ -50,6 +51,23 @@ fun main(args: Array<String>) {
                 println("  URL: ${pr.htmlUrl}")
                 println("  Created: ${formatDate(pr.createdAt)}")
                 println("  Closed: ${pr.closedAt?.let { formatDate(it) } ?: "N/A"}")
+                println("  Repository: ${pr.repository.fullName}")
+                println("  Changes: +${pr.additions ?: 0} -${pr.deletions ?: 0} (${pr.changedFiles ?: 0} files)")
+                println()
+            }
+
+            // Get merged PRs by author ID within a date range
+            // For this demo, we'll use the same user and date range as above
+            // In a real scenario, you would get the user ID from somewhere else
+            val userId = recentPRs.firstOrNull()?.user?.id ?: username
+            val mergedPRs = githubApi.getPullRequestsByAuthorIdAndAfterMergedDate(userId, oneWeekAgo, now)
+
+            println("\nPRs merged by user ID $userId in the last week (${mergedPRs.size} total):")
+            mergedPRs.forEach { pr ->
+                println("- #${pr.number}: ${pr.title}")
+                println("  URL: ${pr.htmlUrl}")
+                println("  Created: ${formatDate(pr.createdAt)}")
+                println("  Merged: ${pr.mergedAt?.let { formatDate(it) } ?: "N/A"}")
                 println("  Repository: ${pr.repository.fullName}")
                 println("  Changes: +${pr.additions ?: 0} -${pr.deletions ?: 0} (${pr.changedFiles ?: 0} files)")
                 println()
