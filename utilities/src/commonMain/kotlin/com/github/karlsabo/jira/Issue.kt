@@ -1,25 +1,13 @@
 package com.github.karlsabo.jira
 
-import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
+import kotlinx.datetime.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.*
 
 @Serializable
 data class Issue(
@@ -61,20 +49,21 @@ data class Issue(
 
 fun JsonObject.toIssue(): Issue {
     @Suppress("UNREACHABLE_CODE") val fields = this["fields"]?.jsonObject ?: return error("Missing fields")
-    val parent = fields["parent"]?.jsonObject
+    val parent = fields["parent"]?.takeIf { it !is JsonNull }?.jsonObject
 
     return Issue(
         id = this["id"]?.jsonPrimitive?.content ?: error("Missing id"),
         url = this["self"]?.jsonPrimitive?.content,
-        iconUrl = fields["issuetype"]?.jsonObject?.get("iconUrl")?.jsonPrimitive?.content,
+        iconUrl = fields["issuetype"]?.takeIf { it !is JsonNull }?.jsonObject?.get("iconUrl")?.jsonPrimitive?.content,
         issueKey = this["key"]?.jsonPrimitive?.content ?: error("Missing key"),
         title = fields["summary"]?.jsonPrimitive?.content,
-        description = fields["description"]?.jsonObject?.toString(),
-        epicKey = fields["customfield_10018"]?.jsonObject?.get("key")?.jsonPrimitive?.content,
-        type = fields["issuetype"]?.jsonObject?.get("name")?.jsonPrimitive?.content,
-        originalType = fields["issuetype"]?.jsonObject?.get("name")?.jsonPrimitive?.content,
-        status = fields["status"]?.jsonObject?.get("statusCategory")?.jsonObject?.get("name")?.jsonPrimitive?.content,
-        originalStatus = fields["status"]?.jsonObject?.get("name")?.jsonPrimitive?.content,
+        description = fields["description"]?.takeIf { it !is JsonNull }?.jsonObject?.toString(),
+        epicKey = fields["customfield_10018"]?.takeIf { it !is JsonNull }?.jsonObject?.get("key")?.jsonPrimitive?.content,
+        type = fields["issuetype"]?.takeIf { it !is JsonNull }?.jsonObject?.get("name")?.jsonPrimitive?.content,
+        originalType = fields["issuetype"]?.takeIf { it !is JsonNull }?.jsonObject?.get("name")?.jsonPrimitive?.content,
+        status = fields["status"]?.takeIf { it !is JsonNull }?.jsonObject?.get("statusCategory")
+            ?.takeIf { it !is JsonNull }?.jsonObject?.get("name")?.jsonPrimitive?.content,
+        originalStatus = fields["status"]?.takeIf { it !is JsonNull }?.jsonObject?.get("name")?.jsonPrimitive?.content,
         resolutionDate = fields["resolutiondate"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content?.let {
             parseOffsetDateTime(it)
         },
@@ -82,18 +71,19 @@ fun JsonObject.toIssue(): Issue {
         updatedDate = fields["updated"]?.jsonPrimitive?.content?.let { parseOffsetDateTime(it) },
         leadTimeMinutes = null, // Calculated elsewhere
         parentIssueId = parent?.get("id")?.jsonPrimitive?.content,
-        priority = fields["priority"]?.jsonObject?.get("name")?.jsonPrimitive?.content,
+        priority = fields["priority"]?.takeIf { it !is JsonNull }?.jsonObject?.get("name")?.jsonPrimitive?.content,
         storyPoint = fields["customfield_10100"]?.jsonPrimitive?.doubleOrNull,
         originalEstimateMinutes = fields["timeoriginalestimate"]?.jsonPrimitive?.longOrNull,
         timeSpentMinutes = fields["timespent"]?.jsonPrimitive?.longOrNull,
         timeRemainingMinutes = fields["timeestimate"]?.jsonPrimitive?.longOrNull,
-        creatorId = fields["creator"]?.jsonObject?.get("accountId")?.jsonPrimitive?.content,
-        creatorName = fields["creator"]?.jsonObject?.get("displayName")?.jsonPrimitive?.content,
+        creatorId = fields["creator"]?.takeIf { it !is JsonNull }?.jsonObject?.get("accountId")?.jsonPrimitive?.content,
+        creatorName = fields["creator"]?.takeIf { it !is JsonNull }?.jsonObject?.get("displayName")?.jsonPrimitive?.content,
         assigneeId = fields["assignee"]?.takeIf { it !is JsonNull }?.jsonObject?.get("accountId")
             ?.takeIf { it !is JsonNull }?.jsonPrimitive?.content,
         assigneeName = fields["assignee"]?.takeIf { it !is JsonNull }?.jsonObject?.get("displayName")?.jsonPrimitive?.content,
         severity = fields["customfield_11203"]?.takeIf { it !is JsonNull }?.jsonObject?.get("value")?.jsonPrimitive?.content,
-        component = fields["components"]?.jsonArray?.firstOrNull()?.jsonObject?.get("name")?.jsonPrimitive?.content,
+        component = fields["components"]?.takeIf { it !is JsonNull }?.jsonArray?.firstOrNull()
+            ?.takeIf { it !is JsonNull }?.jsonObject?.get("name")?.jsonPrimitive?.content,
         originalProject = fields["project"]?.takeIf { it !is JsonNull }?.jsonObject?.get("key")?.jsonPrimitive?.content,
         urgency = fields["customfield_11202"]?.takeIf { it !is JsonNull }?.jsonObject?.get("value")?.jsonPrimitive?.content,
         isSubtask = fields["issuetype"]?.takeIf { it !is JsonNull }?.jsonObject?.get("subtask")?.jsonPrimitive?.booleanOrNull,
