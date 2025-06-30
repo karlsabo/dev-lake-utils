@@ -13,6 +13,7 @@ import kotlin.time.Duration.Companion.days
  * 2. Get PR count for a user for the past year
  * 3. Get PRs for a user for the last week
  * 4. Get merged PRs by author ID within a date range
+ * 5. Get count of merged PRs by author ID within a date range
  */
 fun main(args: Array<String>) {
     println("GitHub API Demo")
@@ -72,6 +73,9 @@ fun main(args: Array<String>) {
                 println("  Changes: +${pr.additions ?: 0} -${pr.deletions ?: 0} (${pr.changedFiles ?: 0} files)")
                 println()
             }
+
+            val mergedPRsCount = githubApi.getPullRequestsByAuthorIdAndAfterMergedDateCount(userId, oneWeekAgo, now)
+            println("\nCount of PRs merged by user ID $userId in the last week: $mergedPRsCount")
         }
 
     } catch (e: Exception) {

@@ -252,7 +252,7 @@ private suspend fun sendToZap(slackMessage: SlackMessage, zapierMetricUrl: Strin
 @Serializable
 data class UserMetrics(
     val userId: String,
-    val pullRequestsPastWeek: List<PullRequest>,
+    val pullRequestsPastWeek: List<GitHubPullRequest>,
     val pullRequestsYearToDateCount: UInt,
     val issuesClosedLastWeek: List<Issue>,
     val issuesClosedYearToDateCount: UInt,
@@ -303,15 +303,14 @@ suspend fun createUserMetrics(user: User, jiraApi: JiraApi, gitHubApi: GitHubApi
             System.now(),
         )
     )
-    pullRequestsYearToDate.addAll(
-        gitHubApi.getPullRequestsByAuthorIdAndAfterMergedDateCount(
-            user.gitHubId!!,
-            startOfThisYear,
-            System.now(),
-        )
+    val prCountYtd = gitHubApi.getPullRequestsByAuthorIdAndAfterMergedDateCount(
+        user.gitHubId!!,
+        startOfThisYear,
+        System.now(),
     )
+
     issuesClosedPastWeek.addAll(
-        issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
+        jiraApi.getIssuesByAssigneeIdAndAfterResolutionDate(
             userAccount.accountId,
             System.now().minus(7.days)
         )
@@ -325,7 +324,7 @@ suspend fun createUserMetrics(user: User, jiraApi: JiraApi, gitHubApi: GitHubApi
     return UserMetrics(
         user.id,
         pullRequestsPastWeek,
-        pullRequestsYearToDate,
+        prCountYtd,
         issuesClosedPastWeek,
         issuesClosedYearToDate,
     )
