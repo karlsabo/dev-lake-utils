@@ -8,6 +8,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.*
+import java.net.URI
 
 @Serializable
 data class Issue(
@@ -51,11 +52,14 @@ fun JsonObject.toIssue(): Issue {
     @Suppress("UNREACHABLE_CODE") val fields = this["fields"]?.jsonObject ?: return error("Missing fields")
     val parent = fields["parent"]?.takeIf { it !is JsonNull }?.jsonObject
 
+    val issueKey = this["key"]?.jsonPrimitive?.content ?: error("Missing key")
+    val uri = URI(this["self"]?.jsonPrimitive?.content ?: error("Missing URL"))
+    val url = uri.scheme + "://" + uri.authority + "/browse/$issueKey"
     return Issue(
         id = this["id"]?.jsonPrimitive?.content ?: error("Missing id"),
-        url = this["self"]?.jsonPrimitive?.content,
+        url = url,
         iconUrl = fields["issuetype"]?.takeIf { it !is JsonNull }?.jsonObject?.get("iconUrl")?.jsonPrimitive?.content,
-        issueKey = this["key"]?.jsonPrimitive?.content ?: error("Missing key"),
+        issueKey = issueKey,
         title = fields["summary"]?.jsonPrimitive?.content,
         description = fields["description"]?.takeIf { it !is JsonNull }?.jsonObject?.toString(),
         epicKey = fields["customfield_10018"]?.takeIf { it !is JsonNull }?.jsonObject?.get("key")?.jsonPrimitive?.content,
