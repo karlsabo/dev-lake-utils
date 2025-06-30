@@ -315,8 +315,8 @@ suspend fun createUserMetrics(user: User, jiraApi: JiraApi, gitHubApi: GitHubApi
             System.now(),
         )
     )
-    val issuesCountYtd = jiraApi.getIssueClosedCount(
-        user.jiraId,
+    val issuesCountYtd = jiraApi.getIssuesResolvedCount(
+        user.jiraId!!,
         startOfThisYear,
         System.now(),
     )

@@ -122,6 +122,16 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
             "assignee = $userJiraId AND resolutiondate >= \"${startDate.toUtcDateString()}\" AND resolutiondate <= \"${endDate.toUtcDateString()}\" ORDER BY resolutiondate DESC"
         return runJql(jql)
     }
+
+    override suspend fun getIssuesResolvedCount(userJiraId: String, startDate: Instant, endDate: Instant): UInt {
+        val jql =
+            "assignee = $userJiraId AND resolutiondate >= \"${startDate.toUtcDateString()}\" AND resolutiondate <= \"${endDate.toUtcDateString()}\""
+        val encodedJql = jql.encodeURLParameter()
+        val url = "https://${config.domain}/rest/api/3/search?jql=$encodedJql&maxResults=0"
+        val response = client.get(url)
+        val root = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        return (root["total"]?.jsonPrimitive?.int ?: 0).toUInt()
+    }
 }
 
 private fun Instant.toUtcDateString(): String {
