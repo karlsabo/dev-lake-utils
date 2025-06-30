@@ -1,8 +1,9 @@
 package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.devlake.DEV_LAKE_APP_NAME
-import io.ktor.utils.io.*
-import io.ktor.utils.io.core.*
+import com.github.karlsabo.tools.getApplicationDirectory
+import io.ktor.utils.io.core.writeText
+import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem

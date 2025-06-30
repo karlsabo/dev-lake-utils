@@ -2,7 +2,7 @@ package com.github.karlsabo.text
 
 import com.github.karlsabo.serialization.loadConfig
 import com.github.karlsabo.serialization.saveConfig
-import io.ktor.utils.io.*
+import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem

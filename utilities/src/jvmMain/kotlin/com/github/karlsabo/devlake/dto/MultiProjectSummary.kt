@@ -7,7 +7,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class DevLakeSummary(
+data class MultiProjectSummary(
     val startDate: LocalDate,
     val endDate: LocalDate,
     val summaryName: String,
@@ -15,7 +15,7 @@ data class DevLakeSummary(
     val pagerDutyAlerts: List<PagerDutyAlert>?,
 )
 
-fun DevLakeSummary.toTerseSlackMarkup(): String {
+fun MultiProjectSummary.toTerseSlackMarkup(): String {
     val slackSummary = StringBuilder()
     slackSummary.appendLine("*$summaryName update $startDate - $endDate*")
     slackSummary.appendLine()
@@ -35,7 +35,7 @@ fun DevLakeSummary.toTerseSlackMarkup(): String {
     return slackSummary.toString()
 }
 
-fun DevLakeSummary.toSlackMarkup(): String {
+fun MultiProjectSummary.toSlackMarkup(): String {
     val slackSummary = StringBuilder()
     slackSummary.appendLine()
     slackSummary.appendLine("*$summaryName update $startDate - $endDate*")
@@ -59,7 +59,7 @@ fun DevLakeSummary.toSlackMarkup(): String {
     return slackSummary.toString()
 }
 
-fun DevLakeSummary.toMarkdown(): String {
+fun MultiProjectSummary.toMarkdown(): String {
     val markdownSummary = StringBuilder()
     markdownSummary.appendLine()
     markdownSummary.appendLine("# Identity and Access Management weekly update $startDate - ${endDate}")

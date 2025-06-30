@@ -12,17 +12,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
+import com.github.karlsabo.devlake.DevLakeUserAndTeamsConfig
 import com.github.karlsabo.devlake.accessor.*
-import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
-import com.github.karlsabo.devlake.isFinishedToday
+import com.github.karlsabo.devlake.gitHubConfigPath
+import com.github.karlsabo.devlake.jiraConfigPath
+import com.github.karlsabo.devlake.loadUserAndTeamConfig
 import com.github.karlsabo.devlake.tools.UserMetricPublisherConfig
 import com.github.karlsabo.devlake.tools.loadUserMetricPublisherConfig
 import com.github.karlsabo.devlake.tools.saveUserMetricPublisherConfig
 import com.github.karlsabo.devlake.tools.userMetricPublisherConfigPath
-import com.github.karlsabo.ds.DataSourceManager
-import com.github.karlsabo.ds.DataSourceManagerDb
-import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
-import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequest
+import com.github.karlsabo.github.GitHubRestApi
+import com.github.karlsabo.github.loadGitHubConfig
+import com.github.karlsabo.jira.JiraApi
+import com.github.karlsabo.jira.JiraRestApi
+import com.github.karlsabo.jira.loadJiraConfig
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -50,14 +55,19 @@ fun main() = application {
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var config by remember { mutableStateOf(UserMetricPublisherConfig()) }
-    var dataSourceManager by remember { mutableStateOf<DataSourceManager?>(null) }
+    var userAndTeamsConfig by remember { mutableStateOf<DevLakeUserAndTeamsConfig?>(null) }
+    var jiraApi by remember { mutableStateOf<JiraApi?>(null) }
+    var gitHubApi by remember { mutableStateOf<GitHubApi?>(null) }
 
     LaunchedEffect(Unit) {
         println("Loading configuration")
         try {
             config = loadUserMetricPublisherConfig()
-            val dataSourceConfig = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)!!
-            dataSourceManager = DataSourceManagerDb(dataSourceConfig.toDataSourceDbConfig())
+            val jiraApiRestConfig = loadJiraConfig(jiraConfigPath)
+            jiraApi = JiraRestApi(jiraApiRestConfig)
+            val gitHubApiRestConfig = loadGitHubConfig(gitHubConfigPath)
+            gitHubApi = GitHubRestApi(gitHubApiRestConfig)
+            userAndTeamsConfig = loadUserAndTeamConfig()!!
             isLoadingConfig = false
         } catch (error: Exception) {
             errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
@@ -96,59 +106,10 @@ fun main() = application {
         return@application
     }
 
-    var isPipelineLoading by remember { mutableStateOf(true) }
-    var isShowPipelineError by remember { mutableStateOf(false) }
-    var pipelineErrorMessage by remember { mutableStateOf("Pipeline is out of date") }
-
-    if (!isLoadingConfig) {
-        LaunchedEffect(Unit) {
-            val pipelineAccessor = PipelineAccessorDb(dataSourceManager!!.getOrCreateDataSource())
-            val latestPipelines = pipelineAccessor.getPipelines(1, 0)
-            if (latestPipelines.isEmpty() || !latestPipelines[0].isFinishedToday()) {
-                pipelineErrorMessage = if (latestPipelines.isEmpty()) {
-                    "No pipelines found"
-                } else {
-                    "Pipeline is out of date: ${latestPipelines[0].beganAt?.toLocalDateTime(TimeZone.currentSystemDefault())} ${TimeZone.currentSystemDefault()}, status: ${latestPipelines[0].status}"
-                }
-                isShowPipelineError = true
-            }
-        }
-        isPipelineLoading = false
-    }
-
-    if (!isLoadingConfig && !isPipelineLoading && isShowPipelineError) {
-        DialogWindow(
-            title = "Error, DevLake pipeline is out of date",
-            onCloseRequest = { isShowPipelineError = false },
-            visible = isShowPipelineError,
-        ) {
-            Surface {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                ) {
-                    Text(text = pipelineErrorMessage, style = MaterialTheme.typography.h6)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = errorMessage)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { isShowPipelineError = false }) {
-                        Text("Continue")
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = ::exitApplication) {
-                        Text("Exit")
-                    }
-                }
-            }
-        }
-    }
-
     Window(
         onCloseRequest = ::exitApplication,
         title = "Metric Publisher",
-        visible = !isLoadingConfig && !isShowPipelineError && !isPipelineLoading,
+        visible = !isLoadingConfig,
         state = rememberWindowState(
             width = 1920.dp,
             height = 1080.dp,
@@ -164,13 +125,15 @@ fun main() = application {
         var metricsPreviewText by remember { mutableStateOf("Loading...") }
         val scope = rememberCoroutineScope()
 
-        if (!isLoadingConfig && !isShowPipelineError && !isPipelineLoading) {
+        if (!isLoadingConfig) {
             LaunchedEffect(Unit) {
                 println("Loading metrics")
                 val jobs = config.userIds.map { userId ->
                     async(Dispatchers.IO) {
                         measureTime {
-                            val userMetrics = createUserMetrics(userId, dataSourceManager!!)
+                            val user = userAndTeamsConfig!!.users.firstOrNull { it.id == userId }
+                                ?: throw Exception("User not found: $userId in ${userAndTeamsConfig!!.users}")
+                            val userMetrics = createUserMetrics(user, jiraApi!!, gitHubApi!!)
                             synchronized(metrics) {
                                 metrics.add(userMetrics)
                             }
@@ -290,9 +253,9 @@ private suspend fun sendToZap(slackMessage: SlackMessage, zapierMetricUrl: Strin
 data class UserMetrics(
     val userId: String,
     val pullRequestsPastWeek: List<PullRequest>,
-    val pullRequestsYearToDay: List<PullRequest>,
+    val pullRequestsYearToDateCount: UInt,
     val issuesClosedLastWeek: List<Issue>,
-    val issuesClosedYearToDate: List<Issue>,
+    val issuesClosedYearToDateCount: UInt,
 )
 
 fun UserMetrics.toSlackMarkdown(): String {
@@ -302,11 +265,11 @@ fun UserMetrics.toSlackMarkdown(): String {
     val builder = StringBuilder()
     builder.append("📌 *Merged PRs*\n")
     builder.append("• *Past week:* `${pullRequestsPastWeek.size}`\n")
-    builder.append("• *Year to Date:* `${pullRequestsYearToDay.size}`. _Expectation ~${(numberOfWeeksThisYear * 2.5).toInt()} (2-3 per week)_\n")
+    builder.append("• *Year to Date:* `$pullRequestsYearToDateCount`. _Expectation ~${(numberOfWeeksThisYear * 2.5).toInt()} (2-3 per week)_\n")
     builder.append("\n")
     builder.append("📌 *Issues Closed*\n")
     builder.append("• *Past week:* `${issuesClosedLastWeek.size}`\n")
-    builder.append("• *Year to date:* `${issuesClosedYearToDate.size}`. _Expectation ~${(numberOfWeeksThisYear * 2.5).toInt()} (2-3 per week)_\n")
+    builder.append("• *Year to date:* `$issuesClosedYearToDateCount`. _Expectation ~${(numberOfWeeksThisYear * 2.5).toInt()} (2-3 per week)_\n")
     builder.append("\n━━━━━━━━━━━━━━━━━━\n")
 
     builder.append("\n")
@@ -324,46 +287,43 @@ fun UserMetrics.toSlackMarkdown(): String {
     return builder.toString()
 }
 
-fun createUserMetrics(userId: String, dataSourceManager: DataSourceManager): UserMetrics {
+suspend fun createUserMetrics(user: User, jiraApi: JiraApi, gitHubApi: GitHubApi): UserMetrics {
     val startOfThisYear = System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         .run { Instant.parse("${year}-01-01T00:00:00Z") }
 
-    val pullRequestsPastWeek = mutableListOf<PullRequest>()
-    val pullRequestsYearToDate = mutableListOf<PullRequest>()
+    val pullRequestsPastWeek = mutableListOf<GitHubPullRequest>()
+    val pullRequestsYearToDate = mutableListOf<GitHubPullRequest>()
     val issuesClosedPastWeek = mutableListOf<Issue>()
     val issuesClosedYearToDate = mutableListOf<Issue>()
-    val pullRequestAccessor = PullRequestAccessorDb(dataSourceManager.getOrCreateDataSource())
-    val issueAccessor = IssueAccessorDb(dataSourceManager.getOrCreateDataSource())
-    val userAccountAccessor = UserAccountAccessorDb(dataSourceManager.getOrCreateDataSource())
-        val userAccounts = userAccountAccessor.getUserAccountByUserId(userId)
-        userAccounts.forEach { userAccount ->
-            pullRequestsPastWeek.addAll(
-                pullRequestAccessor.getPullRequestsByAuthorIdAndAfterMergedDate(
-                    userAccount.accountId,
-                    System.now().minus(7.days),
-                )
-            )
-            pullRequestsYearToDate.addAll(
-                pullRequestAccessor.getPullRequestsByAuthorIdAndAfterMergedDate(
-                    userAccount.accountId,
-                    startOfThisYear,
-                )
-            )
-            issuesClosedPastWeek.addAll(
-                issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
-                    userAccount.accountId,
-                    System.now().minus(7.days)
-                )
-            )
-            issuesClosedYearToDate.addAll(
-                issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
-                    userAccount.accountId,
-                    startOfThisYear
-                )
-            )
-    }
+
+    pullRequestsPastWeek.addAll(
+        gitHubApi.getPullRequestsByAuthorIdAndAfterMergedDate(
+            user.gitHubId!!,
+            System.now().minus(7.days),
+            System.now(),
+        )
+    )
+    pullRequestsYearToDate.addAll(
+        gitHubApi.getPullRequestsByAuthorIdAndAfterMergedDateCount(
+            user.gitHubId!!,
+            startOfThisYear,
+            System.now(),
+        )
+    )
+    issuesClosedPastWeek.addAll(
+        issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
+            userAccount.accountId,
+            System.now().minus(7.days)
+        )
+    )
+    issuesClosedYearToDate.addAll(
+        issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
+            userAccount.accountId,
+            startOfThisYear
+        )
+    )
     return UserMetrics(
-        userId,
+        user.id,
         pullRequestsPastWeek,
         pullRequestsYearToDate,
         issuesClosedPastWeek,

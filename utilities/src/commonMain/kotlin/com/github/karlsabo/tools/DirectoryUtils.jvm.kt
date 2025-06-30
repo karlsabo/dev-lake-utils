@@ -1,4 +1,4 @@
-package com.github.karlsabo.devlake.tools
+package com.github.karlsabo.tools
 
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
