@@ -1,7 +1,7 @@
 package com.github.karlsabo.devlake
 
 import com.github.karlsabo.devlake.accessor.*
-import com.github.karlsabo.devlake.dto.DevLakeSummary
+import com.github.karlsabo.devlake.dto.MultiProjectSummary
 import com.github.karlsabo.devlake.dto.PagerDutyAlert
 import com.github.karlsabo.devlake.dto.Project
 import com.github.karlsabo.jira.JiraApi
@@ -302,7 +302,7 @@ suspend fun createSummary(
     summaryName: String,
     isMiscellaneousProjectIncluded: Boolean,
     isPagerDutyIncluded: Boolean,
-): DevLakeSummary {
+): MultiProjectSummary {
     val timeInPast = Clock.System.now().minus(duration)
     val timeInPastSql = Date(timeInPast.toEpochMilliseconds())
 
@@ -434,7 +434,7 @@ suspend fun createSummary(
         null
     }
 
-    return DevLakeSummary(
+    return MultiProjectSummary(
         timeInPast.toLocalDateTime(TimeZone.UTC).date,
         Clock.System.now().toLocalDateTime(TimeZone.UTC).date,
         summaryName,

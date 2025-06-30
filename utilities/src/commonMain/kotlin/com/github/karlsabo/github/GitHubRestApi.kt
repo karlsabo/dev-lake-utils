@@ -21,12 +21,7 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -35,7 +30,12 @@ private val json = Json { ignoreUnknownKeys = true }
  */
 data class GitHubApiRestConfig(
     val token: String,
-)
+
+    ) {
+    override fun toString(): String {
+        return "GitHubApiRestConfig()"
+    }
+}
 
 /**
  * Configuration for GitHub API.
@@ -160,6 +160,52 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
                 val prRoot = Json.parseToJsonElement(prResponseText).jsonObject
 
                 pullRequests.add(prRoot.toPullRequest())
+            }
+
+            page++
+            totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
+        }
+
+        return pullRequests
+    }
+
+    override suspend fun getPullRequestsByAuthorIdAndAfterMergedDate(
+        gitHubUserId: String,
+        startDate: Instant,
+        endDate: Instant,
+    ): List<GitHubPullRequest> {
+        val formattedStartDate = toUtcDate(startDate)
+        val formattedEndDate = toUtcDate(endDate)
+
+        val query = "author:$gitHubUserId is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
+        val encodedQuery = query.encodeURLParameter()
+
+        val pullRequests = mutableListOf<GitHubPullRequest>()
+        var page = 1
+        val perPage = 100
+        var totalCount = 1000
+
+        while (page <= (totalCount / perPage) + 1) {
+            val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=$perPage&page=$page"
+
+            val response = client.get(url) {
+                addGitHubHeaders()
+            }
+
+            val responseText = response.bodyAsText()
+            val root = Json.parseToJsonElement(responseText).jsonObject
+
+            val items = root["items"]?.jsonArray ?: break
+            if (items.isEmpty()) break
+
+            for (item in items) {
+                val prUrl = item.jsonObject["pull_request"]?.jsonObject?.get("url")?.jsonPrimitive?.content ?: continue
+                val prResponse = client.get(prUrl) {
+                    addGitHubHeaders()
+                }
+                val prResponseText = prResponse.bodyAsText()
+                val pullRequestJson = Json.parseToJsonElement(prResponseText).jsonObject
+                pullRequests.add(pullRequestJson.toPullRequest())
             }
 
             page++
