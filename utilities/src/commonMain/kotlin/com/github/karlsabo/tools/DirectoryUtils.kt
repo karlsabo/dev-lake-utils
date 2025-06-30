@@ -12,7 +12,7 @@ import kotlinx.io.files.SystemFileSystem
  *
  * @return Path to the application directory.
  */
-actual fun getApplicationDirectory(appName:String): Path {
+fun getApplicationDirectory(appName: String): Path {
     val userHome = Path(System.getProperty("user.home"))
 
     val directory = when (System.getProperty("os.name").lowercase()) {

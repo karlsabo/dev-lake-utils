@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import com.github.karlsabo.devlake.DevLakeUserAndTeamsConfig
-import com.github.karlsabo.devlake.accessor.*
+import com.github.karlsabo.devlake.accessor.User
 import com.github.karlsabo.devlake.gitHubConfigPath
 import com.github.karlsabo.devlake.jiraConfigPath
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
@@ -29,14 +29,18 @@ import com.github.karlsabo.jira.Issue
 import com.github.karlsabo.jira.JiraApi
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.gson.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
+import io.ktor.serialization.gson.gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.joinAll
@@ -277,7 +281,7 @@ fun UserMetrics.toSlackMarkdown(): String {
     builder.append("🔍 *Details:*\n")
     builder.append("🔹 *Merged PRs:*\n")
     pullRequestsPastWeek.forEach {
-        builder.append("• <${it.url}|${it.pullRequestKey}> ${it.title}\n")
+        builder.append("• <${it.url}|${it.id}> ${it.title}\n")
     }
 
     builder.append("\n")
