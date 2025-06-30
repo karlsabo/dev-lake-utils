@@ -281,7 +281,7 @@ fun UserMetrics.toSlackMarkdown(): String {
     builder.append("🔍 *Details:*\n")
     builder.append("🔹 *Merged PRs:*\n")
     pullRequestsPastWeek.forEach {
-        builder.append("• <${it.url}|${it.number}> ${it.title}\n")
+        builder.append("• <${it.htmlUrl}|${it.number}> ${it.title}\n")
     }
 
     builder.append("\n")
