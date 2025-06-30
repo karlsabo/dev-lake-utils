@@ -15,7 +15,6 @@
 # TODO
 
 * [ ] Remove DevLake
-  * metrics publisher
   * summary publisher
 * [ ] Create native executables
 * [ ] Add logging
