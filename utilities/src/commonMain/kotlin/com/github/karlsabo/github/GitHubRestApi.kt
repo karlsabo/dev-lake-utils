@@ -214,6 +214,31 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
         return pullRequests
     }
+
+    override suspend fun getPullRequestsByAuthorIdAndAfterMergedDateCount(
+        gitHubUserId: String,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt {
+        val formattedStartDate = toUtcDate(startDate)
+        val formattedEndDate = toUtcDate(endDate)
+
+        val query = "author:$gitHubUserId is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
+        val encodedQuery = query.encodeURLParameter()
+
+        val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"
+
+        val response = client.get(url) {
+            addGitHubHeaders()
+        }
+
+        val responseText = response.bodyAsText()
+        val root = Json.parseToJsonElement(responseText).jsonObject
+
+        val totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
+
+        return totalCount.toUInt()
+    }
 }
 
 private fun JsonObject.toPullRequest(): GitHubPullRequest {
