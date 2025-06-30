@@ -99,13 +99,15 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
     override suspend fun getMergedPullRequests(
         gitHubUserId: String,
+        organizationIds: List<String>,
         startDate: Instant,
         endDate: Instant,
     ): List<GitHubPullRequest> {
         val formattedStartDate = toUtcDate(startDate)
         val formattedEndDate = toUtcDate(endDate)
 
-        val query = "author:$gitHubUserId is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
+        val query =
+            "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
         val encodedQuery = query.encodeURLParameter()
 
         val pullRequests = mutableListOf<GitHubPullRequest>()
@@ -145,13 +147,15 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
     override suspend fun getMergedPullRequestCount(
         gitHubUserId: String,
+        organizationIds: List<String>,
         startDate: Instant,
         endDate: Instant,
     ): UInt {
         val formattedStartDate = toUtcDate(startDate)
         val formattedEndDate = toUtcDate(endDate)
 
-        val query = "author:$gitHubUserId is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
+        val query =
+            "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
         val encodedQuery = query.encodeURLParameter()
 
         val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"

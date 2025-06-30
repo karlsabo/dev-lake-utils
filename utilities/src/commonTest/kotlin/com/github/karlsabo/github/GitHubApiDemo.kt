@@ -32,6 +32,8 @@ fun main(args: Array<String>) {
                 ?: throw Exception("No --user=username provided")
         println("Using GitHub username: $username")
 
+        val organizations = args.find { it.startsWith("--orgs=") }?.substringAfter("=")?.split(",") ?: emptyList()
+
         // Get PR count for the past year
         val now = Clock.System.now()
         val currentYear = now.toString().substring(0, 4)
@@ -39,12 +41,12 @@ fun main(args: Array<String>) {
 
         runBlocking {
             // Get PR count for the past year
-            val prCount = githubApi.getMergedPullRequestCount(username, startOfTheYear, now)
+            val prCount = githubApi.getMergedPullRequestCount(username, organizations, startOfTheYear, now)
             println("PR count for $username in the past year: $prCount")
 
             // Get PRs for the last week
             val oneWeekAgo = now.minus(7.days)
-            val recentPRs = githubApi.getMergedPullRequests(username, oneWeekAgo, now)
+            val recentPRs = githubApi.getMergedPullRequests(username, organizations, oneWeekAgo, now)
 
             println("\nPRs closed by $username in the last week (${recentPRs.size} total):")
             recentPRs.forEach { pr ->
@@ -61,7 +63,7 @@ fun main(args: Array<String>) {
             // For this demo, we'll use the same user and date range as above
             // In a real scenario, you would get the user ID from somewhere else
             val userId = recentPRs.firstOrNull()?.user?.id ?: username
-            val mergedPRs = githubApi.getMergedPullRequests(userId, oneWeekAgo, now)
+            val mergedPRs = githubApi.getMergedPullRequests(userId, organizations, oneWeekAgo, now)
 
             println("\nPRs merged by user ID $userId in the last week (${mergedPRs.size} total):")
             mergedPRs.forEach { pr ->
@@ -74,7 +76,7 @@ fun main(args: Array<String>) {
                 println()
             }
 
-            val mergedPRsCount = githubApi.getMergedPullRequestCount(userId, oneWeekAgo, now)
+            val mergedPRsCount = githubApi.getMergedPullRequestCount(userId, organizations, oneWeekAgo, now)
             println("\nCount of PRs merged by user ID $userId in the last week: $mergedPRsCount")
         }
 

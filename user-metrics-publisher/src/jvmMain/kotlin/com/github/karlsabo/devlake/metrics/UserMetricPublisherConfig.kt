@@ -12,7 +12,8 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class UserMetricPublisherConfig(
-    val userIds: List<String> = emptyList<String>(),
+    val userIds: List<String> = emptyList(),
+    val organizationIds: List<String> = emptyList(),
     val zapierMetricUrl: String = "https://hooks.zapier.com",
     val metricInformationPostfix: String = "",
 )
