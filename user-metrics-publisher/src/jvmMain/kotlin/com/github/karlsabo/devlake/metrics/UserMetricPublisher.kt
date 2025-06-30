@@ -25,6 +25,7 @@ import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubPullRequest
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.loadGitHubConfig
+import com.github.karlsabo.jira.Issue
 import com.github.karlsabo.jira.JiraApi
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
@@ -292,40 +293,39 @@ suspend fun createUserMetrics(user: User, jiraApi: JiraApi, gitHubApi: GitHubApi
         .run { Instant.parse("${year}-01-01T00:00:00Z") }
 
     val pullRequestsPastWeek = mutableListOf<GitHubPullRequest>()
-    val pullRequestsYearToDate = mutableListOf<GitHubPullRequest>()
-    val issuesClosedPastWeek = mutableListOf<Issue>()
-    val issuesClosedYearToDate = mutableListOf<Issue>()
+    val issuesClosedPastWeek = mutableListOf<com.github.karlsabo.jira.Issue>()
 
     pullRequestsPastWeek.addAll(
-        gitHubApi.getPullRequestsByAuthorIdAndAfterMergedDate(
+        gitHubApi.getMergedPullRequests(
             user.gitHubId!!,
             System.now().minus(7.days),
             System.now(),
         )
     )
-    val prCountYtd = gitHubApi.getPullRequestsByAuthorIdAndAfterMergedDateCount(
+    val prCountYtd = gitHubApi.getMergedPullRequestCount(
         user.gitHubId!!,
         startOfThisYear,
         System.now(),
     )
 
     issuesClosedPastWeek.addAll(
-        jiraApi.getIssuesByAssigneeIdAndAfterResolutionDate(
-            userAccount.accountId,
-            System.now().minus(7.days)
+        jiraApi.getIssuesResolved(
+            user.jiraId!!,
+            System.now().minus(7.days),
+            System.now(),
         )
     )
-    issuesClosedYearToDate.addAll(
-        issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
-            userAccount.accountId,
-            startOfThisYear
-        )
+    val issuesCountYtd = jiraApi.getIssueClosedCount(
+        user.jiraId,
+        startOfThisYear,
+        System.now(),
     )
+
     return UserMetrics(
         user.id,
         pullRequestsPastWeek,
         prCountYtd,
         issuesClosedPastWeek,
-        issuesClosedYearToDate,
+        issuesCountYtd,
     )
 }

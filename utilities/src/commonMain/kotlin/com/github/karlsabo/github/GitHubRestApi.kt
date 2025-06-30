@@ -97,79 +97,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         expectSuccess = false
     }
 
-    override suspend fun getPullRequestCount(username: String, startDate: Instant, endDate: Instant): Int {
-        val formattedStartDate = toUtcDate(startDate)
-        val formattedEndDate = toUtcDate(endDate)
-
-        val encodedQuery = "author:$username created:$formattedStartDate..$formattedEndDate".encodeURLParameter()
-        val url = "https://api.github.com/search/issues?q=$encodedQuery&type=pr&per_page=1"
-
-        val response = client.get(url) {
-            addGitHubHeaders()
-        }
-        val responseText = response.bodyAsText()
-        if (response.status.value < 200 || response.status.value > 299) {
-            println("Error: ${response.status.value} ${response.status.description}")
-            println(responseText)
-            throw Exception("Error querying GitHub API: $responseText")
-        }
-
-        val root = Json.parseToJsonElement(responseText).jsonObject
-
-        return root["total_count"]?.jsonPrimitive?.int ?: 0
-    }
-
-    override suspend fun getClosedPullRequests(
-        username: String,
-        startDate: Instant,
-        endDate: Instant,
-    ): List<GitHubPullRequest> {
-        val formattedStartDate = toUtcDate(startDate)
-        val formattedEndDate = toUtcDate(endDate)
-
-        val query = "author:$username closed:$formattedStartDate..$formattedEndDate"
-        val encodedQuery = query.encodeURLParameter()
-
-        val pullRequests = mutableListOf<GitHubPullRequest>()
-        var page = 1
-        val perPage = 100
-        var totalCount = 1000
-
-        while (page <= (totalCount / perPage) + 1) {
-            val url = "https://api.github.com/search/issues?q=$encodedQuery&type=pr&per_page=$perPage&page=$page"
-
-            val response = client.get(url) {
-                addGitHubHeaders()
-            }
-
-            val responseText = response.bodyAsText()
-            val root = Json.parseToJsonElement(responseText).jsonObject
-
-            val items = root["items"]?.jsonArray ?: break
-            if (items.isEmpty()) break
-
-            for (item in items) {
-                val prUrl = item.jsonObject["pull_request"]?.jsonObject?.get("url")?.jsonPrimitive?.content ?: continue
-
-                // Fetch detailed PR information
-                val prResponse = client.get(prUrl) {
-                    addGitHubHeaders()
-                }
-
-                val prResponseText = prResponse.bodyAsText()
-                val prRoot = Json.parseToJsonElement(prResponseText).jsonObject
-
-                pullRequests.add(prRoot.toPullRequest())
-            }
-
-            page++
-            totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
-        }
-
-        return pullRequests
-    }
-
-    override suspend fun getPullRequestsByAuthorIdAndAfterMergedDate(
+    override suspend fun getMergedPullRequests(
         gitHubUserId: String,
         startDate: Instant,
         endDate: Instant,
@@ -215,7 +143,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         return pullRequests
     }
 
-    override suspend fun getPullRequestsByAuthorIdAndAfterMergedDateCount(
+    override suspend fun getMergedPullRequestCount(
         gitHubUserId: String,
         startDate: Instant,
         endDate: Instant,
