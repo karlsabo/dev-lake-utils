@@ -7,24 +7,14 @@ import kotlinx.datetime.Instant
  */
 interface GitHubApi {
     /**
-     * Gets the count of pull requests created by a user within a specified date range.
+     * Retrieves the count of pull requests merged by a specific user within a given date range.
      *
-     * @param username The GitHub username
-     * @param startDate The start date (inclusive)
-     * @param endDate The end date (inclusive)
-     * @return The count of pull requests
+     * @param gitHubId The GitHub username
+     * @param startDate The start date of the range (inclusive)
+     * @param endDate The end date of the range (inclusive)
+     * @return The number of merged pull requests
      */
-    suspend fun getPullRequestCount(username: String, startDate: Instant, endDate: Instant): Int
-
-    /**
-     * Gets the details of pull requests closed by a user within a specified date range.
-     *
-     * @param username The GitHub username
-     * @param startDate The start date (inclusive)
-     * @param endDate The end date (inclusive)
-     * @return List of pull request details
-     */
-    suspend fun getClosedPullRequests(username: String, startDate: Instant, endDate: Instant): List<GitHubPullRequest>
+    suspend fun getMergedPullRequestCount(gitHubId: String, startDate: Instant, endDate: Instant): UInt
 
     /**
      * Gets the details of pull requests by a user that have been merged within a specified date range.
@@ -34,23 +24,9 @@ interface GitHubApi {
      * @param endDate The end date (inclusive)
      * @return List of pull request details
      */
-    suspend fun getPullRequestsByAuthorIdAndAfterMergedDate(
+    suspend fun getMergedPullRequests(
         gitHubUserId: String,
         startDate: Instant,
         endDate: Instant,
     ): List<GitHubPullRequest>
-
-    /**
-     * Gets the count of pull requests by a user that have been merged within a specified date range.
-     *
-     * @param gitHubUserId The GitHub user ID
-     * @param startDate The start date (inclusive)
-     * @param endDate The end date (inclusive)
-     * @return The count of pull requests as UInt
-     */
-    suspend fun getPullRequestsByAuthorIdAndAfterMergedDateCount(
-        gitHubUserId: String,
-        startDate: Instant,
-        endDate: Instant,
-    ): UInt
 }
