@@ -21,4 +21,5 @@ data class User(
     val name: String,
     val slackId: String? = null,
     val gitHubId: String? = null,
+    val jiraId: String? = null,
 )

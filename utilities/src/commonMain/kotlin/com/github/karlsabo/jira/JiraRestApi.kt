@@ -12,16 +12,15 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.readText
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -117,4 +116,14 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
 
         return issueList
     }
+
+    override suspend fun getIssuesResolved(userJiraId: String, startDate: Instant, endDate: Instant): List<Issue> {
+        val jql =
+            "assignee = $userJiraId AND resolutiondate >= \"${startDate.toUtcDateString()}\" AND resolutiondate <= \"${endDate.toUtcDateString()}\" ORDER BY resolutiondate DESC"
+        return runJql(jql)
+    }
+}
+
+private fun Instant.toUtcDateString(): String {
+    return toLocalDateTime(TimeZone.UTC).date.toString()
 }
