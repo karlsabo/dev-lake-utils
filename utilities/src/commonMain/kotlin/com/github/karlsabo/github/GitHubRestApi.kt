@@ -130,12 +130,16 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
             for (item in items) {
                 val prUrl = item.jsonObject["pull_request"]?.jsonObject?.get("url")?.jsonPrimitive?.content ?: continue
-                val prResponse = client.get(prUrl) {
-                    addGitHubHeaders()
+                val urlParts = prUrl.split("/")
+                if (urlParts.size >= 8) {
+                    val owner = urlParts[4]
+                    val repo = urlParts[5]
+                    val prNumber = urlParts[7].toIntOrNull() ?: continue
+                    pullRequests.add(getPullRequestDetails(owner, repo, prNumber))
+                } else {
+                    // Fallback to using the URL directly if we can't parse it
+                    pullRequests.add(getPullRequestDetails(prUrl))
                 }
-                val prResponseText = prResponse.bodyAsText()
-                val pullRequestJson = Json.parseToJsonElement(prResponseText).jsonObject
-                pullRequests.add(pullRequestJson.toPullRequest())
             }
 
             page++
@@ -143,6 +147,26 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
 
         return pullRequests
+    }
+
+    override suspend fun getPullRequestDetails(
+        prUrl: String,
+    ): GitHubPullRequest {
+        val prResponse = client.get(prUrl) {
+            addGitHubHeaders()
+        }
+        val prResponseText = prResponse.bodyAsText()
+        val pullRequestJson = Json.parseToJsonElement(prResponseText).jsonObject
+        return pullRequestJson.toPullRequest()
+    }
+
+    override suspend fun getPullRequestDetails(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): GitHubPullRequest {
+        val url = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber"
+        return getPullRequestDetails(url)
     }
 
     override suspend fun getMergedPullRequestCount(
