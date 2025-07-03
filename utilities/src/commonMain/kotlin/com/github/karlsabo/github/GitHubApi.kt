@@ -35,4 +35,26 @@ interface GitHubApi {
         startDate: Instant,
         endDate: Instant,
     ): List<GitHubPullRequest>
+
+    /**
+     * Retrieves the details of a pull request from the specified URL.
+     *
+     * @param prUrl The URL of the pull request to fetch details for.
+     */
+    suspend fun getPullRequestDetails(
+        prUrl: String,
+    ): GitHubPullRequest
+
+    /**
+     * Retrieves the details of a pull request using the PR ID.
+     *
+     * @param owner The owner of the repository
+     * @param repo The name of the repository
+     * @param prNumber The number of the pull request to fetch details for
+     */
+    suspend fun getPullRequestDetails(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): GitHubPullRequest
 }
