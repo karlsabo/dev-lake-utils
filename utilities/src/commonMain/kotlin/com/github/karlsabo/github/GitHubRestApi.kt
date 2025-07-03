@@ -72,6 +72,7 @@ fun loadGitHubConfig(configFilePath: Path): GitHubApiRestConfig {
 /**
  * Saves GitHub configuration to a file.
  */
+@Suppress("unused")
 fun saveGitHubConfig(config: GitHubConfig, configPath: Path) {
     SystemFileSystem.sink(configPath, false).buffered().use { sink ->
         sink.writeString(json.encodeToString(GitHubConfig.serializer(), config))
@@ -102,7 +103,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         organizationIds: List<String>,
         startDate: Instant,
         endDate: Instant,
-    ): List<GitHubPullRequest> {
+    ): List<Issue> {
         val formattedStartDate = toUtcDate(startDate)
         val formattedEndDate = toUtcDate(endDate)
 
@@ -110,9 +111,9 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
             "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
         val encodedQuery = query.encodeURLParameter()
 
-        val pullRequests = mutableListOf<GitHubPullRequest>()
+        val pullRequests = mutableListOf<Issue>()
         var page = 1
-        val perPage = 100
+        val perPage = 20
         var totalCount = 1000
 
         while (page <= (totalCount / perPage) + 1) {
@@ -129,17 +130,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
             if (items.isEmpty()) break
 
             for (item in items) {
-                val prUrl = item.jsonObject["pull_request"]?.jsonObject?.get("url")?.jsonPrimitive?.content ?: continue
-                val urlParts = prUrl.split("/")
-                if (urlParts.size >= 8) {
-                    val owner = urlParts[4]
-                    val repo = urlParts[5]
-                    val prNumber = urlParts[7].toIntOrNull() ?: continue
-                    pullRequests.add(getPullRequestDetails(owner, repo, prNumber))
-                } else {
-                    // Fallback to using the URL directly if we can't parse it
-                    pullRequests.add(getPullRequestDetails(prUrl))
-                }
+                pullRequests.add(item.toPullRequest())
             }
 
             page++
@@ -147,26 +138,6 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
 
         return pullRequests
-    }
-
-    override suspend fun getPullRequestDetails(
-        prUrl: String,
-    ): GitHubPullRequest {
-        val prResponse = client.get(prUrl) {
-            addGitHubHeaders()
-        }
-        val prResponseText = prResponse.bodyAsText()
-        val pullRequestJson = Json.parseToJsonElement(prResponseText).jsonObject
-        return pullRequestJson.toPullRequest()
-    }
-
-    override suspend fun getPullRequestDetails(
-        owner: String,
-        repo: String,
-        prNumber: Int,
-    ): GitHubPullRequest {
-        val url = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber"
-        return getPullRequestDetails(url)
     }
 
     override suspend fun getMergedPullRequestCount(
@@ -202,63 +173,9 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
     }
 }
 
-private fun JsonObject.toPullRequest(): GitHubPullRequest {
-    val id = this["id"]?.jsonPrimitive?.content ?: ""
-    val number = this["number"]?.jsonPrimitive?.int ?: 0
-    val title = this["title"]?.jsonPrimitive?.content ?: ""
-    val url = this["url"]?.jsonPrimitive?.content ?: ""
-    val htmlUrl = this["html_url"]?.jsonPrimitive?.content ?: ""
-    val state = this["state"]?.jsonPrimitive?.content ?: ""
-
-    val createdAt = this["created_at"]?.jsonPrimitive?.content?.let { Instant.parse(it) }
-        ?: Instant.fromEpochSeconds(0)
-    val updatedAt = this["updated_at"]?.jsonPrimitive?.content?.let { Instant.parse(it) }
-        ?: Instant.fromEpochSeconds(0)
-    val closedAt = this["closed_at"]?.jsonPrimitive?.content?.let { Instant.parse(it) }
-    val mergedAt = this["merged_at"]?.jsonPrimitive?.content?.let { Instant.parse(it) }
-
-    val userJson = this["user"]?.jsonObject ?: JsonObject(emptyMap())
-    val user = GitHubUser(
-        id = userJson["id"]?.jsonPrimitive?.content ?: "",
-        login = userJson["login"]?.jsonPrimitive?.content ?: "",
-        avatarUrl = userJson["avatar_url"]?.jsonPrimitive?.content,
-        url = userJson["url"]?.jsonPrimitive?.content ?: ""
-    )
-
-    val body = this["body"]?.jsonPrimitive?.content
-    val additions = this["additions"]?.jsonPrimitive?.int
-    val deletions = this["deletions"]?.jsonPrimitive?.int
-    val changedFiles = this["changed_files"]?.jsonPrimitive?.int
-
-    val repoJson = this["base"]?.jsonObject?.get("repo")?.jsonObject ?: JsonObject(emptyMap())
-    val repository = GitHubRepository(
-        id = repoJson["id"]?.jsonPrimitive?.content ?: "",
-        name = repoJson["name"]?.jsonPrimitive?.content ?: "",
-        fullName = repoJson["full_name"]?.jsonPrimitive?.content ?: "",
-        url = repoJson["url"]?.jsonPrimitive?.content ?: "",
-        htmlUrl = repoJson["html_url"]?.jsonPrimitive?.content ?: ""
-    )
-
-    return GitHubPullRequest(
-        id = id,
-        number = number,
-        title = title,
-        url = url,
-        htmlUrl = htmlUrl,
-        state = state,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-        closedAt = closedAt,
-        mergedAt = mergedAt,
-        user = user,
-        body = body,
-        additions = additions,
-        deletions = deletions,
-        changedFiles = changedFiles,
-        repository = repository
-    )
+fun JsonElement.toPullRequest(): Issue {
+    return json.decodeFromJsonElement(Issue.serializer(), this)
 }
-
 
 private fun HttpRequestBuilder.addGitHubHeaders() {
     header("Accept", "application/vnd.github.v3+json")

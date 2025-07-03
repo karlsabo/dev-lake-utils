@@ -1,6 +1,5 @@
 package com.github.karlsabo.devlake.metrics
 
-
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,7 +21,6 @@ import com.github.karlsabo.devlake.tools.loadUserMetricPublisherConfig
 import com.github.karlsabo.devlake.tools.saveUserMetricPublisherConfig
 import com.github.karlsabo.devlake.tools.userMetricPublisherConfigPath
 import com.github.karlsabo.github.GitHubApi
-import com.github.karlsabo.github.GitHubPullRequest
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.loadGitHubConfig
 import com.github.karlsabo.jira.Issue
@@ -54,6 +52,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.days
 import kotlin.time.measureTime
+import com.github.karlsabo.github.Issue as GitHubIssue
 
 fun main() = application {
     var isLoadingConfig by remember { mutableStateOf(true) }
@@ -255,7 +254,7 @@ private suspend fun sendToZap(slackMessage: SlackMessage, zapierMetricUrl: Strin
 @Serializable
 data class UserMetrics(
     val userId: String,
-    val pullRequestsPastWeek: List<GitHubPullRequest>,
+    val pullRequestsPastWeek: List<GitHubIssue>,
     val pullRequestsYearToDateCount: UInt,
     val issuesClosedLastWeek: List<Issue>,
     val issuesClosedYearToDateCount: UInt,
@@ -299,7 +298,7 @@ suspend fun createUserMetrics(
     val startOfThisYear = System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         .run { Instant.parse("${year}-01-01T00:00:00Z") }
 
-    val pullRequestsPastWeek = mutableListOf<GitHubPullRequest>()
+    val pullRequestsPastWeek = mutableListOf<GitHubIssue>()
     val issuesClosedPastWeek = mutableListOf<Issue>()
 
     pullRequestsPastWeek.addAll(
