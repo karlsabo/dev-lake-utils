@@ -117,6 +117,14 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
         return issueList
     }
 
+    override suspend fun getIssues(issueKeys: List<String>): List<Issue> {
+        return runJql("key in (${issueKeys.joinToString(",")})")
+    }
+
+    override suspend fun getChildIssues(issueKeys: List<String>): List<Issue> {
+        return runJql(issueKeys.joinToString(" OR ") { key -> "issuekey in portfolioChildIssuesOf(\"$key\")" })
+    }
+
     override suspend fun getIssuesResolved(userJiraId: String, startDate: Instant, endDate: Instant): List<Issue> {
         val jql =
             "assignee = $userJiraId AND resolutiondate >= \"${startDate.toUtcDateString()}\" AND resolutiondate <= \"${endDate.toUtcDateString()}\" ORDER BY resolutiondate DESC"

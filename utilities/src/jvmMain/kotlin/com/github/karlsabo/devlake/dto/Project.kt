@@ -13,7 +13,6 @@ data class Project(
     val projectContributors: List<String>? = emptyList(),
     val productManager: String? = null,
     val topLevelIssueKeys: List<String> = emptyList(),
-    val topLevelIssueIds: List<String> = emptyList(),
     val isVerboseMilestones: Boolean = false,
     val isTagMilestoneOwners: Boolean = false,
     val jqlToPullChildIssues: String? = null,
