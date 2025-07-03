@@ -165,6 +165,11 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
 
         val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("$gitHubUserId query=`$query`")
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId")
+        }
         val root = Json.parseToJsonElement(responseText).jsonObject
 
         val totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
