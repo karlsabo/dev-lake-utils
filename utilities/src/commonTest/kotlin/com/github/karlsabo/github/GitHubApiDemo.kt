@@ -54,15 +54,13 @@ fun main(args: Array<String>) {
                 println("  URL: ${pr.htmlUrl}")
                 println("  Created: ${formatDate(pr.createdAt)}")
                 println("  Closed: ${pr.closedAt?.let { formatDate(it) } ?: "N/A"}")
-                println("  Repository: ${pr.repository.fullName}")
-                println("  Changes: +${pr.additions ?: 0} -${pr.deletions ?: 0} (${pr.changedFiles ?: 0} files)")
                 println()
             }
 
             // Get merged PRs by author ID within a date range
             // For this demo, we'll use the same user and date range as above
             // In a real scenario, you would get the user ID from somewhere else
-            val userId = recentPRs.firstOrNull()?.user?.id ?: username
+            val userId = recentPRs.firstOrNull()?.user?.login ?: username
             val mergedPRs = githubApi.getMergedPullRequests(userId, organizations, oneWeekAgo, now)
 
             println("\nPRs merged by user ID $userId in the last week (${mergedPRs.size} total):")
@@ -70,9 +68,7 @@ fun main(args: Array<String>) {
                 println("- #${pr.number}: ${pr.title}")
                 println("  URL: ${pr.htmlUrl}")
                 println("  Created: ${formatDate(pr.createdAt)}")
-                println("  Merged: ${pr.mergedAt?.let { formatDate(it) } ?: "N/A"}")
-                println("  Repository: ${pr.repository.fullName}")
-                println("  Changes: +${pr.additions ?: 0} -${pr.deletions ?: 0} (${pr.changedFiles ?: 0} files)")
+                println("  Merged: ${pr.pullRequest?.mergedAt?.let { formatDate(it) } ?: "N/A"}")
                 println()
             }
 
