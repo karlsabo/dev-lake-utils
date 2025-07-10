@@ -1,5 +1,6 @@
 package com.github.karlsabo.github
 
+import com.github.karlsabo.http.installHttpRetry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -95,6 +96,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
+        installHttpRetry()
         expectSuccess = false
     }
 
