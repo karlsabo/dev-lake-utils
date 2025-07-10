@@ -106,8 +106,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         startDate: Instant,
         endDate: Instant,
     ): List<Issue> {
-        val formattedStartDate = toUtcDate(startDate)
-        val formattedEndDate = toUtcDate(endDate)
+        val formattedStartDate = startDate.toUtcDateString()
+        val formattedEndDate = endDate.toUtcDateString()
 
         val query =
             "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
@@ -148,8 +148,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         startDate: Instant,
         endDate: Instant,
     ): UInt {
-        val formattedStartDate = toUtcDate(startDate)
-        val formattedEndDate = toUtcDate(endDate)
+        val formattedStartDate = startDate.toUtcDateString()
+        val formattedEndDate = endDate.toUtcDateString()
 
         val query =
             "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
@@ -184,6 +184,6 @@ private fun HttpRequestBuilder.addGitHubHeaders() {
     header("X-GitHub-Api-Version", "2022-11-28")
 }
 
-private fun toUtcDate(instant: Instant): String {
-    return instant.toLocalDateTime(TimeZone.UTC).toString()
+private fun Instant.toUtcDateString(): String {
+    return toLocalDateTime(TimeZone.UTC).toString()
 }
