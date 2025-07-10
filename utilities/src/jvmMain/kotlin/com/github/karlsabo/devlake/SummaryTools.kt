@@ -1,12 +1,11 @@
 package com.github.karlsabo.devlake
 
-import com.github.karlsabo.devlake.accessor.*
 import com.github.karlsabo.devlake.dto.MultiProjectSummary
 import com.github.karlsabo.devlake.dto.PagerDutyAlert
 import com.github.karlsabo.devlake.dto.Project
+import com.github.karlsabo.dto.User
 import com.github.karlsabo.github.GitHubApi
-import com.github.karlsabo.jira.JiraApi
-import com.github.karlsabo.jira.toPlainText
+import com.github.karlsabo.jira.*
 import com.github.karlsabo.text.TextSummarizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -34,7 +33,7 @@ data class Milestone(
     val issueChangeLogs: Set<IssueChangelog>,
     val milestoneComments: Set<IssueComment>,
     val durationIssues: Set<Issue>,
-    val durationMergedPullRequests: Set<PullRequest>,
+    val durationMergedPullRequests: Set<com.github.karlsabo.github.Issue>,
 )
 
 /**
@@ -53,7 +52,7 @@ data class ProjectSummary(
     val durationProgressSummary: String,
     val issues: Set<Issue>,
     val durationIssues: Set<Issue>,
-    val durationMergedPullRequests: Set<PullRequest>,
+    val durationMergedPullRequests: Set<com.github.karlsabo.github.Issue>,
     val milestones: Set<Milestone>,
     val isTagMilestoneAssignees: Boolean,
 )
@@ -177,7 +176,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     )
                 }
                 if (milestone.durationMergedPullRequests.isNotEmpty()) {
-                    summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.pullRequestKey}>" }}")
+                    summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.number}>" }}")
                 }
                 summary.appendLine()
             }
@@ -228,7 +227,7 @@ fun ProjectSummary.toSlackMarkup(): String {
         )
     }
     if (durationMergedPullRequests.isNotEmpty()) {
-        summary.appendLine("🔹 PRs merged: ${durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.pullRequestKey}>" }}")
+        summary.appendLine("🔹 PRs merged: ${durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.number}>" }}")
     }
 
     if (milestones.isNotEmpty()) {
@@ -304,15 +303,15 @@ suspend fun createSummary(
     isPagerDutyIncluded: Boolean,
 ): MultiProjectSummary {
     val timeInPast = Clock.System.now().minus(duration)
-    val timeInPastSql = Date(timeInPast.toEpochMilliseconds())
+    Date(timeInPast.toEpochMilliseconds())
 
     val mutex = Mutex()
     val projectSummaries = mutableListOf<ProjectSummary>()
     val miscIssueSet = mutableSetOf<Issue>()
-    val miscPrSet = mutableSetOf<PullRequest>()
+    val miscPrSet = mutableSetOf<com.github.karlsabo.github.Issue>()
 
     coroutineScope {
-        val projectJobs = projects.map { project ->
+        projects.map { project ->
             async(Dispatchers.Default) {
                 val projectSummary =
                     project.createSummary(users.toSet(), gitHubApi, jiraApi, textSummarizer, duration, emptySet())
@@ -322,19 +321,14 @@ suspend fun createSummary(
             }
         }
 
-        val issueAccessor = IssueAccessorDb(dataSource)
-        val pullRequestAccessor = PullRequestAccessorDb(dataSource)
-        val userAccountAccessor = UserAccountAccessorDb(dataSource)
-
-        val userJobs = if (isMiscellaneousProjectIncluded) {
-            val issueJobs = users.map { user ->
+        if (isMiscellaneousProjectIncluded) {
+            users.map { user ->
                 async(Dispatchers.Default) {
-                    val userAccounts = userAccountAccessor.getUserAccountByUserId(user.id)
-                    userAccounts.forEach {
-                        val issuesForUser = issueAccessor.getIssuesByAssigneeIdAndAfterResolutionDate(
-                            it.accountId,
-                            Clock.System.now().minus(duration)
-                        )
+                    val issuesForUser = jiraApi.getIssuesResolved(
+                        user.jiraId!!,
+                        Clock.System.now().minus(duration),
+                        Clock.System.now()
+                    )
                         mutex.withLock {
                             miscIssueSet.addAll(issuesForUser)
                         }
@@ -449,7 +443,7 @@ suspend fun Project.createSummary(
     jiraApi: JiraApi,
     textSummarizer: TextSummarizer,
     duration: Duration,
-    pullRequests: Set<PullRequest>,
+    pullRequests: Set<com.github.karlsabo.github.Issue>,
     parentIssuesAreChildren: Boolean = false,
 ): ProjectSummary {
     val parentIssues = if (topLevelIssueKeys.isEmpty())
@@ -459,7 +453,7 @@ suspend fun Project.createSummary(
 
     val parentIssueKeys = parentIssues.map { it.issueKey }
 
-    val childIssues: MutableList<com.github.karlsabo.jira.Issue> = if (parentIssuesAreChildren) {
+    val childIssues: MutableList<Issue> = if (parentIssuesAreChildren) {
         parentIssues
     } else {
         jiraApi.getChildIssues(parentIssueKeys).toMutableList()
@@ -492,7 +486,7 @@ suspend fun Project.createSummary(
     }
 
     // Get merged PRs related to these issues
-    val mergedPrs = mutableSetOf<PullRequest>()
+    val mergedPrs = mutableSetOf<com.github.karlsabo.github.Issue>()
 
     // For each issue, find related PRs from GitHub
     Clock.System.now().minus(duration)
@@ -520,7 +514,7 @@ suspend fun Project.createSummary(
                 // For PRs, we would need to query GitHub API
                 // This is a simplification - in a real implementation, you would need to
                 // query GitHub for PRs that reference these issue keys
-                val milestonePrs = mutableSetOf<PullRequest>()
+                val milestonePrs = mutableSetOf<com.github.karlsabo.github.Issue>()
 
                 // Find the owner of the milestone
                 val owner = if (milestoneIssue.assigneeId != null && milestoneIssue.assigneeId.isNotBlank()) {
@@ -578,7 +572,7 @@ suspend fun Project.createSummary(
     )
 }
 
-private fun com.github.karlsabo.jira.Issue.toIssue(): Issue {
+private fun Issue.toIssue(): Issue {
     val uri = URI(this.url!!)
     val url = uri.scheme + "://" + uri.authority + "/browse/${this.issueKey}"
     // TODO should look in _tool_jira_accounts tables
@@ -622,7 +616,7 @@ private fun com.github.karlsabo.jira.Issue.toIssue(): Issue {
     )
 }
 
-private fun com.github.karlsabo.jira.Comment.toIssueComment(): IssueComment {
+private fun Comment.toIssueComment(): IssueComment {
     return IssueComment(
         id = this.id,
         issueId = this.id,

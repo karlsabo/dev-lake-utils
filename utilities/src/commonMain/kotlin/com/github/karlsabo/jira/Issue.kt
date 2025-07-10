@@ -48,6 +48,27 @@ data class Issue(
     val dueDate: Instant? = null,
 )
 
+fun Issue.isCompleted(): Boolean {
+    return resolutionDate != null
+}
+
+fun Issue.isMilestone(): Boolean {
+    return type != null && type.lowercase() == "epic"
+}
+
+fun Issue.isIssueOrBug(): Boolean {
+    if (type == null) return false
+    return when (type.lowercase()) {
+        "bug", "issue", "story", "subtask", "artifact", "task", "vulnerability" -> true
+        "epic", "theme", "parent artifact", "r&d initiative" -> false
+        else -> {
+            val message = "Unhandled issue type `$type`, Info: $issueKey, $title"
+            print(message)
+            throw RuntimeException(message)
+        }
+    }
+}
+
 fun JsonObject.toIssue(): Issue {
     @Suppress("UNREACHABLE_CODE") val fields = this["fields"]?.jsonObject ?: return error("Missing fields")
     val parent = fields["parent"]?.takeIf { it !is JsonNull }?.jsonObject
