@@ -1,6 +1,7 @@
 package com.github.karlsabo.jira
 
 import com.github.karlsabo.Credentials
+import com.github.karlsabo.http.installHttpRetry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -78,6 +79,7 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
+        installHttpRetry()
         expectSuccess = false
     }
 
