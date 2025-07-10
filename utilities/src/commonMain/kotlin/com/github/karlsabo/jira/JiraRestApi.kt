@@ -145,5 +145,6 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
 }
 
 private fun Instant.toUtcDateString(): String {
-    return toLocalDateTime(TimeZone.UTC).date.toString()
+    val toLocalDateTime = toLocalDateTime(TimeZone.UTC)
+    return "${toLocalDateTime.date} ${toLocalDateTime.hour}:${toLocalDateTime.minute}"
 }
