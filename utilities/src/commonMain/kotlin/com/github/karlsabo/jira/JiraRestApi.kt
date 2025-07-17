@@ -7,6 +7,7 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
 import io.ktor.client.plugins.auth.providers.basic
+import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -21,7 +22,11 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -80,6 +85,7 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
             json(Json { ignoreUnknownKeys = true })
         }
         installHttpRetry()
+        install(HttpCache)
         expectSuccess = false
     }
 
