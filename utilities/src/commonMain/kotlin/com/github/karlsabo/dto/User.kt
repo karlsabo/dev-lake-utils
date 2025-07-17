@@ -8,6 +8,7 @@ data class User(
     val id: String,
     val createdAt: Instant? = null,
     val updatedAt: Instant? = null,
+    // karlfixme remove these raw params
     val rawDataParams: String? = null,
     val rawDataTable: String? = null,
     val rawDataId: Long? = null,

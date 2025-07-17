@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
-import com.github.karlsabo.devlake.DevLakeUserAndTeamsConfig
+import com.github.karlsabo.devlake.UserAndTeamsConfig
 import com.github.karlsabo.devlake.accessor.User
 import com.github.karlsabo.devlake.gitHubConfigPath
 import com.github.karlsabo.devlake.jiraConfigPath
@@ -59,7 +59,7 @@ fun main() = application {
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var config by remember { mutableStateOf(UserMetricPublisherConfig()) }
-    var userAndTeamsConfig by remember { mutableStateOf<DevLakeUserAndTeamsConfig?>(null) }
+    var userAndTeamsConfig by remember { mutableStateOf<UserAndTeamsConfig?>(null) }
     var jiraApi by remember { mutableStateOf<JiraApi?>(null) }
     var gitHubApi by remember { mutableStateOf<GitHubApi?>(null) }
 

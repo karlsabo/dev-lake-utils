@@ -2,11 +2,11 @@ package com.github.karlsabo.devlake
 
 import com.github.karlsabo.devlake.accessor.Team
 import com.github.karlsabo.devlake.accessor.TeamUser
-import com.github.karlsabo.devlake.accessor.User
 import com.github.karlsabo.devlake.accessor.UserAccount
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.dto.User
 import com.github.karlsabo.tools.getApplicationDirectory
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
@@ -34,7 +34,7 @@ fun main() {
         println("Users config file $devLakeUserAndTeamsConfigPath does not exist, please populate it.")
         if (!SystemFileSystem.exists(devLakeUserAndTeamsConfigPath)) {
             saveUserConfig(
-                DevLakeUserAndTeamsConfig(
+                UserAndTeamsConfig(
                     listOf(
                         User(
                             id = "Example1 ID",
@@ -224,13 +224,13 @@ private fun createUser(
 }
 
 private val devLakeUserAndTeamsConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "users-and-teams.json")
-fun loadUserAndTeamConfig(): DevLakeUserAndTeamsConfig? {
+fun loadUserAndTeamConfig(): UserAndTeamsConfig? {
     if (!SystemFileSystem.exists(devLakeUserAndTeamsConfigPath)) {
         return null
     }
     return try {
         Json.decodeFromString(
-            DevLakeUserAndTeamsConfig.serializer(),
+            UserAndTeamsConfig.serializer(),
             SystemFileSystem.source(devLakeUserAndTeamsConfigPath).buffered().readText(),
         )
     } catch (error: Exception) {
@@ -241,11 +241,11 @@ fun loadUserAndTeamConfig(): DevLakeUserAndTeamsConfig? {
 
 private val json = Json { prettyPrint = true; encodeDefaults = true }
 
-private fun saveUserConfig(userConfig: DevLakeUserAndTeamsConfig) {
+private fun saveUserConfig(userConfig: UserAndTeamsConfig) {
     SystemFileSystem.sink(devLakeUserAndTeamsConfigPath).buffered().use {
         it.writeString(
             json.encodeToString(
-                DevLakeUserAndTeamsConfig.serializer(),
+                UserAndTeamsConfig.serializer(),
                 userConfig,
             )
         )
