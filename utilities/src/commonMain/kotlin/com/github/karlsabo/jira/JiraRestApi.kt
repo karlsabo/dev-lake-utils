@@ -8,6 +8,7 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
 import io.ktor.client.plugins.auth.providers.basic
+import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -82,6 +83,7 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
             json(lenientJson)
         }
         installHttpRetry()
+        install(HttpCache)
         expectSuccess = false
     }
 
