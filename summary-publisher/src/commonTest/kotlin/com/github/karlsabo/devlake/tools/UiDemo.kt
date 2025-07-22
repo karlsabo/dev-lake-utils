@@ -45,7 +45,7 @@ fun main() = application {
         ),
     ) {
         var zapierJson by remember { mutableStateOf("Loading summary") }
-        val scrollState = rememberScrollState()
+        rememberScrollState()
         var projectMessages by remember {
             mutableStateOf(
                 mutableListOf(

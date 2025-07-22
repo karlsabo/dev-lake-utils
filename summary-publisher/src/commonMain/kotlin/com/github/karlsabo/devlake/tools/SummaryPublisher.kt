@@ -34,35 +34,39 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.Credentials
-import com.github.karlsabo.devlake.ProjectSummary
-import com.github.karlsabo.devlake.accessor.PipelineAccessorDb
-import com.github.karlsabo.devlake.accessor.Status
-import com.github.karlsabo.devlake.createSummary
-import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
-import com.github.karlsabo.devlake.jiraConfigPath
-import com.github.karlsabo.devlake.loadUserAndTeamConfig
-import com.github.karlsabo.devlake.textSummarizerConfigPath
-import com.github.karlsabo.devlake.toSlackMarkup
-import com.github.karlsabo.devlake.toVerboseSlackMarkdown
-import com.github.karlsabo.ds.DataSourceDbConfigNoSecrets
-import com.github.karlsabo.ds.DataSourceManagerDb
-import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
-import com.github.karlsabo.ds.saveDataSourceDbConfigNoSecrets
-import com.github.karlsabo.ds.toDataSourceDbConfig
 import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.dto.toTerseSlackMarkup
+import com.github.karlsabo.github.GitHubApiRestConfig
+import com.github.karlsabo.github.GitHubConfig
+import com.github.karlsabo.github.GitHubRestApi
+import com.github.karlsabo.github.loadGitHubConfig
+import com.github.karlsabo.github.saveGitHubConfig
 import com.github.karlsabo.jira.JiraApiRestConfig
 import com.github.karlsabo.jira.JiraConfig
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
 import com.github.karlsabo.jira.saveJiraConfig
+import com.github.karlsabo.pagerduty.PagerDutyApiRestConfig
+import com.github.karlsabo.pagerduty.PagerDutyConfig
+import com.github.karlsabo.pagerduty.PagerDutyRestApi
+import com.github.karlsabo.pagerduty.loadPagerDutyConfig
+import com.github.karlsabo.pagerduty.savePagerDutyConfig
 import com.github.karlsabo.text.TextSummarizerOpenAi
 import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
 import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
 import com.github.karlsabo.text.saveTextSummarizerOpenAiNoSecrets
 import com.github.karlsabo.text.toTextSummarizerOpenAiConfig
+import com.github.karlsabo.tools.ProjectSummary
+import com.github.karlsabo.tools.createSummary
+import com.github.karlsabo.tools.gitHubConfigPath
+import com.github.karlsabo.tools.jiraConfigPath
 import com.github.karlsabo.tools.lenientJson
+import com.github.karlsabo.tools.loadUsersConfig
+import com.github.karlsabo.tools.pagerDutyConfigPath
+import com.github.karlsabo.tools.textSummarizerConfigPath
+import com.github.karlsabo.tools.toSlackMarkup
+import com.github.karlsabo.tools.toVerboseSlackMarkdown
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -76,14 +80,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.serialization.gson.gson
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock.System
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
 
 data class ProjectSummaryHolder(val projectSummary: ProjectSummary, val message: String)
 
@@ -107,86 +107,56 @@ fun main(args: Array<String>) = application {
             )
         )
     }
-    var dataSourceConfigNoSecrets by remember {
-        mutableStateOf<DataSourceDbConfigNoSecrets?>(
-            DataSourceDbConfigNoSecrets(
-                passwordFilePath = "invalid.txt"
-            )
-        )
-    }
+    var gitHubConfig by remember { mutableStateOf(GitHubApiRestConfig("token")) }
+    var pagerDutyConfig by remember { mutableStateOf(PagerDutyApiRestConfig("apiKey")) }
+
     var isConfigLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         println("Loading configuration $configFilePath")
         try {
             summaryConfig = loadSummaryPublisherConfig(configFilePath)
+            textSummarizerConfig = loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)
+            jiraConfig = loadJiraConfig(jiraConfigPath)
+            gitHubConfig = loadGitHubConfig(gitHubConfigPath)
+            pagerDutyConfig = loadPagerDutyConfig(pagerDutyConfigPath)
         } catch (error: Exception) {
             println("Error loading summary config $error")
-            errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
-                "Please update the configuration file:\n${summaryPublisherConfigPath}."
+            errorMessage = "Failed to load configuration: $error."
             if (!SystemFileSystem.exists(summaryPublisherConfigPath)) {
+                errorMessage += "\nCreating new configuration.\n Please update the configuration file:\n${summaryPublisherConfigPath}."
                 saveSummaryPublisherConfig(SummaryPublisherConfig())
+            }
+            if (!SystemFileSystem.exists(textSummarizerConfigPath)) {
+                errorMessage += "Please update the configuration file:\n${textSummarizerConfigPath}."
+                saveTextSummarizerOpenAiNoSecrets(
+                    textSummarizerConfigPath,
+                    TextSummarizerOpenAiConfigNoSecrets(apiKeyFilePath = "password.txt"),
+                )
+            }
+            if (!SystemFileSystem.exists(jiraConfigPath)) {
+                errorMessage += "Please update the configuration file:\n${jiraConfigPath}."
+                saveJiraConfig(jiraConfigPath, JiraConfig("domain", "username", "/path/to/jira-api-key.json"))
+            }
+            if (!SystemFileSystem.exists(gitHubConfigPath)) {
+                errorMessage += "Please update the configuration file:\n${gitHubConfigPath}."
+                saveGitHubConfig(gitHubConfigPath, GitHubConfig("/path/to/github-token.json"))
+            }
+            if (!SystemFileSystem.exists(pagerDutyConfigPath)) {
+                errorMessage += "Please update the configuration file:\n${pagerDutyConfigPath}."
+                savePagerDutyConfig(PagerDutyConfig("/path/to/pagerduty-api-key.json"), pagerDutyConfigPath)
             }
             isDisplayErrorDialog = true
         }
-        if (!isDisplayErrorDialog) {
-            try {
-                dataSourceConfigNoSecrets = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)
-            } catch (error: Exception) {
-                println("Error loading datasource config $error")
-                errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
-                    "Please update the configuration file:\n${devLakeDataSourceDbConfigPath}."
-                if (!SystemFileSystem.exists(devLakeDataSourceDbConfigPath)) {
-                    saveDataSourceDbConfigNoSecrets(
-                        devLakeDataSourceDbConfigPath,
-                        DataSourceDbConfigNoSecrets(passwordFilePath = "password.txt")
-                    )
-                }
-                isDisplayErrorDialog = true
-            }
-            if (!isDisplayErrorDialog) {
-                try {
-                    textSummarizerConfig = loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)
-                } catch (error: Exception) {
-                    println("Error loading text summarizer config $error")
-                    errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
-                        "Please update the configuration file:\n${textSummarizerConfigPath}."
-                    if (!SystemFileSystem.exists(textSummarizerConfigPath)) {
-                        saveTextSummarizerOpenAiNoSecrets(
-                            textSummarizerConfigPath,
-                            TextSummarizerOpenAiConfigNoSecrets(apiKeyFilePath = "password.txt")
-                        )
-                    }
-                    isDisplayErrorDialog = true
-                }
-            }
-            if (!isDisplayErrorDialog) {
-                try {
-                    jiraConfig = loadJiraConfig(jiraConfigPath)
-                } catch (error: Exception) {
-                    isDisplayErrorDialog = true
-                    println("Error loading Jira config ${error.message}")
-                    errorMessage =
-                        "Failed to load Jira config: ${error.message}.\nCreating a new configuration.\nPlease update the configuration ${jiraConfigPath}"
-                    if (!SystemFileSystem.exists(jiraConfigPath)) {
-                        saveJiraConfig(
-                            JiraConfig("example.atlassian.net", "username", "apiKeyPath"),
-                            jiraConfigPath
-                        )
-                    }
-                }
-            }
-        }
-
         isConfigLoaded = true
         println("Summary config = $summaryConfig")
-        println("DataSource config = $dataSourceConfigNoSecrets")
     }
 
     if (isDisplayErrorDialog) {
         DialogWindow(
             onCloseRequest = ::exitApplication,
             title = "Error",
+            visible = isDisplayErrorDialog,
         ) {
             Surface {
                 Column(
@@ -210,64 +180,12 @@ fun main(args: Array<String>) = application {
 
     println("Config = $summaryConfig")
 
-    var isPipelineLoading by remember { mutableStateOf(true) }
-    var isShowPipelineError by remember { mutableStateOf(false) }
-    var pipelineErrorMessage by remember { mutableStateOf("Pipeline is out of date") }
-
     var projectSummaries by remember { mutableStateOf(listOf<ProjectSummaryHolder>()) }
-
-    LaunchedEffect(Unit) {
-        DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
-            val pipelineAccessor = PipelineAccessorDb(dataSourceManager.getOrCreateDataSource())
-            val latestPipelines = pipelineAccessor.getPipelines(1, 0)
-            if (latestPipelines.isEmpty()
-                || latestPipelines[0].status != Status.TASK_COMPLETED
-                || latestPipelines[0].beganAt!! < System.now().minus(24.hours)
-            ) {
-                pipelineErrorMessage = if (latestPipelines.isEmpty()) {
-                    "No pipelines found"
-                } else {
-                    "Pipeline is out of date: ${latestPipelines[0].beganAt?.toLocalDateTime(TimeZone.currentSystemDefault())} ${TimeZone.currentSystemDefault()}, status: ${latestPipelines[0].status}"
-                }
-                isShowPipelineError = true
-            }
-        }
-        isPipelineLoading = false
-    }
-
-    if (isShowPipelineError) {
-        DialogWindow(
-            title = "Error, DevLake pipeline is out of date",
-            onCloseRequest = { isShowPipelineError = false },
-            visible = isShowPipelineError,
-        ) {
-            Surface {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                ) {
-                    Text(text = pipelineErrorMessage, style = MaterialTheme.typography.h6)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = errorMessage)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { isShowPipelineError = false }) {
-                        Text("Continue")
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = ::exitApplication) {
-                        Text("Exit")
-                    }
-                }
-            }
-        }
-    }
 
     Window(
         onCloseRequest = ::exitApplication,
         title = "Summary Publisher",
-        visible = !isShowPipelineError && !isPipelineLoading,
+        visible = isConfigLoaded,
         state = rememberWindowState(
             width = 1920.dp,
             height = 1080.dp,
@@ -287,28 +205,29 @@ fun main(args: Array<String>) = application {
         var isLoadingSummary by remember { mutableStateOf(true) }
         if (isConfigLoaded) {
             LaunchedEffect(Unit) {
-                DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
-                    summaryLast7Days = createSummary(
-                        dataSourceManager.getOrCreateDataSource(),
-                        JiraRestApi(jiraConfig),
-                        TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
-                        summaryConfig.projects,
-                        7.days,
-                        loadUserAndTeamConfig()!!.users,
-                        summaryConfig.summaryName,
-                        summaryConfig.isMiscellaneousProjectIncluded,
-                        summaryConfig.isMiscellaneousProjectIncluded,
-                    )
-                    val slackSummary =
-                        if (summaryConfig.isTerseSummaryUsed) summaryLast7Days?.toTerseSlackMarkup() else summaryLast7Days?.toSlackMarkup()
-                    topLevelSummary = slackSummary ?: "* Failed to generate a summary"
-                    projectSummaries
-                    projectSummaries = summaryLast7Days?.projectSummaries?.map {
-                        val message =
-                            if (it.project.isVerboseMilestones) it.toVerboseSlackMarkdown() else it.toSlackMarkup()
-                        ProjectSummaryHolder(it, message)
-                    } ?: emptyList<ProjectSummaryHolder>()
-                }
+                summaryLast7Days = createSummary(
+                    JiraRestApi(jiraConfig),
+                    GitHubRestApi(gitHubConfig),
+                    emptyList(), // karlfixme add github orgs
+                    PagerDutyRestApi(pagerDutyConfig),
+                    emptyList<String>(), // karlfixme add pager duty service IDs
+                    TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
+                    summaryConfig.projects,
+                    7.days,
+                    loadUsersConfig()!!.users,
+                    emptyList(), // karlfixme need misc users for PRs and Issues
+                    summaryConfig.summaryName,
+                    summaryConfig.isMiscellaneousProjectIncluded,
+                )
+                val slackSummary =
+                    if (summaryConfig.isTerseSummaryUsed) summaryLast7Days?.toTerseSlackMarkup() else summaryLast7Days?.toSlackMarkup()
+                topLevelSummary = slackSummary ?: "* Failed to generate a summary"
+                projectSummaries
+                projectSummaries = summaryLast7Days?.projectSummaries?.map { it ->
+                    val message =
+                        if (it.project.isVerboseMilestones) it.toVerboseSlackMarkdown() else it.toSlackMarkup()
+                    ProjectSummaryHolder(it, message)
+                } ?: emptyList<ProjectSummaryHolder>()
                 isLoadingSummary = false
             }
         }

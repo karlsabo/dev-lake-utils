@@ -79,7 +79,7 @@ fun loadGitHubConfig(configFilePath: Path): GitHubApiRestConfig {
  * Saves GitHub configuration to a file.
  */
 @Suppress("unused")
-fun saveGitHubConfig(config: GitHubConfig, configPath: Path) {
+fun saveGitHubConfig(configPath: Path, config: GitHubConfig) {
     SystemFileSystem.sink(configPath, false).buffered().use { sink ->
         sink.writeString(lenientJson.encodeToString(GitHubConfig.serializer(), config))
     }

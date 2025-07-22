@@ -60,7 +60,7 @@ fun loadJiraConfig(configFilePath: Path): JiraApiRestConfig {
     )
 }
 
-fun saveJiraConfig(config: JiraConfig, configPath: Path) {
+fun saveJiraConfig(configPath: Path, config: JiraConfig) {
     SystemFileSystem.sink(configPath, false).buffered().use { sink ->
         sink.writeString(lenientJson.encodeToString(JiraConfig.serializer(), config))
     }

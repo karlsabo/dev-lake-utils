@@ -1,4 +1,4 @@
-package com.github.karlsabo.devlake
+package com.github.karlsabo.tools
 
 import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.dto.Project
@@ -292,6 +292,7 @@ suspend fun createSummary(
     projects: List<Project>,
     duration: Duration,
     users: List<User>,
+    miscUsers: List<User>,
     summaryName: String,
     isMiscellaneousProjectIncluded: Boolean,
 ): MultiProjectSummary {
@@ -323,7 +324,7 @@ suspend fun createSummary(
         }
 
         val userJobs = if (isMiscellaneousProjectIncluded) {
-            val issueJobs = users.map { user ->
+            val issueJobs = miscUsers.map { user ->
                 async(Dispatchers.Default) {
                     val issuesForUser = jiraApi.getIssuesResolved(
                         user.jiraId!!,
@@ -335,7 +336,7 @@ suspend fun createSummary(
                     }
                 }
             }
-            val prJobs = users.map { user ->
+            val prJobs = miscUsers.map { user ->
                 async(Dispatchers.Default) {
                     val prsForUser = gitHubApi.getMergedPullRequests(
                         user.gitHubId!!, gitHubOrganizationIds, Clock.System.now().minus(duration),
@@ -371,7 +372,7 @@ suspend fun createSummary(
     if (isMiscellaneousProjectIncluded) {
         projectSummaries.add(
             miscProject.createSummary(
-                users.toSet(),
+                miscUsers.toSet(),
                 gitHubApi,
                 gitHubOrganizationIds,
                 jiraApi,

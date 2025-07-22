@@ -1,7 +1,9 @@
 package com.github.karlsabo.dto
 
-import com.github.karlsabo.devlake.ProjectSummary
-import com.github.karlsabo.devlake.toTerseSlackMarkdown
+import com.github.karlsabo.pagerduty.PagerDutyIncident
+import com.github.karlsabo.tools.ProjectSummary
+import com.github.karlsabo.tools.toSlackMarkup
+import com.github.karlsabo.tools.toTerseSlackMarkdown
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
@@ -11,7 +13,7 @@ data class MultiProjectSummary(
     val endDate: LocalDate,
     val summaryName: String,
     val projectSummaries: List<ProjectSummary>,
-    val pagerDutyAlerts: List<PagerDutyAlert>?,
+    val pagerDutyAlerts: List<PagerDutyIncident>?,
 )
 
 fun MultiProjectSummary.toTerseSlackMarkup(): String {
@@ -26,7 +28,7 @@ fun MultiProjectSummary.toTerseSlackMarkup(): String {
         slackSummary.appendLine("📟 *Pager Duty Alerts*")
         val alerts = mutableListOf<String>()
         pagerDutyAlerts.forEach {
-            alerts.add("- <${it.url}|${it.key}>: ${it.description}")
+            alerts.add("- <${it.htmlUrl}|${it.incidentNumber}>: ${it.description}")
         }
         if (alerts.isEmpty()) alerts.add("- No pages! 🎉")
         alerts.forEach { slackSummary.appendLine(it) }
@@ -50,7 +52,7 @@ fun MultiProjectSummary.toSlackMarkup(): String {
         slackSummary.appendLine()
         val alerts = mutableListOf<String>()
         pagerDutyAlerts.forEach {
-            alerts.add("- <${it.url}|${it.key}>: ${it.description}")
+            alerts.add("- <${it.htmlUrl}|${it.incidentNumber}>: ${it.description}")
         }
         if (alerts.isEmpty()) alerts.add("- No pages! 🎉")
         alerts.forEach { slackSummary.appendLine(it) }
@@ -76,7 +78,7 @@ fun MultiProjectSummary.toMarkdown(): String {
         markdownSummary.appendLine()
         val alerts = mutableListOf<String>()
         pagerDutyAlerts.forEach {
-            alerts.add("""* [${it.key}](${it.url}): ${it.description}""")
+            alerts.add("""* [${it.htmlUrl}](${it.incidentNumber}): ${it.description}""")
         }
         if (alerts.isEmpty()) alerts.add("* No pages! :tada:")
         alerts.forEach { markdownSummary.appendLine(it) }

@@ -11,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
-import com.github.karlsabo.devlake.UserAndTeamsConfig
 import com.github.karlsabo.devlake.accessor.User
 import com.github.karlsabo.devlake.gitHubConfigPath
 import com.github.karlsabo.devlake.jiraConfigPath
@@ -20,6 +19,7 @@ import com.github.karlsabo.devlake.tools.UserMetricPublisherConfig
 import com.github.karlsabo.devlake.tools.loadUserMetricPublisherConfig
 import com.github.karlsabo.devlake.tools.saveUserMetricPublisherConfig
 import com.github.karlsabo.devlake.tools.userMetricPublisherConfigPath
+import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.loadGitHubConfig
@@ -59,7 +59,7 @@ fun main() = application {
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var config by remember { mutableStateOf(UserMetricPublisherConfig()) }
-    var userAndTeamsConfig by remember { mutableStateOf<UserAndTeamsConfig?>(null) }
+    var userAndTeamsConfig by remember { mutableStateOf<UsersConfig?>(null) }
     var jiraApi by remember { mutableStateOf<JiraApi?>(null) }
     var gitHubApi by remember { mutableStateOf<GitHubApi?>(null) }
 
