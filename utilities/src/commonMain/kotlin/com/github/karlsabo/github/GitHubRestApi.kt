@@ -8,7 +8,7 @@ import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
@@ -100,8 +100,28 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         install(ContentNegotiation) {
             json(lenientJson)
         }
+        defaultRequest {
+            header("Accept", "application/vnd.github.v3+json")
+            header("X-GitHub-Api-Version", "2022-11-28")
+        }
         installHttpRetry()
         expectSuccess = false
+    }
+
+    override suspend fun searchPullRequestsByText(
+        searchText: String,
+        organizationIds: List<String>,
+        startDateInclusive: Instant,
+        endDateInclusive: Instant,
+    ): List<Issue> {
+        val formattedStartDate = startDateInclusive.toUtcDateString()
+        val formattedEndDate = endDateInclusive.toUtcDateString()
+
+        val query =
+            "${organizationIds.joinToString(" ") { "org:$it" }} is:merged merged:$formattedStartDate..$formattedEndDate is:pr $searchText in:title,body"
+        val encodedQuery = query.encodeURLParameter()
+
+        return paginatedIssueQuery(encodedQuery)
     }
 
     override suspend fun getMergedPullRequests(
@@ -110,13 +130,35 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         startDate: Instant,
         endDate: Instant,
     ): List<Issue> {
-        val formattedStartDate = startDate.toUtcDateString()
-        val formattedEndDate = endDate.toUtcDateString()
+        val encodedQuery = createMergedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds)
+        return paginatedIssueQuery(encodedQuery)
+    }
 
-        val query =
-            "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
-        val encodedQuery = query.encodeURLParameter()
+    override suspend fun getMergedPullRequestCount(
+        gitHubUserId: String,
+        organizationIds: List<String>,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt {
+        val encodedQuery =
+            createMergedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds).encodeURLParameter()
+        val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"
 
+        val response = client.get(url)
+
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId")
+        }
+        val root = Json.parseToJsonElement(responseText).jsonObject
+
+        val totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
+
+        return totalCount.toUInt()
+    }
+
+    private suspend fun paginatedIssueQuery(encodedQuery: String): MutableList<Issue> {
         val pullRequests = mutableListOf<Issue>()
         var page = 1
         val perPage = 20
@@ -125,11 +167,15 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         while (page <= (totalCount / perPage) + 1) {
             val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=$perPage&page=$page"
 
-            val response = client.get(url) {
-                addGitHubHeaders()
-            }
+            val response = client.get(url)
 
             val responseText = response.bodyAsText()
+            if (response.status.value !in 200..299) {
+                println("searchPullRequestsByText query=`$`")
+                println("\tresponseText=```$responseText```")
+                throw Exception("Failed to search pull requests: ${response.status.value}")
+            }
+
             val root = lenientJson.parseToJsonElement(responseText).jsonObject
 
             val items = root["items"]?.jsonArray ?: break
@@ -145,47 +191,25 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
         return pullRequests
     }
+}
 
-    override suspend fun getMergedPullRequestCount(
-        gitHubUserId: String,
-        organizationIds: List<String>,
-        startDate: Instant,
-        endDate: Instant,
-    ): UInt {
-        val formattedStartDate = startDate.toUtcDateString()
-        val formattedEndDate = endDate.toUtcDateString()
+private fun createMergedPrEncodedQuery(
+    startDate: Instant,
+    endDate: Instant,
+    gitHubUserId: String,
+    organizationIds: List<String>,
+): String {
+    val formattedStartDate = startDate.toUtcDateString()
+    val formattedEndDate = endDate.toUtcDateString()
 
-        val query =
-            "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
-        val encodedQuery = query.encodeURLParameter()
-
-        val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"
-
-        val response = client.get(url) {
-            addGitHubHeaders()
-        }
-
-        val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
-            println("$gitHubUserId query=`$query`")
-            println("\tresponseText=```$responseText```")
-            throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId")
-        }
-        val root = Json.parseToJsonElement(responseText).jsonObject
-
-        val totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
-
-        return totalCount.toUInt()
-    }
+    val query =
+        "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
+    val encodedQuery = query.encodeURLParameter()
+    return encodedQuery
 }
 
 fun JsonElement.toPullRequest(): Issue {
     return lenientJson.decodeFromJsonElement(Issue.serializer(), this)
-}
-
-private fun HttpRequestBuilder.addGitHubHeaders() {
-    header("Accept", "application/vnd.github.v3+json")
-    header("X-GitHub-Api-Version", "2022-11-28")
 }
 
 private fun Instant.toUtcDateString(): String {
