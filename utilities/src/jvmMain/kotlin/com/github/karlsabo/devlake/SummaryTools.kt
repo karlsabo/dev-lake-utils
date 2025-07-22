@@ -307,7 +307,15 @@ suspend fun createSummary(
         val projectJobs = projects.map { project ->
             async(Dispatchers.Default) {
                 val projectSummary =
-                    project.createSummary(users.toSet(), gitHubApi, jiraApi, textSummarizer, duration, emptySet())
+                    project.createSummary(
+                        users.toSet(),
+                        gitHubApi,
+                        gitHubOrganizationIds,
+                        jiraApi,
+                        textSummarizer,
+                        duration,
+                        emptySet()
+                    )
                 mutex.withLock {
                     projectSummaries.add(projectSummary)
                 }
@@ -365,6 +373,7 @@ suspend fun createSummary(
             miscProject.createSummary(
                 users.toSet(),
                 gitHubApi,
+                gitHubOrganizationIds,
                 jiraApi,
                 textSummarizer,
                 duration,
@@ -396,6 +405,7 @@ suspend fun createSummary(
 suspend fun Project.createSummary(
     users: Set<User>,
     gitHubApi: GitHubApi,
+    gitHubOrganizationIds: List<String>,
     jiraApi: JiraApi,
     textSummarizer: TextSummarizer,
     duration: Duration,
@@ -415,7 +425,6 @@ suspend fun Project.createSummary(
         jiraApi.getChildIssues(parentIssueKeys).toMutableList()
     }
 
-    // Add additional issues from JQL if specified
     if (jqlToPullChildIssues != null) {
         val jiraIssues = jiraApi.runJql(jqlToPullChildIssues)
         jiraIssues.forEach { jiraIssue ->
@@ -426,7 +435,9 @@ suspend fun Project.createSummary(
     }
 
     val resolvedChildIssues =
-        childIssues.filter { it.resolutionDate != null && it.resolutionDate >= Clock.System.now().minus(duration) }
+        childIssues.filter {
+            it.resolutionDate != null && it.resolutionDate >= Clock.System.now().minus(duration) && it.isIssueOrBug()
+        }
 
     val summary = if (resolvedChildIssues.isNotEmpty()) {
         val summaryRawInput = StringBuilder()
@@ -443,11 +454,14 @@ suspend fun Project.createSummary(
 
     // Get merged PRs related to these issues
     val mergedPrs = mutableSetOf(*pullRequests.toTypedArray())
-
-
-    // For each issue, find related PRs from GitHub
-    Clock.System.now().minus(duration)
-    Clock.System.now()
+    resolvedChildIssues.forEach { issue ->
+        mergedPrs += gitHubApi.searchPullRequestsByText(
+            issue.issueKey,
+            gitHubOrganizationIds,
+            Clock.System.now().minus(duration),
+            Clock.System.now()
+        )
+    }
 
     val milestones = if (parentIssuesAreChildren) {
         emptySet()
