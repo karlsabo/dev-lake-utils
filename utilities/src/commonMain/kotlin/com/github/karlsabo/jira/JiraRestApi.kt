@@ -2,6 +2,7 @@ package com.github.karlsabo.jira
 
 import com.github.karlsabo.Credentials
 import com.github.karlsabo.http.installHttpRetry
+import com.github.karlsabo.tools.lenientJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -21,9 +22,10 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
-
-private val json = Json { ignoreUnknownKeys = true }
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class JiraApiRestConfig(
     val credentials: Credentials,
@@ -42,10 +44,10 @@ data class JiraSecret(val jiraApiKey: String)
 
 fun loadJiraConfig(configFilePath: Path): JiraApiRestConfig {
     val config = SystemFileSystem.source(Path(configFilePath)).buffered().use { source ->
-        json.decodeFromString<JiraConfig>(source.readText())
+        lenientJson.decodeFromString<JiraConfig>(source.readText())
     }
     val secretConfig = SystemFileSystem.source(Path(config.apiKeyPath)).buffered().use { source ->
-        json.decodeFromString<JiraSecret>(source.readText())
+        lenientJson.decodeFromString<JiraSecret>(source.readText())
     }
 
     return JiraApiRestConfig(
@@ -59,7 +61,7 @@ fun loadJiraConfig(configFilePath: Path): JiraApiRestConfig {
 
 fun saveJiraConfig(config: JiraConfig, configPath: Path) {
     SystemFileSystem.sink(configPath, false).buffered().use { sink ->
-        sink.writeString(json.encodeToString(JiraConfig.serializer(), config))
+        sink.writeString(lenientJson.encodeToString(JiraConfig.serializer(), config))
     }
 }
 
@@ -77,7 +79,7 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
             }
         }
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
+            json(lenientJson)
         }
         installHttpRetry()
         expectSuccess = false
@@ -87,7 +89,7 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
         val commentList = mutableListOf<Comment>()
         val url = "https://${config.domain}/rest/api/3/issue/$issueKey/comment?orderBy=-created&maxResults=$maxResults"
         val response = client.get(url)
-        val root = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
         val comments = root["comments"]?.jsonArray ?: return commentList
         commentList += comments.map { it.jsonObject.toComment() }
 
@@ -105,7 +107,7 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
                 "https://${config.domain}/rest/api/3/search?jql=$encodedJql&startAt=$startAt&maxResults=$maxResults"
 
             val response = client.get(url)
-            val root = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
 
             val issues = root["issues"]?.jsonArray ?: break
             issueList += issues.map { it.jsonObject.toIssue() }
@@ -139,7 +141,7 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
         val encodedJql = jql.encodeURLParameter()
         val url = "https://${config.domain}/rest/api/3/search?jql=$encodedJql&maxResults=0"
         val response = client.get(url)
-        val root = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
         return (root["total"]?.jsonPrimitive?.int ?: 0).toUInt()
     }
 }

@@ -3,13 +3,13 @@ package com.github.karlsabo.devlake.tools
 import com.github.karlsabo.devlake.DEV_LAKE_APP_NAME
 import com.github.karlsabo.devlake.dto.Project
 import com.github.karlsabo.tools.getApplicationDirectory
+import com.github.karlsabo.tools.lenientJson
 import io.ktor.utils.io.core.writeText
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 @Serializable
 data class SummaryPublisherConfig(
@@ -25,13 +25,12 @@ val summaryPublisherConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME)
 
 fun loadSummaryPublisherConfig(configPath: Path = summaryPublisherConfigPath): SummaryPublisherConfig {
     SystemFileSystem.source(configPath).buffered().readText().let {
-        return Json.decodeFromString(SummaryPublisherConfig.serializer(), it)
+        return lenientJson.decodeFromString(SummaryPublisherConfig.serializer(), it)
     }
 }
 
-val jsonEncoder = Json { encodeDefaults = true }
 fun saveSummaryPublisherConfig(config: SummaryPublisherConfig) {
     SystemFileSystem.sink(summaryPublisherConfigPath).buffered()
-        .writeText(jsonEncoder.encodeToString(SummaryPublisherConfig.serializer(), config))
+        .writeText(lenientJson.encodeToString(SummaryPublisherConfig.serializer(), config))
 }
 

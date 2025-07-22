@@ -1,6 +1,7 @@
 package com.github.karlsabo.github
 
 import com.github.karlsabo.http.installHttpRetry
+import com.github.karlsabo.tools.lenientJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -22,9 +23,13 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
-
-private val json = Json { ignoreUnknownKeys = true }
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Configuration for GitHub REST API.
@@ -59,10 +64,10 @@ data class GitHubSecret(
  */
 fun loadGitHubConfig(configFilePath: Path): GitHubApiRestConfig {
     val config = SystemFileSystem.source(Path(configFilePath)).buffered().use { source ->
-        json.decodeFromString<GitHubConfig>(source.readText())
+        lenientJson.decodeFromString<GitHubConfig>(source.readText())
     }
     val secretConfig = SystemFileSystem.source(Path(config.tokenPath)).buffered().use { source ->
-        json.decodeFromString<GitHubSecret>(source.readText())
+        lenientJson.decodeFromString<GitHubSecret>(source.readText())
     }
 
     return GitHubApiRestConfig(
@@ -76,7 +81,7 @@ fun loadGitHubConfig(configFilePath: Path): GitHubApiRestConfig {
 @Suppress("unused")
 fun saveGitHubConfig(config: GitHubConfig, configPath: Path) {
     SystemFileSystem.sink(configPath, false).buffered().use { sink ->
-        sink.writeString(json.encodeToString(GitHubConfig.serializer(), config))
+        sink.writeString(lenientJson.encodeToString(GitHubConfig.serializer(), config))
     }
 }
 
@@ -94,7 +99,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
             }
         }
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
+            json(lenientJson)
         }
         installHttpRetry()
         expectSuccess = false
@@ -126,7 +131,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
             }
 
             val responseText = response.bodyAsText()
-            val root = Json.parseToJsonElement(responseText).jsonObject
+            val root = lenientJson.parseToJsonElement(responseText).jsonObject
 
             val items = root["items"]?.jsonArray ?: break
             if (items.isEmpty()) break

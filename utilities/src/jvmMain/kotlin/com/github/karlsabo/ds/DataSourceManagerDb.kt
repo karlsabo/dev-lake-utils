@@ -1,8 +1,9 @@
 package com.github.karlsabo.ds
 
+import com.github.karlsabo.tools.lenientJson
 import com.zaxxer.hikari.HikariDataSource
-import io.ktor.utils.io.*
 import io.ktor.utils.io.core.writeText
+import io.ktor.utils.io.readText
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -10,9 +11,7 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import javax.sql.DataSource
-import kotlin.io.use
 
 data class DataSourceDbConfig(
     val jdbcUrl: String = "jdbc:mysql://localhost:4306/lake",
@@ -55,7 +54,7 @@ fun loadDataSourceDbConfigNoSecrets(dataSourceDbConfigPath: Path): DataSourceDbC
         return null
     }
     return try {
-        Json.decodeFromString<DataSourceDbConfigNoSecrets>(
+        lenientJson.decodeFromString(
             DataSourceDbConfigNoSecrets.serializer(),
             SystemFileSystem.source(dataSourceDbConfigPath).buffered().readText(),
         )
@@ -65,10 +64,9 @@ fun loadDataSourceDbConfigNoSecrets(dataSourceDbConfigPath: Path): DataSourceDbC
     }
 }
 
-private val json = Json { encodeDefaults = true }
 fun saveDataSourceDbConfigNoSecrets(dataSourceDbConfigPath: Path, config: DataSourceDbConfigNoSecrets) {
     SystemFileSystem.sink(dataSourceDbConfigPath).buffered()
-        .writeText(json.encodeToString(DataSourceDbConfigNoSecrets.serializer(), config))
+        .writeText(lenientJson.encodeToString(DataSourceDbConfigNoSecrets.serializer(), config))
 }
 
 

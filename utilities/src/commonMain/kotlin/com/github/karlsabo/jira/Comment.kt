@@ -1,9 +1,9 @@
 package com.github.karlsabo.jira
 
+import com.github.karlsabo.tools.lenientJson
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 
@@ -66,12 +66,6 @@ data class ContentAttrs(
     val shortName: String? = null
 )
 
-private val jsonParser = Json {
-    ignoreUnknownKeys = true
-    coerceInputValues = true
-    isLenient = true
-}
-
 /**
  * Parses a kotlinx.serialization.JsonObject representing a Jira comment
  * into a [Comment] data class.
@@ -84,7 +78,7 @@ private val jsonParser = Json {
  * @throws kotlinx.serialization.SerializationException if parsing fails due to mismatched types or structure.
  */
 fun JsonObject.toComment(): Comment {
-    return jsonParser.decodeFromJsonElement<Comment>(this)
+    return lenientJson.decodeFromJsonElement<Comment>(this)
 }
 
 /**

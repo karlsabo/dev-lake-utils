@@ -30,8 +30,7 @@ data class Milestone(
     val assignee: User?,
     val issue: Issue,
     val issues: Set<Issue>,
-    val issueChangeLogs: Set<IssueChangelog>,
-    val milestoneComments: Set<IssueComment>,
+    val milestoneComments: Set<Comment>,
     val durationIssues: Set<Issue>,
     val durationMergedPullRequests: Set<com.github.karlsabo.github.Issue>,
 )
@@ -294,6 +293,7 @@ private fun createSlackMarkdownProgressBar(issues: Set<Issue>, durationIssues: S
 suspend fun createSummary(
     jiraApi: JiraApi,
     gitHubApi: GitHubApi,
+    gitHubOrganizationIds: List<String>,
     textSummarizer: TextSummarizer,
     projects: List<Project>,
     duration: Duration,
@@ -311,7 +311,7 @@ suspend fun createSummary(
     val miscPrSet = mutableSetOf<com.github.karlsabo.github.Issue>()
 
     coroutineScope {
-        projects.map { project ->
+        val projectJobs = projects.map { project ->
             async(Dispatchers.Default) {
                 val projectSummary =
                     project.createSummary(users.toSet(), gitHubApi, jiraApi, textSummarizer, duration, emptySet())
@@ -321,8 +321,8 @@ suspend fun createSummary(
             }
         }
 
-        if (isMiscellaneousProjectIncluded) {
-            users.map { user ->
+        val userJobs = if (isMiscellaneousProjectIncluded) {
+            val issueJobs = users.map { user ->
                 async(Dispatchers.Default) {
                     val issuesForUser = jiraApi.getIssuesResolved(
                         user.jiraId!!,
@@ -332,20 +332,16 @@ suspend fun createSummary(
                         mutex.withLock {
                             miscIssueSet.addAll(issuesForUser)
                         }
-                    }
                 }
             }
             val prJobs = users.map { user ->
                 async(Dispatchers.Default) {
-                    val userAccounts = userAccountAccessor.getUserAccountByUserId(user.id)
-                    userAccounts.forEach {
-                        val prsForUser = pullRequestAccessor.getPullRequestsByAuthorIdAndAfterMergedDate(
-                            it.accountId,
-                            Clock.System.now().minus(duration)
-                        )
-                        mutex.withLock {
-                            miscPrSet.addAll(prsForUser)
-                        }
+                    val prsForUser = gitHubApi.getMergedPullRequests(
+                        user.gitHubId!!, gitHubOrganizationIds, Clock.System.now().minus(duration),
+                        Clock.System.now()
+                    )
+                    mutex.withLock {
+                        miscPrSet.addAll(prsForUser)
                     }
                 }
             }
@@ -357,29 +353,19 @@ suspend fun createSummary(
         projectJobs.joinAll()
         userJobs.joinAll()
     }
+
     projectSummaries.forEach { projectSummary ->
         miscIssueSet.removeAll(projectSummary.issues)
         miscIssueSet.removeAll(projectSummary.milestones.map { it.issue })
         miscIssueSet.removeAll(projectSummary.milestones.flatMap { it.issues })
         miscPrSet.removeAll(projectSummary.durationMergedPullRequests)
     }
-
-    val pullRequestAccessor = PullRequestAccessorDb(dataSource)
-    var miscPullRequests = mutableSetOf<PullRequest>()
-    users.forEach {
-        miscPullRequests.addAll(
-            pullRequestAccessor
-                .getPullRequestsByAuthorIdAndAfterMergedDate(it.id, Clock.System.now().minus(duration))
-        )
-    }
     projectSummaries.sortBy { it.project.title?.replaceFirst(Regex("""^[^\p{L}\p{N}]+"""), "") }
-    projectSummaries.forEach { projectSummary ->
-        miscPullRequests = miscPullRequests.subtract(projectSummary.durationMergedPullRequests).toMutableSet()
-    }
+
     val miscProject = Project(
         id = 123456789101112L,
         title = "📋 Other (Misc)",
-        topLevelIssueIds = miscIssueSet.map { it.id },
+        topLevelIssueKeys = miscIssueSet.map { it.issueKey },
     )
     if (isMiscellaneousProjectIncluded) {
         projectSummaries.add(
@@ -528,22 +514,16 @@ suspend fun Project.createSummary(
                 }
 
                 // Get recent comments for the milestone
-                val milestoneCommentSet = mutableSetOf<IssueComment>()
+                val milestoneCommentSet = mutableSetOf<Comment>()
                 if (milestoneIssue.issueKey.isNotBlank()) {
                     milestoneCommentSet.addAll(
                         jiraApi.getRecentComments(milestoneIssue.issueKey, 5).map { it.toIssueComment() })
                 }
 
-                // For issue changelogs, we would need to query Jira API
-                // This is a simplification - in a real implementation, you would need to
-                // query Jira for changelogs
-                val issueChangelogs = mutableSetOf<IssueChangelog>()
-
                 Milestone(
                     owner,
                     milestoneIssue,
                     milestoneChildIssues,
-                    issueChangelogs,
                     milestoneCommentSet,
                     milestoneChildIssues.filter { issue ->
                         issue.isIssueOrBug()

@@ -8,12 +8,12 @@ import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.tools.getApplicationDirectory
+import com.github.karlsabo.tools.lenientJson
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
-import kotlinx.serialization.json.Json
 import java.sql.Connection
 
 const val DEV_LAKE_APP_NAME = "DevLakeUtils"
@@ -229,7 +229,7 @@ fun loadUserAndTeamConfig(): UserAndTeamsConfig? {
         return null
     }
     return try {
-        Json.decodeFromString(
+        lenientJson.decodeFromString(
             UserAndTeamsConfig.serializer(),
             SystemFileSystem.source(devLakeUserAndTeamsConfigPath).buffered().readText(),
         )
@@ -239,12 +239,10 @@ fun loadUserAndTeamConfig(): UserAndTeamsConfig? {
     }
 }
 
-private val json = Json { prettyPrint = true; encodeDefaults = true }
-
 private fun saveUserConfig(userConfig: UserAndTeamsConfig) {
     SystemFileSystem.sink(devLakeUserAndTeamsConfigPath).buffered().use {
         it.writeString(
-            json.encodeToString(
+            lenientJson.encodeToString(
                 UserAndTeamsConfig.serializer(),
                 userConfig,
             )

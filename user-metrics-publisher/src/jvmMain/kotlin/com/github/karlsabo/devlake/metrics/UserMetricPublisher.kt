@@ -27,6 +27,7 @@ import com.github.karlsabo.jira.Issue
 import com.github.karlsabo.jira.JiraApi
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.tools.lenientJson
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -49,7 +50,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.days
 import kotlin.time.measureTime
 import com.github.karlsabo.github.Issue as GitHubIssue
@@ -242,7 +242,7 @@ private suspend fun sendToZap(slackMessage: SlackMessage, zapierMetricUrl: Strin
     val response: HttpResponse = client.post(zapierMetricUrl) {
         header(HttpHeaders.Referrer, "https://hooks.zapier.com")
         contentType(ContentType.Application.Json)
-        setBody(Json.encodeToString(SlackMessage.serializer(), slackMessage))
+        setBody(lenientJson.encodeToString(SlackMessage.serializer(), slackMessage))
     }
 
     println("response=$response, body=${response.body<String>()}")

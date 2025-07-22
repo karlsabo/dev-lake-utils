@@ -14,7 +14,6 @@
 
 # TODO
 
-* [ ] Handle rate limiting
 * [ ] Remove DevLake
   * summary publisher
 * [ ] Create native executables

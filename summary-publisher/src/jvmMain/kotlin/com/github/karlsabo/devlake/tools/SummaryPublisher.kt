@@ -1,25 +1,68 @@
 package com.github.karlsabo.devlake.tools
 
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.material.Button
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
+import androidx.compose.material.TextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.*
+import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.Credentials
-import com.github.karlsabo.devlake.*
+import com.github.karlsabo.devlake.ProjectSummary
 import com.github.karlsabo.devlake.accessor.PipelineAccessorDb
 import com.github.karlsabo.devlake.accessor.Status
+import com.github.karlsabo.devlake.createSummary
+import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
 import com.github.karlsabo.devlake.dto.MultiProjectSummary
 import com.github.karlsabo.devlake.dto.toSlackMarkup
 import com.github.karlsabo.devlake.dto.toTerseSlackMarkup
-import com.github.karlsabo.ds.*
-import com.github.karlsabo.jira.*
-import com.github.karlsabo.text.*
+import com.github.karlsabo.devlake.jiraConfigPath
+import com.github.karlsabo.devlake.loadUserAndTeamConfig
+import com.github.karlsabo.devlake.textSummarizerConfigPath
+import com.github.karlsabo.devlake.toSlackMarkup
+import com.github.karlsabo.devlake.toVerboseSlackMarkdown
+import com.github.karlsabo.ds.DataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.DataSourceManagerDb
+import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.saveDataSourceDbConfigNoSecrets
+import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.jira.JiraApiRestConfig
+import com.github.karlsabo.jira.JiraConfig
+import com.github.karlsabo.jira.JiraRestApi
+import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.jira.saveJiraConfig
+import com.github.karlsabo.text.TextSummarizerOpenAi
+import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
+import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
+import com.github.karlsabo.text.saveTextSummarizerOpenAiNoSecrets
+import com.github.karlsabo.text.toTextSummarizerOpenAiConfig
+import com.github.karlsabo.tools.lenientJson
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -39,7 +82,6 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 
@@ -390,7 +432,7 @@ suspend fun sendToZap(zapierProjectSummary: ZapierProjectSummary, zapierSummaryU
     val response: HttpResponse = client.post(zapierSummaryUrl) {
         header(HttpHeaders.Referrer, "https://hooks.zapier.com")
         contentType(ContentType.Application.Json)
-        setBody(Json.encodeToString(ZapierProjectSummary.serializer(), zapierProjectSummary))
+        setBody(lenientJson.encodeToString(ZapierProjectSummary.serializer(), zapierProjectSummary))
     }
 
     println("response=$response, body=${response.body<String>()}")
