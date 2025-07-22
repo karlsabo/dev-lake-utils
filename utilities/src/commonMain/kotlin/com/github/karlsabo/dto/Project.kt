@@ -1,4 +1,4 @@
-package com.github.karlsabo.devlake.dto
+package com.github.karlsabo.dto
 
 import kotlinx.serialization.Serializable
 

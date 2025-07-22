@@ -2,11 +2,11 @@ package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.devlake.createSummary
 import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
-import com.github.karlsabo.devlake.dto.toSlackMarkup
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.text.TextSummarizerFake
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.days

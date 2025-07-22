@@ -1,7 +1,7 @@
 package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.devlake.DEV_LAKE_APP_NAME
-import com.github.karlsabo.devlake.dto.Project
+import com.github.karlsabo.dto.Project
 import com.github.karlsabo.tools.getApplicationDirectory
 import com.github.karlsabo.tools.lenientJson
 import io.ktor.utils.io.core.writeText

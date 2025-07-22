@@ -1,11 +1,18 @@
 package com.github.karlsabo.devlake
 
-import com.github.karlsabo.devlake.dto.MultiProjectSummary
-import com.github.karlsabo.devlake.dto.PagerDutyAlert
-import com.github.karlsabo.devlake.dto.Project
+import com.github.karlsabo.dto.MultiProjectSummary
+import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.github.GitHubApi
-import com.github.karlsabo.jira.*
+import com.github.karlsabo.jira.Comment
+import com.github.karlsabo.jira.Issue
+import com.github.karlsabo.jira.JiraApi
+import com.github.karlsabo.jira.isCompleted
+import com.github.karlsabo.jira.isIssueOrBug
+import com.github.karlsabo.jira.isMilestone
+import com.github.karlsabo.jira.toPlainText
+import com.github.karlsabo.pagerduty.PagerDutyApi
+import com.github.karlsabo.pagerduty.PagerDutyIncident
 import com.github.karlsabo.text.TextSummarizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -17,7 +24,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
-import java.net.URI
 import java.sql.Date
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -97,39 +103,25 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     )
                 } else {
                     val changeCharacterLimit = 200
-                    val lastChange = milestone.issueChangeLogs.sortedByDescending { it.createdDate }.firstOrNull()
-                    val lastChangeDate = lastChange?.createdDate
                     val lastIssue = milestone.issues.sortedByDescending { it.resolutionDate }.firstOrNull()
                     val lastIssueResolutionDate = lastIssue?.resolutionDate
 
                     // Check for the most recent update from changelogs, issue resolutions, or comments
-                    val lastComment = milestone.milestoneComments.sortedByDescending { it.createdDate }.firstOrNull()
-                    val lastCommentDate = lastComment?.createdDate
+                    val lastComment = milestone.milestoneComments.maxByOrNull { it.created }
+                    val lastCommentDate = lastComment?.created
 
                     val isStatusRecent: Boolean
                     // Determine which is the most recent update: changelog, issue resolution, or comment
-                    if (lastChangeDate != null &&
-                        (lastIssueResolutionDate == null || lastChange.createdDate > lastIssue.resolutionDate) &&
-                        (lastCommentDate == null || lastChange.createdDate > lastCommentDate)
-                    ) {
-                        // Changelog is the most recent
-                        val dateStr = lastChangeDate.toLocalDateTime(TimeZone.of("America/New_York")).date
-                        isStatusRecent = lastChangeDate >= Clock.System.now().minus(14.days)
-                        val warningEmoji = if (!isStatusRecent) "⚠️ " else ""
-                        val changeDescription =
-                            "${lastChange.originalToValue}".take(changeCharacterLimit) + if ("${lastChange.fieldName} to ${lastChange.originalToValue}".length > changeCharacterLimit) "..." else ""
-                        summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: *${lastChange.authorName}* \"$changeDescription\"")
-                    } else if (lastCommentDate != null &&
-                        (lastIssueResolutionDate == null || lastCommentDate > lastIssue.resolutionDate) &&
-                        (lastChangeDate == null || lastCommentDate > lastChangeDate)
+                    if (lastCommentDate != null &&
+                        (lastIssueResolutionDate == null || lastCommentDate > lastIssue.resolutionDate)
                     ) {
                         // Comment is the most recent
                         val dateStr = lastCommentDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         isStatusRecent = lastCommentDate >= Clock.System.now().minus(14.days)
                         val warningEmoji = if (!isStatusRecent) "⚠️ " else ""
-                        val commentBody = lastComment.body?.take(changeCharacterLimit) ?: ""
+                        val commentBody = lastComment.body.toPlainText().take(changeCharacterLimit)
                         val commentDescription =
-                            commentBody + if ((lastComment.body?.length ?: 0) > changeCharacterLimit) "..." else ""
+                            commentBody + if (lastComment.body.toPlainText().length > changeCharacterLimit) "..." else ""
                         summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: \"$commentDescription\"")
                     } else if (lastIssueResolutionDate != null) {
                         // Issue resolution is the most recent
@@ -294,13 +286,14 @@ suspend fun createSummary(
     jiraApi: JiraApi,
     gitHubApi: GitHubApi,
     gitHubOrganizationIds: List<String>,
+    pagerDutyApi: PagerDutyApi?,
+    pagerDutyServiceIds: List<String>,
     textSummarizer: TextSummarizer,
     projects: List<Project>,
     duration: Duration,
     users: List<User>,
     summaryName: String,
     isMiscellaneousProjectIncluded: Boolean,
-    isPagerDutyIncluded: Boolean,
 ): MultiProjectSummary {
     val timeInPast = Clock.System.now().minus(duration)
     Date(timeInPast.toEpochMilliseconds())
@@ -329,9 +322,9 @@ suspend fun createSummary(
                         Clock.System.now().minus(duration),
                         Clock.System.now()
                     )
-                        mutex.withLock {
-                            miscIssueSet.addAll(issuesForUser)
-                        }
+                    mutex.withLock {
+                        miscIssueSet.addAll(issuesForUser)
+                    }
                 }
             }
             val prJobs = users.map { user ->
@@ -381,33 +374,10 @@ suspend fun createSummary(
         )
     }
 
-    val pagerDutyAlertList: List<PagerDutyAlert>? = if (isPagerDutyIncluded) {
-        val alertList = mutableListOf<PagerDutyAlert>()
-        dataSource.connection.use { conn ->
-            conn.prepareStatement(
-                """
-        SELECT
-            *
-        FROM
-            issues
-        WHERE
-            issues.id LIKE '%page%'
-            AND issues.created_date >= ?
-        """.trimIndent()
-            ).use { ps ->
-                ps.setDate(1, timeInPastSql)
-                ps.executeQuery().use { rs ->
-                    while (rs.next()) {
-                        alertList.add(
-                            PagerDutyAlert(
-                                rs.getString("issue_key"),
-                                rs.getString("description"),
-                                rs.getString("url")
-                            )
-                        )
-                    }
-                }
-            }
+    val pagerDutyIncidentList: List<PagerDutyIncident>? = if (pagerDutyApi != null) {
+        val alertList = mutableListOf<PagerDutyIncident>()
+        pagerDutyServiceIds.forEach { serviceId ->
+            alertList += pagerDutyApi.getServicePages(serviceId, Clock.System.now().minus(duration), Clock.System.now())
         }
         alertList
     } else {
@@ -419,7 +389,7 @@ suspend fun createSummary(
         Clock.System.now().toLocalDateTime(TimeZone.UTC).date,
         summaryName,
         projectSummaries,
-        pagerDutyAlertList,
+        pagerDutyIncidentList,
     )
 }
 
@@ -450,7 +420,7 @@ suspend fun Project.createSummary(
         val jiraIssues = jiraApi.runJql(jqlToPullChildIssues)
         jiraIssues.forEach { jiraIssue ->
             if (childIssues.none { it.issueKey == jiraIssue.issueKey }) {
-                childIssues.add(jiraIssue.toIssue())
+                childIssues.add(jiraIssue)
             }
         }
     }
@@ -472,18 +442,12 @@ suspend fun Project.createSummary(
     }
 
     // Get merged PRs related to these issues
-    val mergedPrs = mutableSetOf<com.github.karlsabo.github.Issue>()
+    val mergedPrs = mutableSetOf(*pullRequests.toTypedArray())
+
 
     // For each issue, find related PRs from GitHub
     Clock.System.now().minus(duration)
     Clock.System.now()
-
-    // This is a simplification - in a real implementation, you would need to
-    // query GitHub for PRs that reference these issue keys
-    // For now, we'll add the provided PRs
-    mergedPrs.addAll(pullRequests)
-
-    // We would need to implement a way to find PRs by issue key in GitHub API
 
     val milestones = if (parentIssuesAreChildren) {
         emptySet()
@@ -493,7 +457,6 @@ suspend fun Project.createSummary(
                 // Get child issues for this milestone using JQL
                 val jqlForMilestoneChildren = "parent = ${milestoneIssue.id}"
                 val milestoneChildIssues = jiraApi.runJql(jqlForMilestoneChildren)
-                    .map { it.toIssue() }
                     .filter { issue -> issue.isIssueOrBug() }
                     .toSet()
 
@@ -517,7 +480,8 @@ suspend fun Project.createSummary(
                 val milestoneCommentSet = mutableSetOf<Comment>()
                 if (milestoneIssue.issueKey.isNotBlank()) {
                     milestoneCommentSet.addAll(
-                        jiraApi.getRecentComments(milestoneIssue.issueKey, 5).map { it.toIssueComment() })
+                        jiraApi.getRecentComments(milestoneIssue.issueKey, 5)
+                    )
                 }
 
                 Milestone(
@@ -549,60 +513,5 @@ suspend fun Project.createSummary(
         mergedPrs,
         milestones,
         isTagMilestoneOwners,
-    )
-}
-
-private fun Issue.toIssue(): Issue {
-    val uri = URI(this.url!!)
-    val url = uri.scheme + "://" + uri.authority + "/browse/${this.issueKey}"
-    // TODO should look in _tool_jira_accounts tables
-    val assigneeIdTranslated = if (assigneeId != null) "jira:JiraAccount:1:${this.assigneeId}" else null
-    return Issue(
-        id = this.id,
-        url = url,
-        iconUrl = this.iconUrl,
-        issueKey = this.issueKey,
-        title = this.title,
-        description = this.description,
-        epicKey = this.epicKey,
-        type = this.type,
-        originalType = this.originalType,
-        status = this.status,
-        originalStatus = this.originalStatus,
-        resolutionDate = this.resolutionDate,
-        createdDate = this.createdDate,
-        updatedDate = this.updatedDate,
-        leadTimeMinutes = this.leadTimeMinutes,
-        parentIssueId = this.parentIssueId,
-        priority = this.priority,
-        storyPoint = this.storyPoint,
-        originalEstimateMinutes = this.originalEstimateMinutes,
-        timeSpentMinutes = this.timeSpentMinutes,
-        timeRemainingMinutes = this.timeRemainingMinutes,
-        creatorId = this.creatorId,
-        creatorName = this.creatorName,
-        assigneeId = assigneeIdTranslated,
-        assigneeName = this.assigneeName,
-        severity = this.severity,
-        component = this.component,
-        originalProject = this.originalProject,
-        urgency = this.urgency,
-        isSubtask = this.isSubtask,
-        rawDataParams = null,
-        rawDataTable = null,
-        rawDataId = null,
-        rawDataRemark = null,
-        dueDate = this.dueDate,
-    )
-}
-
-private fun Comment.toIssueComment(): IssueComment {
-    return IssueComment(
-        id = this.id,
-        issueId = this.id,
-        accountId = this.author.accountId,
-        body = this.body.toPlainText(),
-        createdDate = this.created,
-        updatedDate = this.updated,
     )
 }

@@ -1,7 +1,6 @@
-package com.github.karlsabo.devlake.dto
+package com.github.karlsabo.dto
 
 import com.github.karlsabo.devlake.ProjectSummary
-import com.github.karlsabo.devlake.toSlackMarkup
 import com.github.karlsabo.devlake.toTerseSlackMarkdown
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable

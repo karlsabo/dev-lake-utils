@@ -25,7 +25,6 @@ import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -181,7 +180,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 }
 
 fun JsonElement.toPullRequest(): Issue {
-    return json.decodeFromJsonElement(Issue.serializer(), this)
+    return lenientJson.decodeFromJsonElement(Issue.serializer(), this)
 }
 
 private fun HttpRequestBuilder.addGitHubHeaders() {

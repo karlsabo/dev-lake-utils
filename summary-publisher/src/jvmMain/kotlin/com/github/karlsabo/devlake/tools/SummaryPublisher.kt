@@ -39,9 +39,6 @@ import com.github.karlsabo.devlake.accessor.PipelineAccessorDb
 import com.github.karlsabo.devlake.accessor.Status
 import com.github.karlsabo.devlake.createSummary
 import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
-import com.github.karlsabo.devlake.dto.MultiProjectSummary
-import com.github.karlsabo.devlake.dto.toSlackMarkup
-import com.github.karlsabo.devlake.dto.toTerseSlackMarkup
 import com.github.karlsabo.devlake.jiraConfigPath
 import com.github.karlsabo.devlake.loadUserAndTeamConfig
 import com.github.karlsabo.devlake.textSummarizerConfigPath
@@ -52,6 +49,9 @@ import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.saveDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.dto.MultiProjectSummary
+import com.github.karlsabo.dto.toSlackMarkup
+import com.github.karlsabo.dto.toTerseSlackMarkup
 import com.github.karlsabo.jira.JiraApiRestConfig
 import com.github.karlsabo.jira.JiraConfig
 import com.github.karlsabo.jira.JiraRestApi

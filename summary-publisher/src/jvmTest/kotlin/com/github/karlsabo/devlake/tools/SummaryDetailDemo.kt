@@ -1,11 +1,11 @@
 package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.devlake.*
-import com.github.karlsabo.devlake.dto.toSlackMarkup
-import com.github.karlsabo.devlake.dto.toTerseSlackMarkup
 import com.github.karlsabo.ds.DataSourceManagerDb
 import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
 import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.dto.toSlackMarkup
+import com.github.karlsabo.dto.toTerseSlackMarkup
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
 import com.github.karlsabo.text.TextSummarizerFake
