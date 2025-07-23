@@ -1,11 +1,8 @@
 package com.github.karlsabo.devlake.metrics
 
-import com.github.karlsabo.devlake.accessor.Issue
-import com.github.karlsabo.devlake.accessor.IssueAccessorDb
-import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
-import com.github.karlsabo.ds.DataSourceManagerDb
-import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
-import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.jira.JiraRestApi
+import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlin.time.measureTime
 
@@ -25,24 +22,13 @@ fun main(args: Array<String>): Unit = runBlocking {
         args.find { it.startsWith("--parent=") }?.substringAfter("=")
             ?: throw Exception("No --parent=issueKey provided")
 
-    val dataSourceConfig = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)!!
-    val dataSourceManager = DataSourceManagerDb(dataSourceConfig.toDataSourceDbConfig())
-    val dataSource = dataSourceManager.getOrCreateDataSource()
-
-    val issueAccessor = IssueAccessorDb(dataSource)
+    val jiraApi = JiraRestApi(loadJiraConfig(jiraConfigPath))
 
     println("Finding issues for user: $userId with parent key: $parentKey")
 
     val executionTime = measureTime {
-        // Get the parent issue by key
-        val parentIssue = issueAccessor.getIssuesByKey(parentKey)
-        if (parentIssue == null) {
-            println("Parent issue with key $parentKey not found")
-            return@measureTime
-        }
-
         // Find all issues that have this parent (directly or indirectly)
-        val allIssuesUnderParent = issueAccessor.getAllChildIssues(listOf(parentIssue.id))
+        val allIssuesUnderParent = jiraApi.getChildIssues(listOf(parentKey))
         println("Found ${allIssuesUnderParent.size} issues under parent $parentKey")
 
         // Filter to issues assigned to the specified user
@@ -73,27 +59,4 @@ fun main(args: Array<String>): Unit = runBlocking {
     }
 
     println("\nExecution time: $executionTime")
-}
-
-/**
- * Recursively finds all issues under a parent issue.
- */
-private fun findAllIssuesUnderParent(issueAccessor: IssueAccessorDb, parentIssue: Issue): Set<Issue> {
-    val result = mutableSetOf<Issue>()
-    val processedIssueIds = mutableSetOf<String>()
-
-    fun findAllChildIssues(issue: Issue) {
-        if (issue.id in processedIssueIds) return
-        processedIssueIds.add(issue.id)
-
-        val childIssues = issueAccessor.getIssuesByParentIssueId(issue.id)
-        result.addAll(childIssues)
-
-        childIssues.forEach { childIssue ->
-            findAllChildIssues(childIssue)
-        }
-    }
-
-    findAllChildIssues(parentIssue)
-    return result
 }

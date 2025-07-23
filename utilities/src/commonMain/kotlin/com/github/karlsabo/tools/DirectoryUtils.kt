@@ -7,12 +7,12 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
 
-const val DEV_LAKE_APP_NAME = "DevLakeUtils"
-val textSummarizerConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "text-summarizer-openai-config.json")
-val jiraConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "jira-rest-config.json")
-val gitHubConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "github-config.json")
-val pagerDutyConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "pagerduty-config.json")
-val usersConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "users-and-teams.json")
+const val DEV_METRICS_APP_NAME = "DevLakeUtils"
+val textSummarizerConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "text-summarizer-openai-config.json")
+val jiraConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "jira-rest-config.json")
+val gitHubConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "github-config.json")
+val pagerDutyConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "pagerduty-config.json")
+val usersConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "users-and-teams.json")
 
 fun loadUsersConfig(): UsersConfig? {
     if (!SystemFileSystem.exists(usersConfigPath)) {

@@ -1,13 +1,13 @@
 package com.github.karlsabo.devlake.metrics
 
-import com.github.karlsabo.devlake.accessor.Issue
-import com.github.karlsabo.devlake.accessor.IssueAccessorDb
-import com.github.karlsabo.devlake.accessor.isIssueOrBug
-import com.github.karlsabo.devlake.devLakeDataSourceDbConfigPath
-import com.github.karlsabo.ds.DataSourceManagerDb
-import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
-import com.github.karlsabo.ds.toDataSourceDbConfig
+import com.github.karlsabo.jira.Issue
+import com.github.karlsabo.jira.JiraRestApi
+import com.github.karlsabo.jira.isIssueOrBug
+import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.measureTime
 
 /**
@@ -21,16 +21,12 @@ fun main(args: Array<String>): Unit = runBlocking {
     val userId =
         args.find { it.startsWith("--user=") }?.substringAfter("=") ?: throw Exception("No --user=username provided")
 
-    val dataSourceConfig = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)!!
-    val dataSourceManager = DataSourceManagerDb(dataSourceConfig.toDataSourceDbConfig())
-    val dataSource = dataSourceManager.getOrCreateDataSource()
-
-    val issueAccessor = IssueAccessorDb(dataSource)
+    val jiraApi = JiraRestApi(loadJiraConfig(jiraConfigPath))
 
     println("Finding epics for user: $userId")
 
     val executionTime = measureTime {
-        val userIssues = issueAccessor.getIssuesByAssigneeId(userId)
+        val userIssues = jiraApi.getIssuesResolved(userId, Clock.System.now().minus((4 * 365).days), Clock.System.now())
         println("Found ${userIssues.size} issues assigned to user")
 
         if (userIssues.isEmpty()) {
@@ -51,7 +47,7 @@ fun main(args: Array<String>): Unit = runBlocking {
 
             processedIssueIds.addAll(parentIssueIds)
 
-            val parentIssues = issueAccessor.getIssuesById(parentIssueIds)
+            val parentIssues = runBlocking { jiraApi.getIssues(parentIssueIds) }
 
             allParentIssues.addAll(parentIssues)
 

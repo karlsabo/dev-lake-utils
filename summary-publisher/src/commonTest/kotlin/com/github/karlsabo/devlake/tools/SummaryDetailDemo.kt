@@ -1,16 +1,19 @@
 package com.github.karlsabo.devlake.tools
 
-import com.github.karlsabo.devlake.*
-import com.github.karlsabo.ds.DataSourceManagerDb
-import com.github.karlsabo.ds.loadDataSourceDbConfigNoSecrets
-import com.github.karlsabo.ds.toDataSourceDbConfig
 import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.dto.toTerseSlackMarkup
+import com.github.karlsabo.github.GitHubRestApi
+import com.github.karlsabo.github.loadGitHubConfig
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.pagerduty.PagerDutyRestApi
+import com.github.karlsabo.pagerduty.loadPagerDutyConfig
 import com.github.karlsabo.text.TextSummarizerFake
 import com.github.karlsabo.tools.createSummary
-import com.github.karlsabo.tools.getApplicationDirectory
+import com.github.karlsabo.tools.gitHubConfigPath
+import com.github.karlsabo.tools.jiraConfigPath
+import com.github.karlsabo.tools.loadUsersConfig
+import com.github.karlsabo.tools.pagerDutyConfigPath
 import com.github.karlsabo.tools.toSlackMarkup
 import com.github.karlsabo.tools.toVerboseSlackMarkdown
 import kotlinx.coroutines.runBlocking
@@ -23,38 +26,41 @@ fun main(args: Array<String>) {
 
     runBlocking {
         val jiraApi =
-            JiraRestApi(loadJiraConfig(Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "jira-rest-config.json")))
+            JiraRestApi(loadJiraConfig(jiraConfigPath))
+        val gitHubApi = GitHubRestApi(loadGitHubConfig(gitHubConfigPath))
+        val pagerDutyApi = PagerDutyRestApi(loadPagerDutyConfig(pagerDutyConfigPath))
+        val usersConfig = loadUsersConfig()!!
 
         val textSummarizer = TextSummarizerFake()
         val summaryConfig = loadSummaryPublisherConfig(configFilePath)
-        val dataSourceConfigNoSecrets = loadDataSourceDbConfigNoSecrets(devLakeDataSourceDbConfigPath)
-        DataSourceManagerDb(dataSourceConfigNoSecrets!!.toDataSourceDbConfig()).use { dataSourceManager ->
-            val summaryLast7Days = createSummary(
-                dataSourceManager.getOrCreateDataSource(),
-                jiraApi,
-                textSummarizer,
-                summaryConfig.projects,
-                7.days,
-                loadUserAndTeamConfig()!!.users,
-                summaryConfig.summaryName,
-                summaryConfig.isMiscellaneousProjectIncluded,
-                summaryConfig.isPagerDutyIncluded,
-            )
+        val summaryLast7Days = createSummary(
+            jiraApi,
+            gitHubApi,
+            summaryConfig.gitHubOrganizationIds,
+            pagerDutyApi,
+            summaryConfig.pagerDutyServiceIds,
+            textSummarizer,
+            summaryConfig.projects,
+            7.days,
+            usersConfig.users,
+            summaryConfig.miscUserIds.map { userId -> usersConfig.users.first { it.id == userId } },
+            summaryConfig.summaryName,
+            summaryConfig.isMiscellaneousProjectIncluded
+        )
 
-            println("Summary:")
-            if (summaryConfig.isTerseSummaryUsed)
-                println(summaryLast7Days.toTerseSlackMarkup())
+        println("Summary:")
+        if (summaryConfig.isTerseSummaryUsed)
+            println(summaryLast7Days.toTerseSlackMarkup())
+        else
+            println(summaryLast7Days.toSlackMarkup())
+        println()
+
+        summaryLast7Days.projectSummaries.forEach {
+            if (it.project.isVerboseMilestones)
+                println(it.toVerboseSlackMarkdown())
             else
-                println(summaryLast7Days.toSlackMarkup())
+                println(it.toSlackMarkup())
             println()
-
-            summaryLast7Days.projectSummaries.forEach {
-                if (it.project.isVerboseMilestones)
-                    println(it.toVerboseSlackMarkdown())
-                else
-                    println(it.toSlackMarkup())
-                println()
-            }
         }
     }
 }

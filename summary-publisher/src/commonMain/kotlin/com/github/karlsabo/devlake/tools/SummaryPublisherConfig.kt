@@ -1,7 +1,7 @@
 package com.github.karlsabo.devlake.tools
 
-import com.github.karlsabo.devlake.DEV_LAKE_APP_NAME
 import com.github.karlsabo.dto.Project
+import com.github.karlsabo.tools.DEV_METRICS_APP_NAME
 import com.github.karlsabo.tools.getApplicationDirectory
 import com.github.karlsabo.tools.lenientJson
 import io.ktor.utils.io.core.writeText
@@ -19,9 +19,12 @@ data class SummaryPublisherConfig(
     val projects: List<Project> = emptyList(),
     val isMiscellaneousProjectIncluded: Boolean = true,
     val isPagerDutyIncluded: Boolean = true,
+    val gitHubOrganizationIds: List<String> = emptyList(),
+    val pagerDutyServiceIds: List<String> = emptyList(),
+    val miscUserIds: List<String> = emptyList(),
 )
 
-val summaryPublisherConfigPath = Path(getApplicationDirectory(DEV_LAKE_APP_NAME), "summary-publisher-config.json")
+val summaryPublisherConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "summary-publisher-config.json")
 
 fun loadSummaryPublisherConfig(configPath: Path = summaryPublisherConfigPath): SummaryPublisherConfig {
     SystemFileSystem.source(configPath).buffered().readText().let {
