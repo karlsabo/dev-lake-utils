@@ -46,24 +46,6 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-
-        getByName("jvmMain") {
-            dependencies {
-                implementation(libs.guava)
-
-                // DB
-                api("com.zaxxer:HikariCP:5.1.0")
-                implementation("mysql:mysql-connector-java:8.0.33")
-
-
-                // logging
-                implementation("org.slf4j:slf4j-api:2.0.16")
-                val log4jVersion = "2.24.1"
-                implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$log4jVersion")
-                implementation("org.apache.logging.log4j:log4j-core:$log4jVersion")
-                implementation("org.apache.logging.log4j:log4j-api:$log4jVersion")
-            }
-        }
     }
 }
 
