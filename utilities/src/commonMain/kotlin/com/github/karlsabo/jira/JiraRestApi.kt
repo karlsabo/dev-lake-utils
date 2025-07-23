@@ -124,10 +124,12 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
     }
 
     override suspend fun getIssues(issueKeys: List<String>): List<Issue> {
+        if (issueKeys.isEmpty()) return emptyList()
         return runJql("key in (${issueKeys.joinToString(",")})")
     }
 
     override suspend fun getChildIssues(issueKeys: List<String>): List<Issue> {
+        if (issueKeys.isEmpty()) return emptyList()
         return runJql(issueKeys.joinToString(" OR ") { key -> "issuekey in portfolioChildIssuesOf(\"$key\")" })
     }
 

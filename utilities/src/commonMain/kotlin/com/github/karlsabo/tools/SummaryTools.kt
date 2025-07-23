@@ -307,6 +307,7 @@ suspend fun createSummary(
     coroutineScope {
         val projectJobs = projects.map { project ->
             async(Dispatchers.Default) {
+                println("Creating summary for project ${project.title}")
                 val projectSummary =
                     project.createSummary(
                         users.toSet(),
@@ -326,6 +327,7 @@ suspend fun createSummary(
         val userJobs = if (isMiscellaneousProjectIncluded) {
             val issueJobs = miscUsers.map { user ->
                 async(Dispatchers.Default) {
+                    println("Pulling issues for user ${user.id}")
                     val issuesForUser = jiraApi.getIssuesResolved(
                         user.jiraId!!,
                         Clock.System.now().minus(duration),
@@ -338,6 +340,7 @@ suspend fun createSummary(
             }
             val prJobs = miscUsers.map { user ->
                 async(Dispatchers.Default) {
+                    println("Pulling PRs for user ${user.id}")
                     val prsForUser = gitHubApi.getMergedPullRequests(
                         user.gitHubId!!, gitHubOrganizationIds, Clock.System.now().minus(duration),
                         Clock.System.now()
@@ -415,18 +418,22 @@ suspend fun Project.createSummary(
 ): ProjectSummary {
     val parentIssues = if (topLevelIssueKeys.isEmpty())
         mutableListOf()
-    else
+    else {
+        println("Getting issues for $topLevelIssueKeys")
         jiraApi.getIssues(topLevelIssueKeys).toMutableList()
+    }
 
     val parentIssueKeys = parentIssues.map { it.issueKey }
 
     val childIssues: MutableList<Issue> = if (parentIssuesAreChildren) {
         parentIssues
     } else {
+        println("Getting child issues for $parentIssues")
         jiraApi.getChildIssues(parentIssueKeys).toMutableList()
     }
 
     if (jqlToPullChildIssues != null) {
+        println("Running jqlToPullChildIssues for `$jqlToPullChildIssues`")
         val jiraIssues = jiraApi.runJql(jqlToPullChildIssues)
         jiraIssues.forEach { jiraIssue ->
             if (childIssues.none { it.issueKey == jiraIssue.issueKey }) {
@@ -456,6 +463,7 @@ suspend fun Project.createSummary(
     // Get merged PRs related to these issues
     val mergedPrs = mutableSetOf(*pullRequests.toTypedArray())
     resolvedChildIssues.forEach { issue ->
+        println("Searching PRs for ${issue.issueKey}")
         mergedPrs += gitHubApi.searchPullRequestsByText(
             issue.issueKey,
             gitHubOrganizationIds,
