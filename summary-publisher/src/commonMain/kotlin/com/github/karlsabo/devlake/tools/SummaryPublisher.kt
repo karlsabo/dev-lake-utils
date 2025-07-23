@@ -35,6 +35,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.Credentials
 import com.github.karlsabo.dto.MultiProjectSummary
+import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.dto.toTerseSlackMarkup
 import com.github.karlsabo.github.GitHubApiRestConfig
@@ -109,6 +110,7 @@ fun main(args: Array<String>) = application {
     }
     var gitHubConfig by remember { mutableStateOf(GitHubApiRestConfig("token")) }
     var pagerDutyConfig by remember { mutableStateOf(PagerDutyApiRestConfig("apiKey")) }
+    var usersConfig by remember { mutableStateOf(UsersConfig(emptyList())) }
 
     var isConfigLoaded by remember { mutableStateOf(false) }
 
@@ -120,6 +122,7 @@ fun main(args: Array<String>) = application {
             jiraConfig = loadJiraConfig(jiraConfigPath)
             gitHubConfig = loadGitHubConfig(gitHubConfigPath)
             pagerDutyConfig = loadPagerDutyConfig(pagerDutyConfigPath)
+            usersConfig = loadUsersConfig()!!
         } catch (error: Exception) {
             println("Error loading summary config $error")
             errorMessage = "Failed to load configuration: $error."
@@ -208,14 +211,14 @@ fun main(args: Array<String>) = application {
                 summaryLast7Days = createSummary(
                     JiraRestApi(jiraConfig),
                     GitHubRestApi(gitHubConfig),
-                    emptyList(), // karlfixme add github orgs
+                    summaryConfig.gitHubOrganizationIds,
                     PagerDutyRestApi(pagerDutyConfig),
-                    emptyList<String>(), // karlfixme add pager duty service IDs
+                    summaryConfig.pagerDutyServiceIds,
                     TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
                     summaryConfig.projects,
                     7.days,
-                    loadUsersConfig()!!.users,
-                    emptyList(), // karlfixme need misc users for PRs and Issues
+                    usersConfig.users,
+                    summaryConfig.miscUserIds.map { userId -> usersConfig.users.first { it.id == userId } },
                     summaryConfig.summaryName,
                     summaryConfig.isMiscellaneousProjectIncluded,
                 )
