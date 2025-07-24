@@ -46,8 +46,14 @@ class SummaryDetailTest {
         val projects = listOf(
             Project(
                 id = 1L,
-                title = "Test Project",
-                topLevelIssueKeys = listOf("TEST-1"),
+                title = "Test Project 1",
+                topLevelIssueKeys = listOf("TEST-1", "TEST-4"),
+                isVerboseMilestones = true
+            ),
+            Project(
+                id = 2L,
+                title = "Test Project 2",
+                topLevelIssueKeys = listOf("PROJ2-1", "PROJ2-2"),
                 isVerboseMilestones = true
             )
         )
@@ -108,13 +114,14 @@ class SummaryDetailTest {
         private val oneWeekAgo = now.minus(7.days)
 
         private val mockIssues = mapOf(
+            // Test Project 1 - Epic 1 (In Progress)
             "TEST-1" to JiraIssue(
                 id = "1",
                 url = "https://jira.example.local/browse/TEST-1",
                 iconUrl = "https://jira.example.local/images/epic.png",
                 issueKey = "TEST-1",
-                title = "Test Epic",
-                description = "This is a test epic",
+                title = "Test Epic 1",
+                description = "This is a test epic that is in progress",
                 type = "Epic",
                 status = "In Progress",
                 resolutionDate = null,
@@ -127,8 +134,8 @@ class SummaryDetailTest {
                 url = "https://jira.example.local/browse/TEST-2",
                 iconUrl = "https://jira.example.local/images/story.png",
                 issueKey = "TEST-2",
-                title = "Test Story",
-                description = "This is a test story",
+                title = "Test Story 1",
+                description = "This is a test story for Epic 1",
                 type = "Story",
                 status = "Done",
                 resolutionDate = now.minus(1.days),
@@ -142,13 +149,181 @@ class SummaryDetailTest {
                 url = "https://jira.example.local/browse/TEST-3",
                 iconUrl = "https://jira.example.local/images/bug.png",
                 issueKey = "TEST-3",
-                title = "Test Bug",
-                description = "This is a test bug",
+                title = "Test Bug 1",
+                description = "This is a test bug for Epic 1",
                 type = "Bug",
                 status = "Done",
                 resolutionDate = now.minus(2.days),
                 createdDate = oneWeekAgo.plus(2.days),
                 parentIssueId = "1",
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User"
+            ),
+            "TEST-5" to JiraIssue(
+                id = "5",
+                url = "https://jira.example.local/browse/TEST-5",
+                iconUrl = "https://jira.example.local/images/task.png",
+                issueKey = "TEST-5",
+                title = "Test Task 1",
+                description = "This is a test task for Epic 1 that is still in progress",
+                type = "Task",
+                status = "In Progress",
+                resolutionDate = null,
+                createdDate = oneWeekAgo.plus(3.days),
+                parentIssueId = "1",
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User"
+            ),
+
+            // Test Project 1 - Epic 2 (Completed)
+            "TEST-4" to JiraIssue(
+                id = "4",
+                url = "https://jira.example.local/browse/TEST-4",
+                iconUrl = "https://jira.example.local/images/epic.png",
+                issueKey = "TEST-4",
+                title = "Test Epic 2",
+                description = "This is a completed test epic",
+                type = "Epic",
+                status = "Done",
+                resolutionDate = now.minus(1.days),
+                createdDate = oneWeekAgo.plus(1.days),
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User"
+            ),
+            "TEST-6" to JiraIssue(
+                id = "6",
+                url = "https://jira.example.local/browse/TEST-6",
+                iconUrl = "https://jira.example.local/images/story.png",
+                issueKey = "TEST-6",
+                title = "Test Story 2",
+                description = "This is a test story for Epic 2",
+                type = "Story",
+                status = "Done",
+                resolutionDate = now.minus(2.days),
+                createdDate = oneWeekAgo.plus(2.days),
+                parentIssueId = "4",
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User"
+            ),
+            "TEST-7" to JiraIssue(
+                id = "7",
+                url = "https://jira.example.local/browse/TEST-7",
+                iconUrl = "https://jira.example.local/images/bug.png",
+                issueKey = "TEST-7",
+                title = "Test Bug 2",
+                description = "This is a test bug for Epic 2",
+                type = "Bug",
+                status = "Done",
+                resolutionDate = now.minus(3.days),
+                createdDate = oneWeekAgo.plus(1.days),
+                parentIssueId = "4",
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User"
+            ),
+
+            // Test Project 2 - Epic 1 (In Progress with low completion rate)
+            "PROJ2-1" to JiraIssue(
+                id = "101",
+                url = "https://jira.example.local/browse/PROJ2-1",
+                iconUrl = "https://jira.example.local/images/epic.png",
+                issueKey = "PROJ2-1",
+                title = "Project 2 Epic 1",
+                description = "This is an epic for Project 2 with low completion rate",
+                type = "Epic",
+                status = "In Progress",
+                resolutionDate = null,
+                createdDate = oneWeekAgo,
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User"
+            ),
+            "PROJ2-3" to JiraIssue(
+                id = "103",
+                url = "https://jira.example.local/browse/PROJ2-3",
+                iconUrl = "https://jira.example.local/images/story.png",
+                issueKey = "PROJ2-3",
+                title = "Project 2 Story 1",
+                description = "This is a story for Project 2 Epic 1",
+                type = "Story",
+                status = "In Progress",
+                resolutionDate = null,
+                createdDate = oneWeekAgo.plus(2.days),
+                parentIssueId = "101",
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User"
+            ),
+            "PROJ2-4" to JiraIssue(
+                id = "104",
+                url = "https://jira.example.local/browse/PROJ2-4",
+                iconUrl = "https://jira.example.local/images/task.png",
+                issueKey = "PROJ2-4",
+                title = "Project 2 Task 1",
+                description = "This is a task for Project 2 Epic 1",
+                type = "Task",
+                status = "In Progress",
+                resolutionDate = null,
+                createdDate = oneWeekAgo.plus(3.days),
+                parentIssueId = "101",
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User"
+            ),
+            "PROJ2-5" to JiraIssue(
+                id = "105",
+                url = "https://jira.example.local/browse/PROJ2-5",
+                iconUrl = "https://jira.example.local/images/bug.png",
+                issueKey = "PROJ2-5",
+                title = "Project 2 Bug 1",
+                description = "This is a bug for Project 2 Epic 1",
+                type = "Bug",
+                status = "Done",
+                resolutionDate = now.minus(1.days),
+                createdDate = oneWeekAgo.plus(4.days),
+                parentIssueId = "101",
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User"
+            ),
+
+            // Test Project 2 - Epic 2 (Completed milestone)
+            "PROJ2-2" to JiraIssue(
+                id = "102",
+                url = "https://jira.example.local/browse/PROJ2-2",
+                iconUrl = "https://jira.example.local/images/epic.png",
+                issueKey = "PROJ2-2",
+                title = "Project 2 Epic 2",
+                description = "This is a completed epic for Project 2",
+                type = "Epic",
+                status = "Done",
+                resolutionDate = now.minus(2.days),
+                createdDate = oneWeekAgo,
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User"
+            ),
+            "PROJ2-6" to JiraIssue(
+                id = "106",
+                url = "https://jira.example.local/browse/PROJ2-6",
+                iconUrl = "https://jira.example.local/images/story.png",
+                issueKey = "PROJ2-6",
+                title = "Project 2 Story 2",
+                description = "This is a story for Project 2 Epic 2",
+                type = "Story",
+                status = "Done",
+                resolutionDate = now.minus(3.days),
+                createdDate = oneWeekAgo.plus(1.days),
+                parentIssueId = "102",
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User"
+            ),
+            "PROJ2-7" to JiraIssue(
+                id = "107",
+                url = "https://jira.example.local/browse/PROJ2-7",
+                iconUrl = "https://jira.example.local/images/task.png",
+                issueKey = "PROJ2-7",
+                title = "Project 2 Task 2",
+                description = "This is a task for Project 2 Epic 2",
+                type = "Task",
+                status = "Done",
+                resolutionDate = now.minus(4.days),
+                createdDate = oneWeekAgo.plus(2.days),
+                parentIssueId = "102",
                 assigneeId = "jira-misc-1",
                 assigneeName = "Misc User"
             )
@@ -257,6 +432,7 @@ class SummaryDetailTest {
         )
 
         private val mockPullRequests = listOf(
+            // PRs for Test Project 1
             GitHubIssue(
                 url = "https://api.github.com/repos/test-org/test-repo/issues/1",
                 repositoryUrl = "https://api.github.com/repos/test-org/test-repo",
@@ -300,6 +476,118 @@ class SummaryDetailTest {
                     mergedAt = now.minus(2.days)
                 ),
                 comments = 1
+            ),
+            GitHubIssue(
+                url = "https://api.github.com/repos/test-org/test-repo/issues/3",
+                repositoryUrl = "https://api.github.com/repos/test-org/test-repo",
+                id = 3L,
+                number = 3,
+                state = "closed",
+                title = "Test PR 3",
+                user = mockUser,
+                body = "This is a test PR that implements TEST-6",
+                htmlUrl = "https://github.com/test-org/test-repo/pull/3",
+                labels = listOf(Label(name = "feature", id = 3L, color = "blue", description = "New feature")),
+                draft = false,
+                createdAt = oneWeekAgo.plus(2.days),
+                updatedAt = now.minus(2.days),
+                closedAt = now.minus(2.days),
+                pullRequest = PullRequest(
+                    url = "https://api.github.com/repos/test-org/test-repo/pulls/3",
+                    htmlUrl = "https://github.com/test-org/test-repo/pull/3",
+                    mergedAt = now.minus(2.days)
+                ),
+                comments = 3
+            ),
+            GitHubIssue(
+                url = "https://api.github.com/repos/test-org/test-repo/issues/4",
+                repositoryUrl = "https://api.github.com/repos/test-org/test-repo",
+                id = 4L,
+                number = 4,
+                state = "closed",
+                title = "Test PR 4",
+                user = mockUser,
+                body = "This is a test PR that fixes TEST-7",
+                htmlUrl = "https://github.com/test-org/test-repo/pull/4",
+                labels = listOf(Label(name = "bug", id = 1L, color = "red", description = "Bug fix")),
+                draft = false,
+                createdAt = oneWeekAgo.plus(3.days),
+                updatedAt = now.minus(3.days),
+                closedAt = now.minus(3.days),
+                pullRequest = PullRequest(
+                    url = "https://api.github.com/repos/test-org/test-repo/pulls/4",
+                    htmlUrl = "https://github.com/test-org/test-repo/pull/4",
+                    mergedAt = now.minus(3.days)
+                ),
+                comments = 1
+            ),
+
+            // PRs for Test Project 2
+            GitHubIssue(
+                url = "https://api.github.com/repos/test-org/project2-repo/issues/1",
+                repositoryUrl = "https://api.github.com/repos/test-org/project2-repo",
+                id = 101L,
+                number = 1,
+                state = "closed",
+                title = "Project 2 PR 1",
+                user = mockUser,
+                body = "This PR fixes PROJ2-5",
+                htmlUrl = "https://github.com/test-org/project2-repo/pull/1",
+                labels = listOf(Label(name = "bug", id = 1L, color = "red", description = "Bug fix")),
+                draft = false,
+                createdAt = oneWeekAgo.plus(4.days),
+                updatedAt = now.minus(1.days),
+                closedAt = now.minus(1.days),
+                pullRequest = PullRequest(
+                    url = "https://api.github.com/repos/test-org/project2-repo/pulls/1",
+                    htmlUrl = "https://github.com/test-org/project2-repo/pull/1",
+                    mergedAt = now.minus(1.days)
+                ),
+                comments = 2
+            ),
+            GitHubIssue(
+                url = "https://api.github.com/repos/test-org/project2-repo/issues/2",
+                repositoryUrl = "https://api.github.com/repos/test-org/project2-repo",
+                id = 102L,
+                number = 2,
+                state = "closed",
+                title = "Project 2 PR 2",
+                user = mockUser,
+                body = "This PR implements PROJ2-6",
+                htmlUrl = "https://github.com/test-org/project2-repo/pull/2",
+                labels = listOf(Label(name = "enhancement", id = 2L, color = "green", description = "Enhancement")),
+                draft = false,
+                createdAt = oneWeekAgo.plus(2.days),
+                updatedAt = now.minus(3.days),
+                closedAt = now.minus(3.days),
+                pullRequest = PullRequest(
+                    url = "https://api.github.com/repos/test-org/project2-repo/pulls/2",
+                    htmlUrl = "https://github.com/test-org/project2-repo/pull/2",
+                    mergedAt = now.minus(3.days)
+                ),
+                comments = 1
+            ),
+            GitHubIssue(
+                url = "https://api.github.com/repos/test-org/project2-repo/issues/3",
+                repositoryUrl = "https://api.github.com/repos/test-org/project2-repo",
+                id = 103L,
+                number = 3,
+                state = "closed",
+                title = "Project 2 PR 3",
+                user = mockUser,
+                body = "This PR implements PROJ2-7",
+                htmlUrl = "https://github.com/test-org/project2-repo/pull/3",
+                labels = listOf(Label(name = "feature", id = 3L, color = "blue", description = "New feature")),
+                draft = false,
+                createdAt = oneWeekAgo.plus(3.days),
+                updatedAt = now.minus(4.days),
+                closedAt = now.minus(4.days),
+                pullRequest = PullRequest(
+                    url = "https://api.github.com/repos/test-org/project2-repo/pulls/3",
+                    htmlUrl = "https://github.com/test-org/project2-repo/pull/3",
+                    mergedAt = now.minus(4.days)
+                ),
+                comments = 3
             )
         )
 
