@@ -167,7 +167,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     )
                 }
                 if (milestone.durationMergedPullRequests.isNotEmpty()) {
-                    summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.number}>" }}")
+                    summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "<${it.htmlUrl}|${it.number}>" }}")
                 }
                 summary.appendLine()
             }
@@ -218,7 +218,7 @@ fun ProjectSummary.toSlackMarkup(): String {
         )
     }
     if (durationMergedPullRequests.isNotEmpty()) {
-        summary.appendLine("🔹 PRs merged: ${durationMergedPullRequests.joinToString(", ") { "<${it.url}|${it.number}>" }}")
+        summary.appendLine("🔹 PRs merged: ${durationMergedPullRequests.joinToString(", ") { "<${it.htmlUrl}|${it.number}>" }}")
     }
 
     if (milestones.isNotEmpty()) {
@@ -387,7 +387,8 @@ suspend fun createSummary(
         )
     }
 
-    val pagerDutyIncidentList: List<PagerDutyIncident>? = if (pagerDutyApi != null) {
+    val pagerDutyIncidentList: List<PagerDutyIncident>? =
+        if (pagerDutyApi != null && pagerDutyServiceIds.isNotEmpty()) {
         val alertList = mutableListOf<PagerDutyIncident>()
         pagerDutyServiceIds.forEach { serviceId ->
             alertList += pagerDutyApi.getServicePages(serviceId, Clock.System.now().minus(duration), Clock.System.now())

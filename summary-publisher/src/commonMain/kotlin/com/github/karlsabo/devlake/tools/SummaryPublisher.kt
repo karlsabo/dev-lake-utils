@@ -212,7 +212,7 @@ fun main(args: Array<String>) = application {
                     JiraRestApi(jiraConfig),
                     GitHubRestApi(gitHubConfig),
                     summaryConfig.gitHubOrganizationIds,
-                    PagerDutyRestApi(pagerDutyConfig),
+                    if (summaryConfig.pagerDutyServiceIds.isNotEmpty()) PagerDutyRestApi(pagerDutyConfig) else null,
                     summaryConfig.pagerDutyServiceIds,
                     TextSummarizerOpenAi(textSummarizerConfig!!.toTextSummarizerOpenAiConfig()),
                     summaryConfig.projects,

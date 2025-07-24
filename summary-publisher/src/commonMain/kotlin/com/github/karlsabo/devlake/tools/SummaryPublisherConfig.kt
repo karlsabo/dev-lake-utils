@@ -18,7 +18,6 @@ data class SummaryPublisherConfig(
     val isTerseSummaryUsed: Boolean = true,
     val projects: List<Project> = emptyList(),
     val isMiscellaneousProjectIncluded: Boolean = true,
-    val isPagerDutyIncluded: Boolean = true,
     val gitHubOrganizationIds: List<String> = emptyList(),
     val pagerDutyServiceIds: List<String> = emptyList(),
     val miscUserIds: List<String> = emptyList(),

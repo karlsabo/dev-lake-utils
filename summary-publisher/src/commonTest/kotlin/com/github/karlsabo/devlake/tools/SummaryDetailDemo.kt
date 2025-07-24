@@ -25,14 +25,16 @@ fun main(args: Array<String>) {
     val configFilePath: Path = configParameter?.let { Path(configParameter) } ?: summaryPublisherConfigPath
 
     runBlocking {
+        val summaryConfig = loadSummaryPublisherConfig(configFilePath)
+
         val jiraApi =
             JiraRestApi(loadJiraConfig(jiraConfigPath))
         val gitHubApi = GitHubRestApi(loadGitHubConfig(gitHubConfigPath))
-        val pagerDutyApi = PagerDutyRestApi(loadPagerDutyConfig(pagerDutyConfigPath))
+        val pagerDutyApi =
+            if (summaryConfig.pagerDutyServiceIds.isNotEmpty()) PagerDutyRestApi(loadPagerDutyConfig(pagerDutyConfigPath)) else null
         val usersConfig = loadUsersConfig()!!
 
         val textSummarizer = TextSummarizerFake()
-        val summaryConfig = loadSummaryPublisherConfig(configFilePath)
         val summaryLast7Days = createSummary(
             jiraApi,
             gitHubApi,
