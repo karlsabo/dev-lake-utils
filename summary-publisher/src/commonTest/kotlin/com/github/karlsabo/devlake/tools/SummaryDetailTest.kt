@@ -155,11 +155,9 @@ class SummaryDetailTest {
         )
 
         override suspend fun runJql(jql: String): List<JiraIssue> {
-            // For simplicity, return child issues of TEST-1 for any JQL that mentions parent
             return if (jql.contains("parent")) {
                 mockIssues.values.filter { it.parentIssueId == "1" }.toList()
             } else {
-                // Return resolved issues for any other JQL
                 mockIssues.values.filter { it.resolutionDate != null }.toList()
             }
         }
@@ -174,7 +172,6 @@ class SummaryDetailTest {
         }
 
         override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<Comment> {
-            // Create mock comments for the issue
             val avatarUrls = JiraAvatarUrls(
                 size48x48 = "https://jira.example.local/avatar/48.png",
                 size24x24 = "https://jira.example.local/avatar/24.png",
