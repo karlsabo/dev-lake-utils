@@ -24,7 +24,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
-import java.sql.Date
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -297,7 +296,6 @@ suspend fun createSummary(
     isMiscellaneousProjectIncluded: Boolean,
 ): MultiProjectSummary {
     val timeInPast = Clock.System.now().minus(duration)
-    Date(timeInPast.toEpochMilliseconds())
 
     val mutex = Mutex()
     val projectSummaries = mutableListOf<ProjectSummary>()
