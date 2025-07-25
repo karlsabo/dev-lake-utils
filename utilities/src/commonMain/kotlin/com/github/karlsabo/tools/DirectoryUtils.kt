@@ -12,7 +12,7 @@ val textSummarizerConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME
 val jiraConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "jira-rest-config.json")
 val gitHubConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "github-config.json")
 val pagerDutyConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "pagerduty-config.json")
-val usersConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "users-and-teams.json")
+val usersConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "users-config.json")
 
 fun loadUsersConfig(): UsersConfig? {
     if (!SystemFileSystem.exists(usersConfigPath)) {
