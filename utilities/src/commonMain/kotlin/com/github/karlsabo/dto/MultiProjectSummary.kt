@@ -59,30 +59,3 @@ fun MultiProjectSummary.toSlackMarkup(): String {
     }
     return slackSummary.toString()
 }
-
-fun MultiProjectSummary.toMarkdown(): String {
-    val markdownSummary = StringBuilder()
-    markdownSummary.appendLine()
-    markdownSummary.appendLine("# Identity and Access Management weekly update $startDate - ${endDate}")
-    markdownSummary.appendLine()
-    markdownSummary.appendLine()
-    markdownSummary.appendLine("## Projects")
-    markdownSummary.appendLine()
-    projectSummaries.forEach {
-        markdownSummary.appendLine(it.toSlackMarkup())
-    }
-
-    if (pagerDutyAlerts != null) {
-        markdownSummary.appendLine()
-        markdownSummary.appendLine("## Pager Duty Alerts")
-        markdownSummary.appendLine()
-        val alerts = mutableListOf<String>()
-        pagerDutyAlerts.forEach {
-            alerts.add("""* [${it.htmlUrl}](${it.incidentNumber}): ${it.description}""")
-        }
-        if (alerts.isEmpty()) alerts.add("* No pages! :tada:")
-        alerts.forEach { markdownSummary.appendLine(it) }
-    }
-
-    return markdownSummary.toString()
-}

@@ -12,7 +12,7 @@ import kotlin.time.measureTime
  * 1. Find all issues with a parent issue-key - navigating all the way up
  * 2. Filter those issues to that user
  * 3. Print the issue
- *    - title and then description in markdown format
+ *    - title and then description in Markdown format
  *    - So the title is a list, and then the description is in a nested list.
  */
 fun main(args: Array<String>): Unit = runBlocking {

@@ -39,7 +39,7 @@ leads, contributors, and related issue keys. The summaries are published to a sp
 
 ## User Metrics Publisher
 
-The [user metrics publisher](./user-metrics-publisher/readme.md) collects user metrics and send a Slack report to that
+The [user metrics publisher](./user-metrics-publisher/readme.md) collects user metrics and sends a Slack report to that
 user. It collects metrics such as pull requests and issues.
 
 ## Location for configuration files
@@ -134,7 +134,7 @@ is as follows:
 ### User metrics publisher config
 
 `user-metric-publisher-config.json` contains the configuration for the user metrics publisher. The JSON format for
-the [UserMetricPublisherConfig](user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/UserMetricPublisherConfig.kt)
+the [UserMetricPublisherConfig](user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherConfig.kt)
 is as follows:
 
 ```json

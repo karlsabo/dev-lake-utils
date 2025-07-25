@@ -29,6 +29,7 @@ fun loadUsersConfig(): UsersConfig? {
     }
 }
 
+@Suppress("unused")
 private fun saveUserConfig(userConfig: UsersConfig) {
     SystemFileSystem.sink(usersConfigPath).buffered().use {
         it.writeString(
