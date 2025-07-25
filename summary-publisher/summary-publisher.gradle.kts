@@ -53,7 +53,7 @@ kotlin {
 
             getByName("jvmMain") {
                 dependencies {
-                    val log4jVersion = "2.24.1"
+                    val log4jVersion = libs.versions.log4jVersion.get()
                     runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:$log4jVersion")
                     runtimeOnly("org.apache.logging.log4j:log4j-core:$log4jVersion")
                     runtimeOnly("org.apache.logging.log4j:log4j-api:$log4jVersion")
