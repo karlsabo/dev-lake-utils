@@ -143,7 +143,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         endDate: Instant,
     ): UInt {
         val encodedQuery =
-            createMergedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds).encodeURLParameter()
+            createMergedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds)
         val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"
 
         val response = client.get(url)
