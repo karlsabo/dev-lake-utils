@@ -1,6 +1,7 @@
 package com.github.karlsabo.tools
 
 import com.github.karlsabo.dto.UsersConfig
+import com.github.karlsabo.system.getEnv
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -51,12 +52,13 @@ private fun saveUserConfig(userConfig: UsersConfig) {
  * @return Path to the application directory.
  */
 fun getApplicationDirectory(appName: String): Path {
-    val userHome = Path(getEnv("HOME") ?: getEnv("USERPROFILE"))
+    val homeEnv = getEnv("HOME") ?: getEnv("USERPROFILE") ?: "."
+    val userHome = Path(homeEnv)
 
     val directory = when (System.getProperty("os.name").lowercase()) {
         in listOf("mac os x", "mac os", "macos", "macosx") -> Path(userHome, "Library", "Application Support", appName)
         in listOf("windows") -> {
-            val appDataEnv = System.getenv("APPDATA")
+            val appDataEnv = getEnv("APPDATA")
             val appData: Path = if (appDataEnv != null) Path(appDataEnv) else Path(userHome, "AppData", "Roaming")
             Path(appData, appName)
         }
