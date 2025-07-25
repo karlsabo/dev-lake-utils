@@ -10,7 +10,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
-import io.ktor.serialization.gson.gson
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlin.io.println
 import kotlin.use
@@ -30,7 +30,7 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
 
         HttpClient {
             install(ContentNegotiation) {
-                gson()
+                json(lenientJson)
             }
         }.use { client ->
             val requestBody = mapOf(
