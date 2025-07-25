@@ -14,6 +14,7 @@ import com.github.karlsabo.jira.JiraAvatarUrls
 import com.github.karlsabo.jira.JiraUser
 import com.github.karlsabo.pagerduty.PagerDutyApi
 import com.github.karlsabo.pagerduty.PagerDutyIncident
+import com.github.karlsabo.pagerduty.Service
 import com.github.karlsabo.text.TextSummarizerFake
 import com.github.karlsabo.tools.createSummary
 import kotlinx.coroutines.runBlocking
@@ -650,13 +651,12 @@ class SummaryDetailTest {
                 description = "This is a test incident",
                 status = "resolved",
                 urgency = "high",
-                serviceId = "PD123",
-                serviceName = "Test Service",
                 createdAt = oneWeekAgo.plus(1.days),
                 lastStatusChangeAt = now.minus(3.days),
                 resolvedAt = now.minus(3.days),
                 htmlUrl = "https://pagerduty.example.local/incidents/1",
                 updatedAt = now.minus(3.days).minus(10.minutes),
+                service = Service(id = "PD123")
             ),
             PagerDutyIncident(
                 id = "INCIDENT2",
@@ -665,8 +665,7 @@ class SummaryDetailTest {
                 description = "This is another test incident",
                 status = "resolved",
                 urgency = "low",
-                serviceId = "PD123",
-                serviceName = "Test Service",
+                service = Service("PD123"),
                 createdAt = oneWeekAgo.plus(3.days),
                 lastStatusChangeAt = now.minus(1.days),
                 resolvedAt = now.minus(1.days),
@@ -681,7 +680,7 @@ class SummaryDetailTest {
             endTimeExclusive: Instant,
         ): List<PagerDutyIncident> {
             return mockIncidents.filter {
-                it.serviceId == serviceId &&
+                it.service?.id == serviceId &&
                         it.createdAt >= startTimeInclusive &&
                         it.createdAt < endTimeExclusive
             }

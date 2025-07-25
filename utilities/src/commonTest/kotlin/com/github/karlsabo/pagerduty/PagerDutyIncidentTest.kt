@@ -105,10 +105,10 @@ class PagerDutyIncidentTest {
         assertEquals("[#123456] Service Response Alert", incident.summary)
 
         assertNotNull(incident.service)
-        assertEquals("ABC123", incident.service?.id)
-        assertEquals("service_reference", incident.service?.type)
-        assertEquals("API Service", incident.service?.summary)
-        assertEquals("https://api.example.local/services/ABC123", incident.service?.selfUrl)
-        assertEquals("https://example.pagerduty.com/service-directory/ABC123", incident.service?.htmlUrl)
+        assertEquals("ABC123", incident.service.id)
+        assertEquals("service_reference", incident.service.type)
+        assertEquals("API Service", incident.service.summary)
+        assertEquals("https://api.example.local/services/ABC123", incident.service.selfUrl)
+        assertEquals("https://example.pagerduty.com/service-directory/ABC123", incident.service.htmlUrl)
     }
 }

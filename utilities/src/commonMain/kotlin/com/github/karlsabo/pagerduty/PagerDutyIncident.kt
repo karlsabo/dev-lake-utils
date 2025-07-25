@@ -32,10 +32,10 @@ data class PagerDutyIncident(
 @Serializable
 data class Service(
     val id: String,
-    val type: String,
-    val summary: String,
+    val type: String? = null,
+    val summary: String? = null,
     @SerialName("self")
-    val selfUrl: String,
+    val selfUrl: String? = null,
     @SerialName("html_url")
-    val htmlUrl: String,
+    val htmlUrl: String? = null,
 )
