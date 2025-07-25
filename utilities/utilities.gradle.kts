@@ -19,6 +19,19 @@ kotlin {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
+    macosArm64 {
+        binaries {
+            framework {
+                baseName = "utilities"
+            }
+            sharedLib {
+                baseName = "utilities"
+            }
+            staticLib {
+                baseName = "utilities"
+            }
+        }
+    }
 
     sourceSets {
         getByName("commonMain") {
@@ -35,7 +48,6 @@ kotlin {
                 implementation("io.ktor:ktor-client-cio:$ktorVersion")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-                implementation("io.ktor:ktor-serialization-gson:$ktorVersion")
                 implementation("io.ktor:ktor-client-logging:$ktorVersion")
                 implementation("io.ktor:ktor-client-auth:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
@@ -69,5 +81,14 @@ tasks.register<JavaExec>("gitHubApiDemo") {
 publishing {
     repositories {
         mavenLocal()
+    }
+
+    publications {
+        withType<MavenPublication> {
+            pom {
+                name.set("Utilities")
+                description.set("Utility libraries metrics")
+            }
+        }
     }
 }

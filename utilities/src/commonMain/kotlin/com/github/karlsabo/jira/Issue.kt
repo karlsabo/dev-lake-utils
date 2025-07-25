@@ -1,5 +1,7 @@
 package com.github.karlsabo.jira
 
+import io.ktor.http.Url
+import io.ktor.http.hostWithPort
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -20,7 +22,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
-import java.net.URI
 
 @Serializable
 data class Issue(
@@ -86,8 +87,9 @@ fun JsonObject.toIssue(): Issue {
     val parent = fields["parent"]?.takeIf { it !is JsonNull }?.jsonObject
 
     val issueKey = this["key"]?.jsonPrimitive?.content ?: error("Missing key")
-    val uri = URI(this["self"]?.jsonPrimitive?.content ?: error("Missing URL"))
-    val url = uri.scheme + "://" + uri.authority + "/browse/$issueKey"
+    val selfUrlString = this["self"]?.jsonPrimitive?.content ?: error("Missing URL")
+    val originalUrl = Url(selfUrlString)
+    val url = "${originalUrl.protocol.name}://${originalUrl.hostWithPort}/browse/$issueKey"
     return Issue(
         id = this["id"]?.jsonPrimitive?.content ?: error("Missing id"),
         url = url,

@@ -51,7 +51,7 @@ private fun saveUserConfig(userConfig: UsersConfig) {
  * @return Path to the application directory.
  */
 fun getApplicationDirectory(appName: String): Path {
-    val userHome = Path(System.getProperty("user.home"))
+    val userHome = Path(getEnv("HOME") ?: getEnv("USERPROFILE"))
 
     val directory = when (System.getProperty("os.name").lowercase()) {
         in listOf("mac os x", "mac os", "macos", "macosx") -> Path(userHome, "Library", "Application Support", appName)
