@@ -433,16 +433,6 @@ suspend fun Project.createSummary(
         jiraApi.getChildIssues(parentIssueKeys).toMutableList()
     }
 
-    if (jqlToPullChildIssues != null) {
-        println("Running jqlToPullChildIssues for `$jqlToPullChildIssues`")
-        val jiraIssues = jiraApi.runJql(jqlToPullChildIssues)
-        jiraIssues.forEach { jiraIssue ->
-            if (childIssues.none { it.issueKey == jiraIssue.issueKey }) {
-                childIssues.add(jiraIssue)
-            }
-        }
-    }
-
     val resolvedChildIssues =
         childIssues.filter {
             it.resolutionDate != null && it.resolutionDate >= Clock.System.now().minus(duration) && it.isIssueOrBug()

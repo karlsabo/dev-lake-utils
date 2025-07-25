@@ -104,8 +104,7 @@ is as follows:
       "productManager": "joe.bob@example.local",
       "topLevelIssueKeys": [
         "JIRA-1234"
-      ],
-      "jqlToPullChildIssues": "project = JIRA AND parent = JIRA-1234"
+      ]
     },
     {
       "id": 2,
