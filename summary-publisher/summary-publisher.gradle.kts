@@ -28,10 +28,7 @@ kotlin {
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${libs.versions.kotlinxCoroutines.get()}")
-            }
-        }
-        getByName("jvmMain") {
-            dependencies {
+
                 implementation(project(":utilities"))
 
                 implementation(compose.runtime)
@@ -52,6 +49,15 @@ kotlin {
 
                 // IO
                 implementation("org.jetbrains.kotlinx:kotlinx-io-core:${libs.versions.kotlinxIo.get()}")
+            }
+
+            getByName("jvmMain") {
+                dependencies {
+                    val log4jVersion = "2.24.1"
+                    runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:$log4jVersion")
+                    runtimeOnly("org.apache.logging.log4j:log4j-core:$log4jVersion")
+                    runtimeOnly("org.apache.logging.log4j:log4j-api:$log4jVersion")
+                }
             }
         }
     }

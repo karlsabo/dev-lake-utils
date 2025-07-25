@@ -1,15 +1,17 @@
 # Introduction
 
-Hold utilities for accessing DevLake database. It also has a utility to create user, account, and team mappings in the
-DevLake database.
+Contains common utilities used by other projects, including API clients for GitHub, Jira, and PagerDuty, as well as user
+and team configuration management.
 
-## Commands
+## API Clients
 
-`./gradle createUsersAndTeams`
+The utilities project provides direct API clients for:
 
-Executes [CreateUsersAndTeams.kt](./src/jvmMain/kotlin/com/github/karlsabo/devlake/CreateUsersAndTeams.kt) to create
-users, accounts, and team mappings in the DevLake database.
+- **GitHub**: Access GitHub repositories, issues, and pull requests
+- **Jira**: Query Jira issues and comments
+- **PagerDuty**: Retrieve incident information
 
-It will load [configurations](../README.md#location-for-configuration-files) from [dev-lake-datasource-db-config.json](../README.md#devlake-datasource-db-config)
-and [users-and-teams.json](../README.md#users-and-teams) to create new records in the database for mapping users to
-accounts.
+## User Configuration
+
+The project uses [users-config.json](../README.md#users-config) to manage user information, including mappings to
+GitHub, Jira, and Slack IDs.

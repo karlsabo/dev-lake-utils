@@ -1,7 +1,45 @@
 package com.github.karlsabo.tools
 
+import com.github.karlsabo.dto.UsersConfig
+import io.ktor.utils.io.readText
+import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.writeString
+
+const val DEV_METRICS_APP_NAME = "DevLakeUtils"
+val textSummarizerConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "text-summarizer-openai-config.json")
+val jiraConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "jira-rest-config.json")
+val gitHubConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "github-config.json")
+val pagerDutyConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "pagerduty-config.json")
+val usersConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "users-config.json")
+
+fun loadUsersConfig(): UsersConfig? {
+    if (!SystemFileSystem.exists(usersConfigPath)) {
+        return null
+    }
+    return try {
+        lenientJson.decodeFromString(
+            UsersConfig.serializer(),
+            SystemFileSystem.source(usersConfigPath).buffered().readText(),
+        )
+    } catch (error: Exception) {
+        println("Failed to load user config: $error")
+        return null
+    }
+}
+
+@Suppress("unused")
+private fun saveUserConfig(userConfig: UsersConfig) {
+    SystemFileSystem.sink(usersConfigPath).buffered().use {
+        it.writeString(
+            lenientJson.encodeToString(
+                UsersConfig.serializer(),
+                userConfig,
+            )
+        )
+    }
+}
 
 /**
  * Returns the application directory path based on the operating system.
