@@ -7,3 +7,4 @@ package com.github.karlsabo.system
  * @return The value of the environment variable, or null if it doesn't exist.
  */
 expect fun getEnv(name: String): String?
+expect fun osName(): String

@@ -58,6 +58,14 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
+
+        create("posixMain") {
+            dependsOn(getByName("commonMain"))
+        }
+
+        getByName("macosArm64Main") {
+            dependsOn(getByName("posixMain"))
+        }
     }
 }
 

@@ -2,6 +2,7 @@ package com.github.karlsabo.tools
 
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.system.getEnv
+import com.github.karlsabo.system.osName
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -55,7 +56,7 @@ fun getApplicationDirectory(appName: String): Path {
     val homeEnv = getEnv("HOME") ?: getEnv("USERPROFILE") ?: "."
     val userHome = Path(homeEnv)
 
-    val directory = when (System.getProperty("os.name").lowercase()) {
+    val directory = when (osName().lowercase()) {
         in listOf("mac os x", "mac os", "macos", "macosx") -> Path(userHome, "Library", "Application Support", appName)
         in listOf("windows") -> {
             val appDataEnv = getEnv("APPDATA")
