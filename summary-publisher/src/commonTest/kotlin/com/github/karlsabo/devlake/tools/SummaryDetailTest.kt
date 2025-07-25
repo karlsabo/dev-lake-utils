@@ -284,7 +284,7 @@ class SummaryDetailTest {
                 assigneeName = "Test User"
             ),
 
-            // Test Project 2 - Epic 2 (Completed milestone)
+            // Test Project 2 - Epic 2 (Completed the milestone)
             "PROJ2-2" to JiraIssue(
                 id = "102",
                 url = "https://jira.example.local/browse/PROJ2-2",

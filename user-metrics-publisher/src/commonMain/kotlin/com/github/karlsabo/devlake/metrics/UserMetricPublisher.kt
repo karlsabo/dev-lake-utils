@@ -34,10 +34,6 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import com.github.karlsabo.devlake.tools.UserMetricPublisherConfig
-import com.github.karlsabo.devlake.tools.loadUserMetricPublisherConfig
-import com.github.karlsabo.devlake.tools.saveUserMetricPublisherConfig
-import com.github.karlsabo.devlake.tools.userMetricPublisherConfigPath
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi

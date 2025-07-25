@@ -1,4 +1,4 @@
-package com.github.karlsabo.devlake.tools
+package com.github.karlsabo.devlake.metrics
 
 import com.github.karlsabo.tools.DEV_METRICS_APP_NAME
 import com.github.karlsabo.tools.getApplicationDirectory

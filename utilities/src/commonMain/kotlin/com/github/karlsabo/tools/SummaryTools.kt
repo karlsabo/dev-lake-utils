@@ -481,10 +481,10 @@ suspend fun Project.createSummary(
 
                 // Find the owner of the milestone
                 val owner = if (milestoneIssue.assigneeId != null && milestoneIssue.assigneeId.isNotBlank()) {
-                    // Try to find user by name or email
+                    // Try to find the user by name or email
                     users.firstOrNull { it.name == milestoneIssue.assigneeName }
                 } else if (projectLeadUserId != null) {
-                    // Try to find user by email
+                    // Try to find the user by email
                     users.firstOrNull { it.email == projectLeadUserId }
                 } else {
                     null

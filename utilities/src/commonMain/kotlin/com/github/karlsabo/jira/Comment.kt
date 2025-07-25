@@ -127,7 +127,7 @@ private fun extractTextFromNode(node: ContentNode): String {
             } else if (sb.isEmpty() && node.content?.isNotEmpty() == true) {
                  sb.append("\n\n")
             } else if (sb.isEmpty() && node.content.isNullOrEmpty()){
-                 sb.append("\n\n") // Represent empty paragraph as some space
+                sb.append("\n\n")
             }
         }
         "rule" -> {
@@ -163,7 +163,7 @@ private fun extractTextFromNode(node: ContentNode): String {
             if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
                 sb.append('\n')
             } else if (sb.isNotEmpty() && !sb.endsWith("\n")){
-                sb.append("\n\n") // if list items didn't add newline for some reason.
+                sb.append("\n\n")
             }
         }
         "listItem" -> {

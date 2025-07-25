@@ -1,6 +1,5 @@
 package com.github.karlsabo.devlake.metrics
 
-import com.github.karlsabo.devlake.tools.loadUserMetricPublisherConfig
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.loadGitHubConfig
 import com.github.karlsabo.jira.JiraRestApi
