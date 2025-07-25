@@ -9,6 +9,7 @@ compose = "1.7.3"
 markdown = "0.29.0"
 kotlinxIo = "0.6.0"
 kotlinxCoroutines = "1.10.1"
+log4jVersion = "2.24.1"
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
