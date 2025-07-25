@@ -14,8 +14,6 @@
 
 # TODO
 
-* [ ] Remove DevLake
-  * summary publisher
 * [ ] Create native executables
 * [ ] Add logging
 * [ ] Add dependency injection
