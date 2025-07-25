@@ -5,8 +5,8 @@
 
 # Introduction
 
-This project pulls data from DevLake and creates a summary for projects. The summary is sent to Zapier, which then
-forwards it to Slack. It uses configurations defined
+This project makes direct API calls to GitHub, Jira, and PagerDuty to collect data and create summaries for projects.
+The summary is sent to Zapier, which then forwards it to Slack. It uses configurations defined
 in [summary-publisher-config.json](../README.md#summary-publisher-config).
 
 ## How to run the application

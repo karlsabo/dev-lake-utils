@@ -28,11 +28,7 @@ kotlin {
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${libs.versions.kotlinxCoroutines.get()}")
-            }
-        }
 
-        getByName("jvmMain") {
-            dependencies {
                 implementation(project(":utilities"))
 
                 implementation(compose.runtime)

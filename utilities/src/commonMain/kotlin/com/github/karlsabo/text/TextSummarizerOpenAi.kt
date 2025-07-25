@@ -1,5 +1,6 @@
 package com.github.karlsabo.text
 
+import com.github.karlsabo.tools.lenientJson
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -11,13 +12,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.gson.gson
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.io.println
 import kotlin.use
-
-private val json = Json {
-    ignoreUnknownKeys = true
-}
 
 class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : TextSummarizer {
     override suspend fun summarize(text: String): String {
@@ -64,7 +60,7 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
             println("responseText: $responseText")
 
 
-            val openAiResponse: OpenAIResponse = json.decodeFromString(OpenAIResponse.serializer(), responseText)
+            val openAiResponse: OpenAIResponse = lenientJson.decodeFromString(OpenAIResponse.serializer(), responseText)
             println("openAiResponse=$openAiResponse")
             val summary: String = if (openAiResponse.choices != null) {
                 println("Choices:")

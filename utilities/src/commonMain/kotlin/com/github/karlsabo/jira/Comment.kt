@@ -1,9 +1,9 @@
 package com.github.karlsabo.jira
 
+import com.github.karlsabo.tools.lenientJson
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 
@@ -66,12 +66,6 @@ data class ContentAttrs(
     val shortName: String? = null
 )
 
-private val jsonParser = Json {
-    ignoreUnknownKeys = true
-    coerceInputValues = true
-    isLenient = true
-}
-
 /**
  * Parses a kotlinx.serialization.JsonObject representing a Jira comment
  * into a [Comment] data class.
@@ -84,7 +78,7 @@ private val jsonParser = Json {
  * @throws kotlinx.serialization.SerializationException if parsing fails due to mismatched types or structure.
  */
 fun JsonObject.toComment(): Comment {
-    return jsonParser.decodeFromJsonElement<Comment>(this)
+    return lenientJson.decodeFromJsonElement<Comment>(this)
 }
 
 /**
@@ -133,7 +127,7 @@ private fun extractTextFromNode(node: ContentNode): String {
             } else if (sb.isEmpty() && node.content?.isNotEmpty() == true) {
                  sb.append("\n\n")
             } else if (sb.isEmpty() && node.content.isNullOrEmpty()){
-                 sb.append("\n\n") // Represent empty paragraph as some space
+                sb.append("\n\n")
             }
         }
         "rule" -> {
@@ -169,7 +163,7 @@ private fun extractTextFromNode(node: ContentNode): String {
             if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
                 sb.append('\n')
             } else if (sb.isNotEmpty() && !sb.endsWith("\n")){
-                sb.append("\n\n") // if list items didn't add newline for some reason.
+                sb.append("\n\n")
             }
         }
         "listItem" -> {

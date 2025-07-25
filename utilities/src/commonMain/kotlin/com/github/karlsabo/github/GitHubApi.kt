@@ -35,4 +35,20 @@ interface GitHubApi {
         startDate: Instant,
         endDate: Instant,
     ): List<Issue>
+
+    /**
+     * Searches for pull requests containing the specified text within a given date range and organization scope.
+     *
+     * @param searchText The text to search for in pull request titles or descriptions.
+     * @param organizationIds A list of organization IDs to limit the search scope.
+     * @param startDateInclusive The start date of the search range (inclusive).
+     * @param endDateInclusive The end date of the search range (inclusive).
+     * @return A list of issues representing the pull requests that match the search criteria.
+     */
+    suspend fun searchPullRequestsByText(
+        searchText: String,
+        organizationIds: List<String>,
+        startDateInclusive: Instant,
+        endDateInclusive: Instant,
+    ): List<Issue>
 }

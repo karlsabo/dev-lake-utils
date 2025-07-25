@@ -1,13 +1,25 @@
 package com.github.karlsabo.jira
 
-import kotlinx.datetime.*
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import java.net.URI
 
 @Serializable
@@ -47,6 +59,27 @@ data class Issue(
     val isSubtask: Boolean? = null,
     val dueDate: Instant? = null,
 )
+
+fun Issue.isCompleted(): Boolean {
+    return resolutionDate != null
+}
+
+fun Issue.isMilestone(): Boolean {
+    return type != null && type.lowercase() == "epic"
+}
+
+fun Issue.isIssueOrBug(): Boolean {
+    if (type == null) return false
+    return when (type.lowercase()) {
+        "bug", "issue", "story", "subtask", "artifact", "task", "vulnerability" -> true
+        "epic", "theme", "parent artifact", "r&d initiative", "sub-task" -> false
+        else -> {
+            val message = "Unhandled issue type `$type`, Info: $issueKey, $title"
+            print(message)
+            throw RuntimeException(message)
+        }
+    }
+}
 
 fun JsonObject.toIssue(): Issue {
     @Suppress("UNREACHABLE_CODE") val fields = this["fields"]?.jsonObject ?: return error("Missing fields")

@@ -1,17 +1,16 @@
 package com.github.karlsabo.serialization
 
+import com.github.karlsabo.tools.lenientJson
 import io.ktor.utils.io.core.writeText
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
 
-private val json = Json { encodeDefaults = true }
 fun <T> saveConfig(configPath: Path, config: T, serializer: KSerializer<T>) {
     SystemFileSystem.sink(configPath).buffered()
-        .writeText(json.encodeToString(serializer, config))
+        .writeText(lenientJson.encodeToString(serializer, config))
 }
 
 inline fun <reified T> loadConfig(configPath: Path, serializer: KSerializer<T>): T? {
@@ -19,7 +18,7 @@ inline fun <reified T> loadConfig(configPath: Path, serializer: KSerializer<T>):
         return null
     }
     return try {
-        Json.decodeFromString(serializer, SystemFileSystem.source(configPath).buffered().readText())
+        lenientJson.decodeFromString(serializer, SystemFileSystem.source(configPath).buffered().readText())
     } catch (error: Exception) {
         println("Failed to load config: $error, $configPath")
         return null
