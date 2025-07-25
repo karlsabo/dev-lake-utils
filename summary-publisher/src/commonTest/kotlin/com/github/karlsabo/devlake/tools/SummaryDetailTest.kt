@@ -24,6 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import com.github.karlsabo.github.Issue as GitHubIssue
 import com.github.karlsabo.github.User as GitHubUser
 import com.github.karlsabo.jira.Issue as JiraIssue
@@ -654,7 +655,8 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(1.days),
                 lastStatusChangeAt = now.minus(3.days),
                 resolvedAt = now.minus(3.days),
-                htmlUrl = "https://pagerduty.example.local/incidents/1"
+                htmlUrl = "https://pagerduty.example.local/incidents/1",
+                updatedAt = now.minus(3.days).minus(10.minutes),
             ),
             PagerDutyIncident(
                 id = "INCIDENT2",
@@ -668,7 +670,8 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(3.days),
                 lastStatusChangeAt = now.minus(1.days),
                 resolvedAt = now.minus(1.days),
-                htmlUrl = "https://pagerduty.example.local/incidents/2"
+                htmlUrl = "https://pagerduty.example.local/incidents/2",
+                updatedAt = now.minus(1.days),
             )
         )
 
