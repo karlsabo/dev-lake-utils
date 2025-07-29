@@ -72,7 +72,7 @@ fun Issue.isMilestone(): Boolean {
 fun Issue.isIssueOrBug(): Boolean {
     if (type == null) return false
     return when (type.lowercase()) {
-        "bug", "issue", "story", "subtask", "artifact", "task", "vulnerability" -> true
+        "bug", "issue", "story", "subtask", "artifact", "task", "vulnerability", "request", "design story", "ds story" -> true
         "epic", "theme", "parent artifact", "r&d initiative", "sub-task" -> false
         else -> {
             val message = "Unhandled issue type `$type`, Info: $issueKey, $title"
