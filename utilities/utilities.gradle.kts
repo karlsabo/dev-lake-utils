@@ -85,7 +85,6 @@ tasks.register<JavaExec>("gitHubApiDemo") {
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
 
-
 publishing {
     repositories {
         mavenLocal()
