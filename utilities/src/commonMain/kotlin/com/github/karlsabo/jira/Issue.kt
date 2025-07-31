@@ -61,11 +61,10 @@ data class Issue(
     val key: String,
     val self: String,
     val fields: JiraIssueFields,
-    val url: String? = null,
 ) {
     val htmlUrl: String?
         get() {
-            val originalUrl = Url(this.url ?: "https://example.local")
+            val originalUrl = Url(this.self ?: "https://example.local")
             return "${originalUrl.protocol.name}://${originalUrl.hostWithPort}/browse/$key"
         }
 }

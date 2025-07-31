@@ -89,7 +89,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
             ) return@forEach
 
             val complete = if (milestone.issue.fields.resolutionDate == null) "" else "✅ "
-            summary.appendLine("*$complete<${milestone.issue.url}|${milestone.issue.fields.summary}>: ${milestone.issue.fields.assignee?.displayName}*")
+            summary.appendLine("*$complete<${milestone.issue.htmlUrl}|${milestone.issue.fields.summary}>: ${milestone.issue.fields.assignee?.displayName}*")
             summary.append(createSlackMarkdownProgressBar(milestone.issues, milestone.durationIssues))
 
             if (milestone.issue.fields.resolutionDate == null) {
@@ -97,7 +97,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                 if (issuesResolved.isNotEmpty()) {
                     summary.appendLine(
                         "📍 Issues resolved: ${
-                            issuesResolved.joinToString(", ") { "<${it.url}|${it.key}>" }
+                            issuesResolved.joinToString(", ") { "<${it.htmlUrl}|${it.key}>" }
                         }"
                     )
                 } else {
@@ -129,7 +129,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         val warningEmoji =
                             if (!isStatusRecent) "⚠️ " else ""
                         summary.appendLine(
-                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.key}> \"${
+                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.htmlUrl}|${lastIssue.key}> \"${
                                 lastIssue.fields.summary?.take(
                                     changeCharacterLimit
                                 )
@@ -161,7 +161,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                 if (issuesOpened.isNotEmpty()) {
                     summary.appendLine(
                         "📩 Issues opened: ${
-                            issuesOpened.joinToString(", ") { "<${it.url}|${it.key}>" }
+                            issuesOpened.joinToString(", ") { "<${it.htmlUrl}|${it.key}>" }
                         }"
                     )
                 }
@@ -204,7 +204,7 @@ fun ProjectSummary.toSlackMarkup(): String {
     if (issuesResolved.isNotEmpty()) {
         summary.appendLine(
             "📍 Issues resolved: ${
-                issuesResolved.joinToString(", ") { "<${it.url}|${it.key}>" }
+                issuesResolved.joinToString(", ") { "<${it.htmlUrl}|${it.key}>" }
             }"
         )
     }
@@ -212,7 +212,7 @@ fun ProjectSummary.toSlackMarkup(): String {
     if (issuesOpened.isNotEmpty()) {
         summary.appendLine(
             "📩 Issues opened: ${
-                issuesOpened.joinToString(", ") { "<${it.url}|${it.key}>" }
+                issuesOpened.joinToString(", ") { "<${it.htmlUrl}|${it.key}>" }
             }"
         )
     }
@@ -234,7 +234,7 @@ fun ProjectSummary.toSlackMarkup(): String {
                 return@forEach
             }
             milestoneCount++
-            milestoneSummary.appendLine("*✅ <${milestone.issue.url}|${milestone.issue.fields.summary}>*")
+            milestoneSummary.appendLine("*✅ <${milestone.issue.htmlUrl}|${milestone.issue.fields.summary}>*")
         }
         if (milestoneCount > 0) {
             summary.append(milestoneSummary.toString())
