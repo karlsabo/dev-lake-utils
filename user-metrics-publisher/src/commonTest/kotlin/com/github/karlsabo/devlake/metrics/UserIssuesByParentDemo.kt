@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.metrics
 
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.jira.toPlainText
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlin.time.measureTime
@@ -32,7 +33,7 @@ fun main(args: Array<String>): Unit = runBlocking {
         println("Found ${allIssuesUnderParent.size} issues under parent $parentKey")
 
         // Filter to issues assigned to the specified user
-        val userIssues = allIssuesUnderParent.filter { it.assigneeId == userId }
+        val userIssues = allIssuesUnderParent.filter { it.fields.assignee?.accountId == userId }
         println("Found ${userIssues.size} issues assigned to user $userId under parent $parentKey")
 
         if (userIssues.isEmpty()) {
@@ -44,11 +45,11 @@ fun main(args: Array<String>): Unit = runBlocking {
         println("\nIssues assigned to user $userId under parent $parentKey:")
         println("========================================")
 
-        userIssues.sortedBy { it.createdDate }.forEach { issue ->
-            val title = issue.title ?: "Untitled"
-            val description = issue.description ?: "No description"
-            val key = issue.issueKey
-            val url = issue.url ?: "No URL available"
+        userIssues.sortedBy { it.fields.created }.forEach { issue ->
+            val title = issue.fields.summary ?: "Untitled"
+            val description = issue.fields.description.toPlainText() ?: "No description"
+            val key = issue.key
+            val url = issue.htmlUrl ?: "No URL available"
 
             println("* $title [$key]($url)")
             println("  * ```$description```")

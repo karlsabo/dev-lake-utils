@@ -5,6 +5,7 @@ import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.isCompleted
 import com.github.karlsabo.jira.isIssueOrBug
 import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.jira.toPlainText
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -42,7 +43,7 @@ fun main(args: Array<String>): Unit = runBlocking {
 
         fun findAllParentIssues(issues: List<Issue>) {
             val parentIssueIds = issues
-                .mapNotNull { it.parentIssueId }
+                .mapNotNull { it.fields.parent?.id }
                 .filter { it !in processedIssueIds }
                 .distinct()
 
@@ -59,21 +60,22 @@ fun main(args: Array<String>): Unit = runBlocking {
 
         findAllParentIssues(userIssues)
 
-        val epics = allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.resolutionDate ?: it.createdDate }
+        val epics =
+            allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.fields.resolutionDate ?: it.fields.created }
 
         println("# Epics the user contributed to:")
 
         if (epics.isEmpty()) {
             println("No epics found for this user")
         } else {
-            val userIssuesByParentId = userIssues.groupBy { it.parentIssueId }
+            val userIssuesByParentId = userIssues.groupBy { it.fields.parent?.id }
 
-            epics.sortedBy { it.type }.forEach { epic ->
-                val type = epic.type ?: "Unknown"
-                val title = epic.title ?: "Untitled"
-                epic.url ?: "No URL available"
-                val key = epic.issueKey
-                val date = epic.resolutionDate ?: epic.createdDate
+            epics.sortedBy { it.fields.issueType?.name }.forEach { epic ->
+                val type = epic.fields.issueType?.name ?: "Unknown"
+                val title = epic.fields.summary ?: "Untitled"
+                epic.htmlUrl ?: "No URL available"
+                val key = epic.key
+                val date = epic.fields.resolutionDate ?: epic.fields.created
 
                 println("* [$type] ($key) $date $title ")
 
@@ -101,11 +103,11 @@ fun main(args: Array<String>): Unit = runBlocking {
 
                 // Print user's completed issues under this epic
                 userCompletedIssues.forEach { issue ->
-                    println("  * ${issue.issueKey} - ${issue.title ?: "Untitled"}")
-                    issue.description?.let { description ->
+                    println("  * ${issue.key} - ${issue.fields.summary ?: "Untitled"}")
+                    issue.fields.description?.toPlainText().let { description ->
                         // Truncate description if it's too long
-                        val truncatedDescription = if (description.length > 100) {
-                            description.substring(0, 97) + "..."
+                        val truncatedDescription = if ((description?.length ?: 0) > 100) {
+                            description?.substring(0, 97) + "..."
                         } else {
                             description
                         }
