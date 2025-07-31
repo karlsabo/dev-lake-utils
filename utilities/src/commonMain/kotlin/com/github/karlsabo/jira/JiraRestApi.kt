@@ -112,7 +112,7 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
             val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
 
             val issues = root["issues"]?.jsonArray ?: break
-            issueList += issues.map { it.jsonObject.toIssue() }
+            issueList += issues.map { issue -> lenientJson.decodeFromJsonElement(Issue.serializer(), issue.jsonObject) }
 
             val total = root["total"]?.jsonPrimitive?.int ?: break
             startAt += maxResults
