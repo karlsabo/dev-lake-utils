@@ -311,11 +311,7 @@ fun Issue.isIssueOrBug(): Boolean {
 }
 
 fun parseOffsetDateTime(dateString: String): Instant {
-    println("Parsing date: $dateString")
-
-    // Handle short date format (YYYY-MM-DD)
     if (dateString.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
-        // For short dates, assume start of day in UTC
         val dateParts = dateString.split("-")
         val year = dateParts[0].toInt()
         val month = dateParts[1].toInt()
@@ -325,7 +321,6 @@ fun parseOffsetDateTime(dateString: String): Instant {
         return local.toInstant(TimeZone.UTC)
     }
 
-    // Handle standard format with date, time and offset
     val dateTimePart = dateString.substring(0, 23) // "2025-03-29T15:17:30.431"
     val offsetPart = dateString.substring(23)      // "-0400"
 
