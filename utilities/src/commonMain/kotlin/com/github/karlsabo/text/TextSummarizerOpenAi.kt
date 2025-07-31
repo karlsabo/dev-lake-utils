@@ -11,9 +11,8 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlin.io.println
-import kotlin.use
 
 class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : TextSummarizer {
     override suspend fun summarize(text: String): String {
@@ -33,25 +32,21 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
                 json(lenientJson)
             }
         }.use { client ->
-            val requestBody = mapOf(
-                "model" to model,
-                "messages" to listOf(
-                    mapOf(
-                        "role" to "system",
-                        "content" to instructions,
-                    ),
-                    mapOf("role" to "user", "content" to text)
+            val request = ChatCompletionRequest(
+                model = model,
+                messages = listOf(
+                    Message("system", instructions),
+                    Message("user", text)
                 ),
-                "temperature" to 0,
-                "max_tokens" to 250
+                temperature = 0,
+                maxTokens = 250,
             )
-
             val response: HttpResponse = client.post("https://api.openai.com/v1/chat/completions") {
                 headers {
                     append(HttpHeaders.Authorization, "Bearer ${config.apiKey}")
                     append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 }
-                setBody(requestBody)
+                setBody(request)
                 println(this)
             }
 
@@ -79,9 +74,20 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
 
 }
 
+@Serializable
+data class Message(
+    val role: String,
+    val content: String,
+)
 
 @Serializable
-private data class Message(val role: String? = null, val content: String? = null)
+data class ChatCompletionRequest(
+    val model: String,
+    val messages: List<Message>, // Note the list of the Message class
+    val temperature: Int,
+    @SerialName("max_tokens") // Maps the Kotlin camelCase to JSON snake_case
+    val maxTokens: Int,
+)
 
 @Serializable
 private data class Choice(val message: Message? = null)
