@@ -39,7 +39,7 @@ fun main(args: Array<String>): Unit = runBlocking {
 
         fun findAllParentIssues(issues: List<Issue>) {
             val parentIssueIds = issues
-                .mapNotNull { it.parentIssueId }
+                .mapNotNull { it.fields.parent?.id }
                 .filter { it !in processedIssueIds }
                 .distinct()
 
@@ -56,7 +56,8 @@ fun main(args: Array<String>): Unit = runBlocking {
 
         findAllParentIssues(userIssues)
 
-        val epics = allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.resolutionDate ?: it.createdDate }
+        val epics =
+            allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.fields.resolutionDate ?: it.fields.created }
 
         println("\nEpics the user contributed to:")
         println("========================================")
@@ -64,12 +65,12 @@ fun main(args: Array<String>): Unit = runBlocking {
         if (epics.isEmpty()) {
             println("No epics found for this user")
         } else {
-            epics.sortedBy { it.type }.forEach { issue ->
-                val type = issue.type ?: "Unknown"
-                val title = issue.title ?: "Untitled"
-                val url = issue.url ?: "No URL available"
-                val key = issue.issueKey
-                val date = issue.resolutionDate ?: issue.createdDate
+            epics.sortedBy { it.fields.issueType?.name }.forEach { issue ->
+                val type = issue.fields.issueType?.name ?: "Unknown"
+                val title = issue.fields.summary ?: "Untitled"
+                val url = issue.htmlUrl ?: "No URL available"
+                val key = issue.key
+                val date = issue.fields.resolutionDate ?: issue.fields.created
 
                 println("[$type] $date $title ($key)")
                 println("URL: $url")
