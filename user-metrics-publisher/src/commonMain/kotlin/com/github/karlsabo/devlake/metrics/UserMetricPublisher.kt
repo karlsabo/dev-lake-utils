@@ -303,7 +303,7 @@ fun UserMetrics.toSlackMarkdown(): String {
     builder.append("\n")
     builder.append("🔹 *Issues Closed:*\n")
     issuesClosedLastWeek.forEach {
-        builder.append("• <${it.url}|${it.key}> ${it.fields.summary}\n")
+        builder.append("• <${it.htmlUrl}|${it.key}> ${it.fields.summary}\n")
     }
     return builder.toString()
 }
