@@ -1,8 +1,10 @@
 package com.github.karlsabo.text
 
+import com.github.karlsabo.http.installHttpRetry
 import com.github.karlsabo.tools.lenientJson
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
@@ -10,13 +12,14 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : TextSummarizer {
     override suspend fun summarize(text: String): String {
-        val model = "gpt-4o-mini"
+        val model = "gpt-5-mini"
 
         val instructions =
             """
@@ -31,6 +34,9 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
             install(ContentNegotiation) {
                 json(lenientJson)
             }
+            installHttpRetry()
+            install(HttpCache)
+            expectSuccess = false
         }.use { client ->
             val request = ChatCompletionRequest(
                 model = model,
@@ -38,8 +44,8 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
                     Message("system", instructions),
                     Message("user", text)
                 ),
-                temperature = 0,
-                maxTokens = 250,
+                maxCompletionTokens = 2048,
+                reasoningEffort = "minimal"
             )
             val response: HttpResponse = client.post("https://api.openai.com/v1/chat/completions") {
                 headers {
@@ -54,6 +60,9 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
             val responseText: String = response.body()
             println("responseText: $responseText")
 
+            if (!response.status.isSuccess()) {
+                throw Exception("Failed to summarize text: ${response.status.value}")
+            }
 
             val openAiResponse: OpenAIResponse = lenientJson.decodeFromString(OpenAIResponse.serializer(), responseText)
             println("openAiResponse=$openAiResponse")
@@ -83,10 +92,13 @@ data class Message(
 @Serializable
 data class ChatCompletionRequest(
     val model: String,
-    val messages: List<Message>, // Note the list of the Message class
-    val temperature: Int,
-    @SerialName("max_tokens") // Maps the Kotlin camelCase to JSON snake_case
-    val maxTokens: Int,
+    val messages: List<Message>,
+    val temperature: Double = 1.0,
+    @SerialName("max_completion_tokens")
+    val maxCompletionTokens: Int,
+    val verbosity: String? = null, // New param supported by GPT-5 (values: "low", "medium", "high")
+    @SerialName("reasoning_effort")
+    val reasoningEffort: String? = null, // New param for GPT-5: e.g. "minimal"
 )
 
 @Serializable
