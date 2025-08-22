@@ -88,8 +88,9 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     .minus(14.days)
             ) return@forEach
 
+            summary.appendLine()
             val complete = if (milestone.issue.fields.resolutionDate == null) "" else "✅ "
-            summary.appendLine("*$complete<${milestone.issue.htmlUrl}|${milestone.issue.fields.summary}>: ${milestone.issue.fields.assignee?.displayName}*")
+            summary.appendLine("*$complete<${milestone.issue.htmlUrl}|${milestone.issue.fields.summary}>: ${milestone.issue.fields.assignee?.displayName ?: "No assignee"}*")
             summary.append(createSlackMarkdownProgressBar(milestone.issues, milestone.durationIssues))
 
             if (milestone.issue.fields.resolutionDate == null) {
@@ -168,7 +169,6 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                 if (milestone.durationMergedPullRequests.isNotEmpty()) {
                     summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "<${it.htmlUrl}|${it.number}>" }}")
                 }
-                summary.appendLine()
             }
         }
     }
