@@ -226,11 +226,11 @@ fun main(args: Array<String>) = application {
                     if (summaryConfig.isTerseSummaryUsed) summaryLast7Days?.toTerseSlackMarkup() else summaryLast7Days?.toSlackMarkup()
                 topLevelSummary = slackSummary ?: "* Failed to generate a summary"
                 projectSummaries
-                projectSummaries = summaryLast7Days?.projectSummaries?.map { it ->
+                projectSummaries = summaryLast7Days?.projectSummaries?.map {
                     val message =
                         if (it.project.isVerboseMilestones) it.toVerboseSlackMarkdown() else it.toSlackMarkup()
                     ProjectSummaryHolder(it, message)
-                } ?: emptyList<ProjectSummaryHolder>()
+                } ?: emptyList()
                 isLoadingSummary = false
             }
         }
