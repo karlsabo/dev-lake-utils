@@ -51,4 +51,22 @@ interface GitHubApi {
         startDateInclusive: Instant,
         endDateInclusive: Instant,
     ): List<Issue>
+
+    /**
+     * Lists notifications for the authenticated user.
+     * Note: GitHub's REST API only supports the authenticated user's notifications.
+     */
+    suspend fun listNotifications(): List<Notification>
+
+    /**
+     * Marks a notification thread as read (done) for the authenticated user.
+     * @param threadId The notification thread ID.
+     */
+    suspend fun markNotificationAsDone(threadId: String)
+
+    /**
+     * Unsubscribes (ignores) the authenticated user from a notification thread.
+     * @param threadId The notification thread ID.
+     */
+    suspend fun unsubscribeFromNotification(threadId: String)
 }

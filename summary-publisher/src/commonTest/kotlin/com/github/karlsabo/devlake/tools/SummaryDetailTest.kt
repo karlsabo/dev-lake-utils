@@ -1121,6 +1121,18 @@ class SummaryDetailTest {
                         } ?: false
             }
         }
+
+        override suspend fun listNotifications(): List<com.github.karlsabo.github.Notification> {
+            return emptyList()
+        }
+
+        override suspend fun markNotificationAsDone(threadId: String) {
+            // no-op for tests
+        }
+
+        override suspend fun unsubscribeFromNotification(threadId: String) {
+            // no-op for tests
+        }
     }
 
     /**
