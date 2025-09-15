@@ -12,6 +12,9 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.patch
+import io.ktor.client.request.put
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
@@ -192,6 +195,42 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
 
         return pullRequests
+    }
+
+    override suspend fun listNotifications(): List<Notification> {
+        val url = "https://api.github.com/notifications"
+        val response = client.get(url)
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to list notifications: ${response.status.value}")
+        }
+        return lenientJson.decodeFromString(responseText)
+    }
+
+    override suspend fun markNotificationAsDone(threadId: String) {
+        val url = "https://api.github.com/notifications/threads/$threadId"
+        val response = client.patch(url)
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId")
+        }
+    }
+
+    @Serializable
+    private data class ThreadSubscriptionUpdate(val ignored: Boolean)
+
+    override suspend fun unsubscribeFromNotification(threadId: String) {
+        val url = "https://api.github.com/notifications/threads/$threadId/subscription"
+        val response = client.put(url) {
+            setBody(ThreadSubscriptionUpdate(ignored = true))
+        }
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId")
+        }
     }
 }
 
