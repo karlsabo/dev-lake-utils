@@ -208,6 +208,16 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         return lenientJson.decodeFromString(responseText)
     }
 
+    override suspend fun getPullRequestByUrl(url: String): PullRequest {
+        val response = client.get(url)
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to get pull request: ${response.status.value} for url=$url")
+        }
+        return lenientJson.decodeFromString(PullRequest.serializer(), responseText)
+    }
+
     override suspend fun markNotificationAsDone(threadId: String) {
         val url = "https://api.github.com/notifications/threads/$threadId"
         val response = client.patch(url)
