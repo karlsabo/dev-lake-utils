@@ -59,6 +59,17 @@ kotlin {
             }
         }
 
+        getByName("jvmTest") {
+            dependencies {
+                implementation("org.slf4j:slf4j-api:2.0.9")
+                implementation("org.apache.logging.log4j:log4j-core:${libs.versions.log4jVersion.get()}")
+                implementation("org.apache.logging.log4j:log4j-slf4j2-impl:${libs.versions.log4jVersion.get()}")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
+                implementation("org.junit.jupiter:junit-jupiter-engine:5.10.0")
+                runtimeOnly("org.junit.platform:junit-platform-launcher")
+            }
+        }
+
         create("posixMain") {
             dependsOn(getByName("commonMain"))
         }

@@ -10,9 +10,9 @@ import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.patch
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -220,10 +220,10 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
     override suspend fun markNotificationAsDone(threadId: String) {
         val url = "https://api.github.com/notifications/threads/$threadId"
-        val response = client.patch(url)
+        val response = client.delete(url)
         val responseText = response.bodyAsText()
+        println("\tresponseText=```$responseText```")
         if (response.status.value !in 200..299) {
-            println("\tresponseText=```$responseText```")
             throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId")
         }
     }
