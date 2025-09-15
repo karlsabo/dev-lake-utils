@@ -9,6 +9,8 @@ data class PullRequest(
     val url: String? = null,
     @SerialName("html_url")
     val htmlUrl: String? = null,
+    /** open or closed */
+    val state: String? = null,
     @SerialName("merged_at")
     val mergedAt: Instant? = null,
 )

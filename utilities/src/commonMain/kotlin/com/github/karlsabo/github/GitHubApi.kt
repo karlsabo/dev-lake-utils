@@ -59,6 +59,12 @@ interface GitHubApi {
     suspend fun listNotifications(): List<Notification>
 
     /**
+     * Fetch a pull request by its API URL.
+     * Example URL: https://api.github.com/repos/{owner}/{repo}/pulls/{number}
+     */
+    suspend fun getPullRequestByUrl(url: String): PullRequest
+
+    /**
      * Marks a notification thread as read (done) for the authenticated user.
      * @param threadId The notification thread ID.
      */

@@ -85,6 +85,17 @@ tasks.register<JavaExec>("gitHubApiDemo") {
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
 
+tasks.register<JavaExec>("notificationCleanupDemo") {
+    dependsOn("jvmTestClasses")
+
+    group = "application"
+    mainClass.set("com.github.karlsabo.github.GitHubNotificationsCleanupDemoKt")
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
+
+
 publishing {
     repositories {
         mavenLocal()
