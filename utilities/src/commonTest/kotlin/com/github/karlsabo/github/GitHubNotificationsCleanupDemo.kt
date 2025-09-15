@@ -7,11 +7,7 @@ import kotlinx.io.files.Path
 
 
 /**
- * Demo that lists notifications for the authenticated GitHub user.
- *
- * Usage:
- *   - Pass --config=/absolute/path/to/github-config.json
- *     The config file should point to a token file containing {"githubToken": "<token>"}.
+ * Demo that lists and cleans up notifications for the authenticated GitHub user.
  */
 fun main(args: Array<String>) {
     println("GitHub Notifications Demo")
@@ -42,7 +38,6 @@ fun main(args: Array<String>) {
                 println("  Updated: ${formatDate(n.updatedAt)}")
                 n.lastReadAt?.let { println("  Last read: ${formatDate(it)}") }
 
-                // If the notification is for a Pull Request, print whether it's merged or closed
                 if (n.subject.type.equals("PullRequest", ignoreCase = true)) {
                     val prUrl = n.subject.url
                     if (prUrl != null) {
