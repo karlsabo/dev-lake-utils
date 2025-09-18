@@ -11,7 +11,13 @@ import io.ktor.client.plugins.auth.providers.basic
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.readText
@@ -89,8 +95,13 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
 
     override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<Comment> {
         val commentList = mutableListOf<Comment>()
-        val url = "https://${config.domain}/rest/api/3/issue/$issueKey/comment?orderBy=-created&maxResults=$maxResults"
+        val url =
+            "https://${config.domain}/rest/api/3/issue/$issueKey/comment?orderBy=-created&maxResults=1&startAt=0"
         val response = client.get(url)
+        if (response.status.value !in 200..299) {
+            println("Response: ```${response.bodyAsText()}```")
+            throw Exception("Failed to get comments: ${response.status.value} for issueKey=$issueKey")
+        }
         val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
         val comments = root["comments"]?.jsonArray ?: return commentList
         commentList += comments.map { it.jsonObject.toComment() }
@@ -106,9 +117,13 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
         while (true) {
             val encodedJql = jql.encodeURLParameter()
             val url =
-                "https://${config.domain}/rest/api/3/search?jql=$encodedJql&startAt=$startAt&maxResults=$maxResults"
+                "https://${config.domain}/rest/api/3/search/jql?jql=$encodedJql&startAt=$startAt&maxResults=$maxResults&fields=*all"
 
             val response = client.get(url)
+            if (response.status.value !in 200..299) {
+                println("Response: ```${response.bodyAsText()}```")
+                throw Exception("Failed to run JQL: ${response.status.value} for jql=$jql")
+            }
             val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
 
             val issues = root["issues"]?.jsonArray ?: break
@@ -142,11 +157,18 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
     override suspend fun getIssuesResolvedCount(userJiraId: String, startDate: Instant, endDate: Instant): UInt {
         val jql =
             "assignee = $userJiraId AND resolutiondate >= \"${startDate.toUtcDateString()}\" AND resolutiondate <= \"${endDate.toUtcDateString()}\""
-        val encodedJql = jql.encodeURLParameter()
-        val url = "https://${config.domain}/rest/api/3/search?jql=$encodedJql&maxResults=0"
-        val response = client.get(url)
+        val url = "https://${config.domain}/rest/api/3/search/approximate-count"
+        val response = client.post(url) {
+            header(HttpHeaders.Accept, ContentType.Application.Json)
+            contentType(ContentType.Application.Json)
+            setBody(mapOf("jql" to jql))
+        }
+        if (response.status.value !in 200..299) {
+            println("Response: ```${response.bodyAsText()}```")
+            throw Exception("Failed to get issues resolved count: ${response.status.value} for jql=$jql")
+        }
         val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
-        return (root["total"]?.jsonPrimitive?.int ?: 0).toUInt()
+        return (root["count"]?.jsonPrimitive?.int ?: 0).toUInt()
     }
 }
 
