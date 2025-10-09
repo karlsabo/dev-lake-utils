@@ -1,5 +1,7 @@
-package com.github.karlsabo.github
+package com.github.karlsabo.github.notification
 
+import com.github.karlsabo.github.GitHubRestApi
+import com.github.karlsabo.github.loadGitHubConfig
 import com.github.karlsabo.tools.gitHubConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
@@ -50,6 +52,42 @@ fun main(args: Array<String>) {
                             }
                             println("  PR Status: $status")
                             pr.htmlUrl?.let { println("  PR URL: $it") }
+
+                            // Auto-approve matching PRs only if not already approved; always mark notification done
+                            val title = n.subject.title
+                            val matchesDemoAppFile =
+                                title.startsWith("Updating appfile", ignoreCase = true) && title.contains(
+                                    "demo",
+                                    ignoreCase = true
+                                )
+                            if (matchesDemoAppFile && pr.mergedAt == null && pr.state?.equals(
+                                    "closed",
+                                    ignoreCase = true
+                                ) != true
+                            ) {
+                                try {
+                                    val alreadyApproved = githubApi.hasAnyApprovedReview(prUrl)
+                                    if (alreadyApproved) {
+                                        println("  Action: PR already approved; skipping additional approval ${pr.url} ${n.subject.title}")
+
+                                    } else {
+                                        githubApi.approvePullRequestByUrl(
+                                            prUrl,
+                                            body = "Auto-approving demo appfile update"
+                                        )
+                                        println("  Action: Approved PR based on title match ${pr.url} ${n.subject.title}")
+                                    }
+                                    try {
+                                        githubApi.markNotificationAsDone(n.id)
+                                        println("  Action: Marked notification as done")
+                                    } catch (e: Exception) {
+                                        println("  Action: Failed to mark notification as done (${e.message})")
+                                    }
+                                } catch (e: Exception) {
+                                    println("  Action: Failed to check/approve PR ${pr.url} ${n.subject.title} (${e.message})")
+                                }
+                            }
+
                             if (pr.mergedAt != null || pr.state?.equals("closed", ignoreCase = true) == true) {
                                 try {
                                     githubApi.markNotificationAsDone(n.id)
