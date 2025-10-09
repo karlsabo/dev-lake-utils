@@ -65,6 +65,13 @@ interface GitHubApi {
     suspend fun getPullRequestByUrl(url: String): PullRequest
 
     /**
+     * Submit an approval review for a pull request by its API URL.
+     * @param url API URL of the PR (e.g., https://api.github.com/repos/{owner}/{repo}/pulls/{number})
+     * @param body Optional body/comment for the review
+     */
+    suspend fun approvePullRequestByUrl(url: String, body: String? = null)
+
+    /**
      * Marks a notification thread as read (done) for the authenticated user.
      * @param threadId The notification thread ID.
      */
@@ -75,4 +82,12 @@ interface GitHubApi {
      * @param threadId The notification thread ID.
      */
     suspend fun unsubscribeFromNotification(threadId: String)
+
+    /**
+     * Checks if a pull request has any approved review.
+     *
+     * @param url The API URL of the pull request (e.g., https://api.github.com/repos/{owner}/{repo}/pulls/{number}).
+     * @return True if the pull request has at least one approved review, otherwise false.
+     */
+    suspend fun hasAnyApprovedReview(url: String): Boolean
 }

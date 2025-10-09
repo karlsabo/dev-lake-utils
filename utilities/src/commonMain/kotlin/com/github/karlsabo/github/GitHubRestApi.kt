@@ -13,9 +13,12 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.readText
@@ -112,6 +115,15 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         install(HttpCache)
         expectSuccess = false
     }
+
+    @Serializable
+    private data class CreateReviewRequest(val event: String, val body: String? = null)
+
+    @Serializable
+    private data class PullRequestReview(
+        val id: Long? = null,
+        val state: String? = null,
+    )
 
     override suspend fun searchPullRequestsByText(
         searchText: String,
@@ -218,6 +230,49 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         return lenientJson.decodeFromString(PullRequest.serializer(), responseText)
     }
 
+    override suspend fun approvePullRequestByUrl(url: String, body: String?) {
+        val reviewsUrl = if (url.endsWith("/reviews")) url else "$url/reviews"
+        val response = client.post(reviewsUrl) {
+            contentType(ContentType.Application.Json)
+            setBody(CreateReviewRequest(event = "APPROVE", body = body))
+        }
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to approve pull request: ${response.status.value} for url=$url")
+        }
+    }
+
+    /**
+     * Returns true if the pull request already has any APPROVED review.
+     */
+    override suspend fun hasAnyApprovedReview(url: String): Boolean {
+        val reviewsUrl = if (url.endsWith("/reviews")) url else "$url/reviews"
+        val response = client.get(reviewsUrl)
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to list pull request reviews: ${response.status.value} for url=$url")
+        }
+
+        return try {
+            val elements = lenientJson.parseToJsonElement(responseText).jsonArray
+            elements.any { el ->
+                val state = el.jsonObject["state"]?.jsonPrimitive?.content
+                state.equals("APPROVED", ignoreCase = true)
+            }
+        } catch (error: Exception) {
+            println("Failed to parse GitHub JSON $responseText")
+            error.printStackTrace()
+            try {
+                val reviews = lenientJson.decodeFromString<List<PullRequestReview>>(responseText)
+                reviews.any { it.state.equals("APPROVED", ignoreCase = true) }
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
     override suspend fun markNotificationAsDone(threadId: String) {
         val url = "https://api.github.com/notifications/threads/$threadId"
         val response = client.delete(url)
@@ -234,6 +289,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
     override suspend fun unsubscribeFromNotification(threadId: String) {
         val url = "https://api.github.com/notifications/threads/$threadId/subscription"
         val response = client.put(url) {
+            contentType(ContentType.Application.Json)
             setBody(ThreadSubscriptionUpdate(ignored = true))
         }
         val responseText = response.bodyAsText()

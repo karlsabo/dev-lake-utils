@@ -1126,6 +1126,14 @@ class SummaryDetailTest {
             return emptyList()
         }
 
+        override suspend fun getPullRequestByUrl(url: String): PullRequest {
+            TODO("Not yet implemented")
+        }
+
+        override suspend fun approvePullRequestByUrl(url: String, body: String?) {
+            TODO("Not yet implemented")
+        }
+
         override suspend fun markNotificationAsDone(threadId: String) {
             // no-op for tests
         }
