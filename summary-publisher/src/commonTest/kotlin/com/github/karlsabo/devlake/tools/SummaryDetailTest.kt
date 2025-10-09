@@ -1141,6 +1141,10 @@ class SummaryDetailTest {
         override suspend fun unsubscribeFromNotification(threadId: String) {
             // no-op for tests
         }
+
+        override suspend fun hasAnyApprovedReview(url: String): Boolean {
+            TODO("Not yet implemented")
+        }
     }
 
     /**
