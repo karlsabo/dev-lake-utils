@@ -56,20 +56,17 @@ fun main(args: Array<String>) {
                             // Auto-approve matching PRs only if not already approved; always mark notification done
                             val title = n.subject.title
                             val matchesDemoAppFile =
-                                title.startsWith("Updating appfile", ignoreCase = true) && title.contains(
-                                    "demo",
-                                    ignoreCase = true
-                                )
-                            if (matchesDemoAppFile && pr.mergedAt == null && pr.state?.equals(
-                                    "closed",
-                                    ignoreCase = true
-                                ) != true
+                                title.startsWith("Updating appfile", ignoreCase = true)
+                                        && (title.contains("demo", ignoreCase = true)
+                                        || title.contains("to dev", ignoreCase = true))
+                            if (matchesDemoAppFile
+                                && pr.mergedAt == null
+                                && pr.state?.equals("closed", ignoreCase = true) != true
                             ) {
                                 try {
                                     val alreadyApproved = githubApi.hasAnyApprovedReview(prUrl)
                                     if (alreadyApproved) {
                                         println("  Action: PR already approved; skipping additional approval ${pr.url} ${n.subject.title}")
-
                                     } else {
                                         githubApi.approvePullRequestByUrl(
                                             prUrl,
