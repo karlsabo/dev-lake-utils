@@ -209,8 +209,14 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         return pullRequests
     }
 
+    /**
+     * Lists notifications for the authenticated user.
+     * Note: By default, GitHub returns only UNREAD notifications. To also include notifications you have
+     * already viewed (read) but not marked as done/archive, request with `all=true`.
+     * This method intentionally sets `all=true` so callers can see both unread and previously-read items.
+     */
     override suspend fun listNotifications(): List<Notification> {
-        val url = "https://api.github.com/notifications"
+        val url = "https://api.github.com/notifications?all=true&participating=false"
         val response = client.get(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
