@@ -123,6 +123,13 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
     private data class PullRequestReview(
         val id: Long? = null,
         val state: String? = null,
+        val user: ReviewUser? = null,
+    )
+
+    @Serializable
+    private data class ReviewUser(
+        val login: String? = null,
+        val type: String? = null,
     )
 
     override suspend fun searchPullRequestsByText(
@@ -216,14 +223,16 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
      * This method intentionally sets `all=true` so callers can see both unread and previously-read items.
      */
     override suspend fun listNotifications(): List<Notification> {
-        val url = "https://api.github.com/notifications?all=true&participating=false"
+        // karlfixme need to filter 'done' and paginate all=true&
+        val url = "https://api.github.com/notifications?participating=false"
         val response = client.get(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
             println("\tresponseText=```$responseText```")
             throw Exception("Failed to list notifications: ${response.status.value}")
         }
-        return lenientJson.decodeFromString(responseText)
+        val notifications = lenientJson.decodeFromString<List<Notification>>(responseText)
+        return notifications
     }
 
     override suspend fun getPullRequestByUrl(url: String): PullRequest {
@@ -250,7 +259,9 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
     }
 
     /**
-     * Returns true if the pull request already has any APPROVED review.
+     * Returns true if the pull request already has any APPROVED review from a human reviewer.
+     * Bot approvals (e.g., users of type "Bot", accounts ending with "[bot]",
+     * or known automation accounts like "continuous-deployer") are ignored.
      */
     override suspend fun hasAnyApprovedReview(url: String): Boolean {
         val reviewsUrl = if (url.endsWith("/reviews")) url else "$url/reviews"
@@ -264,19 +275,39 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         return try {
             val elements = lenientJson.parseToJsonElement(responseText).jsonArray
             elements.any { el ->
-                val state = el.jsonObject["state"]?.jsonPrimitive?.content
-                state.equals("APPROVED", ignoreCase = true)
+                val obj = el.jsonObject
+                val state = obj["state"]?.jsonPrimitive?.content
+                if (!state.equals("APPROVED", ignoreCase = true)) return@any false
+
+                val userObj = obj["user"]?.jsonObject
+                val login = userObj?.get("login")?.jsonPrimitive?.content
+                val type = userObj?.get("type")?.jsonPrimitive?.content
+                !isBotUser(login, type)
             }
         } catch (error: Exception) {
             println("Failed to parse GitHub JSON $responseText")
             error.printStackTrace()
             try {
                 val reviews = lenientJson.decodeFromString<List<PullRequestReview>>(responseText)
-                reviews.any { it.state.equals("APPROVED", ignoreCase = true) }
+                reviews.any { review ->
+                    review.state.equals("APPROVED", ignoreCase = true) &&
+                            !isBotUser(review.user?.login, review.user?.type)
+                }
             } catch (_: Exception) {
                 false
             }
         }
+    }
+
+    private fun isBotUser(login: String?, type: String?): Boolean {
+        if (type.equals("Bot", ignoreCase = true)) return true
+        val normalizedLogin = login?.lowercase() ?: return false
+        if (normalizedLogin.endsWith("[bot]")) return true
+        // Known automation accounts to ignore for approvals
+        val excluded = setOf(
+            "continuous-deployer",
+        )
+        return normalizedLogin in excluded
     }
 
     override suspend fun markNotificationAsDone(threadId: String) {
