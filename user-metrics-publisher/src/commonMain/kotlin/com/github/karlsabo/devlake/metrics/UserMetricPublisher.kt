@@ -275,6 +275,7 @@ data class UserMetrics(
     val userId: String,
     val pullRequestsPastWeek: List<GitHubIssue>,
     val pullRequestsYearToDateCount: UInt,
+    val prReviewCountYtd: UInt,
     val issuesClosedLastWeek: List<Issue>,
     val issuesClosedYearToDateCount: UInt,
 )
@@ -287,6 +288,7 @@ fun UserMetrics.toSlackMarkdown(): String {
     builder.append("📌 *Merged PRs*\n")
     builder.append("• *Past week:* `${pullRequestsPastWeek.size}`\n")
     builder.append("• *Year to Date:* `$pullRequestsYearToDateCount`. _Expectation ~${(numberOfWeeksThisYear * 2.5).toInt()} (2-3 per week)_\n")
+    builder.append("• *PRs Reviewed YTD:* `$prReviewCountYtd`\n")
     builder.append("\n")
     builder.append("📌 *Issues Closed*\n")
     builder.append("• *Past week:* `${issuesClosedLastWeek.size}`\n")
@@ -334,6 +336,12 @@ suspend fun createUserMetrics(
         startOfThisYear,
         System.now(),
     )
+    val prReviewCountYtd = gitHubApi.getPullRequestReviewCount(
+        user.gitHubId!!,
+        organizationIds,
+        startOfThisYear,
+        System.now(),
+    )
 
     issuesClosedPastWeek.addAll(
         jiraApi.getIssuesResolved(
@@ -352,6 +360,7 @@ suspend fun createUserMetrics(
         user.id,
         pullRequestsPastWeek,
         prCountYtd,
+        prReviewCountYtd,
         issuesClosedPastWeek,
         issuesCountYtd,
     )

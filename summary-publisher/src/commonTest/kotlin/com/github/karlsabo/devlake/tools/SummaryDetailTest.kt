@@ -1094,6 +1094,17 @@ class SummaryDetailTest {
             }.toUInt()
         }
 
+        override suspend fun getPullRequestReviewCount(
+            gitHubUserId: String,
+            organizationIds: List<String>,
+            startDate: Instant,
+            endDate: Instant,
+        ): UInt {
+            // For summary tests we don't currently track reviews separately.
+            // Return 0 to satisfy the interface; user-metrics publisher uses the real implementation.
+            return 0u
+        }
+
         override suspend fun getMergedPullRequests(
             gitHubUserId: String,
             organizationIds: List<String>,
