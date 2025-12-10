@@ -22,6 +22,26 @@ interface GitHubApi {
     ): UInt
 
     /**
+     * Retrieves the count of pull requests that a specific user has reviewed
+     * within a given date range.
+     *
+     * This counts unique pull requests that have at least one review by the user
+     * in the specified organizations and time period.
+     *
+     * @param gitHubUserId The GitHub username
+     * @param organizationIds The GitHub organizations to search within
+     * @param startDate The start date of the range (inclusive)
+     * @param endDate The end date of the range (inclusive)
+     * @return The number of pull requests reviewed by the user
+     */
+    suspend fun getPullRequestReviewCount(
+        gitHubUserId: String,
+        organizationIds: List<String>,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt
+
+    /**
      * Gets the details of pull requests by a user that have been merged within a specified date range.
      *
      * @param gitHubUserId The GitHub user ID

@@ -164,8 +164,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         startDate: Instant,
         endDate: Instant,
     ): UInt {
-        val encodedQuery =
-            createMergedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds)
+        val encodedQuery = createMergedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds)
         val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"
 
         val response = client.get(url)
@@ -174,6 +173,29 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         if (response.status.value !in 200..299) {
             println("\tresponseText=```$responseText```")
             throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId")
+        }
+        val root = Json.parseToJsonElement(responseText).jsonObject
+
+        val totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
+
+        return totalCount.toUInt()
+    }
+
+    override suspend fun getPullRequestReviewCount(
+        gitHubUserId: String,
+        organizationIds: List<String>,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt {
+        val encodedQuery = createReviewedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds)
+        val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"
+
+        val response = client.get(url)
+
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            println("\tresponseText=```$responseText```")
+            throw Exception("Failed to get pull request review count: ${response.status.value} for $gitHubUserId")
         }
         val root = Json.parseToJsonElement(responseText).jsonObject
 
@@ -348,6 +370,22 @@ private fun createMergedPrEncodedQuery(
 
     val query =
         "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
+    val encodedQuery = query.encodeURLParameter()
+    return encodedQuery
+}
+
+private fun createReviewedPrEncodedQuery(
+    startDate: Instant,
+    endDate: Instant,
+    gitHubUserId: String,
+    organizationIds: List<String>,
+): String {
+    val formattedStartDate = startDate.toUtcDateString()
+    val formattedEndDate = endDate.toUtcDateString()
+
+    // q=reviewed-by:karlsabo (org:klaviyo OR org:zitadel) is:pr updated:2025-01-01..2025-12-31
+    val query =
+        "reviewed-by:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr updated:$formattedStartDate..$formattedEndDate"
     val encodedQuery = query.encodeURLParameter()
     return encodedQuery
 }
