@@ -9,7 +9,10 @@ import com.github.karlsabo.jira.toPlainText
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
-import kotlin.time.Duration.Companion.days
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlin.math.min
 import kotlin.time.measureTime
 
 /**
@@ -30,7 +33,12 @@ fun main(args: Array<String>): Unit = runBlocking {
     println("Finding epics and their issues for user: $userId")
 
     val executionTime = measureTime {
-        val userIssues = jiraApi.getIssuesResolved(userId, Clock.System.now().minus((4 * 365).days), Clock.System.now())
+        val startDate = LocalDateTime(2025, 1, 1, 0, 0, 0).toInstant(TimeZone.UTC)
+        val userIssues = jiraApi.getIssuesResolved(
+            userId,
+            startDate,
+            Clock.System.now()
+        )
         println("Found ${userIssues.size} issues assigned to user")
 
         if (userIssues.isEmpty()) {
@@ -60,58 +68,64 @@ fun main(args: Array<String>): Unit = runBlocking {
 
         findAllParentIssues(userIssues)
 
-        val epics =
+        val parents =
             allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.fields.resolutionDate ?: it.fields.created }
 
-        println("# Epics the user contributed to:")
+        println("# Parents the user contributed to:")
 
-        if (epics.isEmpty()) {
-            println("No epics found for this user")
+        if (parents.isEmpty()) {
+            println("No parents found for this user")
         } else {
             val userIssuesByParentId = userIssues.groupBy { it.fields.parent?.id }
 
-            epics.sortedBy { it.fields.issueType?.name }.forEach { epic ->
+            parents.sortedBy { it.fields.issueType?.name }.forEach { epic ->
                 val type = epic.fields.issueType?.name ?: "Unknown"
                 val title = epic.fields.summary ?: "Untitled"
                 epic.htmlUrl ?: "No URL available"
                 val key = epic.key
                 val date = epic.fields.resolutionDate ?: epic.fields.created
 
-                println("* [$type] ($key) $date $title ")
-
                 // Get all issues under this epic
-                val allEpicIssues = runBlocking { jiraApi.getChildIssues(listOf(key)) }
+                val allChildIssues = runBlocking { jiraApi.getChildIssues(listOf(key)) }
                     .filter { it.isIssueOrBug() }
 
                 // Get completed issues under this epic
-                val completedEpicIssues = allEpicIssues.filter { it.isCompleted() }
+                val completedChildIssues = allChildIssues.filter { it.isCompleted() }
 
                 // Get user's completed issues under this epic
                 val userCompletedIssues = userIssuesByParentId[epic.id] ?: emptyList()
 
                 // Calculate statistics
                 val userCompletedCount = userCompletedIssues.size
-                val totalCompletedCount = completedEpicIssues.size
+                val totalCompletedCount = completedChildIssues.size
                 val percentageByUser = if (totalCompletedCount > 0) {
                     (userCompletedCount.toDouble() / totalCompletedCount.toDouble() * 100).toInt()
                 } else {
                     0
                 }
 
-                // Print statistics
+                if (userCompletedCount == 0) return@forEach
+
+                println("* [$type] ($key) $date $title ")
                 println("  * $userCompletedCount/$totalCompletedCount $percentageByUser%")
 
                 // Print user's completed issues under this epic
                 userCompletedIssues.forEach { issue ->
+                    issue.fields.resolutionDate?.takeIf { it >= startDate } ?: return@forEach
                     println("  * ${issue.key} - ${issue.fields.summary ?: "Untitled"}")
                     issue.fields.description?.toPlainText().let { description ->
                         // Truncate description if it's too long
                         val truncatedDescription = if ((description?.length ?: 0) > 100) {
-                            description?.substring(0, 97) + "..."
+                            description?.substring(0, min(200, description.length)) + "..."
                         } else {
                             description
                         }
-                        println("    * $truncatedDescription")
+                        println("    * Details:")
+                        println("      `````")
+                        truncatedDescription?.split(Regex("""\R+"""))?.forEach {
+                            println("      $it")
+                        }
+                        println("      `````")
                     }
                 }
             }

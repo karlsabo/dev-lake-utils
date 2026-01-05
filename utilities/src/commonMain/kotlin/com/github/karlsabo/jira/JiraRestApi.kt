@@ -73,7 +73,17 @@ fun saveJiraConfig(configPath: Path, config: JiraConfig) {
 }
 
 class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
-    private val client: HttpClient = HttpClient(CIO) {
+    constructor(config: JiraApiRestConfig, httpClient: HttpClient) : this(config) {
+        clientOverride = httpClient
+    }
+
+    private var clientOverride: HttpClient? = null
+
+    private val client: HttpClient by lazy {
+        clientOverride ?: buildDefaultClient()
+    }
+
+    private fun buildDefaultClient(): HttpClient = HttpClient(CIO) {
         install(Auth) {
             basic {
                 credentials {
@@ -111,13 +121,20 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
 
     override suspend fun runJql(jql: String): List<Issue> {
         val issueList = mutableListOf<Issue>()
-        var startAt = 0
         val maxResults = 100
+        var startAt = 0
+        var nextPageToken: String? = null
 
         while (true) {
             val encodedJql = jql.encodeURLParameter()
-            val url =
-                "https://${config.domain}/rest/api/3/search/jql?jql=$encodedJql&startAt=$startAt&maxResults=$maxResults&fields=*all"
+            val url = buildString {
+                append("https://${config.domain}/rest/api/3/search/jql?jql=$encodedJql&maxResults=$maxResults&fields=*all")
+                if (nextPageToken != null) {
+                    append("&nextPageToken=${nextPageToken!!.encodeURLParameter()}")
+                } else {
+                    append("&startAt=$startAt")
+                }
+            }
 
             val response = client.get(url)
             if (response.status.value !in 200..299) {
@@ -129,10 +146,24 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
             val issues = root["issues"]?.jsonArray ?: break
             issueList += issues.map { issue -> lenientJson.decodeFromJsonElement(Issue.serializer(), issue.jsonObject) }
 
-            val total = root["total"]?.jsonPrimitive?.int ?: break
-            startAt += maxResults
+            val isLast = root["isLast"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+            if (isLast == true) break
 
-            if (startAt >= total) break
+            val newNextPageToken = root["nextPageToken"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            if (newNextPageToken != null) {
+                nextPageToken = newNextPageToken
+                continue
+            }
+
+            val total = root["total"]?.jsonPrimitive?.int
+            if (total != null) {
+                startAt += maxResults
+                if (startAt >= total) break
+                continue
+            }
+
+            if (issues.size < maxResults) break
+            throw Exception("JQL results appear truncated (received ${issues.size} issues, but no pagination fields like isLast/nextPageToken/total were returned) for jql=$jql")
         }
 
         return issueList
