@@ -10,6 +10,8 @@
 
 # TODO
 
+* [ ] Add Linear support
+    * Demo for Linear
 * [ ] Create native executables
 * [ ] Add logging
 * [ ] Add dependency injection
