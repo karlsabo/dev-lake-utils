@@ -460,8 +460,8 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
 
         return """
             {
-              assignee: { id: { eq: \"$escapedUserId\" } }
-              completedAt: { gte: \"$start\", lte: \"$end\" }
+              assignee: { id: { eq: "$escapedUserId" } }
+              completedAt: { gte: "$start", lte: "$end" }
             }
         """.trimIndent()
     }
