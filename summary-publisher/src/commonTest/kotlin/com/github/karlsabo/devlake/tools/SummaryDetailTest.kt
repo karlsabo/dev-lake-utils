@@ -9,6 +9,7 @@ import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.jira.Comment
 import com.github.karlsabo.jira.CommentBody
 import com.github.karlsabo.jira.ContentNode
+import com.github.karlsabo.jira.CustomFieldFilter
 import com.github.karlsabo.jira.IssueDescription
 import com.github.karlsabo.jira.IssueParent
 import com.github.karlsabo.jira.IssueStatus
@@ -902,6 +903,20 @@ class SummaryDetailTest {
             endDate: Instant,
         ): UInt {
             return getIssuesResolved(userJiraId, startDate, endDate).size.toUInt()
+        }
+
+        override suspend fun getIssuesByCustomFieldFilter(
+            issueTypes: List<String>,
+            customFieldFilter: CustomFieldFilter,
+            resolvedAfter: Instant?,
+            resolvedBefore: Instant?,
+        ): List<JiraIssue> {
+            return mockIssues.values.filter { issue ->
+                val typeMatches = issueTypes.any { it.equals(issue.fields.issueType?.name, ignoreCase = true) }
+                val dateMatches =
+                    resolvedAfter == null || (issue.fields.resolutionDate?.let { it >= resolvedAfter } ?: false)
+                typeMatches && dateMatches
+            }
         }
     }
 

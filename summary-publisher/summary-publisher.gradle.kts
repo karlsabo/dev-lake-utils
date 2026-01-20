@@ -116,3 +116,16 @@ tasks.register<JavaExec>("runSummaryPublisherWithConfig") {
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("main").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
+
+tasks.register<JavaExec>("runJiraTeamMerDemo") {
+    group = "run"
+    mainClass.set("com.github.karlsabo.devlake.tools.JiraTeamMerDemoKt")
+
+    val argLine: String? = project.findProperty("args") as String?
+    if (argLine != null) {
+        args = argLine.split("\\s+".toRegex())
+    }
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}

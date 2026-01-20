@@ -201,6 +201,26 @@ class JiraRestApi(private val config: JiraApiRestConfig) : JiraApi {
         val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
         return (root["count"]?.jsonPrimitive?.int ?: 0).toUInt()
     }
+
+    override suspend fun getIssuesByCustomFieldFilter(
+        issueTypes: List<String>,
+        customFieldFilter: CustomFieldFilter,
+        resolvedAfter: Instant?,
+        resolvedBefore: Instant?,
+    ): List<Issue> {
+        val jql = buildString {
+            append("issuetype in (${issueTypes.joinToString(", ")})")
+            if (resolvedAfter != null) {
+                append(" AND resolutiondate >= \"${resolvedAfter.toUtcDateString()}\"")
+            }
+            if (resolvedBefore != null) {
+                append(" AND resolutiondate <= \"${resolvedBefore.toUtcDateString()}\"")
+            }
+            append(" AND \"${customFieldFilter.fieldId}\" in (${customFieldFilter.values.joinToString(", ") { "\"$it\"" }})")
+            append(" ORDER BY resolutiondate DESC")
+        }
+        return runJql(jql)
+    }
 }
 
 private fun Instant.toUtcDateString(): String {
