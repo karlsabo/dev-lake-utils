@@ -14,7 +14,6 @@ repositories {
 
 kotlin {
     jvm {
-        withJava()
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
@@ -101,6 +100,14 @@ tasks.register<JavaExec>("runUserIssuesByParentDemo") {
 tasks.register<JavaExec>("runUserEpicsWithIssuesDemo") {
     group = "run"
     mainClass.set("com.github.karlsabo.devlake.metrics.UserEpicsWithIssuesDemoKt")
+
+    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
+    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
+
+tasks.register<JavaExec>("runLinearDemo") {
+    group = "run"
+    mainClass.set("com.github.karlsabo.devlake.metrics.LinearDemoKt")
 
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
