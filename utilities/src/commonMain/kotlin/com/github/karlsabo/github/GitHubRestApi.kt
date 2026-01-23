@@ -245,15 +245,28 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
      * This method intentionally sets `all=true` so callers can see both unread and previously-read items.
      */
     override suspend fun listNotifications(): List<Notification> {
-        // karlfixme need to filter 'done' and paginate all=true&
-        val url = "https://api.github.com/notifications?participating=false"
-        val response = client.get(url)
-        val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
-            println("\tresponseText=```$responseText```")
-            throw Exception("Failed to list notifications: ${response.status.value}")
+        val notifications = mutableListOf<Notification>()
+        var page = 1
+        val perPage = 50
+
+        while (true) {
+            val url = "https://api.github.com/notifications?participating=false&all=true&per_page=$perPage&page=$page"
+            val response = client.get(url)
+            val responseText = response.bodyAsText()
+
+            if (response.status.value !in 200..299) {
+                println("Failed to list notifications $url")
+                println("\tresponse.status=${response.status} responseText=```$responseText```")
+                throw Exception("Failed to list notifications: ${response.status.value}")
+            }
+
+            val pageNotifications = lenientJson.decodeFromString<List<Notification>>(responseText)
+            if (pageNotifications.isEmpty()) break
+
+            notifications.addAll(pageNotifications)
+            page++
         }
-        val notifications = lenientJson.decodeFromString<List<Notification>>(responseText)
+
         return notifications
     }
 
@@ -261,7 +274,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val response = client.get(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("\tresponseText=```$responseText```")
+            println("Failed to get pull request $url")
+            println("\tresponse.status=${response.status} responseText=```$responseText```. Response=```$response```")
             throw Exception("Failed to get pull request: ${response.status.value} for url=$url")
         }
         return lenientJson.decodeFromString(PullRequest.serializer(), responseText)
@@ -336,8 +350,9 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val url = "https://api.github.com/notifications/threads/$threadId"
         val response = client.delete(url)
         val responseText = response.bodyAsText()
-        println("\tresponseText=```$responseText```")
         if (response.status.value !in 200..299) {
+            println("Failed to mark notification done $url")
+            println("\tresponse.status=${response.status} responseText=```$responseText```")
             throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId")
         }
     }
