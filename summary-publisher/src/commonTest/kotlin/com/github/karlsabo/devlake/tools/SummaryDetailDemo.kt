@@ -27,8 +27,7 @@ fun main(args: Array<String>) {
     runBlocking {
         val summaryConfig = loadSummaryPublisherConfig(configFilePath)
 
-        val jiraApi =
-            JiraRestApi(loadJiraConfig(jiraConfigPath))
+        val projectManagementApi = JiraRestApi(loadJiraConfig(jiraConfigPath))
         val gitHubApi = GitHubRestApi(loadGitHubConfig(gitHubConfigPath))
         val pagerDutyApi =
             if (summaryConfig.pagerDutyServiceIds.isNotEmpty()) PagerDutyRestApi(loadPagerDutyConfig(pagerDutyConfigPath)) else null
@@ -36,7 +35,7 @@ fun main(args: Array<String>) {
 
         val textSummarizer = TextSummarizerFake()
         val summaryLast7Days = createSummary(
-            jiraApi,
+            projectManagementApi,
             gitHubApi,
             summaryConfig.gitHubOrganizationIds,
             pagerDutyApi,

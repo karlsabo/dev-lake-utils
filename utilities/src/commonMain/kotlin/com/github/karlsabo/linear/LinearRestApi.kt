@@ -1,6 +1,11 @@
 package com.github.karlsabo.linear
 
 import com.github.karlsabo.http.installHttpRetry
+import com.github.karlsabo.projectmanagement.IssueFilter
+import com.github.karlsabo.projectmanagement.ProjectComment
+import com.github.karlsabo.projectmanagement.ProjectIssue
+import com.github.karlsabo.projectmanagement.ProjectManagementApi
+import com.github.karlsabo.projectmanagement.StatusCategory
 import com.github.karlsabo.tools.lenientJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -28,6 +33,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import com.github.karlsabo.projectmanagement.ProjectMilestone as UnifiedProjectMilestone
 
 private const val DEFAULT_LINEAR_ENDPOINT = "https://api.linear.app/graphql"
 private const val DEFAULT_PAGE_SIZE = 100
@@ -90,6 +96,14 @@ private val COMMENT_FIELDS = """
             }
         """.trimIndent()
 
+private val MILESTONE_FIELDS = """
+            id
+            name
+            description
+            targetDate
+            progress
+        """.trimIndent()
+
 /**
  * Configuration for Linear GraphQL API.
  */
@@ -150,10 +164,10 @@ fun saveLinearConfig(configPath: Path, config: LinearConfig) {
 }
 
 /**
- * Implementation of the Linear API using GraphQL.
+ * Linear GraphQL API implementation of ProjectManagementApi.
  */
 class LinearRestApi(private val config: LinearApiRestConfig, private val clientOverride: HttpClient? = null) :
-    LinearApi {
+    ProjectManagementApi {
     @Serializable
     private data class GraphQlRequest(
         val query: String,
@@ -177,7 +191,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         expectSuccess = false
     }
 
-    override suspend fun getIssues(issueKeys: List<String>): List<Issue> {
+    override suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue> {
         if (issueKeys.isEmpty()) return emptyList()
 
         val issues = mutableListOf<Issue>()
@@ -192,10 +206,10 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
             }
         }
 
-        return issues
+        return issues.map { it.toProjectIssue() }
     }
 
-    override suspend fun getChildIssues(issueKeys: List<String>): List<Issue> {
+    override suspend fun getChildIssues(issueKeys: List<String>): List<ProjectIssue> {
         if (issueKeys.isEmpty()) return emptyList()
 
         val children = mutableListOf<Issue>()
@@ -203,14 +217,14 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
             children += fetchChildIssues(issueKey)
         }
 
-        return children
+        return children.map { it.toProjectIssue() }
     }
 
-    override suspend fun getDirectChildIssues(parentKey: String): List<Issue> {
-        return fetchChildIssues(parentKey)
+    override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> {
+        return fetchChildIssues(parentKey).map { it.toProjectIssue() }
     }
 
-    override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<Comment> {
+    override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<ProjectComment> {
         if (maxResults <= 0) return emptyList()
 
         val comments = mutableListOf<Comment>()
@@ -241,17 +255,82 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
             if (nodes.isEmpty()) break
         }
 
-        return comments
+        return comments.map { it.toProjectComment() }
     }
 
-    override suspend fun getIssuesResolved(userId: String, startDate: Instant, endDate: Instant): List<Issue> {
+    override suspend fun getIssuesResolved(userId: String, startDate: Instant, endDate: Instant): List<ProjectIssue> {
         val filter = buildResolvedIssuesFilter(userId, startDate, endDate)
-        return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt")
+        return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
     override suspend fun getIssuesResolvedCount(userId: String, startDate: Instant, endDate: Instant): UInt {
         val filter = buildResolvedIssuesFilter(userId, startDate, endDate)
         return countIssuesByFilter(filter)
+    }
+
+    override suspend fun getIssuesByFilter(filter: IssueFilter): List<ProjectIssue> {
+        if (!filter.labels.isNullOrEmpty()) {
+            return getIssuesByLabels(
+                labels = filter.labels,
+                completedAfter = filter.completedAfter,
+                completedBefore = filter.completedBefore,
+            )
+        }
+
+        return emptyList()
+    }
+
+    /**
+     * Retrieves issues that have the specified labels.
+     * This is a Linear-specific method not part of the ProjectManagementApi interface.
+     *
+     * @param labels List of label names to filter by
+     * @param completedAfter Only return issues completed after this time (optional)
+     * @param completedBefore Only return issues completed before this time (optional)
+     * @return List of issues matching the label criteria
+     */
+    suspend fun getIssuesByLabels(
+        labels: List<String>,
+        completedAfter: Instant? = null,
+        completedBefore: Instant? = null,
+    ): List<ProjectIssue> {
+        if (labels.isEmpty()) return emptyList()
+
+        val filter = buildLabelsFilter(labels, completedAfter, completedBefore)
+        return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
+    }
+
+    override suspend fun getMilestones(projectId: String): List<UnifiedProjectMilestone> {
+        val milestones = mutableListOf<ProjectMilestone>()
+        var cursor: String? = null
+        val escapedProjectId = escapeGraphQlString(projectId)
+
+        while (true) {
+            val query = buildProjectMilestonesQuery(escapedProjectId, cursor)
+            val data = executeGraphQl(query)
+            val projectNode = data["project"]?.jsonObject ?: break
+            val milestonesNode = projectNode["projectMilestones"]?.jsonObject ?: break
+            val nodes = milestonesNode["nodes"]?.jsonArray ?: break
+
+            nodes.forEach { node ->
+                milestones += lenientJson.decodeFromJsonElement(ProjectMilestone.serializer(), node)
+            }
+
+            val pageInfo = milestonesNode["pageInfo"]?.jsonObject
+            val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true
+            val endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content
+
+            if (!hasNextPage || endCursor.isNullOrBlank()) break
+            cursor = endCursor
+            if (nodes.isEmpty()) break
+        }
+
+        return milestones.map { it.toUnifiedProjectMilestone() }
+    }
+
+    override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
+        val filter = buildMilestoneIssuesFilter(milestoneId)
+        return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
     private suspend fun fetchChildIssues(issueKey: String): List<Issue> {
@@ -470,6 +549,70 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         """.trimIndent()
     }
 
+    private fun buildLabelsFilter(
+        labels: List<String>,
+        completedAfter: Instant?,
+        completedBefore: Instant?,
+    ): String {
+        val labelNames = labels.joinToString(", ") { "\"${escapeGraphQlString(it)}\"" }
+        val completedFilter = buildCompletedAtFilter(completedAfter, completedBefore)
+
+        return buildString {
+            append("{ labels: { name: { in: [$labelNames] } }")
+            if (completedFilter.isNotEmpty()) {
+                append(", $completedFilter")
+            }
+            append(" }")
+        }
+    }
+
+    private fun buildCompletedAtFilter(completedAfter: Instant?, completedBefore: Instant?): String {
+        if (completedAfter == null && completedBefore == null) return ""
+
+        return buildString {
+            append("completedAt: { ")
+            val filters = mutableListOf<String>()
+            if (completedAfter != null) {
+                filters.add("gte: \"${escapeGraphQlString(completedAfter.toString())}\"")
+            }
+            if (completedBefore != null) {
+                filters.add("lte: \"${escapeGraphQlString(completedBefore.toString())}\"")
+            }
+            append(filters.joinToString(", "))
+            append(" }")
+        }
+    }
+
+    private fun buildProjectMilestonesQuery(projectId: String, cursor: String?): String {
+        return buildString {
+            append("query {")
+            append("\n  project(id: \"")
+            append(projectId)
+            append("\") {")
+            append("\n    projectMilestones(first: ")
+            append(DEFAULT_PAGE_SIZE)
+            if (!cursor.isNullOrBlank()) {
+                append(", after: \"")
+                append(escapeGraphQlString(cursor))
+                append("\"")
+            }
+            append(") {")
+            append("\n      nodes {")
+            append("\n")
+            append(MILESTONE_FIELDS.indent("        "))
+            append("\n      }")
+            append("\n      pageInfo { hasNextPage endCursor }")
+            append("\n    }")
+            append("\n  }")
+            append("\n}")
+        }
+    }
+
+    private fun buildMilestoneIssuesFilter(milestoneId: String): String {
+        val escapedMilestoneId = escapeGraphQlString(milestoneId)
+        return "{ projectMilestone: { id: { eq: \"$escapedMilestoneId\" } } }"
+    }
+
     private fun authorizationHeaderValue(): String {
         if (config.token.startsWith("Bearer ")) return config.token
         return if (config.useBearerAuth) {
@@ -489,5 +632,117 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
 
     private fun String.indent(prefix: String): String {
         return this.lines().joinToString("\n") { line -> if (line.isBlank()) line else prefix + line }
+    }
+}
+
+/**
+ * Converts a Linear Issue to a unified ProjectIssue.
+ */
+fun Issue.toProjectIssue(): ProjectIssue {
+    return ProjectIssue(
+        id = id,
+        key = identifier ?: id,
+        url = url,
+        title = title,
+        description = description,
+        status = state?.name,
+        statusCategory = state?.toProjectStatusCategory(),
+        issueType = "Issue", // Linear doesn't have issue types like Jira
+        priority = priorityToString(priority),
+        estimate = estimate,
+        assigneeId = assignee?.id,
+        assigneeName = assignee?.displayName ?: assignee?.name,
+        creatorId = creator?.id,
+        creatorName = creator?.displayName ?: creator?.name,
+        parentKey = parent?.identifier,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        completedAt = completedAt,
+        dueDate = parseDueDate(dueDate),
+    )
+}
+
+/**
+ * Converts a Linear Comment to a unified ProjectComment.
+ */
+fun Comment.toProjectComment(): ProjectComment {
+    return ProjectComment(
+        id = id,
+        body = body,
+        authorId = user?.id,
+        authorName = user?.displayName ?: user?.name,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+}
+
+/**
+ * Converts a Linear ProjectMilestone to the unified ProjectMilestone.
+ */
+fun ProjectMilestone.toUnifiedProjectMilestone(): UnifiedProjectMilestone {
+    return UnifiedProjectMilestone(
+        id = id,
+        name = name,
+        description = description,
+        targetDate = parseTargetDate(targetDate),
+        progress = progress,
+        status = status,
+        projectId = null, // Linear milestones don't directly expose project ID in this model
+    )
+}
+
+/**
+ * Converts Linear WorkflowState to the unified StatusCategory.
+ */
+private fun WorkflowState.toProjectStatusCategory(): StatusCategory? {
+    return when (type?.lowercase()) {
+        "backlog", "unstarted", "triage" -> StatusCategory.TODO
+        "started" -> StatusCategory.IN_PROGRESS
+        "completed" -> StatusCategory.DONE
+        "canceled" -> StatusCategory.DONE // Treat canceled as done (no longer active)
+        else -> null
+    }
+}
+
+/**
+ * Converts Linear priority integer to a string representation.
+ */
+private fun priorityToString(priority: Int?): String? {
+    return when (priority) {
+        0 -> "No Priority"
+        1 -> "Urgent"
+        2 -> "High"
+        3 -> "Medium"
+        4 -> "Low"
+        else -> null
+    }
+}
+
+/**
+ * Parses a Linear date string to an Instant.
+ * Linear due dates are typically in "YYYY-MM-DD" format.
+ */
+private fun parseDueDate(dueDate: String?): Instant? {
+    if (dueDate.isNullOrBlank()) return null
+    return try {
+        Instant.parse("${dueDate}T00:00:00Z")
+    } catch (e: Exception) {
+        null
+    }
+}
+
+/**
+ * Parses a Linear target date string to an Instant.
+ */
+private fun parseTargetDate(targetDate: String?): Instant? {
+    if (targetDate.isNullOrBlank()) return null
+    return try {
+        Instant.parse(targetDate)
+    } catch (e: Exception) {
+        try {
+            Instant.parse("${targetDate}T00:00:00Z")
+        } catch (e: Exception) {
+            null
+        }
     }
 }

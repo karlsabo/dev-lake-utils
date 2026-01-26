@@ -4,15 +4,14 @@ import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.github.GitHubApi
-import com.github.karlsabo.jira.Comment
-import com.github.karlsabo.jira.Issue
-import com.github.karlsabo.jira.JiraApi
-import com.github.karlsabo.jira.isCompleted
-import com.github.karlsabo.jira.isIssueOrBug
-import com.github.karlsabo.jira.isMilestone
-import com.github.karlsabo.jira.toPlainText
 import com.github.karlsabo.pagerduty.PagerDutyApi
 import com.github.karlsabo.pagerduty.PagerDutyIncident
+import com.github.karlsabo.projectmanagement.ProjectComment
+import com.github.karlsabo.projectmanagement.ProjectIssue
+import com.github.karlsabo.projectmanagement.ProjectManagementApi
+import com.github.karlsabo.projectmanagement.isCompleted
+import com.github.karlsabo.projectmanagement.isIssueOrBug
+import com.github.karlsabo.projectmanagement.isMilestone
 import com.github.karlsabo.text.TextSummarizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -33,10 +32,10 @@ import kotlin.time.Duration.Companion.days
 @Serializable
 data class Milestone(
     val assignee: User?,
-    val issue: Issue,
-    val issues: Set<Issue>,
-    val milestoneComments: Set<Comment>,
-    val durationIssues: Set<Issue>,
+    val issue: ProjectIssue,
+    val issues: Set<ProjectIssue>,
+    val milestoneComments: Set<ProjectComment>,
+    val durationIssues: Set<ProjectIssue>,
     val durationMergedPullRequests: Set<com.github.karlsabo.github.Issue>,
 )
 
@@ -54,8 +53,8 @@ data class Milestone(
 data class ProjectSummary(
     val project: Project,
     val durationProgressSummary: String,
-    val issues: Set<Issue>,
-    val durationIssues: Set<Issue>,
+    val issues: Set<ProjectIssue>,
+    val durationIssues: Set<ProjectIssue>,
     val durationMergedPullRequests: Set<com.github.karlsabo.github.Issue>,
     val milestones: Set<Milestone>,
     val isTagMilestoneAssignees: Boolean,
@@ -83,45 +82,45 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
     if (milestones.isNotEmpty()) {
         summary.appendLine("🛣️ *Milestones*")
         summary.appendLine()
-        this.milestones.sortedBy { it.issue.fields.summary }.forEach { milestone ->
-            if (milestone.issue.fields.resolutionDate != null && milestone.issue.fields.resolutionDate < Clock.System.now()
+        this.milestones.sortedBy { it.issue.title }.forEach { milestone ->
+            if (milestone.issue.completedAt != null && milestone.issue.completedAt < Clock.System.now()
                     .minus(14.days)
             ) return@forEach
 
             summary.appendLine()
-            val complete = if (milestone.issue.fields.resolutionDate == null) "" else "✅ "
-            summary.appendLine("*$complete<${milestone.issue.htmlUrl}|${milestone.issue.fields.summary}>: ${milestone.issue.fields.assignee?.displayName ?: "No assignee"}*")
+            val complete = if (milestone.issue.completedAt == null) "" else "✅ "
+            summary.appendLine("*$complete<${milestone.issue.url}|${milestone.issue.title}>: ${milestone.issue.assigneeName ?: "No assignee"}*")
             summary.append(createSlackMarkdownProgressBar(milestone.issues, milestone.durationIssues))
 
-            if (milestone.issue.fields.resolutionDate == null) {
+            if (milestone.issue.completedAt == null) {
                 val issuesResolved = milestone.durationIssues.filter { it.isCompleted() }
                 if (issuesResolved.isNotEmpty()) {
                     summary.appendLine(
                         "📍 Issues resolved: ${
-                            issuesResolved.joinToString(", ") { "<${it.htmlUrl}|${it.key}>" }
+                            issuesResolved.joinToString(", ") { "<${it.url}|${it.key}>" }
                         }"
                     )
                 } else {
                     val changeCharacterLimit = 200
-                    val lastIssue = milestone.issues.sortedByDescending { it.fields.resolutionDate }.firstOrNull()
-                    val lastIssueResolutionDate = lastIssue?.fields?.resolutionDate
+                    val lastIssue = milestone.issues.sortedByDescending { it.completedAt }.firstOrNull()
+                    val lastIssueResolutionDate = lastIssue?.completedAt
 
                     // Check for the most recent update from changelogs, issue resolutions, or comments
-                    val lastComment = milestone.milestoneComments.maxByOrNull { it.created }
-                    val lastCommentDate = lastComment?.created
+                    val lastComment = milestone.milestoneComments.maxByOrNull { it.createdAt ?: Clock.System.now() }
+                    val lastCommentDate = lastComment?.createdAt
 
                     val isStatusRecent: Boolean
                     // Determine which is the most recent update: changelog, issue resolution, or comment
                     if (lastCommentDate != null &&
-                        (lastIssueResolutionDate == null || lastCommentDate > lastIssue.fields.resolutionDate)
+                        (lastIssueResolutionDate == null || lastCommentDate > lastIssue.completedAt)
                     ) {
                         // Comment is the most recent
                         val dateStr = lastCommentDate.toLocalDateTime(TimeZone.of("America/New_York")).date
                         isStatusRecent = lastCommentDate >= Clock.System.now().minus(14.days)
                         val warningEmoji = if (!isStatusRecent) "⚠️ " else ""
-                        val commentBody = lastComment.body.toPlainText().take(changeCharacterLimit)
+                        val commentBody = (lastComment.body ?: "").take(changeCharacterLimit)
                         val commentDescription =
-                            commentBody + if (lastComment.body.toPlainText().length > changeCharacterLimit) "..." else ""
+                            commentBody + if ((lastComment.body?.length ?: 0) > changeCharacterLimit) "..." else ""
                         summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: \"$commentDescription\"")
                     } else if (lastIssueResolutionDate != null) {
                         // Issue resolution is the most recent
@@ -130,17 +129,17 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         val warningEmoji =
                             if (!isStatusRecent) "⚠️ " else ""
                         summary.appendLine(
-                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.htmlUrl}|${lastIssue.key}> \"${
-                                lastIssue.fields.summary?.take(
+                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.key}> \"${
+                                lastIssue.title?.take(
                                     changeCharacterLimit
                                 )
-                            }${if ((lastIssue.fields.summary?.length ?: 0) > changeCharacterLimit) "..." else ""}\""
+                            }${if ((lastIssue.title?.length ?: 0) > changeCharacterLimit) "..." else ""}\""
                         )
                     } else {
                         isStatusRecent = false
                     }
 
-                    if (milestone.issue.fields.dueDate == null) {
+                    if (milestone.issue.dueDate == null) {
                         if (milestone.assignee == null) {
                             summary.appendLine("‼️⚠️ This milestone doesn't have a due date or an assignee.")
                         } else {
@@ -148,7 +147,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                             if (isTagMilestoneAssignees) summary.append(" <@${milestone.assignee.slackId}>")
                             summary.appendLine(", please add a due date on the Epic")
                         }
-                    } else if (!isStatusRecent && milestone.issue.fields.dueDate.minus(90.days) < Clock.System.now()) {
+                    } else if (!isStatusRecent && milestone.issue.dueDate.minus(90.days) < Clock.System.now()) {
                         if (milestone.assignee == null) {
                             summary.appendLine("‼️⚠️ There hasn't been any activity for two weeks, and this Epic doesn't have an assignee")
                         } else {
@@ -162,7 +161,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                 if (issuesOpened.isNotEmpty()) {
                     summary.appendLine(
                         "📩 Issues opened: ${
-                            issuesOpened.joinToString(", ") { "<${it.htmlUrl}|${it.key}>" }
+                            issuesOpened.joinToString(", ") { "<${it.url}|${it.key}>" }
                         }"
                     )
                 }
@@ -204,7 +203,7 @@ fun ProjectSummary.toSlackMarkup(): String {
     if (issuesResolved.isNotEmpty()) {
         summary.appendLine(
             "📍 Issues resolved: ${
-                issuesResolved.joinToString(", ") { "<${it.htmlUrl}|${it.key}>" }
+                issuesResolved.joinToString(", ") { "<${it.url}|${it.key}>" }
             }"
         )
     }
@@ -212,7 +211,7 @@ fun ProjectSummary.toSlackMarkup(): String {
     if (issuesOpened.isNotEmpty()) {
         summary.appendLine(
             "📩 Issues opened: ${
-                issuesOpened.joinToString(", ") { "<${it.htmlUrl}|${it.key}>" }
+                issuesOpened.joinToString(", ") { "<${it.url}|${it.key}>" }
             }"
         )
     }
@@ -227,14 +226,14 @@ fun ProjectSummary.toSlackMarkup(): String {
         milestoneSummary.appendLine("🛣️ *Milestones completed in the last 14 days*")
         milestoneSummary.appendLine()
         var milestoneCount = 0
-        this.milestones.sortedBy { it.issue.fields.summary }.forEach { milestone ->
-            if (milestone.issue.fields.resolutionDate == null || milestone.issue.fields.resolutionDate < Clock.System.now()
+        this.milestones.sortedBy { it.issue.title }.forEach { milestone ->
+            if (milestone.issue.completedAt == null || milestone.issue.completedAt < Clock.System.now()
                     .minus(14.days)
             ) {
                 return@forEach
             }
             milestoneCount++
-            milestoneSummary.appendLine("*✅ <${milestone.issue.htmlUrl}|${milestone.issue.fields.summary}>*")
+            milestoneSummary.appendLine("*✅ <${milestone.issue.url}|${milestone.issue.title}>*")
         }
         if (milestoneCount > 0) {
             summary.append(milestoneSummary.toString())
@@ -243,7 +242,7 @@ fun ProjectSummary.toSlackMarkup(): String {
     return summary.toString()
 }
 
-private fun createSlackMarkdownProgressBar(issues: Set<Issue>, durationIssues: Set<Issue>): String {
+private fun createSlackMarkdownProgressBar(issues: Set<ProjectIssue>, durationIssues: Set<ProjectIssue>): String {
     val progressBar = StringBuilder()
     val issueCount = issues.count { it.isIssueOrBug() }
     val closedIssueCount = issues.count { it.isIssueOrBug() && it.isCompleted() }
@@ -282,7 +281,7 @@ private fun createSlackMarkdownProgressBar(issues: Set<Issue>, durationIssues: S
 }
 
 suspend fun createSummary(
-    jiraApi: JiraApi,
+    projectManagementApi: ProjectManagementApi,
     gitHubApi: GitHubApi,
     gitHubOrganizationIds: List<String>,
     pagerDutyApi: PagerDutyApi?,
@@ -299,7 +298,7 @@ suspend fun createSummary(
 
     val mutex = Mutex()
     val projectSummaries = mutableListOf<ProjectSummary>()
-    val miscIssueSet = mutableSetOf<Issue>()
+    val miscIssueSet = mutableSetOf<ProjectIssue>()
     val miscPrSet = mutableSetOf<com.github.karlsabo.github.Issue>()
 
     coroutineScope {
@@ -311,7 +310,7 @@ suspend fun createSummary(
                         users.toSet(),
                         gitHubApi,
                         gitHubOrganizationIds,
-                        jiraApi,
+                        projectManagementApi,
                         textSummarizer,
                         duration,
                         emptySet()
@@ -326,8 +325,10 @@ suspend fun createSummary(
             val issueJobs = miscUsers.map { user ->
                 async(Dispatchers.Default) {
                     println("Pulling issues for user ${user.id}")
-                    val issuesForUser = jiraApi.getIssuesResolved(
-                        user.jiraId!!,
+                    // Use the appropriate user ID field based on what's available
+                    val userId = user.jiraId ?: user.id
+                    val issuesForUser = projectManagementApi.getIssuesResolved(
+                        userId,
                         Clock.System.now().minus(duration),
                         Clock.System.now()
                     )
@@ -359,8 +360,8 @@ suspend fun createSummary(
 
     projectSummaries.forEach { projectSummary ->
         miscIssueSet.removeAll(projectSummary.issues)
-        miscIssueSet.removeAll(projectSummary.milestones.map { it.issue })
-        miscIssueSet.removeAll(projectSummary.milestones.flatMap { it.issues })
+        miscIssueSet.removeAll(projectSummary.milestones.map { it.issue }.toSet())
+        miscIssueSet.removeAll(projectSummary.milestones.flatMap { it.issues }.toSet())
         miscPrSet.removeAll(projectSummary.durationMergedPullRequests)
     }
     projectSummaries.sortBy { it.project.title?.replaceFirst(Regex("""^[^\p{L}\p{N}]+"""), "") }
@@ -376,7 +377,7 @@ suspend fun createSummary(
                 miscUsers.toSet(),
                 gitHubApi,
                 gitHubOrganizationIds,
-                jiraApi,
+                projectManagementApi,
                 textSummarizer,
                 duration,
                 miscPrSet,
@@ -409,7 +410,7 @@ suspend fun Project.createSummary(
     users: Set<User>,
     gitHubApi: GitHubApi,
     gitHubOrganizationIds: List<String>,
-    jiraApi: JiraApi,
+    projectManagementApi: ProjectManagementApi,
     textSummarizer: TextSummarizer,
     duration: Duration,
     pullRequests: Set<com.github.karlsabo.github.Issue>,
@@ -419,21 +420,21 @@ suspend fun Project.createSummary(
         mutableListOf()
     else {
         println("Getting issues for $topLevelIssueKeys")
-        jiraApi.getIssues(topLevelIssueKeys).toMutableList()
+        projectManagementApi.getIssues(topLevelIssueKeys).toMutableList()
     }
 
     val parentIssueKeys = parentIssues.map { it.key }
 
-    val childIssues: MutableList<Issue> = if (parentIssuesAreChildren) {
+    val childIssues: MutableList<ProjectIssue> = if (parentIssuesAreChildren) {
         parentIssues
     } else {
         println("Getting child issues for $parentIssues")
-        jiraApi.getChildIssues(parentIssueKeys).toMutableList()
+        projectManagementApi.getChildIssues(parentIssueKeys).toMutableList()
     }
 
     val resolvedChildIssues =
         childIssues.filter {
-            it.fields.resolutionDate != null && it.fields.resolutionDate >= Clock.System.now()
+            it.completedAt != null && it.completedAt >= Clock.System.now()
                 .minus(duration) && it.isIssueOrBug()
         }
 
@@ -441,9 +442,9 @@ suspend fun Project.createSummary(
         val summaryRawInput = StringBuilder()
         summaryRawInput.appendLine("# Issues\n\n")
         resolvedChildIssues.forEach { issue ->
-            summaryRawInput.appendLine("## ${issue.fields.summary}")
-            summaryRawInput.appendLine("Assignee: ${issue.fields.assignee?.displayName}")
-            summaryRawInput.appendLine("Description:\n````${issue.fields.description}````\n")
+            summaryRawInput.appendLine("## ${issue.title}")
+            summaryRawInput.appendLine("Assignee: ${issue.assigneeName}")
+            summaryRawInput.appendLine("Description:\n````${issue.description}````\n")
         }
         textSummarizer.summarize(summaryRawInput.toString())
     } else {
@@ -468,7 +469,7 @@ suspend fun Project.createSummary(
         parentIssues.plus(childIssues).toSet()
             .filter { it.isMilestone() }.map { milestoneIssue ->
                 // Get direct child issues for this milestone
-                val milestoneChildIssues = jiraApi.getDirectChildIssues(milestoneIssue.key)
+                val milestoneChildIssues = projectManagementApi.getDirectChildIssues(milestoneIssue.key)
                     .filter { issue -> issue.isIssueOrBug() }
                     .toSet()
 
@@ -479,9 +480,9 @@ suspend fun Project.createSummary(
 
                 // Find the owner of the milestone
                 val owner =
-                    if (milestoneIssue.fields.assignee?.displayName != null && milestoneIssue.fields.assignee.displayName.isNotBlank()) {
-                    // Try to find the user by name or email
-                        users.firstOrNull { it.name == milestoneIssue.fields.assignee.displayName }
+                    if (milestoneIssue.assigneeName != null && milestoneIssue.assigneeName.isNotBlank()) {
+                        // Try to find the user by name
+                        users.firstOrNull { it.name == milestoneIssue.assigneeName }
                 } else if (projectLeadUserId != null) {
                     // Try to find the user by email
                     users.firstOrNull { it.email == projectLeadUserId }
@@ -490,10 +491,10 @@ suspend fun Project.createSummary(
                 }
 
                 // Get recent comments for the milestone
-                val milestoneCommentSet = mutableSetOf<Comment>()
+                val milestoneCommentSet = mutableSetOf<ProjectComment>()
                 if (milestoneIssue.key.isNotBlank()) {
                     milestoneCommentSet.addAll(
-                        jiraApi.getRecentComments(milestoneIssue.key, 5)
+                        projectManagementApi.getRecentComments(milestoneIssue.key, 5)
                     )
                 }
 
@@ -504,9 +505,9 @@ suspend fun Project.createSummary(
                     milestoneCommentSet,
                     milestoneChildIssues.filter { issue ->
                         issue.isIssueOrBug()
-                                && (issue.fields.resolutionDate != null
-                                && issue.fields.resolutionDate >= Clock.System.now().minus(duration)
-                                || issue.fields.created != null && issue.fields.created >= Clock.System.now()
+                                && (issue.completedAt != null
+                                && issue.completedAt >= Clock.System.now().minus(duration)
+                                || issue.createdAt != null && issue.createdAt >= Clock.System.now()
                             .minus(duration))
                     }.toSet(),
                     milestonePrs,
@@ -520,9 +521,9 @@ suspend fun Project.createSummary(
         childIssues.filter { it.isIssueOrBug() }.toSet(),
         childIssues.filter {
             it.isIssueOrBug()
-                    && (it.fields.resolutionDate != null && it.fields.resolutionDate >= Clock.System.now()
+                    && (it.completedAt != null && it.completedAt >= Clock.System.now()
                 .minus(duration)
-                    || it.fields.created != null && it.fields.created >= Clock.System.now().minus(duration))
+                    || it.createdAt != null && it.createdAt >= Clock.System.now().minus(duration))
         }
             .toSet(),
         mergedPrs,

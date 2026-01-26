@@ -1,10 +1,9 @@
 package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.jira.CustomFieldFilter
-import com.github.karlsabo.jira.Issue
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
-import com.github.karlsabo.jira.toPlainText
+import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -61,7 +60,7 @@ fun main(args: Array<String>) {
 }
 
 private fun printMarkdownReport(
-    issues: List<Issue>,
+    issues: List<ProjectIssue>,
     teams: List<String>,
     startDate: kotlinx.datetime.Instant,
     endDate: kotlinx.datetime.Instant,
@@ -78,11 +77,11 @@ private fun printMarkdownReport(
     println()
 
     issues.forEach { issue ->
-        val type = issue.fields.issueType?.name ?: "Unknown"
+        val type = issue.issueType ?: "Unknown"
         val key = issue.key
-        val summary = issue.fields.summary ?: "No summary"
-        val url = issue.htmlUrl
-        val resolvedDate = issue.fields.resolutionDate
+        val summary = issue.title ?: "No summary"
+        val url = issue.url
+        val resolvedDate = issue.completedAt
             ?.toLocalDateTime(TimeZone.UTC)?.date?.toString() ?: "N/A"
 
         println("## [$key]($url) - $summary")
@@ -90,7 +89,7 @@ private fun printMarkdownReport(
         println("**Type:** $type | **Resolved:** $resolvedDate")
         println()
 
-        val description = issue.fields.description.toPlainText()
+        val description = issue.description
         if (!description.isNullOrBlank()) {
             val truncatedDesc = if (description.length > 500) {
                 description.take(500) + "..."

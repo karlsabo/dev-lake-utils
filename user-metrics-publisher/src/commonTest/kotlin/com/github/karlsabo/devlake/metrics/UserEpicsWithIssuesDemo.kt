@@ -1,11 +1,10 @@
 package com.github.karlsabo.devlake.metrics
 
-import com.github.karlsabo.jira.Issue
 import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.isCompleted
-import com.github.karlsabo.jira.isIssueOrBug
 import com.github.karlsabo.jira.loadJiraConfig
-import com.github.karlsabo.jira.toPlainText
+import com.github.karlsabo.projectmanagement.ProjectIssue
+import com.github.karlsabo.projectmanagement.isCompleted
+import com.github.karlsabo.projectmanagement.isIssueOrBug
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -46,20 +45,20 @@ fun main(args: Array<String>): Unit = runBlocking {
             return@measureTime
         }
 
-        val allParentIssues = mutableSetOf<Issue>()
-        val processedIssueIds = mutableSetOf<String>()
+        val allParentIssues = mutableSetOf<ProjectIssue>()
+        val processedIssueKeys = mutableSetOf<String>()
 
-        fun findAllParentIssues(issues: List<Issue>) {
-            val parentIssueIds = issues
-                .mapNotNull { it.fields.parent?.id }
-                .filter { it !in processedIssueIds }
+        fun findAllParentIssues(issues: List<ProjectIssue>) {
+            val parentIssueKeys = issues
+                .mapNotNull { it.parentKey }
+                .filter { it !in processedIssueKeys }
                 .distinct()
 
-            if (parentIssueIds.isEmpty()) return
+            if (parentIssueKeys.isEmpty()) return
 
-            processedIssueIds.addAll(parentIssueIds)
+            processedIssueKeys.addAll(parentIssueKeys)
 
-            val parentIssues = runBlocking { jiraApi.getIssues(parentIssueIds) }
+            val parentIssues = runBlocking { jiraApi.getIssues(parentIssueKeys) }
 
             allParentIssues.addAll(parentIssues)
 
@@ -69,21 +68,20 @@ fun main(args: Array<String>): Unit = runBlocking {
         findAllParentIssues(userIssues)
 
         val parents =
-            allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.fields.resolutionDate ?: it.fields.created }
+            allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.completedAt ?: it.createdAt }
 
         println("# Parents the user contributed to:")
 
         if (parents.isEmpty()) {
             println("No parents found for this user")
         } else {
-            val userIssuesByParentId = userIssues.groupBy { it.fields.parent?.id }
+            val userIssuesByParentKey = userIssues.groupBy { it.parentKey }
 
-            parents.sortedBy { it.fields.issueType?.name }.forEach { epic ->
-                val type = epic.fields.issueType?.name ?: "Unknown"
-                val title = epic.fields.summary ?: "Untitled"
-                epic.htmlUrl ?: "No URL available"
+            parents.sortedBy { it.issueType }.forEach { epic ->
+                val type = epic.issueType ?: "Unknown"
+                val title = epic.title ?: "Untitled"
                 val key = epic.key
-                val date = epic.fields.resolutionDate ?: epic.fields.created
+                val date = epic.completedAt ?: epic.createdAt
 
                 // Get all issues under this epic
                 val allChildIssues = runBlocking { jiraApi.getChildIssues(listOf(key)) }
@@ -93,7 +91,7 @@ fun main(args: Array<String>): Unit = runBlocking {
                 val completedChildIssues = allChildIssues.filter { it.isCompleted() }
 
                 // Get user's completed issues under this epic
-                val userCompletedIssues = userIssuesByParentId[epic.id] ?: emptyList()
+                val userCompletedIssues = userIssuesByParentKey[epic.key] ?: emptyList()
 
                 // Calculate statistics
                 val userCompletedCount = userCompletedIssues.size
@@ -111,9 +109,9 @@ fun main(args: Array<String>): Unit = runBlocking {
 
                 // Print user's completed issues under this epic
                 userCompletedIssues.forEach { issue ->
-                    issue.fields.resolutionDate?.takeIf { it >= startDate } ?: return@forEach
-                    println("  * ${issue.key} - ${issue.fields.summary ?: "Untitled"}")
-                    issue.fields.description?.toPlainText().let { description ->
+                    issue.completedAt?.takeIf { it >= startDate } ?: return@forEach
+                    println("  * ${issue.key} - ${issue.title ?: "Untitled"}")
+                    issue.description.let { description ->
                         // Truncate description if it's too long
                         val truncatedDescription = if ((description?.length ?: 0) > 100) {
                             description?.substring(0, min(200, description.length)) + "..."
