@@ -1,7 +1,7 @@
 package com.github.karlsabo.devlake.metrics
 
 import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.jira.config.loadJiraConfig
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlin.time.measureTime

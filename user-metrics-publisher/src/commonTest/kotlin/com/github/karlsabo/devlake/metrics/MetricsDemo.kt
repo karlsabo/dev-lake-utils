@@ -1,9 +1,9 @@
 package com.github.karlsabo.devlake.metrics
 
 import com.github.karlsabo.github.GitHubRestApi
-import com.github.karlsabo.github.loadGitHubConfig
+import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.jira.config.loadJiraConfig
 import com.github.karlsabo.tools.gitHubConfigPath
 import com.github.karlsabo.tools.jiraConfigPath
 import com.github.karlsabo.tools.loadUsersConfig

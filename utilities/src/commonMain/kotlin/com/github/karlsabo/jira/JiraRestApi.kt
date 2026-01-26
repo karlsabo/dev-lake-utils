@@ -1,7 +1,12 @@
 package com.github.karlsabo.jira
 
-import com.github.karlsabo.Credentials
 import com.github.karlsabo.http.installHttpRetry
+import com.github.karlsabo.jira.config.JiraApiRestConfig
+import com.github.karlsabo.jira.conversion.toProjectComment
+import com.github.karlsabo.jira.conversion.toProjectIssue
+import com.github.karlsabo.jira.conversion.toProjectMilestone
+import com.github.karlsabo.jira.extensions.toComment
+import com.github.karlsabo.jira.model.Issue
 import com.github.karlsabo.projectmanagement.IssueFilter
 import com.github.karlsabo.projectmanagement.ProjectComment
 import com.github.karlsabo.projectmanagement.ProjectIssue
@@ -26,58 +31,13 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.utils.io.readText
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlinx.io.buffered
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.writeString
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import com.github.karlsabo.projectmanagement.StatusCategory as UnifiedStatusCategory
-
-data class JiraApiRestConfig(
-    val credentials: Credentials,
-    val domain: String,
-)
-
-@Serializable
-data class JiraConfig(
-    val domain: String,
-    val username: String,
-    val apiKeyPath: String,
-)
-
-@Serializable
-data class JiraSecret(val jiraApiKey: String)
-
-fun loadJiraConfig(configFilePath: Path): JiraApiRestConfig {
-    val config = SystemFileSystem.source(Path(configFilePath)).buffered().use { source ->
-        lenientJson.decodeFromString<JiraConfig>(source.readText())
-    }
-    val secretConfig = SystemFileSystem.source(Path(config.apiKeyPath)).buffered().use { source ->
-        lenientJson.decodeFromString<JiraSecret>(source.readText())
-    }
-
-    return JiraApiRestConfig(
-        Credentials(
-            config.username,
-            secretConfig.jiraApiKey,
-        ),
-        config.domain,
-    )
-}
-
-fun saveJiraConfig(configPath: Path, config: JiraConfig) {
-    SystemFileSystem.sink(configPath, false).buffered().use { sink ->
-        sink.writeString(lenientJson.encodeToString(JiraConfig.serializer(), config))
-    }
-}
 
 /**
  * Jira REST API implementation of ProjectManagementApi.
@@ -310,72 +270,4 @@ private suspend fun HttpResponse.ensureSuccess(operation: String) {
 private fun Instant.toUtcDateString(): String {
     val localDateTime = toLocalDateTime(TimeZone.UTC)
     return "${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute}"
-}
-
-/**
- * Converts a Jira Issue to a unified ProjectIssue.
- */
-fun Issue.toProjectIssue(): ProjectIssue {
-    return ProjectIssue(
-        id = id,
-        key = key,
-        url = htmlUrl,
-        title = fields.summary,
-        description = fields.description.toPlainText(),
-        status = fields.status?.name,
-        statusCategory = fields.status?.statusCategory?.toProjectStatusCategory(),
-        issueType = fields.issueType?.name,
-        priority = fields.priority?.name,
-        estimate = fields.customfield_10100, // Story points
-        assigneeId = fields.assignee?.accountId,
-        assigneeName = fields.assignee?.displayName,
-        creatorId = fields.creator?.accountId,
-        creatorName = fields.creator?.displayName,
-        parentKey = fields.parent?.key,
-        createdAt = fields.created,
-        updatedAt = fields.updated,
-        completedAt = fields.resolutionDate,
-        dueDate = fields.dueDate,
-    )
-}
-
-/**
- * Converts a Jira Comment to a unified ProjectComment.
- */
-fun Comment.toProjectComment(): ProjectComment {
-    return ProjectComment(
-        id = id,
-        body = body.toPlainText(),
-        authorId = author.accountId,
-        authorName = author.displayName,
-        createdAt = created,
-        updatedAt = updated,
-    )
-}
-
-/**
- * Converts a Jira Issue (Epic) to a ProjectMilestone.
- */
-fun Issue.toProjectMilestone(): ProjectMilestone {
-    return ProjectMilestone(
-        id = key,
-        name = fields.summary,
-        description = fields.description.toPlainText(),
-        targetDate = fields.dueDate,
-        progress = null, // Jira doesn't have native progress on Epics
-        status = fields.status?.name,
-        projectId = fields.project?.key,
-    )
-}
-
-/**
- * Converts a Jira StatusCategory to the unified StatusCategory.
- */
-private fun StatusCategory.toProjectStatusCategory(): UnifiedStatusCategory? {
-    return when (this.key?.lowercase()) {
-        "new", "undefined" -> UnifiedStatusCategory.TODO
-        "indeterminate" -> UnifiedStatusCategory.IN_PROGRESS
-        "done" -> UnifiedStatusCategory.DONE
-        else -> null
-    }
 }

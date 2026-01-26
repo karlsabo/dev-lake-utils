@@ -1,5 +1,6 @@
 package com.github.karlsabo.jira
 
+import com.github.karlsabo.jira.serialization.parseOffsetDateTime
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals

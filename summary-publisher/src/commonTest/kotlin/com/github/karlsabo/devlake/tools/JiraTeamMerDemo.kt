@@ -2,7 +2,7 @@ package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.jira.CustomFieldFilter
 import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.jira.config.loadJiraConfig
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking

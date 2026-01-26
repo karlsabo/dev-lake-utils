@@ -1,6 +1,7 @@
 package com.github.karlsabo.jira
 
 import com.github.karlsabo.Credentials
+import com.github.karlsabo.jira.config.JiraApiRestConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
