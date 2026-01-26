@@ -30,16 +30,6 @@ data class ProjectIssue(
 )
 
 /**
- * Represents the high-level category of an issue's status.
- */
-@Serializable
-enum class StatusCategory {
-    TODO,
-    IN_PROGRESS,
-    DONE,
-}
-
-/**
  * Returns true if this issue is completed (has a completedAt date).
  */
 fun ProjectIssue.isCompleted(): Boolean = completedAt != null

@@ -38,9 +38,9 @@ import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubRestApi
-import com.github.karlsabo.github.loadGitHubConfig
+import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.jira.config.loadJiraConfig
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.tools.gitHubConfigPath

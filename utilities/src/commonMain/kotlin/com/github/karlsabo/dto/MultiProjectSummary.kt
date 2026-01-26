@@ -1,9 +1,9 @@
 package com.github.karlsabo.dto
 
 import com.github.karlsabo.pagerduty.PagerDutyIncident
-import com.github.karlsabo.tools.ProjectSummary
-import com.github.karlsabo.tools.toSlackMarkup
-import com.github.karlsabo.tools.toTerseSlackMarkdown
+import com.github.karlsabo.tools.formatting.toSlackMarkup
+import com.github.karlsabo.tools.formatting.toTerseSlackMarkdown
+import com.github.karlsabo.tools.model.ProjectSummary
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 

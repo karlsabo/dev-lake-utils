@@ -1,11 +1,14 @@
 package com.github.karlsabo.linear
 
 import com.github.karlsabo.http.installHttpRetry
+import com.github.karlsabo.linear.config.LinearApiRestConfig
+import com.github.karlsabo.linear.conversion.toProjectComment
+import com.github.karlsabo.linear.conversion.toProjectIssue
+import com.github.karlsabo.linear.conversion.toUnifiedProjectMilestone
 import com.github.karlsabo.projectmanagement.IssueFilter
 import com.github.karlsabo.projectmanagement.ProjectComment
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
-import com.github.karlsabo.projectmanagement.StatusCategory
 import com.github.karlsabo.tools.lenientJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -20,12 +23,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.utils.io.readText
 import kotlinx.datetime.Instant
-import kotlinx.io.buffered
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -35,7 +33,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import com.github.karlsabo.projectmanagement.ProjectMilestone as UnifiedProjectMilestone
 
-private const val DEFAULT_LINEAR_ENDPOINT = "https://api.linear.app/graphql"
 private const val DEFAULT_PAGE_SIZE = 100
 private const val DEFAULT_BATCH_SIZE = 100
 
@@ -103,65 +100,6 @@ private val MILESTONE_FIELDS = """
             targetDate
             progress
         """.trimIndent()
-
-/**
- * Configuration for Linear GraphQL API.
- */
-data class LinearApiRestConfig(
-    val token: String,
-    val endpoint: String = DEFAULT_LINEAR_ENDPOINT,
-    val useBearerAuth: Boolean = false,
-) {
-    override fun toString(): String {
-        return "LinearApiRestConfig(endpoint=$endpoint, useBearerAuth=$useBearerAuth)"
-    }
-}
-
-/**
- * Configuration for Linear API.
- */
-@Serializable
-data class LinearConfig(
-    val tokenPath: String,
-    val endpoint: String? = null,
-    val useBearerAuth: Boolean? = null,
-)
-
-/**
- * Secret configuration for Linear API.
- */
-@Serializable
-data class LinearSecret(
-    val linearApiKey: String,
-)
-
-/**
- * Loads Linear configuration from a file.
- */
-fun loadLinearConfig(configFilePath: Path): LinearApiRestConfig {
-    val config = SystemFileSystem.source(Path(configFilePath)).buffered().use { source ->
-        lenientJson.decodeFromString<LinearConfig>(source.readText())
-    }
-    val secretConfig = SystemFileSystem.source(Path(config.tokenPath)).buffered().use { source ->
-        lenientJson.decodeFromString<LinearSecret>(source.readText())
-    }
-
-    return LinearApiRestConfig(
-        token = secretConfig.linearApiKey,
-        endpoint = config.endpoint ?: DEFAULT_LINEAR_ENDPOINT,
-        useBearerAuth = config.useBearerAuth ?: false,
-    )
-}
-
-/**
- * Saves Linear configuration to a file.
- */
-@Suppress("unused")
-fun saveLinearConfig(configPath: Path, config: LinearConfig) {
-    SystemFileSystem.sink(configPath, false).buffered().use { sink ->
-        sink.writeString(lenientJson.encodeToString(LinearConfig.serializer(), config))
-    }
-}
 
 /**
  * Linear GraphQL API implementation of ProjectManagementApi.
@@ -632,117 +570,5 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
 
     private fun String.indent(prefix: String): String {
         return this.lines().joinToString("\n") { line -> if (line.isBlank()) line else prefix + line }
-    }
-}
-
-/**
- * Converts a Linear Issue to a unified ProjectIssue.
- */
-fun Issue.toProjectIssue(): ProjectIssue {
-    return ProjectIssue(
-        id = id,
-        key = identifier ?: id,
-        url = url,
-        title = title,
-        description = description,
-        status = state?.name,
-        statusCategory = state?.toProjectStatusCategory(),
-        issueType = "Issue", // Linear doesn't have issue types like Jira
-        priority = priorityToString(priority),
-        estimate = estimate,
-        assigneeId = assignee?.id,
-        assigneeName = assignee?.displayName ?: assignee?.name,
-        creatorId = creator?.id,
-        creatorName = creator?.displayName ?: creator?.name,
-        parentKey = parent?.identifier,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-        completedAt = completedAt,
-        dueDate = parseDueDate(dueDate),
-    )
-}
-
-/**
- * Converts a Linear Comment to a unified ProjectComment.
- */
-fun Comment.toProjectComment(): ProjectComment {
-    return ProjectComment(
-        id = id,
-        body = body,
-        authorId = user?.id,
-        authorName = user?.displayName ?: user?.name,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-    )
-}
-
-/**
- * Converts a Linear ProjectMilestone to the unified ProjectMilestone.
- */
-fun ProjectMilestone.toUnifiedProjectMilestone(): UnifiedProjectMilestone {
-    return UnifiedProjectMilestone(
-        id = id,
-        name = name,
-        description = description,
-        targetDate = parseTargetDate(targetDate),
-        progress = progress,
-        status = status,
-        projectId = null, // Linear milestones don't directly expose project ID in this model
-    )
-}
-
-/**
- * Converts Linear WorkflowState to the unified StatusCategory.
- */
-private fun WorkflowState.toProjectStatusCategory(): StatusCategory? {
-    return when (type?.lowercase()) {
-        "backlog", "unstarted", "triage" -> StatusCategory.TODO
-        "started" -> StatusCategory.IN_PROGRESS
-        "completed" -> StatusCategory.DONE
-        "canceled" -> StatusCategory.DONE // Treat canceled as done (no longer active)
-        else -> null
-    }
-}
-
-/**
- * Converts Linear priority integer to a string representation.
- */
-private fun priorityToString(priority: Int?): String? {
-    return when (priority) {
-        0 -> "No Priority"
-        1 -> "Urgent"
-        2 -> "High"
-        3 -> "Medium"
-        4 -> "Low"
-        else -> null
-    }
-}
-
-/**
- * Parses a Linear date string to an Instant.
- * Linear due dates are typically in "YYYY-MM-DD" format.
- */
-private fun parseDueDate(dueDate: String?): Instant? {
-    if (dueDate.isNullOrBlank()) return null
-    return try {
-        Instant.parse("${dueDate}T00:00:00Z")
-    } catch (e: Exception) {
-        null
-    }
-}
-
-/**
- * Parses a Linear target date string to an Instant.
- */
-private fun parseTargetDate(targetDate: String?): Instant? {
-    if (targetDate.isNullOrBlank()) return null
-    return try {
-        Instant.parse(targetDate)
-    } catch (e: Exception) {
-        try {
-            Instant.parse("${targetDate}T00:00:00Z")
-        } catch (e: Exception) {
-            null
-        }
     }
 }

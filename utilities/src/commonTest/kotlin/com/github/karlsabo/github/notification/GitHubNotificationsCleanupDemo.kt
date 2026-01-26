@@ -2,7 +2,7 @@ package com.github.karlsabo.github.notification
 
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.Notification
-import com.github.karlsabo.github.loadGitHubConfig
+import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.tools.gitHubConfigPath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
