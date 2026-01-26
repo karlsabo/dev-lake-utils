@@ -836,6 +836,11 @@ class SummaryDetailTest {
             return mockIssues.values.filter { it.fields.parent?.id in parentIds }.toList()
         }
 
+        override suspend fun getDirectChildIssues(parentKey: String): List<JiraIssue> {
+            val parentId = mockIssues[parentKey]?.id ?: return emptyList()
+            return mockIssues.values.filter { it.fields.parent?.id == parentId }.toList()
+        }
+
         override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<Comment> {
             val avatarUrls = JiraAvatarUrls(
                 size48x48 = "https://jira.example.local/avatar/48.png",

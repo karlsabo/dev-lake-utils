@@ -206,6 +206,10 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         return children
     }
 
+    override suspend fun getDirectChildIssues(parentKey: String): List<Issue> {
+        return fetchChildIssues(parentKey)
+    }
+
     override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<Comment> {
         if (maxResults <= 0) return emptyList()
 
