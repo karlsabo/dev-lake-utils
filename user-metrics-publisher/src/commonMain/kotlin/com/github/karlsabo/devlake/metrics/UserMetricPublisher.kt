@@ -39,10 +39,10 @@ import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.loadGitHubConfig
-import com.github.karlsabo.jira.Issue
-import com.github.karlsabo.jira.JiraApi
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.projectmanagement.ProjectIssue
+import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.tools.gitHubConfigPath
 import com.github.karlsabo.tools.jiraConfigPath
 import com.github.karlsabo.tools.lenientJson
@@ -79,7 +79,7 @@ fun main() = application {
     var errorMessage by remember { mutableStateOf("") }
     var config by remember { mutableStateOf(UserMetricPublisherConfig()) }
     var userAndTeamsConfig by remember { mutableStateOf<UsersConfig?>(null) }
-    var jiraApi by remember { mutableStateOf<JiraApi?>(null) }
+    var projectManagementApi by remember { mutableStateOf<ProjectManagementApi?>(null) }
     var gitHubApi by remember { mutableStateOf<GitHubApi?>(null) }
 
     LaunchedEffect(Unit) {
@@ -87,7 +87,7 @@ fun main() = application {
         try {
             config = loadUserMetricPublisherConfig()
             val jiraApiRestConfig = loadJiraConfig(jiraConfigPath)
-            jiraApi = JiraRestApi(jiraApiRestConfig)
+            projectManagementApi = JiraRestApi(jiraApiRestConfig)
             val gitHubApiRestConfig = loadGitHubConfig(gitHubConfigPath)
             gitHubApi = GitHubRestApi(gitHubApiRestConfig)
             userAndTeamsConfig = loadUsersConfig()!!
@@ -155,7 +155,8 @@ fun main() = application {
                         measureTime {
                             val user = userAndTeamsConfig!!.users.firstOrNull { it.id == userId }
                                 ?: throw Exception("User not found: $userId in ${userAndTeamsConfig!!.users}")
-                            val userMetrics = createUserMetrics(user, config.organizationIds, jiraApi!!, gitHubApi!!)
+                            val userMetrics =
+                                createUserMetrics(user, config.organizationIds, projectManagementApi!!, gitHubApi!!)
                             synchronized(metrics) {
                                 metrics.add(userMetrics)
                             }
@@ -276,7 +277,7 @@ data class UserMetrics(
     val pullRequestsPastWeek: List<GitHubIssue>,
     val pullRequestsYearToDateCount: UInt,
     val prReviewCountYtd: UInt,
-    val issuesClosedLastWeek: List<Issue>,
+    val issuesClosedLastWeek: List<ProjectIssue>,
     val issuesClosedYearToDateCount: UInt,
 )
 
@@ -305,7 +306,7 @@ fun UserMetrics.toSlackMarkdown(): String {
     builder.append("\n")
     builder.append("🔹 *Issues Closed:*\n")
     issuesClosedLastWeek.forEach {
-        builder.append("• <${it.htmlUrl}|${it.key}> ${it.fields.summary}\n")
+        builder.append("• <${it.url}|${it.key}> ${it.title}\n")
     }
     return builder.toString()
 }
@@ -313,14 +314,14 @@ fun UserMetrics.toSlackMarkdown(): String {
 suspend fun createUserMetrics(
     user: User,
     organizationIds: List<String>,
-    jiraApi: JiraApi,
+    projectManagementApi: ProjectManagementApi,
     gitHubApi: GitHubApi,
 ): UserMetrics {
     val startOfThisYear = System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         .run { Instant.parse("${year}-01-01T00:00:00Z") }
 
     val pullRequestsPastWeek = mutableListOf<GitHubIssue>()
-    val issuesClosedPastWeek = mutableListOf<Issue>()
+    val issuesClosedPastWeek = mutableListOf<ProjectIssue>()
 
     pullRequestsPastWeek.addAll(
         gitHubApi.getMergedPullRequests(
@@ -343,15 +344,16 @@ suspend fun createUserMetrics(
         System.now(),
     )
 
+    val userId = user.jiraId ?: user.id
     issuesClosedPastWeek.addAll(
-        jiraApi.getIssuesResolved(
-            user.jiraId!!,
+        projectManagementApi.getIssuesResolved(
+            userId,
             System.now().minus(7.days),
             System.now(),
         )
     )
-    val issuesCountYtd = jiraApi.getIssuesResolvedCount(
-        user.jiraId!!,
+    val issuesCountYtd = projectManagementApi.getIssuesResolvedCount(
+        userId,
         startOfThisYear,
         System.now(),
     )

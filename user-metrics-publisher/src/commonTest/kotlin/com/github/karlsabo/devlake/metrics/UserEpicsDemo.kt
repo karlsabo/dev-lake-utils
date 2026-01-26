@@ -1,9 +1,9 @@
 package com.github.karlsabo.devlake.metrics
 
-import com.github.karlsabo.jira.Issue
 import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.isIssueOrBug
 import com.github.karlsabo.jira.loadJiraConfig
+import com.github.karlsabo.projectmanagement.ProjectIssue
+import com.github.karlsabo.projectmanagement.isIssueOrBug
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -34,20 +34,20 @@ fun main(args: Array<String>): Unit = runBlocking {
             return@measureTime
         }
 
-        val allParentIssues = mutableSetOf<Issue>()
-        val processedIssueIds = mutableSetOf<String>()
+        val allParentIssues = mutableSetOf<ProjectIssue>()
+        val processedIssueKeys = mutableSetOf<String>()
 
-        fun findAllParentIssues(issues: List<Issue>) {
-            val parentIssueIds = issues
-                .mapNotNull { it.fields.parent?.id }
-                .filter { it !in processedIssueIds }
+        fun findAllParentIssues(issues: List<ProjectIssue>) {
+            val parentIssueKeys = issues
+                .mapNotNull { it.parentKey }
+                .filter { it !in processedIssueKeys }
                 .distinct()
 
-            if (parentIssueIds.isEmpty()) return
+            if (parentIssueKeys.isEmpty()) return
 
-            processedIssueIds.addAll(parentIssueIds)
+            processedIssueKeys.addAll(parentIssueKeys)
 
-            val parentIssues = runBlocking { jiraApi.getIssues(parentIssueIds) }
+            val parentIssues = runBlocking { jiraApi.getIssues(parentIssueKeys) }
 
             allParentIssues.addAll(parentIssues)
 
@@ -57,7 +57,7 @@ fun main(args: Array<String>): Unit = runBlocking {
         findAllParentIssues(userIssues)
 
         val epics =
-            allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.fields.resolutionDate ?: it.fields.created }
+            allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.completedAt ?: it.createdAt }
 
         println("\nEpics the user contributed to:")
         println("========================================")
@@ -65,12 +65,12 @@ fun main(args: Array<String>): Unit = runBlocking {
         if (epics.isEmpty()) {
             println("No epics found for this user")
         } else {
-            epics.sortedBy { it.fields.issueType?.name }.forEach { issue ->
-                val type = issue.fields.issueType?.name ?: "Unknown"
-                val title = issue.fields.summary ?: "Untitled"
-                val url = issue.htmlUrl ?: "No URL available"
+            epics.sortedBy { it.issueType }.forEach { issue ->
+                val type = issue.issueType ?: "Unknown"
+                val title = issue.title ?: "Untitled"
+                val url = issue.url ?: "No URL available"
                 val key = issue.key
-                val date = issue.fields.resolutionDate ?: issue.fields.created
+                val date = issue.completedAt ?: issue.createdAt
 
                 println("[$type] $date $title ($key)")
                 println("URL: $url")

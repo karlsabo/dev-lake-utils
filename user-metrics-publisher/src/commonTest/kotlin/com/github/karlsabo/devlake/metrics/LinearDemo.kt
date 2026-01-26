@@ -44,17 +44,17 @@ fun main(args: Array<String>): Unit = runBlocking {
 
         resolvedIssues.sortedByDescending { it.completedAt }.forEach { issue ->
             val title = issue.title
-            val identifier = issue.identifier
+            val identifier = issue.key
             val url = issue.url
             val completedAt = issue.completedAt
-            val state = issue.state?.name ?: "Unknown"
+            val state = issue.status ?: "Unknown"
 
             println("[$identifier] $title")
             println("  State: $state")
             println("  Completed: $completedAt")
             println("  URL: $url")
-            issue.parent?.let { parent ->
-                println("  Parent: [${parent.identifier}] ${parent.title}")
+            issue.parentKey?.let { parentKey ->
+                println("  Parent: $parentKey")
             }
             println("----------------------------------------")
         }

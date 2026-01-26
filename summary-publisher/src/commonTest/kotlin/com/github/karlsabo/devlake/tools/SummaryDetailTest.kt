@@ -6,21 +6,15 @@ import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.Label
 import com.github.karlsabo.github.PullRequest
-import com.github.karlsabo.jira.Comment
-import com.github.karlsabo.jira.CommentBody
-import com.github.karlsabo.jira.ContentNode
-import com.github.karlsabo.jira.CustomFieldFilter
-import com.github.karlsabo.jira.IssueDescription
-import com.github.karlsabo.jira.IssueParent
-import com.github.karlsabo.jira.IssueStatus
-import com.github.karlsabo.jira.IssueType
-import com.github.karlsabo.jira.JiraApi
-import com.github.karlsabo.jira.JiraAvatarUrls
-import com.github.karlsabo.jira.JiraIssueFields
-import com.github.karlsabo.jira.JiraUser
 import com.github.karlsabo.pagerduty.PagerDutyApi
 import com.github.karlsabo.pagerduty.PagerDutyIncident
 import com.github.karlsabo.pagerduty.Service
+import com.github.karlsabo.projectmanagement.IssueFilter
+import com.github.karlsabo.projectmanagement.ProjectComment
+import com.github.karlsabo.projectmanagement.ProjectIssue
+import com.github.karlsabo.projectmanagement.ProjectManagementApi
+import com.github.karlsabo.projectmanagement.ProjectMilestone
+import com.github.karlsabo.projectmanagement.StatusCategory
 import com.github.karlsabo.text.TextSummarizerFake
 import com.github.karlsabo.tools.createSummary
 import kotlinx.coroutines.runBlocking
@@ -34,7 +28,6 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import com.github.karlsabo.github.Issue as GitHubIssue
 import com.github.karlsabo.github.User as GitHubUser
-import com.github.karlsabo.jira.Issue as JiraIssue
 
 /**
  * Test for the summary creation functionality using mock services.
@@ -44,7 +37,7 @@ class SummaryDetailTest {
 
     @Test
     fun testCreateSummary() = runBlocking {
-        val jiraApi = JiraApiMock()
+        val projectManagementApi = ProjectManagementApiMock()
         val gitHubApi = GitHubApiMock()
         val pagerDutyApi = PagerDutyApiMock()
         val textSummarizer = TextSummarizerFake()
@@ -87,7 +80,7 @@ class SummaryDetailTest {
         val isMiscellaneousProjectIncluded = true
 
         val summary = createSummary(
-            jiraApi,
+            projectManagementApi,
             gitHubApi,
             gitHubOrganizationIds,
             pagerDutyApi,
@@ -117,811 +110,292 @@ class SummaryDetailTest {
         assertTrue(summary.pagerDutyAlerts!!.isNotEmpty())
     }
 
-    private class JiraApiMock : JiraApi {
+    private class ProjectManagementApiMock : ProjectManagementApi {
         private val now = Clock.System.now()
         private val oneWeekAgo = now.minus(7.days)
 
         private val mockIssues = mapOf(
             // Test Project 1 - Epic 1 (In Progress)
-            "TEST-1" to JiraIssue(
+            "TEST-1" to ProjectIssue(
                 id = "1",
                 key = "TEST-1",
-                self = "https://jira.example.local/browse/TEST-1",
-                fields = JiraIssueFields(
-                    summary = "Test Epic 1",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a test epic that is in progress"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Epic",
-                        iconUrl = "https://jira.example.local/images/epic.png"
-                    ),
-                    status = IssueStatus(
-                        name = "In Progress"
-                    ),
-                    resolutionDate = null,
-                    created = oneWeekAgo,
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/TEST-1",
+                title = "Test Epic 1",
+                description = "This is a test epic that is in progress",
+                issueType = "Epic",
+                status = "In Progress",
+                statusCategory = StatusCategory.IN_PROGRESS,
+                completedAt = null,
+                createdAt = oneWeekAgo,
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = null
             ),
-            "TEST-2" to JiraIssue(
+            "TEST-2" to ProjectIssue(
                 id = "2",
                 key = "TEST-2",
-                self = "https://jira.example.local/browse/TEST-2",
-                fields = JiraIssueFields(
-                    summary = "Test Story 1",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a test story for Epic 1"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Story",
-                        iconUrl = "https://jira.example.local/images/story.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(1.days),
-                    created = oneWeekAgo.plus(1.days),
-                    parent = IssueParent(
-                        id = "1"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/TEST-2",
+                title = "Test Story 1",
+                description = "This is a test story for Epic 1",
+                issueType = "Story",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(1.days),
+                createdAt = oneWeekAgo.plus(1.days),
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = "TEST-1"
             ),
-            "TEST-3" to JiraIssue(
+            "TEST-3" to ProjectIssue(
                 id = "3",
                 key = "TEST-3",
-                self = "https://jira.example.local/browse/TEST-3",
-                fields = JiraIssueFields(
-                    summary = "Test Bug 1",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a test bug for Epic 1"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Bug",
-                        iconUrl = "https://jira.example.local/images/bug.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(2.days),
-                    created = oneWeekAgo.plus(2.days),
-                    parent = IssueParent(
-                        id = "1"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-misc-1",
-                        accountId = "jira-misc-1",
-                        emailAddress = "misc@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Misc User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/TEST-3",
+                title = "Test Bug 1",
+                description = "This is a test bug for Epic 1",
+                issueType = "Bug",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(2.days),
+                createdAt = oneWeekAgo.plus(2.days),
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User",
+                parentKey = "TEST-1"
             ),
-            "TEST-5" to JiraIssue(
+            "TEST-5" to ProjectIssue(
                 id = "5",
                 key = "TEST-5",
-                self = "https://jira.example.local/browse/TEST-5",
-                fields = JiraIssueFields(
-                    summary = "Test Task 1",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a test task for Epic 1 that is still in progress"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Task",
-                        iconUrl = "https://jira.example.local/images/task.png"
-                    ),
-                    status = IssueStatus(
-                        name = "In Progress"
-                    ),
-                    resolutionDate = null,
-                    created = oneWeekAgo.plus(3.days),
-                    parent = IssueParent(
-                        id = "1"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/TEST-5",
+                title = "Test Task 1",
+                description = "This is a test task for Epic 1 that is still in progress",
+                issueType = "Task",
+                status = "In Progress",
+                statusCategory = StatusCategory.IN_PROGRESS,
+                completedAt = null,
+                createdAt = oneWeekAgo.plus(3.days),
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = "TEST-1"
             ),
 
             // Test Project 1 - Epic 2 (Completed)
-            "TEST-4" to JiraIssue(
+            "TEST-4" to ProjectIssue(
                 id = "4",
                 key = "TEST-4",
-                self = "https://jira.example.local/browse/TEST-4",
-                fields = JiraIssueFields(
-                    summary = "Test Epic 2",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a completed test epic"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Epic",
-                        iconUrl = "https://jira.example.local/images/epic.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(1.days),
-                    created = oneWeekAgo.plus(1.days),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/TEST-4",
+                title = "Test Epic 2",
+                description = "This is a completed test epic",
+                issueType = "Epic",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(1.days),
+                createdAt = oneWeekAgo.plus(1.days),
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = null
             ),
-            "TEST-6" to JiraIssue(
+            "TEST-6" to ProjectIssue(
                 id = "6",
                 key = "TEST-6",
-                self = "https://jira.example.local/browse/TEST-6",
-                fields = JiraIssueFields(
-                    summary = "Test Story 2",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a test story for Epic 2"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Story",
-                        iconUrl = "https://jira.example.local/images/story.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(2.days),
-                    created = oneWeekAgo.plus(2.days),
-                    parent = IssueParent(
-                        id = "4"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/TEST-6",
+                title = "Test Story 2",
+                description = "This is a test story for Epic 2",
+                issueType = "Story",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(2.days),
+                createdAt = oneWeekAgo.plus(2.days),
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = "TEST-4"
             ),
-            "TEST-7" to JiraIssue(
+            "TEST-7" to ProjectIssue(
                 id = "7",
                 key = "TEST-7",
-                self = "https://jira.example.local/browse/TEST-7",
-                fields = JiraIssueFields(
-                    summary = "Test Bug 2",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a test bug for Epic 2"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Bug",
-                        iconUrl = "https://jira.example.local/images/bug.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(3.days),
-                    created = oneWeekAgo.plus(1.days),
-                    parent = IssueParent(
-                        id = "4"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-misc-1",
-                        accountId = "jira-misc-1",
-                        emailAddress = "misc@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Misc User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/TEST-7",
+                title = "Test Bug 2",
+                description = "This is a test bug for Epic 2",
+                issueType = "Bug",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(3.days),
+                createdAt = oneWeekAgo.plus(1.days),
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User",
+                parentKey = "TEST-4"
             ),
 
             // Test Project 2 - Epic 1 (In Progress with low completion rate)
-            "PROJ2-1" to JiraIssue(
+            "PROJ2-1" to ProjectIssue(
                 id = "101",
                 key = "PROJ2-1",
-                self = "https://jira.example.local/browse/PROJ2-1",
-                fields = JiraIssueFields(
-                    summary = "Project 2 Epic 1",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is an epic for Project 2 with low completion rate"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Epic",
-                        iconUrl = "https://jira.example.local/images/epic.png"
-                    ),
-                    status = IssueStatus(
-                        name = "In Progress"
-                    ),
-                    resolutionDate = null,
-                    created = oneWeekAgo,
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/PROJ2-1",
+                title = "Project 2 Epic 1",
+                description = "This is an epic for Project 2 with low completion rate",
+                issueType = "Epic",
+                status = "In Progress",
+                statusCategory = StatusCategory.IN_PROGRESS,
+                completedAt = null,
+                createdAt = oneWeekAgo,
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = null
             ),
-            "PROJ2-3" to JiraIssue(
+            "PROJ2-3" to ProjectIssue(
                 id = "103",
                 key = "PROJ2-3",
-                self = "https://jira.example.local/browse/PROJ2-3",
-                fields = JiraIssueFields(
-                    summary = "Project 2 Story 1",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a story for Project 2 Epic 1"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Story",
-                        iconUrl = "https://jira.example.local/images/story.png"
-                    ),
-                    status = IssueStatus(
-                        name = "In Progress"
-                    ),
-                    resolutionDate = null,
-                    created = oneWeekAgo.plus(2.days),
-                    parent = IssueParent(
-                        id = "101"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/PROJ2-3",
+                title = "Project 2 Story 1",
+                description = "This is a story for Project 2 Epic 1",
+                issueType = "Story",
+                status = "In Progress",
+                statusCategory = StatusCategory.IN_PROGRESS,
+                completedAt = null,
+                createdAt = oneWeekAgo.plus(2.days),
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = "PROJ2-1"
             ),
-            "PROJ2-4" to JiraIssue(
+            "PROJ2-4" to ProjectIssue(
                 id = "104",
                 key = "PROJ2-4",
-                self = "https://jira.example.local/browse/PROJ2-4",
-                fields = JiraIssueFields(
-                    summary = "Project 2 Task 1",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a task for Project 2 Epic 1"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Task",
-                        iconUrl = "https://jira.example.local/images/task.png"
-                    ),
-                    status = IssueStatus(
-                        name = "In Progress"
-                    ),
-                    resolutionDate = null,
-                    created = oneWeekAgo.plus(3.days),
-                    parent = IssueParent(
-                        id = "101"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-misc-1",
-                        accountId = "jira-misc-1",
-                        emailAddress = "misc@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Misc User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/PROJ2-4",
+                title = "Project 2 Task 1",
+                description = "This is a task for Project 2 Epic 1",
+                issueType = "Task",
+                status = "In Progress",
+                statusCategory = StatusCategory.IN_PROGRESS,
+                completedAt = null,
+                createdAt = oneWeekAgo.plus(3.days),
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User",
+                parentKey = "PROJ2-1"
             ),
-            "PROJ2-5" to JiraIssue(
+            "PROJ2-5" to ProjectIssue(
                 id = "105",
                 key = "PROJ2-5",
-                self = "https://jira.example.local/browse/PROJ2-5",
-                fields = JiraIssueFields(
-                    summary = "Project 2 Bug 1",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a bug for Project 2 Epic 1"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Bug",
-                        iconUrl = "https://jira.example.local/images/bug.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(1.days),
-                    created = oneWeekAgo.plus(4.days),
-                    parent = IssueParent(
-                        id = "101"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/PROJ2-5",
+                title = "Project 2 Bug 1",
+                description = "This is a bug for Project 2 Epic 1",
+                issueType = "Bug",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(1.days),
+                createdAt = oneWeekAgo.plus(4.days),
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = "PROJ2-1"
             ),
 
             // Test Project 2 - Epic 2 (Completed the milestone)
-            "PROJ2-2" to JiraIssue(
+            "PROJ2-2" to ProjectIssue(
                 id = "102",
                 key = "PROJ2-2",
-                self = "https://jira.example.local/browse/PROJ2-2",
-                fields = JiraIssueFields(
-                    summary = "Project 2 Epic 2",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a completed epic for Project 2"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Epic",
-                        iconUrl = "https://jira.example.local/images/epic.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(2.days),
-                    created = oneWeekAgo,
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-misc-1",
-                        accountId = "jira-misc-1",
-                        emailAddress = "misc@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Misc User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/PROJ2-2",
+                title = "Project 2 Epic 2",
+                description = "This is a completed epic for Project 2",
+                issueType = "Epic",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(2.days),
+                createdAt = oneWeekAgo,
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User",
+                parentKey = null
             ),
-            "PROJ2-6" to JiraIssue(
+            "PROJ2-6" to ProjectIssue(
                 id = "106",
                 key = "PROJ2-6",
-                self = "https://jira.example.local/browse/PROJ2-6",
-                fields = JiraIssueFields(
-                    summary = "Project 2 Story 2",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a story for Project 2 Epic 2"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Story",
-                        iconUrl = "https://jira.example.local/images/story.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(3.days),
-                    created = oneWeekAgo.plus(1.days),
-                    parent = IssueParent(
-                        id = "102"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-user-1",
-                        accountId = "jira-user-1",
-                        emailAddress = "test@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Test User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/PROJ2-6",
+                title = "Project 2 Story 2",
+                description = "This is a story for Project 2 Epic 2",
+                issueType = "Story",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(3.days),
+                createdAt = oneWeekAgo.plus(1.days),
+                assigneeId = "jira-user-1",
+                assigneeName = "Test User",
+                parentKey = "PROJ2-2"
             ),
-            "PROJ2-7" to JiraIssue(
+            "PROJ2-7" to ProjectIssue(
                 id = "107",
                 key = "PROJ2-7",
-                self = "https://jira.example.local/browse/PROJ2-7",
-                fields = JiraIssueFields(
-                    summary = "Project 2 Task 2",
-                    description = IssueDescription(
-                        type = "doc",
-                        version = 1,
-                        content = listOf(
-                            ContentNode(
-                                type = "paragraph",
-                                content = listOf(
-                                    ContentNode(
-                                        type = "text",
-                                        text = "This is a task for Project 2 Epic 2"
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    issueType = IssueType(
-                        name = "Task",
-                        iconUrl = "https://jira.example.local/images/task.png"
-                    ),
-                    status = IssueStatus(
-                        name = "Done"
-                    ),
-                    resolutionDate = now.minus(4.days),
-                    created = oneWeekAgo.plus(2.days),
-                    parent = IssueParent(
-                        id = "102"
-                    ),
-                    assignee = JiraUser(
-                        self = "https://jira.example.local/rest/api/2/user?accountId=jira-misc-1",
-                        accountId = "jira-misc-1",
-                        emailAddress = "misc@example.local",
-                        avatarUrls = JiraAvatarUrls(
-                            size48x48 = "https://jira.example.local/avatar/48.png",
-                            size24x24 = "https://jira.example.local/avatar/24.png",
-                            size16x16 = "https://jira.example.local/avatar/16.png",
-                            size32x32 = "https://jira.example.local/avatar/32.png"
-                        ),
-                        displayName = "Misc User",
-                        active = true,
-                        timeZone = "UTC",
-                        accountType = "atlassian"
-                    )
-                )
+                url = "https://jira.example.local/browse/PROJ2-7",
+                title = "Project 2 Task 2",
+                description = "This is a task for Project 2 Epic 2",
+                issueType = "Task",
+                status = "Done",
+                statusCategory = StatusCategory.DONE,
+                completedAt = now.minus(4.days),
+                createdAt = oneWeekAgo.plus(2.days),
+                assigneeId = "jira-misc-1",
+                assigneeName = "Misc User",
+                parentKey = "PROJ2-2"
             )
         )
 
-        override suspend fun runJql(jql: String): List<JiraIssue> {
-            return if (jql.contains("parent")) {
-                mockIssues.values.filter { it.fields?.parent?.id == "1" }.toList()
-            } else {
-                mockIssues.values.filter { it.fields?.resolutionDate != null }.toList()
-            }
-        }
-
-        override suspend fun getIssues(issueKeys: List<String>): List<JiraIssue> {
+        override suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue> {
             return issueKeys.mapNotNull { mockIssues[it] }
         }
 
-        override suspend fun getChildIssues(issueKeys: List<String>): List<JiraIssue> {
-            val parentIds = issueKeys.mapNotNull { key -> mockIssues[key]?.id }
-            return mockIssues.values.filter { it.fields.parent?.id in parentIds }.toList()
+        override suspend fun getChildIssues(issueKeys: List<String>): List<ProjectIssue> {
+            return mockIssues.values.filter { it.parentKey in issueKeys }.toList()
         }
 
-        override suspend fun getDirectChildIssues(parentKey: String): List<JiraIssue> {
-            val parentId = mockIssues[parentKey]?.id ?: return emptyList()
-            return mockIssues.values.filter { it.fields.parent?.id == parentId }.toList()
+        override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> {
+            return mockIssues.values.filter { it.parentKey == parentKey }.toList()
         }
 
-        override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<Comment> {
-            val avatarUrls = JiraAvatarUrls(
-                size48x48 = "https://jira.example.local/avatar/48.png",
-                size24x24 = "https://jira.example.local/avatar/24.png",
-                size16x16 = "https://jira.example.local/avatar/16.png",
-                size32x32 = "https://jira.example.local/avatar/32.png"
-            )
-
-            val jiraUser = JiraUser(
-                self = "https://jira.example.local/user/test",
-                accountId = "jira-user-1",
-                emailAddress = "test@example.local",
-                avatarUrls = avatarUrls,
-                displayName = "Test User",
-                active = true,
-                timeZone = "UTC",
-                accountType = "atlassian"
-            )
-
-            val commentBody = CommentBody(
-                type = "doc",
-                version = 1,
-                content = listOf(
-                    ContentNode(
-                        type = "paragraph",
-                        content = listOf(
-                            ContentNode(
-                                type = "text",
-                                text = "This is a test comment for $issueKey"
-                            )
-                        )
-                    )
-                )
-            )
-
+        override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<ProjectComment> {
             return List(maxResults.coerceAtMost(3)) { index ->
-                Comment(
-                    self = "https://jira.example.local/comment/$index",
+                ProjectComment(
                     id = "$index",
-                    author = jiraUser,
-                    body = commentBody,
-                    updateAuthor = jiraUser,
-                    created = now.minus((index + 1).days),
-                    updated = now.minus((index + 1).days)
+                    body = "This is a test comment for $issueKey",
+                    authorId = "jira-user-1",
+                    authorName = "Test User",
+                    createdAt = now.minus((index + 1).days),
+                    updatedAt = now.minus((index + 1).days)
                 )
             }
         }
 
         override suspend fun getIssuesResolved(
-            userJiraId: String,
+            userId: String,
             startDate: Instant,
             endDate: Instant,
-        ): List<JiraIssue> {
+        ): List<ProjectIssue> {
             return mockIssues.values.filter { issue ->
-                issue.fields.assignee?.accountId == userJiraId &&
-                        issue.fields.resolutionDate?.let { date ->
+                issue.assigneeId == userId &&
+                        issue.completedAt?.let { date ->
                             date >= startDate && date <= endDate
                         } ?: false
             }.toList()
         }
 
         override suspend fun getIssuesResolvedCount(
-            userJiraId: String,
+            userId: String,
             startDate: Instant,
             endDate: Instant,
         ): UInt {
-            return getIssuesResolved(userJiraId, startDate, endDate).size.toUInt()
+            return getIssuesResolved(userId, startDate, endDate).size.toUInt()
         }
 
-        override suspend fun getIssuesByCustomFieldFilter(
-            issueTypes: List<String>,
-            customFieldFilter: CustomFieldFilter,
-            resolvedAfter: Instant?,
-            resolvedBefore: Instant?,
-        ): List<JiraIssue> {
+        override suspend fun getIssuesByFilter(filter: IssueFilter): List<ProjectIssue> {
+            val completedAfter = filter.completedAfter
             return mockIssues.values.filter { issue ->
-                val typeMatches = issueTypes.any { it.equals(issue.fields.issueType?.name, ignoreCase = true) }
+                val typeMatches = filter.issueTypes?.any { it.equals(issue.issueType, ignoreCase = true) } ?: true
                 val dateMatches =
-                    resolvedAfter == null || (issue.fields.resolutionDate?.let { it >= resolvedAfter } ?: false)
+                    completedAfter == null || (issue.completedAt?.let { it >= completedAfter } ?: false)
                 typeMatches && dateMatches
             }
+        }
+
+        override suspend fun getMilestones(projectId: String): List<ProjectMilestone> {
+            return emptyList()
+        }
+
+        override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
+            return getDirectChildIssues(milestoneId)
         }
     }
 
