@@ -467,9 +467,8 @@ suspend fun Project.createSummary(
     } else {
         parentIssues.plus(childIssues).toSet()
             .filter { it.isMilestone() }.map { milestoneIssue ->
-                // Get child issues for this milestone using JQL
-                val jqlForMilestoneChildren = "parent = ${milestoneIssue.id}"
-                val milestoneChildIssues = jiraApi.runJql(jqlForMilestoneChildren)
+                // Get direct child issues for this milestone
+                val milestoneChildIssues = jiraApi.getDirectChildIssues(milestoneIssue.key)
                     .filter { issue -> issue.isIssueOrBug() }
                     .toSet()
 
