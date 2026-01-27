@@ -1,33 +1,12 @@
 plugins {
-    kotlin("multiplatform")
-    kotlin("plugin.serialization")
+    id("devlake.kotlin-multiplatform-conventions")
     `maven-publish`
 }
 
 group = parent!!.group
 version = parent!!.version
 
-repositories {
-    mavenCentral()
-    google()
-}
-
 kotlin {
-    targets.all {
-        compilations.all {
-            compileTaskProvider.configure {
-                compilerOptions {
-                    freeCompilerArgs.add("-opt-in=kotlinx.serialization.ExperimentalSerializationApi")
-                }
-            }
-        }
-    }
-
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
     macosArm64 {
         binaries {
             framework {
@@ -49,42 +28,31 @@ kotlin {
                 api(libs.kotlinLogging)
 
                 // IO
-                api("org.jetbrains.kotlinx:kotlinx-io-core:${libs.versions.kotlinxIo.get()}")
+                api(libs.kotlinx.io.core)
 
                 // kotlin
-                api("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                api(libs.kotlinx.datetime)
 
                 // ktor
-                val ktorVersion = libs.versions.ktor.get()
-                implementation("io.ktor:ktor-client-core:${ktorVersion}")
-                implementation("io.ktor:ktor-client-cio:$ktorVersion")
-                implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-                implementation("io.ktor:ktor-client-logging:$ktorVersion")
-                implementation("io.ktor:ktor-client-auth:$ktorVersion")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+                implementation(libs.bundles.ktor.client.full)
             }
         }
         getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
-                val ktorVersion = libs.versions.ktor.get()
-                implementation("io.ktor:ktor-client-mock:$ktorVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${libs.versions.kotlinxCoroutines.get()}")
+                implementation(libs.ktor.client.mock)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         getByName("jvmTest") {
             dependencies {
-                implementation("org.slf4j:slf4j-api:2.0.9")
-                implementation("org.apache.logging.log4j:log4j-core:${libs.versions.log4jVersion.get()}")
-                implementation("org.apache.logging.log4j:log4j-slf4j2-impl:${libs.versions.log4jVersion.get()}")
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
-                implementation("org.junit.jupiter:junit-jupiter-engine:5.10.0")
-                runtimeOnly("org.junit.platform:junit-platform-launcher")
+                implementation(libs.slf4j.api)
+                implementation(libs.bundles.log4j.runtime)
+                implementation(libs.bundles.junit)
+                runtimeOnly(libs.junit.platform.launcher)
             }
         }
-
     }
 
     // Apply native-specific opt-ins to all native targets
@@ -126,11 +94,6 @@ tasks.register<JavaExec>("notificationCleanupDemo") {
 
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
-
-
-tasks.withType<Test>().configureEach {
-    filter.isFailOnNoMatchingTests = false
 }
 
 publishing {
