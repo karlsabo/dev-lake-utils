@@ -84,12 +84,15 @@ kotlin {
 
     }
 
-    // Apply ExperimentalForeignApi opt-in to all native targets
+    // Apply native-specific opt-ins to all native targets
     targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget> {
         compilations.all {
             compileTaskProvider.configure {
                 compilerOptions {
-                    freeCompilerArgs.add("-opt-in=kotlinx.cinterop.ExperimentalForeignApi")
+                    freeCompilerArgs.addAll(
+                        "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
+                        "-opt-in=kotlin.experimental.ExperimentalNativeApi"
+                    )
                 }
             }
         }
