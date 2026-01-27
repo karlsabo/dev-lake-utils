@@ -10,6 +10,8 @@ markdown = "0.29.0"
 kotlinxIo = "0.6.0"
 kotlinxCoroutines = "1.10.1"
 log4jVersion = "2.24.1"
+kotlinLogging = "7.0.14"
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
+kotlinLogging = { module = "io.github.oshai:kotlin-logging", version.ref = "kotlinLogging" }

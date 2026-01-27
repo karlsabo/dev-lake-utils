@@ -47,6 +47,7 @@ import com.github.karlsabo.tools.gitHubConfigPath
 import com.github.karlsabo.tools.jiraConfigPath
 import com.github.karlsabo.tools.lenientJson
 import com.github.karlsabo.tools.loadUsersConfig
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -73,6 +74,8 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.measureTime
 import com.github.karlsabo.github.Issue as GitHubIssue
 
+private val logger = KotlinLogging.logger {}
+
 fun main() = application {
     var isLoadingConfig by remember { mutableStateOf(true) }
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
@@ -83,7 +86,7 @@ fun main() = application {
     var gitHubApi by remember { mutableStateOf<GitHubApi?>(null) }
 
     LaunchedEffect(Unit) {
-        println("Loading configuration")
+        logger.info { "Loading configuration" }
         try {
             config = loadUserMetricPublisherConfig()
             val jiraApiRestConfig = loadJiraConfig(jiraConfigPath)
@@ -95,13 +98,13 @@ fun main() = application {
         } catch (error: Exception) {
             errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
                     "Please update the configuration file:\n${userMetricPublisherConfigPath}."
-            java.lang.System.err.println(errorMessage)
+            logger.error { errorMessage }
             if (!SystemFileSystem.exists(userMetricPublisherConfigPath)) {
                 saveUserMetricPublisherConfig(UserMetricPublisherConfig())
             }
             isDisplayErrorDialog = true
         }
-        println("Config = $config")
+        logger.info { "Config = $config" }
     }
 
     if (!isLoadingConfig && isDisplayErrorDialog) {
@@ -149,7 +152,7 @@ fun main() = application {
 
         if (!isLoadingConfig) {
             LaunchedEffect(Unit) {
-                println("Loading metrics")
+                logger.info { "Loading metrics" }
                 val jobs = config.userIds.map { userId ->
                     async(Dispatchers.IO) {
                         measureTime {
@@ -161,7 +164,7 @@ fun main() = application {
                                 metrics.add(userMetrics)
                             }
                         }.also {
-                            println("Time to load metrics for ${userId}: $it")
+                            logger.debug { "Time to load metrics for $userId: $it" }
                         }
                     }
                 }
@@ -175,7 +178,7 @@ fun main() = application {
                     metricsPreviewText += "\n" + config.metricInformationPostfix
                 }
 
-                println("Metrics loaded")
+                logger.info { "Metrics loaded" }
             }
         }
 
@@ -233,7 +236,7 @@ fun main() = application {
                                 ) {
                                     TextField(
                                         value = metricsPreviewText,
-                                        onValueChange = { println("changed") },
+                                        onValueChange = { logger.debug { "TextField changed" } },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 8.dp),
@@ -253,7 +256,7 @@ fun main() = application {
 private data class SlackMessage(val userEmail: String, val message: String)
 
 private suspend fun sendToZap(slackMessage: SlackMessage, zapierMetricUrl: String): Boolean {
-    println("Sending to ${slackMessage.userEmail}")
+    logger.info { "Sending to ${slackMessage.userEmail}" }
     val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             gson()
@@ -265,7 +268,8 @@ private suspend fun sendToZap(slackMessage: SlackMessage, zapierMetricUrl: Strin
         setBody(lenientJson.encodeToString(SlackMessage.serializer(), slackMessage))
     }
 
-    println("response=$response, body=${response.body<String>()}")
+    val responseBody = response.body<String>()
+    logger.debug { "Zapier response=$response, body=$responseBody" }
     client.close()
     return response.status.value >= 200 && response.status.value <= 299
 }

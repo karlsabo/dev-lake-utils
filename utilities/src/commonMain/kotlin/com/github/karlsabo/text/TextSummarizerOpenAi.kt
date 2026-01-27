@@ -2,6 +2,7 @@ package com.github.karlsabo.text
 
 import com.github.karlsabo.http.installHttpRetry
 import com.github.karlsabo.tools.lenientJson
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.cache.HttpCache
@@ -16,6 +17,8 @@ import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+private val logger = KotlinLogging.logger {}
 
 class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : TextSummarizer {
     override suspend fun summarize(text: String): String {
@@ -53,24 +56,21 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
                     append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 }
                 setBody(request)
-                println(this)
+                logger.debug { "OpenAI request: $this" }
             }
 
-            println("response: $response")
+            logger.debug { "OpenAI response: $response" }
             val responseText: String = response.body()
-            println("responseText: $responseText")
+            logger.debug { "OpenAI responseText: $responseText" }
 
             if (!response.status.isSuccess()) {
                 throw Exception("Failed to summarize text: ${response.status.value}")
             }
 
             val openAiResponse: OpenAIResponse = lenientJson.decodeFromString(OpenAIResponse.serializer(), responseText)
-            println("openAiResponse=$openAiResponse")
+            logger.debug { "openAiResponse=$openAiResponse" }
             val summary: String = if (openAiResponse.choices != null) {
-                println("Choices:")
-                openAiResponse.choices.forEach { choice ->
-                    println("Choice: ${choice.message?.content}")
-                }
+                logger.debug { "OpenAI Choices: ${openAiResponse.choices.map { it.message?.content }}" }
                 openAiResponse.choices.firstOrNull()?.message?.content ?: "* No choices available"
             } else {
                 "* No summary available"

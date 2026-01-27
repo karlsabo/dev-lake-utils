@@ -1,10 +1,13 @@
 package com.github.karlsabo.http
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngineConfig
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.http.HttpStatusCode
 import kotlin.time.Duration.Companion.minutes
+
+private val logger = KotlinLogging.logger {}
 
 fun <T : HttpClientEngineConfig> HttpClientConfig<T>.installHttpRetry() {
     install(HttpRequestRetry) {
@@ -17,7 +20,7 @@ fun <T : HttpClientEngineConfig> HttpClientConfig<T>.installHttpRetry() {
         }
         modifyRequest { request ->
             request.headers.append("X-Ktor-Retry-Count", retryCount.toString())
-            println("Retrying request, attempt: ${retryCount + 1}")
+            logger.info { "Retrying request, attempt: ${retryCount + 1}" }
         }
         exponentialDelay(2.0, 10_000, 5.minutes.inWholeMilliseconds, 5_000, true)
     }

@@ -13,6 +13,7 @@ import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.projectmanagement.ProjectMilestone
 import com.github.karlsabo.tools.lenientJson
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -38,6 +39,8 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Jira REST API implementation of ProjectManagementApi.
@@ -262,7 +265,8 @@ class JiraRestApi(
 
 private suspend fun HttpResponse.ensureSuccess(operation: String) {
     if (status.value !in 200..299) {
-        println("Response: ```${bodyAsText()}```")
+        val responseBody = bodyAsText()
+        logger.debug { "Jira API error response: ```$responseBody```" }
         throw Exception("Failed to $operation: HTTP ${status.value}")
     }
 }

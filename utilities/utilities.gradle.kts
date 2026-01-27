@@ -45,6 +45,9 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                // Logging
+                api(libs.kotlinLogging)
+
                 // IO
                 api("org.jetbrains.kotlinx:kotlinx-io-core:${libs.versions.kotlinxIo.get()}")
 

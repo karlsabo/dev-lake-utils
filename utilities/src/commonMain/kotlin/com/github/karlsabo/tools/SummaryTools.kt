@@ -14,6 +14,7 @@ import com.github.karlsabo.projectmanagement.isMilestone
 import com.github.karlsabo.text.TextSummarizer
 import com.github.karlsabo.tools.model.Milestone
 import com.github.karlsabo.tools.model.ProjectSummary
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -24,6 +25,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration
+
+private val logger = KotlinLogging.logger {}
 
 suspend fun createSummary(
     projectManagementApi: ProjectManagementApi,
@@ -49,7 +52,7 @@ suspend fun createSummary(
     coroutineScope {
         val projectJobs = projects.map { project ->
             async(Dispatchers.Default) {
-                println("Creating summary for project ${project.title}")
+                logger.info { "Creating summary for project ${project.title}" }
                 val projectSummary =
                     project.createSummary(
                         users.toSet(),
@@ -69,7 +72,7 @@ suspend fun createSummary(
         val userJobs = if (isMiscellaneousProjectIncluded) {
             val issueJobs = miscUsers.map { user ->
                 async(Dispatchers.Default) {
-                    println("Pulling issues for user ${user.id}")
+                    logger.info { "Pulling issues for user ${user.id}" }
                     // Use the appropriate user ID field based on what's available
                     val userId = user.jiraId ?: user.id
                     val issuesForUser = projectManagementApi.getIssuesResolved(
@@ -84,7 +87,7 @@ suspend fun createSummary(
             }
             val prJobs = miscUsers.map { user ->
                 async(Dispatchers.Default) {
-                    println("Pulling PRs for user ${user.id}")
+                    logger.info { "Pulling PRs for user ${user.id}" }
                     val prsForUser = gitHubApi.getMergedPullRequests(
                         user.gitHubId!!, gitHubOrganizationIds, Clock.System.now().minus(duration),
                         Clock.System.now()
@@ -164,7 +167,7 @@ suspend fun Project.createSummary(
     val parentIssues = if (topLevelIssueKeys.isEmpty())
         mutableListOf()
     else {
-        println("Getting issues for $topLevelIssueKeys")
+        logger.debug { "Getting issues for $topLevelIssueKeys" }
         projectManagementApi.getIssues(topLevelIssueKeys).toMutableList()
     }
 
@@ -173,7 +176,7 @@ suspend fun Project.createSummary(
     val childIssues: MutableList<ProjectIssue> = if (parentIssuesAreChildren) {
         parentIssues
     } else {
-        println("Getting child issues for $parentIssues")
+        logger.debug { "Getting child issues for $parentIssues" }
         projectManagementApi.getChildIssues(parentIssueKeys).toMutableList()
     }
 
@@ -199,7 +202,7 @@ suspend fun Project.createSummary(
     // Get merged PRs related to these issues
     val mergedPrs = mutableSetOf(*pullRequests.toTypedArray())
     resolvedChildIssues.forEach { issue ->
-        println("Searching PRs for ${issue.key}")
+        logger.debug { "Searching PRs for ${issue.key}" }
         mergedPrs += gitHubApi.searchPullRequestsByText(
             issue.key,
             gitHubOrganizationIds,

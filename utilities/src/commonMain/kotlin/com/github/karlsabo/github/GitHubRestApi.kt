@@ -3,6 +3,7 @@ package com.github.karlsabo.github
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.http.installHttpRetry
 import com.github.karlsabo.tools.lenientJson
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -32,6 +33,8 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Implementation of the GitHubApi interface using REST.
@@ -113,7 +116,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("\tresponseText=```$responseText```")
+            logger.debug { "getMergedPullRequestCount responseText=```$responseText```" }
             throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId")
         }
         val root = Json.parseToJsonElement(responseText).jsonObject
@@ -136,7 +139,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("\tresponseText=```$responseText```")
+            logger.debug { "getPullRequestReviewCount responseText=```$responseText```" }
             throw Exception("Failed to get pull request review count: ${response.status.value} for $gitHubUserId")
         }
         val root = Json.parseToJsonElement(responseText).jsonObject
@@ -159,8 +162,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
             val responseText = response.bodyAsText()
             if (response.status.value !in 200..299) {
-                println("searchPullRequestsByText query=`$`")
-                println("\tresponseText=```$responseText```")
+                logger.error { "searchPullRequestsByText query failed" }
+                logger.debug { "responseText=```$responseText```" }
                 throw Exception("Failed to search pull requests: ${response.status.value}")
             }
 
@@ -197,8 +200,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
             val responseText = response.bodyAsText()
 
             if (response.status.value !in 200..299) {
-                println("Failed to list notifications $url")
-                println("\tresponse.status=${response.status} responseText=```$responseText```")
+                logger.error { "Failed to list notifications $url" }
+                logger.debug { "response.status=${response.status} responseText=```$responseText```" }
                 throw Exception("Failed to list notifications: ${response.status.value}")
             }
 
@@ -216,8 +219,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val response = client.get(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("Failed to get pull request $url")
-            println("\tresponse.status=${response.status} responseText=```$responseText```. Response=```$response```")
+            logger.error { "Failed to get pull request $url" }
+            logger.debug { "response.status=${response.status} responseText=```$responseText```" }
             throw Exception("Failed to get pull request: ${response.status.value} for url=$url")
         }
         return lenientJson.decodeFromString(PullRequest.serializer(), responseText)
@@ -231,7 +234,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("\tresponseText=```$responseText```")
+            logger.debug { "approvePullRequest responseText=```$responseText```" }
             throw Exception("Failed to approve pull request: ${response.status.value} for url=$url")
         }
     }
@@ -246,7 +249,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val response = client.get(reviewsUrl)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("\tresponseText=```$responseText```")
+            logger.debug { "hasAnyApprovedReview responseText=```$responseText```" }
             throw Exception("Failed to list pull request reviews: ${response.status.value} for url=$url")
         }
 
@@ -263,8 +266,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
                 !isBotUser(login, type)
             }
         } catch (error: Exception) {
-            println("Failed to parse GitHub JSON $responseText")
-            error.printStackTrace()
+            logger.error(error) { "Failed to parse GitHub JSON $responseText" }
             try {
                 val reviews = lenientJson.decodeFromString<List<PullRequestReview>>(responseText)
                 reviews.any { review ->
@@ -293,8 +295,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val response = client.delete(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("Failed to mark notification done $url")
-            println("\tresponse.status=${response.status} responseText=```$responseText```")
+            logger.error { "Failed to mark notification done $url" }
+            logger.debug { "response.status=${response.status} responseText=```$responseText```" }
             throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId")
         }
     }
@@ -310,7 +312,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("\tresponseText=```$responseText```")
+            logger.debug { "unsubscribeFromNotification responseText=```$responseText```" }
             throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId")
         }
     }

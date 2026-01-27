@@ -4,11 +4,14 @@ import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.getEnv
 import com.github.karlsabo.system.osFamily
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.writeString
+
+private val logger = KotlinLogging.logger {}
 
 const val DEV_METRICS_APP_NAME = "DevLakeUtils"
 val textSummarizerConfigPath = Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "text-summarizer-openai-config.json")
@@ -28,7 +31,7 @@ fun loadUsersConfig(): UsersConfig? {
             SystemFileSystem.source(usersConfigPath).buffered().readText(),
         )
     } catch (error: Exception) {
-        println("Failed to load user config: $error")
+        logger.error(error) { "Failed to load user config" }
         return null
     }
 }

@@ -1,6 +1,5 @@
 package com.github.karlsabo.devlake.tools
 
-
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -68,6 +67,7 @@ import com.github.karlsabo.tools.loadUsersConfig
 import com.github.karlsabo.tools.model.ProjectSummary
 import com.github.karlsabo.tools.pagerDutyConfigPath
 import com.github.karlsabo.tools.textSummarizerConfigPath
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -85,6 +85,8 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.days
+
+private val logger = KotlinLogging.logger {}
 
 data class ProjectSummaryHolder(val projectSummary: ProjectSummary, val message: String)
 
@@ -115,7 +117,7 @@ fun main(args: Array<String>) = application {
     var isConfigLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        println("Loading configuration $configFilePath")
+        logger.info { "Loading configuration $configFilePath" }
         try {
             summaryConfig = loadSummaryPublisherConfig(configFilePath)
             textSummarizerConfig = loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)
@@ -124,7 +126,7 @@ fun main(args: Array<String>) = application {
             pagerDutyConfig = loadPagerDutyConfig(pagerDutyConfigPath)
             usersConfig = loadUsersConfig()!!
         } catch (error: Exception) {
-            println("Error loading summary config $error")
+            logger.error(error) { "Error loading summary config" }
             errorMessage = "Failed to load configuration: $error."
             if (!SystemFileSystem.exists(summaryPublisherConfigPath)) {
                 errorMessage += "\nCreating new configuration.\n Please update the configuration file:\n${summaryPublisherConfigPath}."
@@ -152,7 +154,7 @@ fun main(args: Array<String>) = application {
             isDisplayErrorDialog = true
         }
         isConfigLoaded = true
-        println("Summary config = $summaryConfig")
+        logger.info { "Summary config = $summaryConfig" }
     }
 
     if (isDisplayErrorDialog) {
@@ -181,7 +183,7 @@ fun main(args: Array<String>) = application {
         return@application
     }
 
-    println("Config = $summaryConfig")
+    logger.debug { "Config = $summaryConfig" }
 
     var projectSummaries by remember { mutableStateOf(listOf<ProjectSummaryHolder>()) }
 
@@ -357,7 +359,8 @@ suspend fun sendToZap(zapierProjectSummary: ZapierProjectSummary, zapierSummaryU
         setBody(lenientJson.encodeToString(ZapierProjectSummary.serializer(), zapierProjectSummary))
     }
 
-    println("response=$response, body=${response.body<String>()}")
+    val responseBody = response.body<String>()
+    logger.debug { "Zapier response=$response, body=$responseBody" }
     client.close()
     return response.status.value >= 200 && response.status.value <= 299
 }

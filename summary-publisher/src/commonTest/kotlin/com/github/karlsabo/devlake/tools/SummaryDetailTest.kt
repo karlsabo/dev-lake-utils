@@ -17,6 +17,7 @@ import com.github.karlsabo.projectmanagement.ProjectMilestone
 import com.github.karlsabo.projectmanagement.StatusCategory
 import com.github.karlsabo.text.TextSummarizerFake
 import com.github.karlsabo.tools.createSummary
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -28,6 +29,8 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import com.github.karlsabo.github.Issue as GitHubIssue
 import com.github.karlsabo.github.User as GitHubUser
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Test for the summary creation functionality using mock services.
@@ -98,11 +101,10 @@ class SummaryDetailTest {
         assertEquals(summaryName, summary.summaryName)
         assertTrue(summary.projectSummaries.isNotEmpty())
 
-        println("Summary:")
-        println(summary.toSlackMarkup())
+        logger.info { "Summary:\n${summary.toSlackMarkup()}" }
 
         summary.projectSummaries.forEach { projectSummary ->
-            println("Project: ${projectSummary.project.title}")
+            logger.info { "Project: ${projectSummary.project.title}" }
             assertNotNull(projectSummary.durationProgressSummary)
         }
 
