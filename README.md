@@ -11,7 +11,6 @@
 # TODO
 
 * [ ] Create native executables
-* [ ] Add logging
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
 
