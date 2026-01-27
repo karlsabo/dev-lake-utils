@@ -2,6 +2,7 @@ package com.github.karlsabo.pagerduty
 
 import com.github.karlsabo.http.installHttpRetry
 import com.github.karlsabo.tools.lenientJson
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -78,6 +79,8 @@ fun savePagerDutyConfig(config: PagerDutyConfig, configPath: Path) {
     }
 }
 
+private val logger = KotlinLogging.logger {}
+
 /**
  * Implementation of the PagerDutyApi interface using REST.
  */
@@ -120,9 +123,9 @@ class PagerDutyRestApi(private val config: PagerDutyApiRestConfig) : PagerDutyAp
 
             val status = response.status.value
             val responseText = response.bodyAsText()
-            println("PagerDuty response: ```$responseText```")
+            logger.debug { "PagerDuty response: ```$responseText```" }
             if (status !in 200..299) {
-                println("Failed to get PagerDuty incidents: $status")
+                logger.error { "Failed to get PagerDuty incidents: $status" }
                 throw Exception("Failed to get PagerDuty incidents: $status")
             }
 

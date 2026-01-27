@@ -10,6 +10,7 @@ import com.github.karlsabo.projectmanagement.ProjectComment
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.tools.lenientJson
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.cache.HttpCache
@@ -32,6 +33,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import com.github.karlsabo.projectmanagement.ProjectMilestone as UnifiedProjectMilestone
+
+private val logger = KotlinLogging.logger {}
 
 private const val DEFAULT_PAGE_SIZE = 100
 private const val DEFAULT_BATCH_SIZE = 100
@@ -358,7 +361,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
 
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            println("Response: ```$responseText```")
+            logger.debug { "Linear GraphQL error response: ```$responseText```" }
             throw Exception("Failed Linear GraphQL request: ${response.status.value}")
         }
 
