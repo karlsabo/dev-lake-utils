@@ -10,8 +10,6 @@
 
 # TODO
 
-* [ ] Add Linear support
-    * Demo for Linear
 * [ ] Create native executables
 * [ ] Add logging
 * [ ] Add dependency injection
@@ -19,7 +17,8 @@
 
 # Overview
 
-This project makes direct API calls to GitHub, Jira, and PagerDuty to collect data and create summaries of projects and
+This project makes direct API calls to GitHub, Jira, Linear, and PagerDuty to collect data and create summaries of
+projects and
 user metrics. By combining data from your development, project management, and incident response tools, it provides a
 unified view of your team's performance, allowing you to track key metrics and gain insights into your workflows.
 
