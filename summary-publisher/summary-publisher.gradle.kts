@@ -1,24 +1,10 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("multiplatform")
-    id("org.jetbrains.compose")
-    kotlin("plugin.compose")
-    kotlin("plugin.serialization")
-}
-
-repositories {
-    mavenCentral()
-    google()
+    id("devlake.kotlin-multiplatform-compose-conventions")
 }
 
 kotlin {
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
-
     sourceSets {
         getByName("commonMain") {
             dependencies {
@@ -26,37 +12,26 @@ kotlin {
                 implementation(kotlin("test"))
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${libs.versions.kotlinxCoroutines.get()}")
+                implementation(libs.kotlinx.coroutines.core)
 
                 implementation(project(":utilities"))
 
                 implementation(compose.runtime)
                 implementation(compose.desktop.currentOs)
 
-                val markdownVersion = libs.versions.markdown.get()
-                implementation("com.mikepenz:multiplatform-markdown-renderer:$markdownVersion")
-                implementation("com.mikepenz:multiplatform-markdown-renderer-m2:$markdownVersion")
-                implementation("com.mikepenz:multiplatform-markdown-renderer-m3:$markdownVersion")
+                implementation(libs.bundles.markdown.renderer)
 
                 // ktor
-                val ktorVersion = libs.versions.ktor.get()
-                implementation("io.ktor:ktor-client-core:${ktorVersion}")
-                implementation("io.ktor:ktor-client-cio:$ktorVersion")
-                implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-                implementation("io.ktor:ktor-serialization-gson:$ktorVersion")
+                implementation(libs.bundles.ktor.client)
+                implementation(libs.ktor.serialization.gson)
 
                 // IO
-                implementation("org.jetbrains.kotlinx:kotlinx-io-core:${libs.versions.kotlinxIo.get()}")
+                implementation(libs.kotlinx.io.core)
             }
-
-            getByName("jvmMain") {
-                dependencies {
-                    val log4jVersion = libs.versions.log4jVersion.get()
-                    runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:$log4jVersion")
-                    runtimeOnly("org.apache.logging.log4j:log4j-core:$log4jVersion")
-                    runtimeOnly("org.apache.logging.log4j:log4j-api:$log4jVersion")
-                }
+        }
+        getByName("jvmMain") {
+            dependencies {
+                runtimeOnly(libs.bundles.log4j.runtime)
             }
         }
     }
@@ -127,8 +102,4 @@ tasks.register<JavaExec>("runJiraTeamMerDemo") {
 
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
-
-tasks.withType<Test>().configureEach {
-    filter.isFailOnNoMatchingTests = false
 }
