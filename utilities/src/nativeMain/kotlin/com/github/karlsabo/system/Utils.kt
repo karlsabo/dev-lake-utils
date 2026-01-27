@@ -8,13 +8,11 @@ import platform.posix.getenv
 import platform.posix.uname
 import platform.posix.utsname
 
-@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 actual fun getEnv(name: String): String? {
     val envValue = getenv(name) ?: return null
     return envValue.toKString()
 }
 
-@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 actual fun osName(): String {
     return memScoped {
         val utsname = alloc<utsname>()
