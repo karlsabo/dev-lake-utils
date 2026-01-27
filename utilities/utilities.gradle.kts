@@ -70,30 +70,50 @@ kotlin {
     }
 }
 
-tasks.register<JavaExec>("createUsersAndTeams") {
-    group = "application"
-    mainClass.set("com.github.karlsabo.devlake.CreateUsersAndTeamsKt")
+// Helper function to create JavaExec tasks with lazy configuration
+fun createJvmExecTask(
+    taskName: String,
+    mainClassName: String,
+    compilationName: String = "main",
+    taskGroup: String = "application",
+    configure: JavaExec.() -> Unit = {},
+) {
+    tasks.register<JavaExec>(taskName) {
+        group = taskGroup
+        mainClass.set(mainClassName)
 
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("main").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+        val jvmTarget = kotlin.targets.named("jvm")
+        val compilation = jvmTarget.flatMap { target ->
+            target.compilations.named(compilationName)
+        }
+
+        classpath(
+            compilation.map { it.output.allOutputs },
+            compilation.map { it.runtimeDependencyFiles ?: files() }
+        )
+
+        configure()
+    }
 }
 
-tasks.register<JavaExec>("gitHubApiDemo") {
-    group = "application"
-    mainClass.set("com.github.karlsabo.github.GitHubApiDemoKt")
+createJvmExecTask(
+    taskName = "createUsersAndTeams",
+    mainClassName = "com.github.karlsabo.devlake.CreateUsersAndTeamsKt",
+    compilationName = "main"
+)
 
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
+createJvmExecTask(
+    taskName = "gitHubApiDemo",
+    mainClassName = "com.github.karlsabo.github.GitHubApiDemoKt",
+    compilationName = "test"
+)
 
-tasks.register<JavaExec>("notificationCleanupDemo") {
+createJvmExecTask(
+    taskName = "notificationCleanupDemo",
+    mainClassName = "com.github.karlsabo.github.notification.GitHubNotificationsCleanupDemoKt",
+    compilationName = "test"
+) {
     dependsOn("jvmTestClasses")
-
-    group = "application"
-    mainClass.set("com.github.karlsabo.github.notification.GitHubNotificationsCleanupDemoKt")
-
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
 
 publishing {
