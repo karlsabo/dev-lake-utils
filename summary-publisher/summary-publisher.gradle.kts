@@ -49,57 +49,69 @@ compose.desktop {
     }
 }
 
-tasks.register<JavaExec>("runSummaryDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.tools.SummaryDemoKt")
+// Helper function to create JavaExec tasks with lazy configuration
+fun createJvmExecTask(
+    taskName: String,
+    mainClassName: String,
+    compilationName: String = "main",
+    taskGroup: String = "run",
+    supportsArgs: Boolean = false,
+    configure: JavaExec.() -> Unit = {},
+) {
+    tasks.register<JavaExec>(taskName) {
+        group = taskGroup
+        mainClass.set(mainClassName)
 
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
+        if (supportsArgs) {
+            val argLine: String? = project.findProperty("args") as String?
+            if (argLine != null) {
+                args = argLine.split("\\s+".toRegex())
+            }
+        }
 
-tasks.register<JavaExec>("runSummaryDetailDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.tools.SummaryDetailDemoKt")
+        val jvmTarget = kotlin.targets.named("jvm")
+        val compilation = jvmTarget.flatMap { target ->
+            target.compilations.named(compilationName)
+        }
 
-    val argLine: String? = project.findProperty("args") as String?
-    if (argLine != null) {
-        args = argLine.split("\\s+".toRegex())
+        classpath(
+            compilation.map { it.output.allOutputs },
+            compilation.map { it.runtimeDependencyFiles ?: files() }
+        )
+
+        configure()
     }
-
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
 
-tasks.register<JavaExec>("runUiDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.tools.UiDemoKt")
+createJvmExecTask(
+    taskName = "runSummaryDemo",
+    mainClassName = "com.github.karlsabo.devlake.tools.SummaryDemoKt",
+    compilationName = "test"
+)
 
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
+createJvmExecTask(
+    taskName = "runSummaryDetailDemo",
+    mainClassName = "com.github.karlsabo.devlake.tools.SummaryDetailDemoKt",
+    compilationName = "test",
+    supportsArgs = true
+)
 
-tasks.register<JavaExec>("runSummaryPublisherWithConfig") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.tools.SummaryPublisherKt")
+createJvmExecTask(
+    taskName = "runUiDemo",
+    mainClassName = "com.github.karlsabo.devlake.tools.UiDemoKt",
+    compilationName = "test"
+)
 
-    val argLine: String? = project.findProperty("args") as String?
-    if (argLine != null) {
-        args = argLine.split("\\s+".toRegex())
-    }
+createJvmExecTask(
+    taskName = "runSummaryPublisherWithConfig",
+    mainClassName = "com.github.karlsabo.devlake.tools.SummaryPublisherKt",
+    compilationName = "main",
+    supportsArgs = true
+)
 
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("main").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
-
-tasks.register<JavaExec>("runJiraTeamMerDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.tools.JiraTeamMerDemoKt")
-
-    val argLine: String? = project.findProperty("args") as String?
-    if (argLine != null) {
-        args = argLine.split("\\s+".toRegex())
-    }
-
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
+createJvmExecTask(
+    taskName = "runJiraTeamMerDemo",
+    mainClassName = "com.github.karlsabo.devlake.tools.JiraTeamMerDemoKt",
+    compilationName = "test",
+    supportsArgs = true
+)

@@ -49,42 +49,50 @@ compose.desktop {
     }
 }
 
-tasks.register<JavaExec>("runMetricsDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.metrics.MetricsDemoKt")
+// Helper function to create JavaExec tasks with lazy configuration
+fun createJvmExecTask(
+    taskName: String,
+    mainClassName: String,
+    compilationName: String = "test",
+    taskGroup: String = "run",
+) {
+    tasks.register<JavaExec>(taskName) {
+        group = taskGroup
+        mainClass.set(mainClassName)
 
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+        val jvmTarget = kotlin.targets.named("jvm")
+        val compilation = jvmTarget.flatMap { target ->
+            target.compilations.named(compilationName)
+        }
+
+        classpath(
+            compilation.map { it.output.allOutputs },
+            compilation.map { it.runtimeDependencyFiles ?: files() }
+        )
+    }
 }
 
-tasks.register<JavaExec>("runUserEpicsDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.metrics.UserEpicsDemoKt")
+createJvmExecTask(
+    taskName = "runMetricsDemo",
+    mainClassName = "com.github.karlsabo.devlake.metrics.MetricsDemoKt"
+)
 
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
+createJvmExecTask(
+    taskName = "runUserEpicsDemo",
+    mainClassName = "com.github.karlsabo.devlake.metrics.UserEpicsDemoKt"
+)
 
-tasks.register<JavaExec>("runUserIssuesByParentDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.metrics.UserIssuesByParentDemoKt")
+createJvmExecTask(
+    taskName = "runUserIssuesByParentDemo",
+    mainClassName = "com.github.karlsabo.devlake.metrics.UserIssuesByParentDemoKt"
+)
 
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
+createJvmExecTask(
+    taskName = "runUserEpicsWithIssuesDemo",
+    mainClassName = "com.github.karlsabo.devlake.metrics.UserEpicsWithIssuesDemoKt"
+)
 
-tasks.register<JavaExec>("runUserEpicsWithIssuesDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.metrics.UserEpicsWithIssuesDemoKt")
-
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
-
-tasks.register<JavaExec>("runLinearDemo") {
-    group = "run"
-    mainClass.set("com.github.karlsabo.devlake.metrics.LinearDemoKt")
-
-    val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
-    classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
-}
+createJvmExecTask(
+    taskName = "runLinearDemo",
+    mainClassName = "com.github.karlsabo.devlake.metrics.LinearDemoKt"
+)
