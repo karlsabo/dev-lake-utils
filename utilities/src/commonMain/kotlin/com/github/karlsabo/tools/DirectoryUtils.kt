@@ -1,8 +1,9 @@
 package com.github.karlsabo.tools
 
 import com.github.karlsabo.dto.UsersConfig
+import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.getEnv
-import com.github.karlsabo.system.osName
+import com.github.karlsabo.system.osFamily
 import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -57,17 +58,15 @@ fun getApplicationDirectory(appName: String): Path {
     val homeEnv = getEnv("HOME") ?: getEnv("USERPROFILE") ?: "."
     val userHome = Path(homeEnv)
 
-    val directory = when (osName().lowercase()) {
-        in listOf("mac os x", "mac os", "macos", "macosx") -> Path(userHome, "Library", "Application Support", appName)
-        in listOf("windows") -> {
+    val directory = when (osFamily()) {
+        OsFamily.MACOS -> Path(userHome, "Library", "Application Support", appName)
+        OsFamily.WINDOWS -> {
             val appDataEnv = getEnv("APPDATA")
             val appData: Path = if (appDataEnv != null) Path(appDataEnv) else Path(userHome, "AppData", "Roaming")
             Path(appData, appName)
         }
 
-        else -> {
-            Path(userHome, ".local", "share", appName)
-        }
+        OsFamily.LINUX, OsFamily.UNKNOWN -> Path(userHome, ".local", "share", appName)
     }
     if (!SystemFileSystem.exists(directory)) SystemFileSystem.createDirectories(directory)
 
