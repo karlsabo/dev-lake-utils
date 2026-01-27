@@ -1,6 +1,5 @@
 package com.github.karlsabo.tools
 
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 
 /**
@@ -10,7 +9,6 @@ import kotlinx.serialization.json.Json
  * ignores unknown keys during deserialization, encodes default property values,
  * and formats the output with pretty-printing for better readability.
  */
-@OptIn(ExperimentalSerializationApi::class)
 val lenientJson = Json {
     allowTrailingComma = true
     allowComments = true

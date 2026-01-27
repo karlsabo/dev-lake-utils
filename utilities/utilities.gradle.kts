@@ -13,8 +13,17 @@ repositories {
 }
 
 kotlin {
+    targets.all {
+        compilations.all {
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-opt-in=kotlinx.serialization.ExperimentalSerializationApi")
+                }
+            }
+        }
+    }
+
     jvm {
-        withJava()
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
@@ -73,12 +82,16 @@ kotlin {
             }
         }
 
-        create("posixMain") {
-            dependsOn(getByName("commonMain"))
-        }
+    }
 
-        getByName("macosArm64Main") {
-            dependsOn(getByName("posixMain"))
+    // Apply ExperimentalForeignApi opt-in to all native targets
+    targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget> {
+        compilations.all {
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-opt-in=kotlinx.cinterop.ExperimentalForeignApi")
+                }
+            }
         }
     }
 }
@@ -109,6 +122,10 @@ tasks.register<JavaExec>("notificationCleanupDemo") {
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
 
+
+tasks.withType<Test>().configureEach {
+    filter.isFailOnNoMatchingTests = false
+}
 
 publishing {
     repositories {

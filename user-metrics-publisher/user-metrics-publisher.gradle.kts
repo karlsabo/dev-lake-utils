@@ -112,3 +112,9 @@ tasks.register<JavaExec>("runLinearDemo") {
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
 }
+
+// This module has demo mains in commonTest but no actual @Test methods
+// Configure the test task to not warn about no tests being executed
+tasks.withType<Test>().configureEach {
+    filter.isFailOnNoMatchingTests = false
+}

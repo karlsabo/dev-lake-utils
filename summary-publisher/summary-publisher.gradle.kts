@@ -14,7 +14,6 @@ repositories {
 
 kotlin {
     jvm {
-        withJava()
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
@@ -128,4 +127,8 @@ tasks.register<JavaExec>("runJiraTeamMerDemo") {
 
     val jvmCompilations = kotlin.targets.named("jvm").get().compilations.named("test").get()
     classpath = jvmCompilations.output.allOutputs + (jvmCompilations.runtimeDependencyFiles ?: files())
+}
+
+tasks.withType<Test>().configureEach {
+    filter.isFailOnNoMatchingTests = false
 }
