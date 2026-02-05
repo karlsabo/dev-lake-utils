@@ -1,5 +1,8 @@
 package com.github.karlsabo.devlake.metrics
 
+import com.github.karlsabo.devlake.metrics.model.UserMetrics
+import com.github.karlsabo.devlake.metrics.model.toSlackMarkdown
+import com.github.karlsabo.devlake.metrics.service.MetricsService
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.jira.JiraRestApi
@@ -13,7 +16,6 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import kotlin.time.measureTime
 
-
 fun main() {
     val jiraConfig = loadJiraConfig(jiraConfigPath)
     val gitHubConfig = loadGitHubConfig(gitHubConfigPath)
@@ -26,7 +28,7 @@ fun main() {
                 val user = users!!.users.firstOrNull { it.id == userId }
                     ?: throw Exception("User not found: $userId in ${users.users}")
                 measureTime {
-                    val userMetrics = createUserMetrics(
+                    val userMetrics = MetricsService.createUserMetrics(
                         user,
                         config.organizationIds,
                         JiraRestApi(jiraConfig),
@@ -42,10 +44,10 @@ fun main() {
         }
         jobs.joinAll()
 
-        metrics.forEach {
+        metrics.forEach { metric ->
             println(
-                "📢 *Weekly PR & Issue Summary* 🚀 (${it.userId})\n"
-                        + it.toSlackMarkdown()
+                "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n"
+                        + metric.toSlackMarkdown()
                         + "\n"
                         + config.metricInformationPostfix
             )
