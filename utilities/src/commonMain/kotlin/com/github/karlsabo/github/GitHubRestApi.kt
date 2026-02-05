@@ -23,9 +23,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
+import com.github.karlsabo.common.datetime.DateTimeFormatting.toIsoUtcDateTime
 import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -83,8 +82,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         startDateInclusive: Instant,
         endDateInclusive: Instant,
     ): List<Issue> {
-        val formattedStartDate = startDateInclusive.toUtcDateString()
-        val formattedEndDate = endDateInclusive.toUtcDateString()
+        val formattedStartDate = startDateInclusive.toIsoUtcDateTime()
+        val formattedEndDate = endDateInclusive.toIsoUtcDateTime()
 
         val query =
             "${organizationIds.joinToString(" ") { "org:$it" }} is:merged merged:$formattedStartDate..$formattedEndDate is:pr $searchText in:title,body"
@@ -324,8 +323,8 @@ private fun createMergedPrEncodedQuery(
     gitHubUserId: String,
     organizationIds: List<String>,
 ): String {
-    val formattedStartDate = startDate.toUtcDateString()
-    val formattedEndDate = endDate.toUtcDateString()
+    val formattedStartDate = startDate.toIsoUtcDateTime()
+    val formattedEndDate = endDate.toIsoUtcDateTime()
 
     val query =
         "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
@@ -339,8 +338,8 @@ private fun createReviewedPrEncodedQuery(
     gitHubUserId: String,
     organizationIds: List<String>,
 ): String {
-    val formattedStartDate = startDate.toUtcDateString()
-    val formattedEndDate = endDate.toUtcDateString()
+    val formattedStartDate = startDate.toIsoUtcDateTime()
+    val formattedEndDate = endDate.toIsoUtcDateTime()
 
     // q=reviewed-by:karlsabo (org:klaviyo OR org:zitadel) is:pr updated:2025-01-01..2025-12-31
     val query =
@@ -351,8 +350,4 @@ private fun createReviewedPrEncodedQuery(
 
 fun JsonElement.toPullRequest(): Issue {
     return lenientJson.decodeFromJsonElement(Issue.serializer(), this)
-}
-
-private fun Instant.toUtcDateString(): String {
-    return toLocalDateTime(TimeZone.UTC).toString()
 }

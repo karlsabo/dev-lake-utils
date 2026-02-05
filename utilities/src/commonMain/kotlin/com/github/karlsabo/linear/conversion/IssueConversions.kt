@@ -1,10 +1,10 @@
 package com.github.karlsabo.linear.conversion
 
+import com.github.karlsabo.common.datetime.DateTimeFormatting
 import com.github.karlsabo.linear.Issue
 import com.github.karlsabo.linear.WorkflowState
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.StatusCategory
-import kotlinx.datetime.Instant
 
 /**
  * Converts a Linear Issue to a unified ProjectIssue.
@@ -64,11 +64,6 @@ internal fun priorityToString(priority: Int?): String? {
  * Parses a Linear date string to an Instant.
  * Linear due dates are typically in "YYYY-MM-DD" format.
  */
-internal fun parseDueDate(dueDate: String?): Instant? {
-    if (dueDate.isNullOrBlank()) return null
-    return try {
-        Instant.parse("${dueDate}T00:00:00Z")
-    } catch (e: Exception) {
-        null
-    }
+internal fun parseDueDate(dueDate: String?) = dueDate?.let {
+    runCatching { DateTimeFormatting.parseDateOnlyToInstant(it) }.getOrNull()
 }

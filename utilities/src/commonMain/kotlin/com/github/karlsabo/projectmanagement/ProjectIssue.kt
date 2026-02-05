@@ -39,7 +39,7 @@ fun ProjectIssue.isCompleted(): Boolean = completedAt != null
  */
 fun ProjectIssue.isMilestone(): Boolean {
     val type = issueType?.lowercase() ?: return false
-    return type == "epic" || type == "milestone"
+    return type in IssueTypeConstants.MILESTONE_TYPES
 }
 
 /**
@@ -47,15 +47,9 @@ fun ProjectIssue.isMilestone(): Boolean {
  */
 fun ProjectIssue.isIssueOrBug(): Boolean {
     val type = issueType?.lowercase() ?: return false
-    return when (type) {
-        "bug", "issue", "story", "subtask", "artifact", "task", "vulnerability",
-        "request", "design story", "ds story", "change request",
-            -> true
-
-        "epic", "theme", "parent artifact", "r&d initiative", "sub-task",
-        "company initiative", "milestone",
-            -> false
-
+    return when {
+        type in IssueTypeConstants.WORK_ITEM_TYPES -> true
+        type in IssueTypeConstants.CONTAINER_TYPES -> false
         else -> true // Default to treating unknown types as issues
     }
 }
