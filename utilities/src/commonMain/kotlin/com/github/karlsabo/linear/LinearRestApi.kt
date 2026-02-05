@@ -5,6 +5,8 @@ import com.github.karlsabo.linear.config.LinearApiRestConfig
 import com.github.karlsabo.linear.conversion.toProjectComment
 import com.github.karlsabo.linear.conversion.toProjectIssue
 import com.github.karlsabo.linear.conversion.toUnifiedProjectMilestone
+import com.github.karlsabo.linear.query.LinearQueryBuilder
+import com.github.karlsabo.linear.query.LinearQueryBuilder.Companion.escapeGraphQlString
 import com.github.karlsabo.projectmanagement.IssueFilter
 import com.github.karlsabo.projectmanagement.ProjectComment
 import com.github.karlsabo.projectmanagement.ProjectIssue
@@ -115,6 +117,8 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         val variables: JsonObject? = null,
     )
 
+    private val queryBuilder = LinearQueryBuilder(DEFAULT_PAGE_SIZE)
+
     private val client: HttpClient by lazy {
         clientOverride ?: buildDefaultClient()
     }
@@ -137,7 +141,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
 
         val issues = mutableListOf<Issue>()
         issueKeys.chunked(DEFAULT_BATCH_SIZE).forEach { batch ->
-            val query = buildIssuesByIdQuery(batch)
+            val query = queryBuilder.issuesByIds(batch, ISSUE_FIELDS)
             val data = executeGraphQl(query)
             batch.indices.forEach { index ->
                 val alias = "issue$index"
@@ -175,7 +179,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
 
         while (remaining > 0) {
             val pageSize = minOf(DEFAULT_PAGE_SIZE, remaining)
-            val query = buildIssueCommentsQuery(escapedIssueKey, pageSize, cursor)
+            val query = queryBuilder.issueComments(escapedIssueKey, COMMENT_FIELDS, pageSize, cursor)
             val data = executeGraphQl(query)
             val issueNode = data["issue"]?.jsonObject ?: break
             val commentsNode = issueNode["comments"]?.jsonObject ?: break
@@ -200,12 +204,12 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
     }
 
     override suspend fun getIssuesResolved(userId: String, startDate: Instant, endDate: Instant): List<ProjectIssue> {
-        val filter = buildResolvedIssuesFilter(userId, startDate, endDate)
+        val filter = queryBuilder.resolvedIssuesFilter(userId, startDate, endDate)
         return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
     override suspend fun getIssuesResolvedCount(userId: String, startDate: Instant, endDate: Instant): UInt {
-        val filter = buildResolvedIssuesFilter(userId, startDate, endDate)
+        val filter = queryBuilder.resolvedIssuesFilter(userId, startDate, endDate)
         return countIssuesByFilter(filter)
     }
 
@@ -237,7 +241,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
     ): List<ProjectIssue> {
         if (labels.isEmpty()) return emptyList()
 
-        val filter = buildLabelsFilter(labels, completedAfter, completedBefore)
+        val filter = queryBuilder.labelsFilter(labels, completedAfter, completedBefore)
         return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
@@ -247,7 +251,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         val escapedProjectId = escapeGraphQlString(projectId)
 
         while (true) {
-            val query = buildProjectMilestonesQuery(escapedProjectId, cursor)
+            val query = queryBuilder.projectMilestones(escapedProjectId, MILESTONE_FIELDS, cursor)
             val data = executeGraphQl(query)
             val projectNode = data["project"]?.jsonObject ?: break
             val milestonesNode = projectNode["projectMilestones"]?.jsonObject ?: break
@@ -270,7 +274,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
     }
 
     override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
-        val filter = buildMilestoneIssuesFilter(milestoneId)
+        val filter = queryBuilder.milestoneIssuesFilter(milestoneId)
         return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
@@ -280,7 +284,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         val escapedIssueKey = escapeGraphQlString(issueKey)
 
         while (true) {
-            val query = buildChildrenQuery(escapedIssueKey, cursor)
+            val query = queryBuilder.childrenOf(escapedIssueKey, ISSUE_FIELDS, cursor)
             val data = executeGraphQl(query)
             val issueNode = data["issue"]?.jsonObject ?: break
             val childrenNode = issueNode["children"]?.jsonObject ?: break
@@ -307,7 +311,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         var cursor: String? = null
 
         while (true) {
-            val query = buildIssuesByFilterQuery(filter, selection, cursor, orderBy)
+            val query = queryBuilder.issuesByFilter(filter, selection, cursor, orderBy)
             val data = executeGraphQl(query)
             val issuesNode = data["issues"]?.jsonObject ?: break
             val nodes = issuesNode["nodes"]?.jsonArray ?: break
@@ -333,7 +337,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         var count = 0
 
         while (true) {
-            val query = buildIssuesByFilterQuery(filter, ISSUE_ID_FIELDS, cursor, null)
+            val query = queryBuilder.issuesByFilter(filter, ISSUE_ID_FIELDS, cursor, null)
             val data = executeGraphQl(query)
             val issuesNode = data["issues"]?.jsonObject ?: break
             val nodes = issuesNode["nodes"]?.jsonArray ?: break
@@ -379,181 +383,6 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
             ?: throw Exception("Linear GraphQL response missing data: $responseText")
     }
 
-    private fun buildIssuesByIdQuery(issueKeys: List<String>): String {
-        return buildString {
-            append("query {")
-            issueKeys.forEachIndexed { index, issueKey ->
-                val escaped = escapeGraphQlString(issueKey)
-                append("\n  issue$index: issue(id: \"")
-                append(escaped)
-                append("\") {")
-                append("\n")
-                append(ISSUE_FIELDS.indent("    "))
-                append("\n  }")
-            }
-            append("\n}")
-        }
-    }
-
-    private fun buildChildrenQuery(issueKey: String, cursor: String?): String {
-        return buildString {
-            append("query {")
-            append("\n  issue(id: \"")
-            append(issueKey)
-            append("\") {")
-            append("\n    children(first: ")
-            append(DEFAULT_PAGE_SIZE)
-            if (!cursor.isNullOrBlank()) {
-                append(", after: \"")
-                append(escapeGraphQlString(cursor))
-                append("\"")
-            }
-            append(") {")
-            append("\n      nodes {")
-            append("\n")
-            append(ISSUE_FIELDS.indent("        "))
-            append("\n      }")
-            append("\n      pageInfo { hasNextPage endCursor }")
-            append("\n    }")
-            append("\n  }")
-            append("\n}")
-        }
-    }
-
-    private fun buildIssueCommentsQuery(issueKey: String, pageSize: Int, cursor: String?): String {
-        return buildString {
-            append("query {")
-            append("\n  issue(id: \"")
-            append(issueKey)
-            append("\") {")
-            append("\n    comments(first: ")
-            append(pageSize)
-            if (!cursor.isNullOrBlank()) {
-                append(", after: \"")
-                append(escapeGraphQlString(cursor))
-                append("\"")
-            }
-            append(", orderBy: updatedAt) {")
-            append("\n      nodes {")
-            append("\n")
-            append(COMMENT_FIELDS.indent("        "))
-            append("\n      }")
-            append("\n      pageInfo { hasNextPage endCursor }")
-            append("\n    }")
-            append("\n  }")
-            append("\n}")
-        }
-    }
-
-    private fun buildIssuesByFilterQuery(
-        filter: String,
-        selection: String,
-        cursor: String?,
-        orderBy: String?,
-    ): String {
-        return buildString {
-            append("query {")
-            append("\n  issues(first: ")
-            append(DEFAULT_PAGE_SIZE)
-            if (!cursor.isNullOrBlank()) {
-                append(", after: \"")
-                append(escapeGraphQlString(cursor))
-                append("\"")
-            }
-            if (!orderBy.isNullOrBlank()) {
-                append(", orderBy: ")
-                append(orderBy)
-            }
-            append(", filter: ")
-            append(filter)
-            append(") {")
-            append("\n    nodes {")
-            append("\n")
-            append(selection.indent("      "))
-            append("\n    }")
-            append("\n    pageInfo { hasNextPage endCursor }")
-            append("\n  }")
-            append("\n}")
-        }
-    }
-
-    private fun buildResolvedIssuesFilter(userId: String, startDate: Instant, endDate: Instant): String {
-        val escapedUserId = escapeGraphQlString(userId)
-        val start = escapeGraphQlString(startDate.toString())
-        val end = escapeGraphQlString(endDate.toString())
-
-        return """
-            {
-              assignee: { id: { eq: "$escapedUserId" } }
-              completedAt: { gte: "$start", lte: "$end" }
-            }
-        """.trimIndent()
-    }
-
-    private fun buildLabelsFilter(
-        labels: List<String>,
-        completedAfter: Instant?,
-        completedBefore: Instant?,
-    ): String {
-        val labelNames = labels.joinToString(", ") { "\"${escapeGraphQlString(it)}\"" }
-        val completedFilter = buildCompletedAtFilter(completedAfter, completedBefore)
-
-        return buildString {
-            append("{ labels: { name: { in: [$labelNames] } }")
-            if (completedFilter.isNotEmpty()) {
-                append(", $completedFilter")
-            }
-            append(" }")
-        }
-    }
-
-    private fun buildCompletedAtFilter(completedAfter: Instant?, completedBefore: Instant?): String {
-        if (completedAfter == null && completedBefore == null) return ""
-
-        return buildString {
-            append("completedAt: { ")
-            val filters = mutableListOf<String>()
-            if (completedAfter != null) {
-                filters.add("gte: \"${escapeGraphQlString(completedAfter.toString())}\"")
-            }
-            if (completedBefore != null) {
-                filters.add("lte: \"${escapeGraphQlString(completedBefore.toString())}\"")
-            }
-            append(filters.joinToString(", "))
-            append(" }")
-        }
-    }
-
-    private fun buildProjectMilestonesQuery(projectId: String, cursor: String?): String {
-        return buildString {
-            append("query {")
-            append("\n  project(id: \"")
-            append(projectId)
-            append("\") {")
-            append("\n    projectMilestones(first: ")
-            append(DEFAULT_PAGE_SIZE)
-            if (!cursor.isNullOrBlank()) {
-                append(", after: \"")
-                append(escapeGraphQlString(cursor))
-                append("\"")
-            }
-            append(") {")
-            append("\n      nodes {")
-            append("\n")
-            append(MILESTONE_FIELDS.indent("        "))
-            append("\n      }")
-            append("\n      pageInfo { hasNextPage endCursor }")
-            append("\n    }")
-            append("\n  }")
-            append("\n}")
-        }
-    }
-
-    private fun buildMilestoneIssuesFilter(milestoneId: String): String {
-        val escapedMilestoneId = escapeGraphQlString(milestoneId)
-        return "{ projectMilestone: { id: { eq: \"$escapedMilestoneId\" } } }"
-    }
-
     private fun authorizationHeaderValue(): String {
         if (config.token.startsWith("Bearer ")) return config.token
         return if (config.useBearerAuth) {
@@ -561,17 +390,5 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         } else {
             config.token
         }
-    }
-
-    private fun escapeGraphQlString(value: String): String {
-        return value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-    }
-
-    private fun String.indent(prefix: String): String {
-        return this.lines().joinToString("\n") { line -> if (line.isBlank()) line else prefix + line }
     }
 }

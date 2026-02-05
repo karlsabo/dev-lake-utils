@@ -32,9 +32,8 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
+import com.github.karlsabo.common.datetime.DateTimeFormatting.toCompactUtcDateTime
 import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -153,7 +152,7 @@ class JiraRestApi(
     }
 
     override suspend fun getMilestones(projectId: String): List<ProjectMilestone> =
-        runJqlPaginated("project = \"$projectId\" AND issuetype = Epic ORDER BY created DESC") { it.toProjectMilestone() }
+        runJqlPaginated("project = \"$projectId\" AND issuetype = ${JiraConstants.ISSUE_TYPE_EPIC} ORDER BY created DESC") { it.toProjectMilestone() }
 
     override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
         return getDirectChildIssues(milestoneId)
@@ -178,10 +177,10 @@ class JiraRestApi(
         val jql = buildString {
             append("issuetype in (${issueTypes.joinToString(", ")})")
             if (resolvedAfter != null) {
-                append(" AND resolutiondate >= \"${resolvedAfter.toUtcDateString()}\"")
+                append(" AND resolutiondate >= \"${resolvedAfter.toCompactUtcDateTime()}\"")
             }
             if (resolvedBefore != null) {
-                append(" AND resolutiondate <= \"${resolvedBefore.toUtcDateString()}\"")
+                append(" AND resolutiondate <= \"${resolvedBefore.toCompactUtcDateTime()}\"")
             }
             append(" AND \"${customFieldFilter.fieldId}\" in (${customFieldFilter.values.joinToString(", ") { "\"$it\"" }})")
             append(" ORDER BY resolutiondate DESC")
@@ -241,7 +240,7 @@ class JiraRestApi(
         }
 
     private fun buildResolvedJql(userId: String, startDate: Instant, endDate: Instant): String =
-        "assignee = $userId AND resolutiondate >= \"${startDate.toUtcDateString()}\" AND resolutiondate <= \"${endDate.toUtcDateString()}\""
+        "assignee = $userId AND resolutiondate >= \"${startDate.toCompactUtcDateTime()}\" AND resolutiondate <= \"${endDate.toCompactUtcDateTime()}\""
 
     private fun buildJqlFromFilter(filter: IssueFilter): String {
         val conditions = mutableListOf<String>()
@@ -269,9 +268,4 @@ private suspend fun HttpResponse.ensureSuccess(operation: String) {
         logger.debug { "Jira API error response: ```$responseBody```" }
         throw Exception("Failed to $operation: HTTP ${status.value}")
     }
-}
-
-private fun Instant.toUtcDateString(): String {
-    val localDateTime = toLocalDateTime(TimeZone.UTC)
-    return "${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute}"
 }
