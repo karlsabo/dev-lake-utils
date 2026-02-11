@@ -13,9 +13,10 @@ data class NotificationUiState(
     val apiUrl: String?,
     val isPullRequest: Boolean,
     val unread: Boolean,
+    val headRef: String? = null,
 )
 
-fun Notification.toNotificationUiState(): NotificationUiState {
+fun Notification.toNotificationUiState(headRef: String? = null): NotificationUiState {
     val subjectUrl = subject.url
     val htmlUrl = if (subjectUrl != null) apiUrlToHtmlUrl(subjectUrl) else null
 
@@ -29,5 +30,6 @@ fun Notification.toNotificationUiState(): NotificationUiState {
         apiUrl = subjectUrl,
         isPullRequest = subject.type == "PullRequest",
         unread = unread,
+        headRef = headRef,
     )
 }

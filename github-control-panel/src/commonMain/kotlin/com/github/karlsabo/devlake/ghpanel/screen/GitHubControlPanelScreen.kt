@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.ghpanel.component.ErrorDialog
 import com.github.karlsabo.devlake.ghpanel.component.NotificationPanel
 import com.github.karlsabo.devlake.ghpanel.component.PullRequestPanel
 import com.github.karlsabo.devlake.ghpanel.viewmodel.GitHubControlPanelViewModel
@@ -19,6 +20,11 @@ import com.github.karlsabo.devlake.ghpanel.viewmodel.GitHubControlPanelViewModel
 fun GitHubControlPanelScreen(viewModel: GitHubControlPanelViewModel) {
     val pullRequestsResult by viewModel.pullRequests.collectAsState()
     val notificationsResult by viewModel.notifications.collectAsState()
+    val actionError by viewModel.actionError.collectAsState()
+
+    actionError?.let { error ->
+        ErrorDialog(message = error, onDismiss = { viewModel.clearActionError() })
+    }
 
     MaterialTheme {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {

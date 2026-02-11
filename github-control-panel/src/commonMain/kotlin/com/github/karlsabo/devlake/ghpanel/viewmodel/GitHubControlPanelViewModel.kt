@@ -15,9 +15,12 @@ import com.github.karlsabo.system.DesktopLauncher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.retry
@@ -33,6 +36,13 @@ class GitHubControlPanelViewModel(
     private val desktopLauncher: DesktopLauncher,
     private val config: GitHubControlPanelConfig,
 ) : ViewModel() {
+
+    private val _actionError = MutableStateFlow<String?>(null)
+    val actionError: StateFlow<String?> = _actionError.asStateFlow()
+
+    fun clearActionError() {
+        _actionError.value = null
+    }
 
     val pullRequests: StateFlow<Result<List<PullRequestUiState>>> = flow {
         while (true) {
@@ -74,12 +84,23 @@ class GitHubControlPanelViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Result.success(emptyList()))
 
-    val notifications: StateFlow<Result<List<NotificationUiState>>> = flow {
+    private val dismissedThreadIds = MutableStateFlow<Set<String>>(emptySet())
+
+    private val polledNotifications = flow {
         while (true) {
             val notifs = gitHubApi.listNotifications()
             val uiStates = notifs
                 .filter { it.unread }
-                .map { it.toNotificationUiState() }
+                .map { notif ->
+                    val headRef = if (notif.subject.type == "PullRequest" && notif.subject.url != null) {
+                        try {
+                            gitHubApi.getPullRequestByUrl(notif.subject.url!!).head?.ref
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else null
+                    notif.toNotificationUiState(headRef)
+                }
             emit(Result.success(uiStates))
             delay(config.pollIntervalMs)
         }
@@ -97,7 +118,13 @@ class GitHubControlPanelViewModel(
             logger.error(e) { "Error polling notifications" }
             emit(Result.failure(e))
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Result.success(emptyList()))
+
+    val notifications: StateFlow<Result<List<NotificationUiState>>> = combine(
+        polledNotifications,
+        dismissedThreadIds,
+    ) { result, dismissed ->
+        result.map { list -> list.filter { it.threadId !in dismissed } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Result.success(emptyList()))
 
     fun openInBrowser(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -114,6 +141,7 @@ class GitHubControlPanelViewModel(
                 desktopLauncher.openInIdea(worktreePath)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to checkout and open $repoFullName branch=$branch" }
+                _actionError.value = e.message ?: "Failed to checkout and open"
             }
         }
     }
@@ -124,6 +152,7 @@ class GitHubControlPanelViewModel(
                 gitHubApi.approvePullRequestByUrl(apiUrl)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to approve PR $apiUrl" }
+                _actionError.value = e.message ?: "Failed to approve pull request"
             }
         }
     }
@@ -134,16 +163,20 @@ class GitHubControlPanelViewModel(
                 gitHubApi.submitReview(apiUrl, event, reviewComment)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to submit review for $apiUrl" }
+                _actionError.value = e.message ?: "Failed to submit review"
             }
         }
     }
 
     fun markNotificationDone(threadId: String) {
+        dismissedThreadIds.value += threadId
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 gitHubApi.markNotificationAsDone(threadId)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to mark notification done $threadId" }
+                dismissedThreadIds.value -= threadId
+                _actionError.value = e.message ?: "Failed to mark notification as done"
             }
         }
     }
@@ -154,6 +187,7 @@ class GitHubControlPanelViewModel(
                 gitHubApi.unsubscribeFromNotification(threadId)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to unsubscribe from notification $threadId" }
+                _actionError.value = e.message ?: "Failed to unsubscribe from notification"
             }
         }
     }

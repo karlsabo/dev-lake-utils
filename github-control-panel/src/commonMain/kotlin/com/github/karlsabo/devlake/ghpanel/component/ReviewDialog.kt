@@ -45,49 +45,51 @@ fun ReviewDialog(
         title = "Submit Review",
         visible = true,
     ) {
-        Surface {
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
-            ) {
-                Text(text = "Review Type", style = MaterialTheme.typography.h6)
-                Spacer(modifier = Modifier.height(8.dp))
+        MaterialTheme {
+            Surface {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                ) {
+                    Text(text = "Review Type", style = MaterialTheme.typography.h6)
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                events.forEach { (event, label) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = selectedEvent == event,
-                            onClick = { selectedEvent = event },
-                        )
-                        Text(text = label)
+                    events.forEach { (event, label) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedEvent == event,
+                                onClick = { selectedEvent = event },
+                            )
+                            Text(text = label)
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedTextField(
-                    value = reviewComment,
-                    onValueChange = { reviewComment = it },
-                    label = { Text("Review comment") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
-                )
+                    OutlinedTextField(
+                        value = reviewComment,
+                        onValueChange = { reviewComment = it },
+                        label = { Text("Review comment") },
+                        modifier = Modifier.fillMaxWidth().height(120.dp),
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Row {
-                    Button(
-                        onClick = {
-                            onSubmit(selectedEvent, reviewComment.ifBlank { null })
-                        },
-                        enabled = selectedEvent == ReviewStateValue.APPROVED || reviewComment.isNotBlank(),
-                    ) {
-                        Text("Submit")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
+                    Row {
+                        Button(
+                            onClick = {
+                                onSubmit(selectedEvent, reviewComment.ifBlank { null })
+                            },
+                            enabled = selectedEvent == ReviewStateValue.APPROVED || reviewComment.isNotBlank(),
+                        ) {
+                            Text("Submit")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel")
+                        }
                     }
                 }
             }

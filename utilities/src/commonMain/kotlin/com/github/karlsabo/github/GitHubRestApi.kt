@@ -115,8 +115,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.debug { "getMergedPullRequestCount responseText=```$responseText```" }
-            throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId")
+            logger.error { "getMergedPullRequestCount responseText=```$responseText```" }
+            throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId responseText=```$responseText```")
         }
         val root = Json.parseToJsonElement(responseText).jsonObject
 
@@ -138,8 +138,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.debug { "getPullRequestReviewCount responseText=```$responseText```" }
-            throw Exception("Failed to get pull request review count: ${response.status.value} for $gitHubUserId")
+            logger.error { "getPullRequestReviewCount responseText=```$responseText```" }
+            throw Exception("Failed to get pull request review count: ${response.status.value} for $gitHubUserId responseText=```$responseText```")
         }
         val root = Json.parseToJsonElement(responseText).jsonObject
 
@@ -161,9 +161,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
             val responseText = response.bodyAsText()
             if (response.status.value !in 200..299) {
-                logger.error { "searchPullRequestsByText query failed" }
-                logger.debug { "responseText=```$responseText```" }
-                throw Exception("Failed to search pull requests: ${response.status.value}")
+                logger.error { "searchPullRequestsByText query failed responseText=```$responseText```" }
+                throw Exception("Failed to search pull requests: ${response.status.value} responseText=```$responseText```")
             }
 
             val root = lenientJson.parseToJsonElement(responseText).jsonObject
@@ -199,9 +198,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
             val responseText = response.bodyAsText()
 
             if (response.status.value !in 200..299) {
-                logger.error { "Failed to list notifications $url" }
-                logger.debug { "response.status=${response.status} responseText=```$responseText```" }
-                throw Exception("Failed to list notifications: ${response.status.value}")
+                logger.error { "Failed to list notifications $url response.status=${response.status} responseText=```$responseText```" }
+                throw Exception("Failed to list notifications: ${response.status.value} responseText=```$responseText```")
             }
 
             val pageNotifications = lenientJson.decodeFromString<List<Notification>>(responseText)
@@ -218,9 +216,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val response = client.get(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.error { "Failed to get pull request $url" }
-            logger.debug { "response.status=${response.status} responseText=```$responseText```" }
-            throw Exception("Failed to get pull request: ${response.status.value} for url=$url")
+            logger.error { "Failed to get pull request $url response.status=${response.status} responseText=```$responseText```" }
+            throw Exception("Failed to get pull request: ${response.status.value} for url=$url responseText=```$responseText```")
         }
         return lenientJson.decodeFromString(PullRequest.serializer(), responseText)
     }
@@ -233,8 +230,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.debug { "approvePullRequest responseText=```$responseText```" }
-            throw Exception("Failed to approve pull request: ${response.status.value} for url=$url")
+            logger.error { "approvePullRequest responseText=```$responseText```" }
+            throw Exception("Failed to approve pull request: ${response.status.value} for url=$url responseText=```$responseText```")
         }
     }
 
@@ -248,8 +245,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val response = client.get(reviewsUrl)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.debug { "hasAnyApprovedReview responseText=```$responseText```" }
-            throw Exception("Failed to list pull request reviews: ${response.status.value} for url=$url")
+            logger.error { "hasAnyApprovedReview responseText=```$responseText```" }
+            throw Exception("Failed to list pull request reviews: ${response.status.value} for url=$url responseText=```$responseText```")
         }
 
         return try {
@@ -294,9 +291,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val response = client.delete(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.error { "Failed to mark notification done $url" }
-            logger.debug { "response.status=${response.status} responseText=```$responseText```" }
-            throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId")
+            logger.error { "Failed to mark notification done $url response.status=${response.status} responseText=```$responseText```" }
+            throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId responseText=```$responseText```")
         }
     }
 
@@ -311,8 +307,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.debug { "unsubscribeFromNotification responseText=```$responseText```" }
-            throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId")
+            logger.error { "unsubscribeFromNotification responseText=```$responseText```" }
+            throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId responseText=```$responseText```")
         }
     }
 
@@ -327,9 +323,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val response = client.get(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.error { "Failed to get check runs for $owner/$repo ref=$ref" }
-            logger.debug { "response.status=${response.status} responseText=```$responseText```" }
-            throw Exception("Failed to get check runs: ${response.status.value} for $owner/$repo ref=$ref")
+            logger.error { "Failed to get check runs for $owner/$repo ref=$ref response.status=${response.status} responseText=```$responseText```" }
+            throw Exception("Failed to get check runs: ${response.status.value} for $owner/$repo ref=$ref responseText=```$responseText```")
         }
 
         val root = lenientJson.parseToJsonElement(responseText).jsonObject
@@ -375,9 +370,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val reviewsResponse = client.get(reviewsUrl)
         val reviewsText = reviewsResponse.bodyAsText()
         if (reviewsResponse.status.value !in 200..299) {
-            logger.error { "Failed to get reviews for $owner/$repo#$prNumber" }
-            logger.debug { "response.status=${reviewsResponse.status} responseText=```$reviewsText```" }
-            throw Exception("Failed to get reviews: ${reviewsResponse.status.value} for $owner/$repo#$prNumber")
+            logger.error { "Failed to get reviews for $owner/$repo#$prNumber response.status=${reviewsResponse.status} responseText=```$reviewsText```" }
+            throw Exception("Failed to get reviews: ${reviewsResponse.status.value} for $owner/$repo#$prNumber responseText=```$reviewsText```")
         }
 
         val reviewElements = lenientJson.parseToJsonElement(reviewsText).jsonArray
@@ -428,8 +422,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            logger.debug { "submitReview responseText=```$responseText```" }
-            throw Exception("Failed to submit review: ${response.status.value} for url=$prApiUrl")
+            logger.error { "submitReview responseText=```$responseText```" }
+            throw Exception("Failed to submit review: ${response.status.value} for url=$prApiUrl responseText=```$responseText```")
         }
     }
 }
