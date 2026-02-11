@@ -652,6 +652,37 @@ class SummaryDetailTest {
         override suspend fun hasAnyApprovedReview(url: String): Boolean {
             TODO("Not yet implemented")
         }
+
+        override suspend fun getOpenPullRequestsByAuthor(
+            organizationIds: List<String>,
+            author: String,
+        ): List<GitHubIssue> {
+            return emptyList()
+        }
+
+        override suspend fun getCheckRunsForRef(
+            owner: String,
+            repo: String,
+            ref: String,
+        ): com.github.karlsabo.github.CheckRunSummary {
+            return com.github.karlsabo.github.CheckRunSummary(0, 0, 0, 0, com.github.karlsabo.github.CiStatus.PENDING)
+        }
+
+        override suspend fun getReviewSummary(
+            owner: String,
+            repo: String,
+            prNumber: Int,
+        ): com.github.karlsabo.github.ReviewSummary {
+            return com.github.karlsabo.github.ReviewSummary(0, 0, emptyList())
+        }
+
+        override suspend fun submitReview(
+            prApiUrl: String,
+            event: com.github.karlsabo.github.ReviewStateValue,
+            reviewComment: String?,
+        ) {
+            TODO("Not yet implemented")
+        }
     }
 
     /**

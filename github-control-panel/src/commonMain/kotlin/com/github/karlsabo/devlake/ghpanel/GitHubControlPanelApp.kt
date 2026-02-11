@@ -68,18 +68,18 @@ fun GitHubControlPanelApp(onExitApplication: () -> Unit) {
         return
     }
 
-    val vm = viewModel ?: return
-
     Window(
         onCloseRequest = onExitApplication,
         title = "GitHub Control Panel",
-        visible = !isLoading,
+        visible = !isLoading && viewModel != null,
         state = rememberWindowState(
             width = 1400.dp,
             height = 900.dp,
             position = WindowPosition(Alignment.Center),
         ),
     ) {
-        GitHubControlPanelScreen(viewModel = vm)
+        viewModel?.let { vm ->
+            GitHubControlPanelScreen(viewModel = vm)
+        }
     }
 }
