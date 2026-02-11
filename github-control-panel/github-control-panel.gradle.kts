@@ -1,0 +1,39 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
+plugins {
+    id("devlake.kotlin-multiplatform-compose-conventions")
+}
+
+kotlin {
+    sourceSets {
+        getByName("commonMain") {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(project(":utilities"))
+                implementation(compose.runtime)
+                implementation(compose.desktop.currentOs)
+                implementation(libs.lifecycle.viewmodel.compose)
+                implementation(libs.kotlinx.io.core)
+                implementation(libs.kotlinx.serialization.json)
+            }
+        }
+        getByName("jvmMain") {
+            dependencies {
+                runtimeOnly(libs.bundles.log4j.runtime)
+                implementation(libs.kotlinx.coroutines.swing)
+            }
+        }
+    }
+}
+
+compose.desktop {
+    application {
+        mainClass = "com.github.karlsabo.devlake.ghpanel.GitHubControlPanelKt"
+
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            packageName = "github-control-panel"
+            packageVersion = "1.0.0"
+        }
+    }
+}

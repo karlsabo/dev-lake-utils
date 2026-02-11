@@ -9,6 +9,7 @@ compose = "1.10.0"
 markdown = "0.29.0"
 kotlinxIo = "0.6.0"
 kotlinxCoroutines = "1.10.1"
+kotlinxSerializationJson = "1.8.1"
 kotlinxDatetime = "0.6.1"
 log4j = "2.24.1"
 kotlinLogging = "7.0.14"
@@ -16,6 +17,7 @@ slf4j = "2.0.9"
 junit = "5.10.0"
 junitPlatform = "1.10.0"
 foojayResolver = "0.8.0"
+lifecycleViewModel = "2.10.0-alpha06"
 
 [libraries]
 # Existing
@@ -41,6 +43,7 @@ log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", ver
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 
 # JUnit
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
@@ -51,6 +54,10 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer", version.ref = "markdown" }
 markdown-renderer-m2 = { module = "com.mikepenz:multiplatform-markdown-renderer-m2", version.ref = "markdown" }
 markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdown" }
+
+# Lifecycle ViewModel
+lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewModel" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinxCoroutines" }
 
 # SLF4J
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }

@@ -110,4 +110,42 @@ interface GitHubApi {
      * @return True if the pull request has at least one approved review, otherwise false.
      */
     suspend fun hasAnyApprovedReview(url: String): Boolean
+
+    /**
+     * Retrieves open pull requests authored by a specific user across the given organizations.
+     *
+     * @param organizationIds The GitHub organizations to search within.
+     * @param author The GitHub username of the PR author.
+     * @return A list of issues representing the open pull requests.
+     */
+    suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String): List<Issue>
+
+    /**
+     * Retrieves check run results for a specific commit reference.
+     *
+     * @param owner The repository owner.
+     * @param repo The repository name.
+     * @param ref The commit SHA or branch name.
+     * @return A summary of check run results.
+     */
+    suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary
+
+    /**
+     * Retrieves a summary of reviews for a specific pull request.
+     *
+     * @param owner The repository owner.
+     * @param repo The repository name.
+     * @param prNumber The pull request number.
+     * @return A summary of review states.
+     */
+    suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary
+
+    /**
+     * Submits a review on a pull request.
+     *
+     * @param prApiUrl The API URL of the pull request.
+     * @param event The review event type.
+     * @param body Optional body/comment for the review.
+     */
+    suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String? = null)
 }

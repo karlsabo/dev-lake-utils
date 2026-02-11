@@ -5,6 +5,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class PullRequestHead(
+    val ref: String? = null,
+    val sha: String? = null,
+)
+
+@Serializable
 data class PullRequest(
     val url: String? = null,
     @SerialName("html_url")
@@ -13,4 +19,5 @@ data class PullRequest(
     val state: String? = null,
     @SerialName("merged_at")
     val mergedAt: Instant? = null,
+    val head: PullRequestHead? = null,
 )

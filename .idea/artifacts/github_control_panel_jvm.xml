@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="github-control-panel-jvm">
+    <output-path>$PROJECT_DIR$/github-control-panel/build/libs</output-path>
+    <root id="archive" name="github-control-panel-jvm.jar">
+      <element id="module-output" name="dev-lake-utils.github-control-panel.jvmMain" />
+    </root>
+  </artifact>
+</component>

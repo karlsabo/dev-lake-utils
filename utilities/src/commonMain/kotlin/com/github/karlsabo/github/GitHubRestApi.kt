@@ -1,5 +1,6 @@
 package com.github.karlsabo.github
 
+import com.github.karlsabo.common.datetime.DateTimeFormatting.toIsoUtcDateTime
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.http.installHttpRetry
 import com.github.karlsabo.tools.lenientJson
@@ -23,7 +24,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
-import com.github.karlsabo.common.datetime.DateTimeFormatting.toIsoUtcDateTime
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -313,6 +313,123 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         if (response.status.value !in 200..299) {
             logger.debug { "unsubscribeFromNotification responseText=```$responseText```" }
             throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId")
+        }
+    }
+
+    override suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String): List<Issue> {
+        val query = "author:$author ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:open"
+        val encodedQuery = query.encodeURLParameter()
+        return paginatedIssueQuery(encodedQuery)
+    }
+
+    override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary {
+        val url = "https://api.github.com/repos/$owner/$repo/commits/$ref/check-runs?per_page=100"
+        val response = client.get(url)
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            logger.error { "Failed to get check runs for $owner/$repo ref=$ref" }
+            logger.debug { "response.status=${response.status} responseText=```$responseText```" }
+            throw Exception("Failed to get check runs: ${response.status.value} for $owner/$repo ref=$ref")
+        }
+
+        val root = lenientJson.parseToJsonElement(responseText).jsonObject
+        val checkRuns = root["check_runs"]?.jsonArray ?: return CheckRunSummary(0, 0, 0, 0, CiStatus.PENDING)
+
+        var passed = 0
+        var failed = 0
+        var inProgress = 0
+
+        for (checkRun in checkRuns) {
+            val obj = checkRun.jsonObject
+            val status = obj["status"]?.jsonPrimitive?.content
+            val conclusion = obj["conclusion"]?.jsonPrimitive?.content
+
+            when {
+                status == "completed" && conclusion == "success" -> passed++
+                status == "completed" && conclusion == "neutral" -> passed++
+                status == "completed" && conclusion == "skipped" -> passed++
+                status == "completed" -> failed++
+                status == "in_progress" || status == "queued" -> inProgress++
+            }
+        }
+
+        val total = checkRuns.size
+        val ciStatus = when {
+            failed > 0 -> CiStatus.FAILED
+            inProgress > 0 -> CiStatus.RUNNING
+            total == 0 -> CiStatus.PENDING
+            else -> CiStatus.PASSED
+        }
+
+        return CheckRunSummary(
+            total = total,
+            passed = passed,
+            failed = failed,
+            inProgress = inProgress,
+            status = ciStatus
+        )
+    }
+
+    override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary {
+        val reviewsUrl = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber/reviews?per_page=100"
+        val reviewsResponse = client.get(reviewsUrl)
+        val reviewsText = reviewsResponse.bodyAsText()
+        if (reviewsResponse.status.value !in 200..299) {
+            logger.error { "Failed to get reviews for $owner/$repo#$prNumber" }
+            logger.debug { "response.status=${reviewsResponse.status} responseText=```$reviewsText```" }
+            throw Exception("Failed to get reviews: ${reviewsResponse.status.value} for $owner/$repo#$prNumber")
+        }
+
+        val reviewElements = lenientJson.parseToJsonElement(reviewsText).jsonArray
+        val latestByUser = mutableMapOf<String, ReviewStateValue>()
+        for (element in reviewElements) {
+            val obj = element.jsonObject
+            val userObj = obj["user"]?.jsonObject
+            val login = userObj?.get("login")?.jsonPrimitive?.content ?: continue
+            val type = userObj["type"]?.jsonPrimitive?.content
+            if (isBotUser(login, type)) continue
+
+            val stateStr = obj["state"]?.jsonPrimitive?.content ?: continue
+            val state = when (stateStr.uppercase()) {
+                "APPROVED" -> ReviewStateValue.APPROVED
+                "CHANGES_REQUESTED" -> ReviewStateValue.CHANGES_REQUESTED
+                "COMMENTED" -> ReviewStateValue.COMMENTED
+                "PENDING" -> ReviewStateValue.PENDING
+                "DISMISSED" -> ReviewStateValue.DISMISSED
+                else -> continue
+            }
+            latestByUser[login] = state
+        }
+
+        val requestedUrl = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber/requested_reviewers"
+        val requestedResponse = client.get(requestedUrl)
+        val requestedText = requestedResponse.bodyAsText()
+        var requestedCount = 0
+        if (requestedResponse.status.value in 200..299) {
+            val requestedRoot = lenientJson.parseToJsonElement(requestedText).jsonObject
+            val users = requestedRoot["users"]?.jsonArray
+            requestedCount = users?.size ?: 0
+        }
+
+        val reviews = latestByUser.map { (user, state) -> ReviewState(user, state) }
+        val approvedCount = reviews.count { it.state == ReviewStateValue.APPROVED }
+        val totalRequested = approvedCount + requestedCount + reviews.count {
+            it.state == ReviewStateValue.CHANGES_REQUESTED || it.state == ReviewStateValue.PENDING
+        }
+
+        return ReviewSummary(approvedCount = approvedCount, requestedCount = totalRequested, reviews = reviews)
+    }
+
+    override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) {
+        val reviewsUrl = if (prApiUrl.endsWith("/reviews")) prApiUrl else "$prApiUrl/reviews"
+        val response = client.post(reviewsUrl) {
+            contentType(ContentType.Application.Json)
+            setBody(CreateReviewRequest(event = event.toSubmitEventString(), body = reviewComment))
+        }
+        val responseText = response.bodyAsText()
+        if (response.status.value !in 200..299) {
+            logger.debug { "submitReview responseText=```$responseText```" }
+            throw Exception("Failed to submit review: ${response.status.value} for url=$prApiUrl")
         }
     }
 }
