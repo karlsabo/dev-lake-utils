@@ -67,6 +67,12 @@ fun NotificationItem(
                     }
                 }
 
+                if (notification.isPullRequest && notification.headRef != null) {
+                    Button(onClick = { onCheckoutAndOpen(notification.repositoryFullName, notification.headRef) }) {
+                        Text("Checkout & Open IDEA")
+                    }
+                }
+
                 if (notification.isPullRequest && notification.apiUrl != null) {
                     Button(onClick = { onApprove(notification.apiUrl) }) {
                         Text("Approve")
