@@ -35,3 +35,6 @@ data class NotificationRepository(
     @SerialName("html_url")
     val htmlUrl: String? = null,
 )
+
+val Notification.isPullRequest: Boolean get() = subject.type.equals("PullRequest", ignoreCase = true)
+val Notification.subjectApiUrl: String? get() = subject.url

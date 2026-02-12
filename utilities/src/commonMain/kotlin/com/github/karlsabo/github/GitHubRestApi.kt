@@ -21,6 +21,7 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
@@ -52,7 +53,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
             json(lenientJson)
         }
         defaultRequest {
-            header("Accept", "application/vnd.github.v3+json")
+            header(HttpHeaders.Accept, "application/vnd.github.v3+json")
             header("X-GitHub-Api-Version", "2022-11-28")
         }
         installHttpRetry()
@@ -61,7 +62,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
     }
 
     @Serializable
-    private data class CreateReviewRequest(val event: String, val body: String? = null)
+    private data class CreateReviewRequest(val event: String, val body: String = "")
 
     @Serializable
     private data class PullRequestReview(
@@ -194,7 +195,9 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
 
         while (true) {
             val url = "https://api.github.com/notifications?participating=false&all=true&per_page=$perPage&page=$page"
-            val response = client.get(url)
+            val response = client.get(url) {
+                header(HttpHeaders.CacheControl, "no-cache")
+            }
             val responseText = response.bodyAsText()
 
             if (response.status.value !in 200..299) {
@@ -226,7 +229,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val reviewsUrl = if (url.endsWith("/reviews")) url else "$url/reviews"
         val response = client.post(reviewsUrl) {
             contentType(ContentType.Application.Json)
-            setBody(CreateReviewRequest(event = "APPROVE", body = body))
+            setBody(CreateReviewRequest(event = "APPROVE", body = body ?: ""))
         }
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {
@@ -418,7 +421,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         val reviewsUrl = if (prApiUrl.endsWith("/reviews")) prApiUrl else "$prApiUrl/reviews"
         val response = client.post(reviewsUrl) {
             contentType(ContentType.Application.Json)
-            setBody(CreateReviewRequest(event = event.toSubmitEventString(), body = reviewComment))
+            setBody(CreateReviewRequest(event = event.toSubmitEventString(), body = reviewComment ?: ""))
         }
         val responseText = response.bodyAsText()
         if (response.status.value !in 200..299) {

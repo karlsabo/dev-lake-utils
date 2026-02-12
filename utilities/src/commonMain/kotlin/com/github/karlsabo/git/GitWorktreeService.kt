@@ -1,13 +1,33 @@
 package com.github.karlsabo.git
 
-import com.github.karlsabo.system.executeCommand
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 
 private val logger = KotlinLogging.logger {}
 
 class GitWorktreeException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
-class GitWorktreeService : GitWorktreeApi {
+class GitWorktreeService(
+    private val gitCommandApi: GitCommandApi = GitCommandService(),
+) : GitWorktreeApi {
+
+    override fun ensureRepository(repoPath: String, cloneUrl: String) {
+        if (!SystemFileSystem.exists(Path(repoPath))) {
+            logger.info { "Repository not found at $repoPath, cloning from $cloneUrl" }
+            try {
+                gitCommandApi.clone(cloneUrl, repoPath)
+            } catch (e: GitCommandException) {
+                throw GitWorktreeException("Failed to clone $cloneUrl to $repoPath: ${e.gitOutput}", e)
+            }
+            logger.info { "Cloned $cloneUrl to $repoPath" }
+        } else {
+            if (!gitCommandApi.isGitRepository(repoPath)) {
+                throw GitWorktreeException("Directory $repoPath exists but is not a git repository")
+            }
+            logger.info { "Repository already exists at $repoPath" }
+        }
+    }
 
     override fun ensureWorktree(repoPath: String, branch: String): String {
         val worktreePath = buildWorktreePath(repoPath, branch)
@@ -18,21 +38,19 @@ class GitWorktreeService : GitWorktreeApi {
             return worktreePath
         }
 
-        val fetchResult = executeCommand(
-            listOf("git", "-C", repoPath, "fetch", "origin", branch),
-            workingDirectory = null,
-        )
-        if (fetchResult.exitCode != 0) {
-            logger.warn { "git fetch origin $branch failed (exitCode=${fetchResult.exitCode}): ${fetchResult.stderr.ifEmpty { fetchResult.stdout }}" }
+        try {
+            gitCommandApi.fetch(repoPath, "origin", branch)
+        } catch (e: GitCommandException) {
+            logger.warn { "git fetch origin $branch failed (exitCode=${e.exitCode}): ${e.gitOutput}" }
         }
 
-        val result = executeCommand(
-            listOf("git", "-C", repoPath, "worktree", "add", worktreePath, branch),
-            workingDirectory = null,
-        )
-        if (result.exitCode != 0) {
-            val errorOutput = result.stderr.ifEmpty { result.stdout }
-            throw GitWorktreeException("Failed to create worktree at $worktreePath for branch $branch: $errorOutput")
+        try {
+            gitCommandApi.worktreeAdd(repoPath, worktreePath, branch)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to create worktree at $worktreePath for branch $branch: ${e.gitOutput}",
+                e
+            )
         }
 
         logger.info { "Created worktree at $worktreePath for branch $branch" }
@@ -45,26 +63,20 @@ class GitWorktreeService : GitWorktreeApi {
     }
 
     override fun listWorktrees(repoPath: String): List<Worktree> {
-        val result = executeCommand(
-            listOf("git", "-C", repoPath, "worktree", "list", "--porcelain"),
-            workingDirectory = null,
-        )
-        if (result.exitCode != 0) {
-            val errorOutput = result.stderr.ifEmpty { result.stdout }
-            throw GitWorktreeException("Failed to list worktrees for $repoPath: $errorOutput")
+        val output = try {
+            gitCommandApi.worktreeList(repoPath)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to list worktrees for $repoPath: ${e.gitOutput}", e)
         }
 
-        return parseWorktreeListPorcelain(result.stdout)
+        return parseWorktreeListPorcelain(output)
     }
 
     override fun removeWorktree(worktreePath: String) {
-        val result = executeCommand(
-            listOf("git", "worktree", "remove", worktreePath),
-            workingDirectory = null,
-        )
-        if (result.exitCode != 0) {
-            val errorOutput = result.stderr.ifEmpty { result.stdout }
-            throw GitWorktreeException("Failed to remove worktree at $worktreePath: $errorOutput")
+        try {
+            gitCommandApi.execute(null, "worktree", "remove", worktreePath)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to remove worktree at $worktreePath: ${e.gitOutput}", e)
         }
         logger.info { "Removed worktree at $worktreePath" }
     }
