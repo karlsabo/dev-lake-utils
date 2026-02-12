@@ -14,6 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
+import dev_lake_utils.github_control_panel.generated.resources.Res
+import dev_lake_utils.github_control_panel.generated.resources.icon
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ErrorDialog(
@@ -23,6 +26,7 @@ fun ErrorDialog(
     DialogWindow(
         onCloseRequest = onDismiss,
         title = "Error",
+        icon = painterResource(Res.drawable.icon),
         visible = true,
     ) {
         MaterialTheme {

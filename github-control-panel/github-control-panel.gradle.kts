@@ -10,8 +10,9 @@ kotlin {
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(project(":utilities"))
-                implementation(compose.runtime)
-                implementation(compose.desktop.currentOs)
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.desktop)
+                implementation(libs.compose.components.resources)
                 implementation(libs.lifecycle.viewmodel.compose)
                 implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.json)

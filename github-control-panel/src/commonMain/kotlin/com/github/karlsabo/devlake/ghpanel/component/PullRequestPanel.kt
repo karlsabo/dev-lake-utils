@@ -5,21 +5,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.ghpanel.state.PullRequestUiState
 
 @Composable
 fun PullRequestPanel(
-    pullRequestsResult: Result<List<PullRequestUiState>>,
+    pullRequestsResult: Result<List<PullRequestUiState>>?,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
+    checkoutInProgress: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
+        if (pullRequestsResult == null) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            return@Box
+        }
         pullRequestsResult.fold(
             onSuccess = { pullRequests ->
                 if (pullRequests.isEmpty()) {
@@ -35,6 +42,7 @@ fun PullRequestPanel(
                                 pr = pr,
                                 onOpenInBrowser = onOpenInBrowser,
                                 onCheckoutAndOpen = onCheckoutAndOpen,
+                                checkoutInProgress = checkoutInProgress,
                             )
                         }
                     }

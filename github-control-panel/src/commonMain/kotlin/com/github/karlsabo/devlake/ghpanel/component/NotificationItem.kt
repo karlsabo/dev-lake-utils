@@ -26,6 +26,7 @@ fun NotificationItem(
     notification: NotificationUiState,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
+    checkoutInProgress: Boolean = false,
     onApprove: (String) -> Unit,
     onSubmitReview: (apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
     onMarkDone: (String) -> Unit,
@@ -68,8 +69,11 @@ fun NotificationItem(
                 }
 
                 if (notification.isPullRequest && notification.headRef != null) {
-                    Button(onClick = { onCheckoutAndOpen(notification.repositoryFullName, notification.headRef) }) {
-                        Text("Checkout & Open IDEA")
+                    Button(
+                        onClick = { onCheckoutAndOpen(notification.repositoryFullName, notification.headRef) },
+                        enabled = !checkoutInProgress,
+                    ) {
+                        Text(if (checkoutInProgress) "Checking out\u2026" else "Checkout & Open IDEA")
                     }
                 }
 

@@ -40,11 +40,14 @@ class GitHubControlPanelViewModel(
     private val _actionError = MutableStateFlow<String?>(null)
     val actionError: StateFlow<String?> = _actionError.asStateFlow()
 
+    private val _checkoutInProgress = MutableStateFlow(false)
+    val checkoutInProgress: StateFlow<Boolean> = _checkoutInProgress.asStateFlow()
+
     fun clearActionError() {
         _actionError.value = null
     }
 
-    val pullRequests: StateFlow<Result<List<PullRequestUiState>>> = flow {
+    val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = flow {
         while (true) {
             val issues = gitHubApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
             val prStates = issues.map { issue ->
@@ -82,7 +85,7 @@ class GitHubControlPanelViewModel(
             logger.error(e) { "Error polling pull requests" }
             emit(Result.failure(e))
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Result.success(emptyList()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val dismissedThreadIds = MutableStateFlow<Set<String>>(emptySet())
 
@@ -119,12 +122,12 @@ class GitHubControlPanelViewModel(
             emit(Result.failure(e))
         }
 
-    val notifications: StateFlow<Result<List<NotificationUiState>>> = combine(
+    val notifications: StateFlow<Result<List<NotificationUiState>>?> = combine(
         polledNotifications,
         dismissedThreadIds,
     ) { result, dismissed ->
         result.map { list -> list.filter { it.threadId !in dismissed } }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Result.success(emptyList()))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun openInBrowser(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -134,16 +137,23 @@ class GitHubControlPanelViewModel(
 
     fun checkoutAndOpen(repoFullName: String, branch: String) {
         viewModelScope.launch(Dispatchers.IO) {
+            _checkoutInProgress.value = true
             try {
                 val repoName = repoFullName.substringAfterLast('/')
                 val repoPath = "${config.repositoriesBaseDir.trimEnd('/')}/$repoName"
                 val cloneUrl = "https://github.com/$repoFullName.git"
+                logger.info { "Checkout & open: ensuring repository at $repoPath" }
                 gitWorktreeApi.ensureRepository(repoPath, cloneUrl)
+                logger.info { "Checkout & open: ensuring worktree for branch $branch" }
                 val worktreePath = gitWorktreeApi.ensureWorktree(repoPath, branch)
+                logger.info { "Checkout & open: opening IDEA at $worktreePath" }
                 desktopLauncher.openInIdea(worktreePath)
+                logger.info { "Checkout & open: done" }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to checkout and open $repoFullName branch=$branch" }
                 _actionError.value = e.message ?: "Failed to checkout and open"
+            } finally {
+                _checkoutInProgress.value = false
             }
         }
     }

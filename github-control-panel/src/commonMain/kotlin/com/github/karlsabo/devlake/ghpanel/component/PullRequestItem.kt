@@ -22,6 +22,7 @@ fun PullRequestItem(
     pr: PullRequestUiState,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
+    checkoutInProgress: Boolean = false,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -58,8 +59,11 @@ fun PullRequestItem(
                     Text("Open in Browser")
                 }
                 if (pr.headRef != null) {
-                    Button(onClick = { onCheckoutAndOpen(pr.repositoryFullName, pr.headRef) }) {
-                        Text("Checkout & Open IDEA")
+                    Button(
+                        onClick = { onCheckoutAndOpen(pr.repositoryFullName, pr.headRef) },
+                        enabled = !checkoutInProgress,
+                    ) {
+                        Text(if (checkoutInProgress) "Checking out\u2026" else "Checkout & Open IDEA")
                     }
                 }
             }

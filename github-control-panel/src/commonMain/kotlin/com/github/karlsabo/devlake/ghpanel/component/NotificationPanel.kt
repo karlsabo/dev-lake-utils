@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -20,9 +21,10 @@ import com.github.karlsabo.github.ReviewStateValue
 
 @Composable
 fun NotificationPanel(
-    notificationsResult: Result<List<NotificationUiState>>,
+    notificationsResult: Result<List<NotificationUiState>>?,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
+    checkoutInProgress: Boolean = false,
     onApprove: (String) -> Unit,
     onSubmitReview: (apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
     onMarkDone: (String) -> Unit,
@@ -30,6 +32,10 @@ fun NotificationPanel(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
+        if (notificationsResult == null) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            return@Box
+        }
         notificationsResult.fold(
             onSuccess = { notifications ->
                 if (notifications.isEmpty()) {
@@ -46,6 +52,7 @@ fun NotificationPanel(
                                 notification = notification,
                                 onOpenInBrowser = onOpenInBrowser,
                                 onCheckoutAndOpen = onCheckoutAndOpen,
+                                checkoutInProgress = checkoutInProgress,
                                 onApprove = onApprove,
                                 onSubmitReview = onSubmitReview,
                                 onMarkDone = onMarkDone,
