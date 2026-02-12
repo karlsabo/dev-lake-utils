@@ -137,6 +137,8 @@ class GitHubControlPanelViewModel(
             try {
                 val repoName = repoFullName.substringAfterLast('/')
                 val repoPath = "${config.repositoriesBaseDir.trimEnd('/')}/$repoName"
+                val cloneUrl = "https://github.com/$repoFullName.git"
+                gitWorktreeApi.ensureRepository(repoPath, cloneUrl)
                 val worktreePath = gitWorktreeApi.ensureWorktree(repoPath, branch)
                 desktopLauncher.openInIdea(worktreePath)
             } catch (e: Exception) {

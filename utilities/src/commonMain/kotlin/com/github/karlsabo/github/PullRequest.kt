@@ -21,3 +21,7 @@ data class PullRequest(
     val mergedAt: Instant? = null,
     val head: PullRequestHead? = null,
 )
+
+val PullRequest.isMerged: Boolean get() = mergedAt != null
+val PullRequest.isClosed: Boolean get() = !isMerged && state?.equals("closed", ignoreCase = true) == true
+val PullRequest.isOpen: Boolean get() = !isMerged && !isClosed
