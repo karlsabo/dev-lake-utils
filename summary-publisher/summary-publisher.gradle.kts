@@ -32,6 +32,7 @@ kotlin {
         getByName("jvmMain") {
             dependencies {
                 runtimeOnly(libs.bundles.log4j.runtime)
+                implementation(libs.skiko.macos.arm64)
             }
         }
     }

@@ -22,6 +22,7 @@ kotlin {
             dependencies {
                 runtimeOnly(libs.bundles.log4j.runtime)
                 implementation(libs.kotlinx.coroutines.swing)
+                implementation(libs.skiko.macos.arm64)
             }
         }
     }
