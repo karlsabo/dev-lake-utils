@@ -16,8 +16,8 @@ kotlin {
 
                 implementation(project(":utilities"))
 
-                implementation(compose.runtime)
-                implementation(compose.desktop.currentOs)
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.desktop)
 
                 implementation(libs.bundles.markdown.renderer)
 

@@ -25,6 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import com.github.karlsabo.github.ReviewStateValue
+import dev_lake_utils.github_control_panel.generated.resources.Res
+import dev_lake_utils.github_control_panel.generated.resources.icon
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ReviewDialog(
@@ -43,6 +46,7 @@ fun ReviewDialog(
     DialogWindow(
         onCloseRequest = onDismiss,
         title = "Submit Review",
+        icon = painterResource(Res.drawable.icon),
         visible = true,
     ) {
         MaterialTheme {

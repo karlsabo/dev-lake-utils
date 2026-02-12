@@ -62,6 +62,11 @@ kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 # SLF4J
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
+# Compose
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose" }
+compose-desktop = { module = "org.jetbrains.compose.desktop:desktop", version.ref = "compose" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
+
 # Gradle Plugins (for buildSrc)
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "compose" }

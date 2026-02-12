@@ -21,6 +21,7 @@ fun GitHubControlPanelScreen(viewModel: GitHubControlPanelViewModel) {
     val pullRequestsResult by viewModel.pullRequests.collectAsState()
     val notificationsResult by viewModel.notifications.collectAsState()
     val actionError by viewModel.actionError.collectAsState()
+    val checkoutInProgress by viewModel.checkoutInProgress.collectAsState()
 
     actionError?.let { error ->
         ErrorDialog(message = error, onDismiss = { viewModel.clearActionError() })
@@ -33,6 +34,7 @@ fun GitHubControlPanelScreen(viewModel: GitHubControlPanelViewModel) {
                 pullRequestsResult = pullRequestsResult,
                 onOpenInBrowser = { viewModel.openInBrowser(it) },
                 onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
+                checkoutInProgress = checkoutInProgress,
                 modifier = Modifier.weight(1f),
             )
 
@@ -43,6 +45,7 @@ fun GitHubControlPanelScreen(viewModel: GitHubControlPanelViewModel) {
                 notificationsResult = notificationsResult,
                 onOpenInBrowser = { viewModel.openInBrowser(it) },
                 onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
+                checkoutInProgress = checkoutInProgress,
                 onApprove = { viewModel.approvePullRequest(it) },
                 onSubmitReview = { apiUrl, event, reviewComment ->
                     viewModel.submitReview(

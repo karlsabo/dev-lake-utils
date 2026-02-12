@@ -19,8 +19,11 @@ import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.system.DesktopLauncherService
 import com.github.karlsabo.tools.gitHubConfigPath
+import dev_lake_utils.github_control_panel.generated.resources.Res
+import dev_lake_utils.github_control_panel.generated.resources.icon
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.io.files.SystemFileSystem
+import org.jetbrains.compose.resources.painterResource
 
 private val logger = KotlinLogging.logger {}
 
@@ -71,6 +74,7 @@ fun GitHubControlPanelApp(onExitApplication: () -> Unit) {
     Window(
         onCloseRequest = onExitApplication,
         title = "GitHub Control Panel",
+        icon = painterResource(Res.drawable.icon),
         visible = !isLoading && viewModel != null,
         state = rememberWindowState(
             width = 1400.dp,

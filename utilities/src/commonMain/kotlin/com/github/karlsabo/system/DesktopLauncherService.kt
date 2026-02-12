@@ -25,7 +25,8 @@ class DesktopLauncherService : DesktopLauncher {
     override fun openInIdea(projectPath: String) {
         val result = executeCommand(listOf("idea", projectPath))
         if (result.exitCode != 0) {
-            logger.error { "Failed to open IntelliJ IDEA for $projectPath: ${result.stderr.ifEmpty { result.stdout }}" }
+            val detail = result.stderr.ifEmpty { result.stdout }
+            throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")
         }
     }
 }

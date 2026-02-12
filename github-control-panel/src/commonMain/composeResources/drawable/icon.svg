@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <!-- Background -->
+    <rect x="1" y="1" width="30" height="30" rx="6" fill="#1E232D" stroke="#46505F" stroke-width="1"/>
+
+    <!-- Top "window" dots -->
+    <circle cx="7" cy="7" r="1.5" fill="#FF5F55"/>
+    <circle cx="11" cy="7" r="1.5" fill="#FFBE3C"/>
+    <circle cx="15" cy="7" r="1.5" fill="#3CC878"/>
+
+    <!-- Baseline -->
+    <line x1="6" y1="22" x2="26" y2="22" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="1"/>
+
+    <!-- Bars -->
+    <rect x="9" y="22" width="2" height="4" fill="#3CC878"/>
+    <rect x="13" y="21" width="2" height="5" fill="#3CC878"/>
+    <rect x="17" y="20" width="2" height="6" fill="#3CC878"/>
+    <rect x="21" y="19" width="2" height="7" fill="#3CC878"/>
+
+    <!-- Line chart -->
+    <path d="M7 20 L12 17 L17 18 L22 14 L25 12"
+          fill="none" stroke="#50A0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Points -->
+    <circle cx="7" cy="20" r="1.4" fill="#F5F7FA"/>
+    <circle cx="12" cy="17" r="1.4" fill="#F5F7FA"/>
+    <circle cx="17" cy="18" r="1.4" fill="#F5F7FA"/>
+    <circle cx="22" cy="14" r="1.4" fill="#F5F7FA"/>
+    <circle cx="25" cy="12" r="1.4" fill="#F5F7FA"/>
+</svg>
