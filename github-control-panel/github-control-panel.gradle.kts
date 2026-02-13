@@ -10,6 +10,7 @@ kotlin {
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(project(":utilities"))
+                implementation(project(":shared-resources"))
                 implementation(libs.compose.runtime)
                 implementation(libs.compose.desktop)
                 implementation(libs.compose.components.resources)
