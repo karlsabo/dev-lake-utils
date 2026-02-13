@@ -73,7 +73,7 @@ fun GitHubControlPanelApp(onExitApplication: () -> Unit) {
 
     Window(
         onCloseRequest = onExitApplication,
-        title = "GitHub Control Panel",
+        title = "Git Control Panel",
         icon = painterResource(Res.drawable.icon),
         visible = !isLoading && viewModel != null,
         state = rememberWindowState(

@@ -25,8 +25,9 @@ fun NotificationPanel(
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
     checkoutInProgress: Boolean = false,
-    onApprove: (String) -> Unit,
-    onSubmitReview: (apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
+    actingOnThreadIds: Set<String> = emptySet(),
+    onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
+    onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
     onMarkDone: (String) -> Unit,
     onUnsubscribe: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -47,12 +48,13 @@ fun NotificationPanel(
                 } else {
                     val listState = rememberLazyListState()
                     LazyColumn(state = listState) {
-                        items(notifications, key = { it.threadId }) { notification ->
+                        items(notifications, key = { it.notificationThreadId }) { notification ->
                             NotificationItem(
                                 notification = notification,
                                 onOpenInBrowser = onOpenInBrowser,
                                 onCheckoutAndOpen = onCheckoutAndOpen,
                                 checkoutInProgress = checkoutInProgress,
+                                actionInProgress = notification.notificationThreadId in actingOnThreadIds,
                                 onApprove = onApprove,
                                 onSubmitReview = onSubmitReview,
                                 onMarkDone = onMarkDone,

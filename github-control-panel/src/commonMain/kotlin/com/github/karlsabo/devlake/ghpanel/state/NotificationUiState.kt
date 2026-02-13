@@ -4,7 +4,7 @@ import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.apiUrlToHtmlUrl
 
 data class NotificationUiState(
-    val threadId: String,
+    val notificationThreadId: String,
     val title: String,
     val reason: String,
     val repositoryFullName: String,
@@ -21,7 +21,7 @@ fun Notification.toNotificationUiState(headRef: String? = null): NotificationUiS
     val htmlUrl = if (subjectUrl != null) apiUrlToHtmlUrl(subjectUrl) else null
 
     return NotificationUiState(
-        threadId = id,
+        notificationThreadId = id,
         title = subject.title,
         reason = reason,
         repositoryFullName = repository.fullName,
