@@ -20,8 +20,9 @@ import com.github.karlsabo.devlake.ghpanel.viewmodel.GitHubControlPanelViewModel
 fun GitHubControlPanelScreen(viewModel: GitHubControlPanelViewModel) {
     val pullRequestsResult by viewModel.pullRequests.collectAsState()
     val notificationsResult by viewModel.notifications.collectAsState()
-    val actionError by viewModel.actionError.collectAsState()
-    val checkoutInProgress by viewModel.checkoutInProgress.collectAsState()
+    val actionError by viewModel.actionErrorStateFlow.collectAsState()
+    val checkoutInProgress by viewModel.checkoutInProgressStateFlow.collectAsState()
+    val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
 
     actionError?.let { error ->
         ErrorDialog(message = error, onDismiss = { viewModel.clearActionError() })
@@ -46,13 +47,15 @@ fun GitHubControlPanelScreen(viewModel: GitHubControlPanelViewModel) {
                 onOpenInBrowser = { viewModel.openInBrowser(it) },
                 onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
                 checkoutInProgress = checkoutInProgress,
-                onApprove = { viewModel.approvePullRequest(it) },
-                onSubmitReview = { apiUrl, event, reviewComment ->
-                    viewModel.submitReview(
-                        apiUrl,
-                        event,
-                        reviewComment
+                actingOnThreadIds = actingOnThreadIds,
+                onApprove = { notificationThreadId, apiUrl ->
+                    viewModel.approvePullRequest(
+                        notificationThreadId,
+                        apiUrl
                     )
+                },
+                onSubmitReview = { notificationThreadId, apiUrl, event, reviewComment ->
+                    viewModel.submitReview(notificationThreadId, apiUrl, event, reviewComment)
                 },
                 onMarkDone = { viewModel.markNotificationDone(it) },
                 onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },

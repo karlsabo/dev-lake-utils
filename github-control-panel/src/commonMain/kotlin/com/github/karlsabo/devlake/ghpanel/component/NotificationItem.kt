@@ -27,8 +27,9 @@ fun NotificationItem(
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
     checkoutInProgress: Boolean = false,
-    onApprove: (String) -> Unit,
-    onSubmitReview: (apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
+    actionInProgress: Boolean = false,
+    onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
+    onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
     onMarkDone: (String) -> Unit,
     onUnsubscribe: (String) -> Unit,
 ) {
@@ -37,7 +38,7 @@ fun NotificationItem(
     if (showReviewDialog && notification.apiUrl != null) {
         ReviewDialog(
             onSubmit = { event, body ->
-                onSubmitReview(notification.apiUrl, event, body)
+                onSubmitReview(notification.notificationThreadId, notification.apiUrl, event, body)
                 showReviewDialog = false
             },
             onDismiss = { showReviewDialog = false },
@@ -63,7 +64,10 @@ fun NotificationItem(
 
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (notification.htmlUrl != null) {
-                    Button(onClick = { onOpenInBrowser(notification.htmlUrl) }) {
+                    Button(
+                        onClick = { onOpenInBrowser(notification.htmlUrl) },
+                        enabled = !actionInProgress,
+                    ) {
                         Text("Open")
                     }
                 }
@@ -71,29 +75,37 @@ fun NotificationItem(
                 if (notification.isPullRequest && notification.headRef != null) {
                     Button(
                         onClick = { onCheckoutAndOpen(notification.repositoryFullName, notification.headRef) },
-                        enabled = !checkoutInProgress,
+                        enabled = !checkoutInProgress && !actionInProgress,
                     ) {
                         Text(if (checkoutInProgress) "Checking out\u2026" else "Checkout & Open IDEA")
                     }
                 }
 
                 if (notification.isPullRequest && notification.apiUrl != null) {
-                    Button(onClick = { onApprove(notification.apiUrl) }) {
+                    Button(
+                        onClick = { onApprove(notification.notificationThreadId, notification.apiUrl) },
+                        enabled = !actionInProgress,
+                    ) {
                         Text("Approve")
                     }
-                    Button(onClick = { showReviewDialog = true }) {
+                    Button(
+                        onClick = { showReviewDialog = true },
+                        enabled = !actionInProgress,
+                    ) {
                         Text("Review")
                     }
                 }
 
                 Button(
-                    onClick = { onMarkDone(notification.threadId) },
+                    onClick = { onMarkDone(notification.notificationThreadId) },
+                    enabled = !actionInProgress,
                     colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.secondary),
                 ) {
                     Text("Done")
                 }
                 Button(
-                    onClick = { onUnsubscribe(notification.threadId) },
+                    onClick = { onUnsubscribe(notification.notificationThreadId) },
+                    enabled = !actionInProgress,
                     colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error),
                 ) {
                     Text("Unsubscribe")

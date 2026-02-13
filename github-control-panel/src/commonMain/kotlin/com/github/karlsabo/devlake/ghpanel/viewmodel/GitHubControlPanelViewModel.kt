@@ -37,14 +37,17 @@ class GitHubControlPanelViewModel(
     private val config: GitHubControlPanelConfig,
 ) : ViewModel() {
 
-    private val _actionError = MutableStateFlow<String?>(null)
-    val actionError: StateFlow<String?> = _actionError.asStateFlow()
+    private val actionError = MutableStateFlow<String?>(null)
+    val actionErrorStateFlow: StateFlow<String?> = actionError.asStateFlow()
 
-    private val _checkoutInProgress = MutableStateFlow(false)
-    val checkoutInProgress: StateFlow<Boolean> = _checkoutInProgress.asStateFlow()
+    private val checkoutInProgress = MutableStateFlow(false)
+    val checkoutInProgressStateFlow: StateFlow<Boolean> = checkoutInProgress.asStateFlow()
+
+    private val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
+    val actingOnThreadIdsStateFlow: StateFlow<Set<String>> = actingOnThreadIds.asStateFlow()
 
     fun clearActionError() {
-        _actionError.value = null
+        actionError.value = null
     }
 
     val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = flow {
@@ -126,7 +129,7 @@ class GitHubControlPanelViewModel(
         polledNotifications,
         dismissedThreadIds,
     ) { result, dismissed ->
-        result.map { list -> list.filter { it.threadId !in dismissed } }
+        result.map { list -> list.filter { it.notificationThreadId !in dismissed } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun openInBrowser(url: String) {
@@ -137,7 +140,7 @@ class GitHubControlPanelViewModel(
 
     fun checkoutAndOpen(repoFullName: String, branch: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            _checkoutInProgress.value = true
+            checkoutInProgress.value = true
             try {
                 val repoName = repoFullName.substringAfterLast('/')
                 val repoPath = "${config.repositoriesBaseDir.trimEnd('/')}/$repoName"
@@ -151,56 +154,72 @@ class GitHubControlPanelViewModel(
                 logger.info { "Checkout & open: done" }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to checkout and open $repoFullName branch=$branch" }
-                _actionError.value = e.message ?: "Failed to checkout and open"
+                actionError.value = e.message ?: "Failed to checkout and open"
             } finally {
-                _checkoutInProgress.value = false
+                checkoutInProgress.value = false
             }
         }
     }
 
-    fun approvePullRequest(apiUrl: String) {
+    fun approvePullRequest(notificationThreadId: String, apiUrl: String) {
+        actingOnThreadIds.value += notificationThreadId
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 gitHubApi.approvePullRequestByUrl(apiUrl)
+                dismissedThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to approve PR $apiUrl" }
-                _actionError.value = e.message ?: "Failed to approve pull request"
+                actionError.value = e.message ?: "Failed to approve pull request"
+            } finally {
+                actingOnThreadIds.value -= notificationThreadId
             }
         }
     }
 
-    fun submitReview(apiUrl: String, event: ReviewStateValue, reviewComment: String?) {
+    fun submitReview(notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) {
+        actingOnThreadIds.value += notificationThreadId
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 gitHubApi.submitReview(apiUrl, event, reviewComment)
+                dismissedThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to submit review for $apiUrl" }
-                _actionError.value = e.message ?: "Failed to submit review"
+                actionError.value = e.message ?: "Failed to submit review"
+            } finally {
+                actingOnThreadIds.value -= notificationThreadId
             }
         }
     }
 
-    fun markNotificationDone(threadId: String) {
-        dismissedThreadIds.value += threadId
+    fun markNotificationDone(notificationThreadId: String) {
+        actingOnThreadIds.value += notificationThreadId
+        dismissedThreadIds.value += notificationThreadId
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                gitHubApi.markNotificationAsDone(threadId)
+                gitHubApi.markNotificationAsDone(notificationThreadId)
             } catch (e: Exception) {
-                logger.error(e) { "Failed to mark notification done $threadId" }
-                dismissedThreadIds.value -= threadId
-                _actionError.value = e.message ?: "Failed to mark notification as done"
+                logger.error(e) { "Failed to mark notification done $notificationThreadId" }
+                dismissedThreadIds.value -= notificationThreadId
+                actingOnThreadIds.value -= notificationThreadId
+                actionError.value = e.message ?: "Failed to mark notification as done"
             }
         }
     }
 
-    fun unsubscribeFromNotification(threadId: String) {
+    fun unsubscribeFromNotification(notificationThreadId: String) {
+        actingOnThreadIds.value += notificationThreadId
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                gitHubApi.unsubscribeFromNotification(threadId)
+                gitHubApi.unsubscribeFromNotification(notificationThreadId)
             } catch (e: Exception) {
-                logger.error(e) { "Failed to unsubscribe from notification $threadId" }
-                _actionError.value = e.message ?: "Failed to unsubscribe from notification"
+                logger.error(e) { "Failed to unsubscribe from notification $notificationThreadId" }
+                actionError.value = e.message ?: "Failed to unsubscribe from notification"
             }
+        }
+        viewModelScope.launch {
+            delay(1_000)
+            dismissedThreadIds.value += notificationThreadId
+            actingOnThreadIds.value -= notificationThreadId
         }
     }
 }

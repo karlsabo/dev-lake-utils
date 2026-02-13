@@ -31,7 +31,8 @@ kotlin {
 
 compose.desktop {
     application {
-        mainClass = "com.github.karlsabo.devlake.ghpanel.GitHubControlPanelKt"
+        mainClass = "com.github.karlsabo.devlake.ghpanel.MainKt"
+        jvmArgs += listOf("-Xdock:name=Git Control Panel")
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
