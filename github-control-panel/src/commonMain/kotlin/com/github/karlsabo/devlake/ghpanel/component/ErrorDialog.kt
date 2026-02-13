@@ -14,8 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
-import dev_lake_utils.github_control_panel.generated.resources.Res
-import dev_lake_utils.github_control_panel.generated.resources.icon
+import dev_lake_utils.shared_resources.generated.resources.Res
+import dev_lake_utils.shared_resources.generated.resources.icon
 import org.jetbrains.compose.resources.painterResource
 
 @Composable

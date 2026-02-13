@@ -19,8 +19,8 @@ import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.system.DesktopLauncherService
 import com.github.karlsabo.tools.gitHubConfigPath
-import dev_lake_utils.github_control_panel.generated.resources.Res
-import dev_lake_utils.github_control_panel.generated.resources.icon
+import dev_lake_utils.shared_resources.generated.resources.Res
+import dev_lake_utils.shared_resources.generated.resources.icon
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.io.files.SystemFileSystem
 import org.jetbrains.compose.resources.painterResource

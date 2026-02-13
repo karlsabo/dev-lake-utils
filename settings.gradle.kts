@@ -30,3 +30,5 @@ include("user-metrics-publisher")
 project(":user-metrics-publisher").buildFileName = "user-metrics-publisher.gradle.kts"
 include("github-control-panel")
 project(":github-control-panel").buildFileName = "github-control-panel.gradle.kts"
+include("shared-resources")
+project(":shared-resources").buildFileName = "shared-resources.gradle.kts"
