@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package com.github.karlsabo.devlake.ghpanel.viewmodel
 
 import androidx.lifecycle.ViewModel
@@ -9,29 +11,26 @@ import com.github.karlsabo.devlake.ghpanel.state.toNotificationUiState
 import com.github.karlsabo.devlake.ghpanel.state.toPullRequestUiState
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubNotificationService
+import com.github.karlsabo.github.NotificationAction
+import com.github.karlsabo.github.NotificationProcessingResult
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.extractOwnerAndRepo
 import com.github.karlsabo.system.DesktopLauncher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.retry
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 
 private val logger = KotlinLogging.logger {}
 
 class GitHubControlPanelViewModel(
     private val gitHubApi: GitHubApi,
+    private val gitHubNotificationService: GitHubNotificationService,
     private val gitWorktreeApi: GitWorktreeApi,
     private val desktopLauncher: DesktopLauncher,
     private val config: GitHubControlPanelConfig,
@@ -92,38 +91,56 @@ class GitHubControlPanelViewModel(
 
     private val dismissedThreadIds = MutableStateFlow<Set<String>>(emptySet())
 
-    private val polledNotifications = flow {
-        while (true) {
-            val notifs = gitHubApi.listNotifications()
-            val uiStates = notifs
-                .filter { it.unread }
-                .map { notif ->
-                    val headRef = if (notif.subject.type == "PullRequest" && notif.subject.url != null) {
-                        try {
-                            gitHubApi.getPullRequestByUrl(notif.subject.url!!).head?.ref
-                        } catch (_: Exception) {
-                            null
+    private val polledNotifications: Flow<Result<List<NotificationUiState>>> =
+        flow {
+            while (true) {
+                val notifs = gitHubApi.listNotifications()
+                val uiStates: List<NotificationUiState> =
+                    notifs
+                        .asSequence()
+                        .asFlow()
+                        .flatMapMerge(concurrency = 16) { notif ->
+                            flow {
+                                val processed = withContext(Dispatchers.IO) {
+                                    gitHubNotificationService.processNotification(notif)
+                                } as? NotificationProcessingResult.Processed
+                                val markedDone =
+                                    processed?.actions?.any { it is NotificationAction.MarkedAsDone } ?: false
+                                if (!markedDone) emit(notif)
+                            }
                         }
-                    } else null
-                    notif.toNotificationUiState(headRef)
-                }
-            emit(Result.success(uiStates))
-            delay(config.pollIntervalMs)
-        }
-    }
-        .flowOn(Dispatchers.IO)
-        .retry(5) { cause ->
-            if (cause is IOException) {
-                delay(5_000)
-                true
-            } else {
-                false
+                        .map { notif ->
+                            val headRef =
+                                if (notif.subject.type == "PullRequest" && notif.subject.url != null) {
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            gitHubApi.getPullRequestByUrl(notif.subject.url!!).head?.ref
+                                        }
+                                    } catch (_: Exception) {
+                                        null
+                                    }
+                                } else null
+
+                            notif.toNotificationUiState(headRef)
+                        }
+                        .toList()
+                emit(Result.success(uiStates))
+                delay(config.pollIntervalMs)
             }
         }
-        .catch { e ->
-            logger.error(e) { "Error polling notifications" }
-            emit(Result.failure(e))
-        }
+            .flowOn(Dispatchers.IO)
+            .retry(5) { cause ->
+                if (cause is IOException) {
+                    delay(5_000)
+                    true
+                } else {
+                    false
+                }
+            }
+            .catch { e ->
+                logger.error(e) { "Error polling notifications" }
+                emit(Result.failure(e))
+            }
 
     val notifications: StateFlow<Result<List<NotificationUiState>>?> = combine(
         polledNotifications,
