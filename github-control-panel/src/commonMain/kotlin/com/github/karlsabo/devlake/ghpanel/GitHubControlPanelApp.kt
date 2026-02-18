@@ -15,6 +15,7 @@ import com.github.karlsabo.devlake.ghpanel.component.ErrorDialog
 import com.github.karlsabo.devlake.ghpanel.screen.GitHubControlPanelScreen
 import com.github.karlsabo.devlake.ghpanel.viewmodel.GitHubControlPanelViewModel
 import com.github.karlsabo.git.GitWorktreeService
+import com.github.karlsabo.github.GitHubNotificationService
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.system.DesktopLauncherService
@@ -29,7 +30,7 @@ private val logger = KotlinLogging.logger {}
 
 @Composable
 fun GitHubControlPanelApp(onExitApplication: () -> Unit) {
-    var isLoading by remember { mutableStateOf(true) }
+    var isLoadingConfiguration by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf("") }
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
     var viewModel by remember { mutableStateOf<GitHubControlPanelViewModel?>(null) }
@@ -40,16 +41,18 @@ fun GitHubControlPanelApp(onExitApplication: () -> Unit) {
             val config = loadGitHubControlPanelConfig()
             val gitHubApiConfig = loadGitHubConfig(gitHubConfigPath)
             val gitHubApi = GitHubRestApi(gitHubApiConfig)
+            val gitHubNotificationService = GitHubNotificationService(gitHubApi)
             val gitWorktreeService = GitWorktreeService()
             val desktopLauncher = DesktopLauncherService()
 
             viewModel = GitHubControlPanelViewModel(
                 gitHubApi = gitHubApi,
+                gitHubNotificationService = gitHubNotificationService,
                 gitWorktreeApi = gitWorktreeService,
                 desktopLauncher = desktopLauncher,
                 config = config,
             )
-            isLoading = false
+            isLoadingConfiguration = false
             logger.info { "Config loaded: $config" }
         } catch (error: Exception) {
             errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
@@ -59,11 +62,11 @@ fun GitHubControlPanelApp(onExitApplication: () -> Unit) {
                 saveGitHubControlPanelConfig(GitHubControlPanelConfig())
             }
             isDisplayErrorDialog = true
-            isLoading = false
+            isLoadingConfiguration = false
         }
     }
 
-    if (!isLoading && isDisplayErrorDialog) {
+    if (!isLoadingConfiguration && isDisplayErrorDialog) {
         ErrorDialog(
             message = errorMessage,
             onDismiss = onExitApplication,
@@ -75,7 +78,7 @@ fun GitHubControlPanelApp(onExitApplication: () -> Unit) {
         onCloseRequest = onExitApplication,
         title = "Git Control Panel",
         icon = painterResource(Res.drawable.icon),
-        visible = !isLoading && viewModel != null,
+        visible = !isLoadingConfiguration && viewModel != null,
         state = rememberWindowState(
             width = 1400.dp,
             height = 900.dp,
