@@ -20,10 +20,10 @@ import com.github.karlsabo.devlake.metrics.ui.components.ErrorDialog
 import com.github.karlsabo.devlake.metrics.userMetricPublisherConfigPath
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.loadGitHubConfig
-import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.config.loadJiraConfig
+import com.github.karlsabo.linear.LinearRestApi
+import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.tools.gitHubConfigPath
-import com.github.karlsabo.tools.jiraConfigPath
+import com.github.karlsabo.tools.linearConfigPath
 import com.github.karlsabo.tools.loadUsersConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +41,7 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        loadConfiguration(state, onExitApplication)
+        loadConfiguration(state)
     }
 
     if (!state.isLoadingConfig && state.isDisplayErrorDialog) {
@@ -93,14 +93,13 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
     }
 }
 
-private suspend fun loadConfiguration(
+private fun loadConfiguration(
     state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState,
-    onExitApplication: () -> Unit,
 ) {
     logger.info { "Loading configuration" }
     try {
         state.config = loadUserMetricPublisherConfig()
-        state.projectManagementApi = JiraRestApi(loadJiraConfig(jiraConfigPath))
+        state.projectManagementApi = LinearRestApi(loadLinearConfig(linearConfigPath))
         state.gitHubApi = GitHubRestApi(loadGitHubConfig(gitHubConfigPath))
         state.usersConfig = loadUsersConfig()!!
         state.isLoadingConfig = false

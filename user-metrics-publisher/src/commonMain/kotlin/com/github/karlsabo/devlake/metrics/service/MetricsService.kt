@@ -42,7 +42,7 @@ object MetricsService {
             now,
         )
 
-        val userId = user.jiraId ?: user.id
+        val userId = user.linearId ?: user.id
         val issuesClosedPastWeek = projectManagementApi.getIssuesResolved(userId, weekAgo, now)
         val issuesCountYtd = projectManagementApi.getIssuesResolvedCount(userId, startOfYear, now)
 
