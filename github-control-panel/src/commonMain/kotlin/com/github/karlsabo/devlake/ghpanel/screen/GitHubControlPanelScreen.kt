@@ -58,7 +58,10 @@ fun GitHubControlPanelScreen(viewModel: GitHubControlPanelViewModel) {
                     viewModel.submitReview(notificationThreadId, apiUrl, event, reviewComment)
                 },
                 onMarkDone = { viewModel.markNotificationDone(it) },
-                onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },
+                onUnsubscribe = {
+                    viewModel.unsubscribeFromNotification(it)
+                    viewModel.markNotificationDone(it)
+                },
                 modifier = Modifier.weight(1f),
             )
         }

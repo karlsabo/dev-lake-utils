@@ -3,7 +3,7 @@
 
 [versions]
 guava = "32.1.3-jre"
-kotlin = "2.1.21"
+kotlin = "2.2.21"
 ktor = "3.1.3"
 compose = "1.10.0"
 skiko = "0.9.37.3"
@@ -12,6 +12,7 @@ kotlinxIo = "0.6.0"
 kotlinxCoroutines = "1.10.1"
 kotlinxSerializationJson = "1.8.1"
 kotlinxDatetime = "0.6.1"
+xmlutil = "0.91.3"
 log4j = "2.24.1"
 kotlinLogging = "7.0.14"
 slf4j = "2.0.9"
@@ -45,6 +46,9 @@ kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.re
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+
+# XML
+xmlutil-core = { module = "io.github.pdvrieze.xmlutil:core", version.ref = "xmlutil" }
 
 # JUnit
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
