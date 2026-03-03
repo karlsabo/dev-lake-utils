@@ -9,11 +9,12 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration.Companion.minutes
 
 @Serializable
 data class GitHubControlPanelConfig(
     val organizationIds: List<String> = emptyList(),
-    val pollIntervalMs: Long = 60_000,
+    val pollIntervalMs: Long = 10.minutes.inWholeMilliseconds,
     val repositoriesBaseDir: String = "",
     val gitHubAuthor: String = "",
 )

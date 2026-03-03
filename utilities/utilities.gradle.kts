@@ -33,6 +33,9 @@ kotlin {
                 // kotlin
                 api(libs.kotlinx.datetime)
 
+                // XML
+                implementation(libs.xmlutil.core)
+
                 // ktor
                 implementation(libs.bundles.ktor.client.full)
             }
@@ -111,6 +114,14 @@ createJvmExecTask(
 createJvmExecTask(
     taskName = "notificationCleanupDemo",
     mainClassName = "com.github.karlsabo.github.notification.GitHubNotificationsCleanupDemoKt",
+    compilationName = "test"
+) {
+    dependsOn("jvmTestClasses")
+}
+
+createJvmExecTask(
+    taskName = "markdownImageExtractorDemo",
+    mainClassName = "com.github.karlsabo.markdown.MarkdownImageExtractorDemoKt",
     compilationName = "test"
 ) {
     dependsOn("jvmTestClasses")
