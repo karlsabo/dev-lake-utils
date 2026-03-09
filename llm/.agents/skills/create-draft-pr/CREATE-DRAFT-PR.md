@@ -1,0 +1,1 @@
+Create a draft PR use the GitHub command line tool `gh` with a description and test plan. If there is a template (.github/pull_request_template.md) that should be filled out when making a PR, please fill out that template too. Also, add a link to the Linear ticket near the top of the PR description.
