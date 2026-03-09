@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.metrics
 
+import com.github.karlsabo.dto.User
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.config.loadJiraConfig
 import com.github.karlsabo.projectmanagement.ProjectIssue
@@ -34,7 +35,7 @@ fun main(args: Array<String>): Unit = runBlocking {
     val executionTime = measureTime {
         val startDate = LocalDateTime(2025, 1, 1, 0, 0, 0).toInstant(TimeZone.UTC)
         val userIssues = jiraApi.getIssuesResolved(
-            userId,
+            User(id = userId, name = userId, jiraId = userId),
             startDate,
             Clock.System.now()
         )

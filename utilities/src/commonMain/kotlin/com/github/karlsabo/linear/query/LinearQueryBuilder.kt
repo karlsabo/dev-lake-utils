@@ -173,6 +173,30 @@ class LinearQueryBuilder(
     }
 
     /**
+     * Builds a query to fetch issues belonging to a project via the project's issues connection.
+     */
+    fun projectIssues(projectId: String, issueFields: String, cursor: String? = null): String {
+        return buildString {
+            append("query {")
+            append("\n  project(id: \"")
+            append(escapeGraphQlString(projectId))
+            append("\") {")
+            append("\n    issues(first: ")
+            append(defaultPageSize)
+            appendCursor(cursor)
+            append(") {")
+            append("\n      nodes {")
+            append("\n")
+            append(issueFields.indent("        "))
+            append("\n      }")
+            append("\n      pageInfo { hasNextPage endCursor }")
+            append("\n    }")
+            append("\n  }")
+            append("\n}")
+        }
+    }
+
+    /**
      * Builds a filter for issues belonging to a milestone.
      */
     fun milestoneIssuesFilter(milestoneId: String): String {

@@ -1,5 +1,6 @@
 package com.github.karlsabo.projectmanagement
 
+import com.github.karlsabo.dto.User
 import kotlinx.datetime.Instant
 
 /**
@@ -19,9 +20,13 @@ interface ProjectManagementApi {
     suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue>
 
     /**
-     * Retrieves all child issues (recursively) for the given parent issue keys.
+     * Retrieves all child issues for the given parent keys.
      *
-     * @param issueKeys List of parent issue keys
+     * Keys can be issue identifiers (e.g., "PROJ-123") or project identifiers
+     * (e.g., a Linear project UUID). When a project identifier is provided,
+     * all issues belonging to that project are returned.
+     *
+     * @param issueKeys List of parent issue or project keys
      * @return List of all child issues
      */
     suspend fun getChildIssues(issueKeys: List<String>): List<ProjectIssue>
@@ -46,22 +51,27 @@ interface ProjectManagementApi {
     /**
      * Retrieves issues resolved by a user within a date range.
      *
-     * @param userId The user ID (platform-specific: Jira account ID, Linear user ID)
+     * Each implementation extracts the appropriate user identifier
+     * (e.g., Jira account ID, Linear user ID) from the User object.
+     *
+     * @param user The user to look up resolved issues for
      * @param startDate Start of the date range (inclusive)
      * @param endDate End of the date range (inclusive)
      * @return List of resolved issues
      */
-    suspend fun getIssuesResolved(userId: String, startDate: Instant, endDate: Instant): List<ProjectIssue>
+    suspend fun getIssuesResolved(user: User, startDate: Instant, endDate: Instant): List<ProjectIssue>
 
     /**
      * Counts issues resolved by a user within a date range.
      *
-     * @param userId The user ID (platform-specific)
+     * Each implementation extracts the appropriate user identifier from the User object.
+     *
+     * @param user The user to count resolved issues for
      * @param startDate Start of the date range (inclusive)
      * @param endDate End of the date range (inclusive)
      * @return Count of resolved issues
      */
-    suspend fun getIssuesResolvedCount(userId: String, startDate: Instant, endDate: Instant): UInt
+    suspend fun getIssuesResolvedCount(user: User, startDate: Instant, endDate: Instant): UInt
 
     /**
      * Retrieves issues matching the given filter criteria.

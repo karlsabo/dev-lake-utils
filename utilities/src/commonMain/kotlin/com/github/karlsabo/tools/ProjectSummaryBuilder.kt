@@ -39,8 +39,18 @@ suspend fun Project.createSummary(
     pullRequests: Set<com.github.karlsabo.github.Issue>,
     parentIssuesAreChildren: Boolean = false,
 ): ProjectSummary {
-    val parentIssues = fetchParentIssues(projectManagementApi)
-    val childIssues = fetchChildIssues(parentIssues, parentIssuesAreChildren, projectManagementApi)
+    val (issueKeys, projectIds) = topLevelIssueIds.partition { issueIdentifierPattern.matches(it) }
+    val hasProjectIds = projectIds.isNotEmpty()
+
+    val parentIssues = fetchParentIssues(issueKeys, projectIds, projectManagementApi)
+    val effectiveParentIssuesAreChildren = parentIssuesAreChildren || hasProjectIds
+    val childIssues = if (effectiveParentIssuesAreChildren) {
+        parentIssues.toMutableList()
+    } else {
+        val parentIssueKeys = parentIssues.map { it.key }
+        logger.debug { "Getting child issues for $parentIssues" }
+        projectManagementApi.getChildIssues(parentIssueKeys).toMutableList()
+    }
 
     val resolvedChildIssues = childIssues.filter {
         it.completedAt != null && it.completedAt >= Clock.System.now().minus(duration) && it.isIssueOrBug()
@@ -50,7 +60,7 @@ suspend fun Project.createSummary(
     val mergedPrs =
         fetchRelatedPullRequests(resolvedChildIssues, pullRequests, gitHubApi, gitHubOrganizationIds, duration)
 
-    val milestones = if (parentIssuesAreChildren) {
+    val milestones = if (effectiveParentIssuesAreChildren) {
         emptySet()
     } else {
         buildMilestones(parentIssues, childIssues, users, projectManagementApi, duration)
@@ -71,29 +81,23 @@ suspend fun Project.createSummary(
     )
 }
 
-private suspend fun Project.fetchParentIssues(
-    projectManagementApi: ProjectManagementApi,
-): MutableList<ProjectIssue> {
-    return if (topLevelIssueKeys.isEmpty()) {
-        mutableListOf()
-    } else {
-        logger.debug { "Getting issues for $topLevelIssueKeys" }
-        projectManagementApi.getIssues(topLevelIssueKeys).toMutableList()
-    }
-}
+private val issueIdentifierPattern = Regex("^[A-Za-z]+-\\d+$")
 
-private suspend fun Project.fetchChildIssues(
-    parentIssues: MutableList<ProjectIssue>,
-    parentIssuesAreChildren: Boolean,
+private suspend fun fetchParentIssues(
+    issueKeys: List<String>,
+    projectIds: List<String>,
     projectManagementApi: ProjectManagementApi,
 ): MutableList<ProjectIssue> {
-    return if (parentIssuesAreChildren) {
-        parentIssues
-    } else {
-        val parentIssueKeys = parentIssues.map { it.key }
-        logger.debug { "Getting child issues for $parentIssues" }
-        projectManagementApi.getChildIssues(parentIssueKeys).toMutableList()
+    val issues = mutableListOf<ProjectIssue>()
+    if (issueKeys.isNotEmpty()) {
+        logger.debug { "Getting issues for $issueKeys" }
+        issues += projectManagementApi.getIssues(issueKeys)
     }
+    if (projectIds.isNotEmpty()) {
+        logger.debug { "Getting issues for projects $projectIds" }
+        issues += projectManagementApi.getChildIssues(projectIds)
+    }
+    return issues
 }
 
 private suspend fun generateSummaryText(

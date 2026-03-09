@@ -7,7 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.config.GitHubApiRestConfig
-import com.github.karlsabo.jira.config.JiraApiRestConfig
+import com.github.karlsabo.linear.config.LinearApiRestConfig
 import com.github.karlsabo.pagerduty.PagerDutyApiRestConfig
 import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
 import com.github.karlsabo.tools.model.ProjectSummary
@@ -29,7 +29,7 @@ class SummaryPublisherState {
 
     var summaryConfig by mutableStateOf(SummaryPublisherConfig())
     var textSummarizerConfig by mutableStateOf<TextSummarizerOpenAiConfigNoSecrets?>(null)
-    var jiraConfig by mutableStateOf<JiraApiRestConfig?>(null)
+    var linearConfig by mutableStateOf<LinearApiRestConfig?>(null)
     var gitHubConfig by mutableStateOf<GitHubApiRestConfig?>(null)
     var pagerDutyConfig by mutableStateOf<PagerDutyApiRestConfig?>(null)
     var usersConfig by mutableStateOf(UsersConfig(emptyList()))

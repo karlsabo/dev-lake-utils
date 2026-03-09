@@ -90,7 +90,7 @@ suspend fun createSummary(
                 duration,
                 mutex,
                 miscIssueSet,
-                miscPrSet
+                miscPrSet,
             )
         } else {
             emptyList()
@@ -114,7 +114,7 @@ suspend fun createSummary(
         val miscProject = Project(
             id = 123456789101112L,
             title = "📋 Other (Misc)",
-            topLevelIssueKeys = miscIssueSet.map { it.key },
+            topLevelIssueIds = miscIssueSet.map { it.key },
         )
         projectSummaries.add(
             miscProject.createSummary(
@@ -158,9 +158,8 @@ private suspend fun collectMiscellaneousWork(
     val issueJobs = miscUsers.map { user ->
         async(Dispatchers.Default) {
             logger.info { "Pulling issues for user ${user.id}" }
-            val userId = user.jiraId ?: user.id
             val issuesForUser = projectManagementApi.getIssuesResolved(
-                userId,
+                user,
                 Clock.System.now().minus(duration),
                 Clock.System.now()
             )
