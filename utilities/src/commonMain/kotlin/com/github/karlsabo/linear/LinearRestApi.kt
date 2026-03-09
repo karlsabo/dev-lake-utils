@@ -1,5 +1,6 @@
 package com.github.karlsabo.linear
 
+import com.github.karlsabo.dto.User
 import com.github.karlsabo.http.installHttpRetry
 import com.github.karlsabo.linear.config.LinearApiRestConfig
 import com.github.karlsabo.linear.conversion.toProjectComment
@@ -158,8 +159,12 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         if (issueKeys.isEmpty()) return emptyList()
 
         val children = mutableListOf<Issue>()
-        for (issueKey in issueKeys) {
-            children += fetchChildIssues(issueKey)
+        for (key in issueKeys) {
+            children += if (isIssueIdentifier(key)) {
+                fetchChildIssues(key)
+            } else {
+                fetchProjectIssues(key)
+            }
         }
 
         return children.map { it.toProjectIssue() }
@@ -203,12 +208,14 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         return comments.map { it.toProjectComment() }
     }
 
-    override suspend fun getIssuesResolved(userId: String, startDate: Instant, endDate: Instant): List<ProjectIssue> {
+    override suspend fun getIssuesResolved(user: User, startDate: Instant, endDate: Instant): List<ProjectIssue> {
+        val userId = user.linearId ?: user.id
         val filter = queryBuilder.resolvedIssuesFilter(userId, startDate, endDate)
         return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
-    override suspend fun getIssuesResolvedCount(userId: String, startDate: Instant, endDate: Instant): UInt {
+    override suspend fun getIssuesResolvedCount(user: User, startDate: Instant, endDate: Instant): UInt {
+        val userId = user.linearId ?: user.id
         val filter = queryBuilder.resolvedIssuesFilter(userId, startDate, endDate)
         return countIssuesByFilter(filter)
     }
@@ -243,6 +250,33 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
 
         val filter = queryBuilder.labelsFilter(labels, completedAfter, completedBefore)
         return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
+    }
+
+    private suspend fun fetchProjectIssues(projectId: String): List<Issue> {
+        val issues = mutableListOf<Issue>()
+        var cursor: String? = null
+
+        while (true) {
+            val query = queryBuilder.projectIssues(projectId, ISSUE_FIELDS, cursor)
+            val data = executeGraphQl(query)
+            val projectNode = data["project"]?.jsonObject ?: break
+            val issuesNode = projectNode["issues"]?.jsonObject ?: break
+            val nodes = issuesNode["nodes"]?.jsonArray ?: break
+
+            nodes.forEach { node ->
+                issues += lenientJson.decodeFromJsonElement(Issue.serializer(), node)
+            }
+
+            val pageInfo = issuesNode["pageInfo"]?.jsonObject
+            val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true
+            val endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content
+
+            if (!hasNextPage || endCursor.isNullOrBlank()) break
+            cursor = endCursor
+            if (nodes.isEmpty()) break
+        }
+
+        return issues
     }
 
     override suspend fun getMilestones(projectId: String): List<UnifiedProjectMilestone> {
@@ -376,11 +410,23 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
             .orEmpty()
 
         if (errors.isNotEmpty()) {
+            val errorDetails = root["errors"]?.jsonArray
+                ?.map { it.jsonObject.toString() }
+                ?.joinToString("\n") ?: ""
+            logger.error { "Linear GraphQL errors for query:\n$query\nErrors:\n$errorDetails" }
             throw Exception("Linear GraphQL errors: ${errors.joinToString("; ")}")
         }
 
         return root["data"]?.jsonObject
             ?: throw Exception("Linear GraphQL response missing data: $responseText")
+    }
+
+    /**
+     * Returns true if the key looks like a Linear issue identifier (e.g., "ENG-123"),
+     * false if it looks like a project identifier (typically a UUID).
+     */
+    private fun isIssueIdentifier(key: String): Boolean {
+        return key.contains(Regex("^[A-Za-z]+-\\d+$"))
     }
 
     private fun authorizationHeaderValue(): String {

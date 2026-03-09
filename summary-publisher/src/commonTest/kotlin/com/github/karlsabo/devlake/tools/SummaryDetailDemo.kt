@@ -4,8 +4,8 @@ import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.dto.toTerseSlackMarkup
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.loadGitHubConfig
-import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.config.loadJiraConfig
+import com.github.karlsabo.linear.LinearRestApi
+import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.pagerduty.PagerDutyRestApi
 import com.github.karlsabo.pagerduty.loadPagerDutyConfig
 import com.github.karlsabo.text.TextSummarizerFake
@@ -13,7 +13,7 @@ import com.github.karlsabo.tools.createSummary
 import com.github.karlsabo.tools.formatting.toSlackMarkup
 import com.github.karlsabo.tools.formatting.toVerboseSlackMarkdown
 import com.github.karlsabo.tools.gitHubConfigPath
-import com.github.karlsabo.tools.jiraConfigPath
+import com.github.karlsabo.tools.linearConfigPath
 import com.github.karlsabo.tools.loadUsersConfig
 import com.github.karlsabo.tools.pagerDutyConfigPath
 import kotlinx.coroutines.runBlocking
@@ -27,7 +27,7 @@ fun main(args: Array<String>) {
     runBlocking {
         val summaryConfig = loadSummaryPublisherConfig(configFilePath)
 
-        val projectManagementApi = JiraRestApi(loadJiraConfig(jiraConfigPath))
+        val projectManagementApi = LinearRestApi(loadLinearConfig(linearConfigPath))
         val gitHubApi = GitHubRestApi(loadGitHubConfig(gitHubConfigPath))
         val pagerDutyApi =
             if (summaryConfig.pagerDutyServiceIds.isNotEmpty()) PagerDutyRestApi(loadPagerDutyConfig(pagerDutyConfigPath)) else null

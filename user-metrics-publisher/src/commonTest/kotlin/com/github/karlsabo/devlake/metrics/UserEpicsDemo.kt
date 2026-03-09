@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.metrics
 
+import com.github.karlsabo.dto.User
 import com.github.karlsabo.jira.JiraRestApi
 import com.github.karlsabo.jira.config.loadJiraConfig
 import com.github.karlsabo.projectmanagement.ProjectIssue
@@ -26,7 +27,11 @@ fun main(args: Array<String>): Unit = runBlocking {
     println("Finding epics for user: $userId")
 
     val executionTime = measureTime {
-        val userIssues = jiraApi.getIssuesResolved(userId, Clock.System.now().minus((4 * 365).days), Clock.System.now())
+        val userIssues = jiraApi.getIssuesResolved(
+            User(id = userId, name = userId, jiraId = userId),
+            Clock.System.now().minus((4 * 365).days),
+            Clock.System.now(),
+        )
         println("Found ${userIssues.size} issues assigned to user")
 
         if (userIssues.isEmpty()) {

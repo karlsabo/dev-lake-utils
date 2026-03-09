@@ -51,13 +51,13 @@ class SummaryDetailTest {
             Project(
                 id = 1L,
                 title = "Test Project 1",
-                topLevelIssueKeys = listOf("TEST-1", "TEST-4"),
+                topLevelIssueIds = listOf("TEST-1", "TEST-4"),
                 isVerboseMilestones = true
             ),
             Project(
                 id = 2L,
                 title = "Test Project 2",
-                topLevelIssueKeys = listOf("PROJ2-1", "PROJ2-2"),
+                topLevelIssueIds = listOf("PROJ2-1", "PROJ2-2"),
                 isVerboseMilestones = true
             )
         )
@@ -362,12 +362,12 @@ class SummaryDetailTest {
         }
 
         override suspend fun getIssuesResolved(
-            userId: String,
+            user: User,
             startDate: Instant,
             endDate: Instant,
         ): List<ProjectIssue> {
             return mockIssues.values.filter { issue ->
-                issue.assigneeId == userId &&
+                issue.assigneeId == user.id &&
                         issue.completedAt?.let { date ->
                             date >= startDate && date <= endDate
                         } ?: false
@@ -375,11 +375,11 @@ class SummaryDetailTest {
         }
 
         override suspend fun getIssuesResolvedCount(
-            userId: String,
+            user: User,
             startDate: Instant,
             endDate: Instant,
         ): UInt {
-            return getIssuesResolved(userId, startDate, endDate).size.toUInt()
+            return getIssuesResolved(user, startDate, endDate).size.toUInt()
         }
 
         override suspend fun getIssuesByFilter(filter: IssueFilter): List<ProjectIssue> {

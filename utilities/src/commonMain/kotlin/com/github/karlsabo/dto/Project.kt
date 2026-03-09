@@ -12,7 +12,7 @@ data class Project(
     val projectLeadUserId: String? = null,
     val projectContributors: List<String>? = emptyList(),
     val productManager: String? = null,
-    val topLevelIssueKeys: List<String> = emptyList(),
+    val topLevelIssueIds: List<String> = emptyList(),
     val isVerboseMilestones: Boolean = false,
     val isTagMilestoneOwners: Boolean = false,
 )

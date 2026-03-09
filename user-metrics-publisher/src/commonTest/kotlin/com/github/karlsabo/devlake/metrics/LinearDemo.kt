@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.metrics
 
+import com.github.karlsabo.dto.User
 import com.github.karlsabo.linear.LinearRestApi
 import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.tools.linearConfigPath
@@ -31,7 +32,8 @@ fun main(args: Array<String>): Unit = runBlocking {
         val endDate = Clock.System.now()
         val startDate = endDate.minus((weeksBack * 7).days)
 
-        val resolvedIssues = linearApi.getIssuesResolved(userId, startDate, endDate)
+        val user = User(id = userId, name = userId, linearId = userId)
+        val resolvedIssues = linearApi.getIssuesResolved(user, startDate, endDate)
         println("Found ${resolvedIssues.size} resolved issues\n")
 
         if (resolvedIssues.isEmpty()) {

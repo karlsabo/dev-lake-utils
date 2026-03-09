@@ -1,5 +1,7 @@
 package com.github.karlsabo.jira
 
+import com.github.karlsabo.common.datetime.DateTimeFormatting.toCompactUtcDateTime
+import com.github.karlsabo.dto.User
 import com.github.karlsabo.http.installHttpRetry
 import com.github.karlsabo.jira.config.JiraApiRestConfig
 import com.github.karlsabo.jira.conversion.toProjectComment
@@ -32,7 +34,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
-import com.github.karlsabo.common.datetime.DateTimeFormatting.toCompactUtcDateTime
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -114,10 +115,13 @@ class JiraRestApi(
         return runJql("parent = $parentKey")
     }
 
-    override suspend fun getIssuesResolved(userId: String, startDate: Instant, endDate: Instant): List<ProjectIssue> =
-        runJql("${buildResolvedJql(userId, startDate, endDate)} ORDER BY resolutiondate DESC")
+    override suspend fun getIssuesResolved(user: User, startDate: Instant, endDate: Instant): List<ProjectIssue> {
+        val userId = user.jiraId ?: user.id
+        return runJql("${buildResolvedJql(userId, startDate, endDate)} ORDER BY resolutiondate DESC")
+    }
 
-    override suspend fun getIssuesResolvedCount(userId: String, startDate: Instant, endDate: Instant): UInt {
+    override suspend fun getIssuesResolvedCount(user: User, startDate: Instant, endDate: Instant): UInt {
+        val userId = user.jiraId ?: user.id
         val jql = buildResolvedJql(userId, startDate, endDate)
         val url = "https://${config.domain}/rest/api/3/search/approximate-count"
         val response = client.post(url) {

@@ -24,10 +24,10 @@ import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.github.config.saveGitHubConfig
-import com.github.karlsabo.jira.JiraRestApi
-import com.github.karlsabo.jira.config.JiraConfig
-import com.github.karlsabo.jira.config.loadJiraConfig
-import com.github.karlsabo.jira.config.saveJiraConfig
+import com.github.karlsabo.linear.LinearRestApi
+import com.github.karlsabo.linear.config.LinearConfig
+import com.github.karlsabo.linear.config.loadLinearConfig
+import com.github.karlsabo.linear.config.saveLinearConfig
 import com.github.karlsabo.pagerduty.PagerDutyConfig
 import com.github.karlsabo.pagerduty.PagerDutyRestApi
 import com.github.karlsabo.pagerduty.loadPagerDutyConfig
@@ -41,7 +41,7 @@ import com.github.karlsabo.tools.createSummary
 import com.github.karlsabo.tools.formatting.toSlackMarkup
 import com.github.karlsabo.tools.formatting.toVerboseSlackMarkdown
 import com.github.karlsabo.tools.gitHubConfigPath
-import com.github.karlsabo.tools.jiraConfigPath
+import com.github.karlsabo.tools.linearConfigPath
 import com.github.karlsabo.tools.loadUsersConfig
 import com.github.karlsabo.tools.pagerDutyConfigPath
 import com.github.karlsabo.tools.textSummarizerConfigPath
@@ -123,7 +123,7 @@ private suspend fun loadConfiguration(
     try {
         state.summaryConfig = loadSummaryPublisherConfig(configFilePath)
         state.textSummarizerConfig = loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)
-        state.jiraConfig = loadJiraConfig(jiraConfigPath)
+        state.linearConfig = loadLinearConfig(linearConfigPath)
         state.gitHubConfig = loadGitHubConfig(gitHubConfigPath)
         state.pagerDutyConfig = loadPagerDutyConfig(pagerDutyConfigPath)
         state.usersConfig = loadUsersConfig()!!
@@ -150,9 +150,9 @@ private fun buildConfigurationErrorMessage(error: Exception): String {
             TextSummarizerOpenAiConfigNoSecrets(apiKeyFilePath = "password.txt"),
         )
     }
-    if (!SystemFileSystem.exists(jiraConfigPath)) {
-        message += "Please update the configuration file:\n${jiraConfigPath}."
-        saveJiraConfig(jiraConfigPath, JiraConfig("domain", "username", "/path/to/jira-api-key.json"))
+    if (!SystemFileSystem.exists(linearConfigPath)) {
+        message += "Please update the configuration file:\n${linearConfigPath}."
+        saveLinearConfig(linearConfigPath, LinearConfig(tokenPath = "/path/to/linear-api-key.json"))
     }
     if (!SystemFileSystem.exists(gitHubConfigPath)) {
         message += "Please update the configuration file:\n${gitHubConfigPath}."
@@ -168,13 +168,13 @@ private fun buildConfigurationErrorMessage(error: Exception): String {
 
 private suspend fun loadSummaryData(state: SummaryPublisherState) {
     val config = state.summaryConfig
-    val jiraConfig = state.jiraConfig ?: return
+    val linearConfig = state.linearConfig ?: return
     val gitHubConfig = state.gitHubConfig ?: return
     val pagerDutyConfig = state.pagerDutyConfig
     val textSummarizerConfig = state.textSummarizerConfig ?: return
 
     val summaryLast7Days = createSummary(
-        JiraRestApi(jiraConfig),
+        LinearRestApi(linearConfig),
         GitHubRestApi(gitHubConfig),
         config.gitHubOrganizationIds,
         if (config.pagerDutyServiceIds.isNotEmpty() && pagerDutyConfig != null) {
