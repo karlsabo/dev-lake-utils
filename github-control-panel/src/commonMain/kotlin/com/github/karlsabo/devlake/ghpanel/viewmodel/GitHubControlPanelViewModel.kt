@@ -228,15 +228,13 @@ class GitHubControlPanelViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 gitHubApi.unsubscribeFromNotification(notificationThreadId)
+                dismissedThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to unsubscribe from notification $notificationThreadId" }
                 actionError.value = e.message ?: "Failed to unsubscribe from notification"
+            } finally {
+                actingOnThreadIds.value -= notificationThreadId
             }
-        }
-        viewModelScope.launch {
-            delay(1_000)
-            dismissedThreadIds.value += notificationThreadId
-            actingOnThreadIds.value -= notificationThreadId
         }
     }
 }
