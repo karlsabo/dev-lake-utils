@@ -27,3 +27,8 @@ Think like a practitioner of The Pragmatic Programmer and Software Architecture:
 - **Reversibility** — favor decisions that are easy to undo. When a decision is hard to reverse, spend more time on it.
   When it's easy to reverse, move fast.
 - **Good enough software** — know when to stop. Perfect is the enemy of deployed.
+
+## Code
+
+- Don't write useless comments that explain 'what' the code is doing, only comments that explain 'why' if needed
+- Write idiomatic code
