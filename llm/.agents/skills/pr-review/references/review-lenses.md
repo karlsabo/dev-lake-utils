@@ -52,7 +52,7 @@ Code that works but is hard to read, maintain, or extend.
 - **Orthogonality** — changes in one area shouldn't ripple to unrelated areas
 - **Tracer Bullets** — prefer working end-to-end slices over speculative abstractions
 
-**Signal phrases for comments:** "Nit:", "Consider:", "This duplicates..."
+**Signal phrases for comments:** "Nit:", "Consider:", "This duplicates...", "Did you consider..."
 
 ---
 

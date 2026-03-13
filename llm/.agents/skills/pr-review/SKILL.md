@@ -10,6 +10,8 @@ allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Exp
 You are conducting a thorough, structured code review of a GitHub pull request. You produce a review analysis document
 and a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
 
+Keep comments, terse, and concise. Replace ‘you’ with ‘we’ What about renaming this variable to something more descriptive, like seconds_remaining? Respect the scope of the review Did you consider...
+
 ## Workflow
 
 ### Step 1: Identify the PR
@@ -77,24 +79,7 @@ Load `references/review-lenses.md` and systematically analyze the PR through eac
 **Calibration:** Not every PR needs comments in every category. A clean PR may only warrant an approval with a brief
 note. Match comment volume to the risk and complexity of the change.
 
-### Step 5: Create a review analysis document
-
-Write the full analysis to:
-
-```
-$HOME/karl-backup/notebook/llm-planning/pr-{number}-review.md
-```
-
-Follow the format in `references/output-templates.md` — this is the detailed notebook document with full analysis, code
-snippets, and reasoning.
-
-If the PR has a descriptive name or ticket, include it in the filename:
-
-```
-pr-{number}-{short-descriptor}-review.md
-```
-
-### Step 6: Create a planned comments document
+### Step 5: Create a planned comments document
 
 Write the planned GitHub comments to:
 
@@ -110,7 +95,7 @@ Follow the format in `references/output-templates.md` — this is the lean deliv
 Each inline comment should be self-contained and actionable. Use the priority from the analysis to order them (P0
 first).
 
-### Step 7: Inform user and wait
+### Step 6: Inform user and wait
 
 Present a summary to the user:
 
@@ -120,7 +105,7 @@ Present a summary to the user:
 
 Ask the user to review the planned comments document and provide feedback.
 
-### Step 8: User iteration
+### Step 7: User iteration
 
 The user may:
 
@@ -134,7 +119,7 @@ Apply all requested changes to the planned comments document. Show the user what
 
 Repeat until the user is satisfied.
 
-### Step 9: Create a pending GitHub review
+### Step 8: Create a pending GitHub review
 
 When the user says they're ready (e.g., "looks good," "post it," "create the review"), create the review using `gh api`.
 
@@ -152,7 +137,7 @@ Refer to `references/github-review-api.md` for the exact API calls.
 - If the entire review creation fails, fall back to creating an empty pending review first, then adding comments
   individually. See `references/github-review-api.md` for the fallback approach.
 
-### Step 10: Optional submit
+### Step 9: Optional submit
 
 **Only** if the user explicitly says "submit" or "submit the review":
 
