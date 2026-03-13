@@ -1,11 +1,10 @@
 package com.github.karlsabo.llm
 
-import kotlinx.cinterop.toKString
+import com.github.karlsabo.system.getEnv
 import kotlinx.io.files.Path
-import platform.posix.getenv
 
 fun main() {
-    val home = getenv("HOME")?.toKString() ?: error("HOME not set")
+    val home = getEnv("HOME") ?: error("HOME not set")
     val sourceLlmDir = Path(home, "git", "dev-lake-utils", "llm")
     val homeDir = Path(home)
 

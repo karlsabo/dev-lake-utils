@@ -17,7 +17,6 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
-import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -299,17 +298,11 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         }
     }
 
-    @Serializable
-    private data class ThreadSubscriptionUpdate(val ignored: Boolean)
-
     override suspend fun unsubscribeFromNotification(threadId: String) {
         val url = "https://api.github.com/notifications/threads/$threadId/subscription"
-        val response = client.put(url) {
-            contentType(ContentType.Application.Json)
-            setBody(ThreadSubscriptionUpdate(ignored = true))
-        }
-        val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
+        val response = client.delete(url)
+        if (response.status.value !in listOf(204, 404)) {
+            val responseText = response.bodyAsText()
             logger.error { "unsubscribeFromNotification responseText=```$responseText```" }
             throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId responseText=```$responseText```")
         }

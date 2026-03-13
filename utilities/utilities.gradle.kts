@@ -127,6 +127,14 @@ createJvmExecTask(
     dependsOn("jvmTestClasses")
 }
 
+createJvmExecTask(
+    taskName = "syncLlmFiles",
+    mainClassName = "com.github.karlsabo.llm.LlmSkillSyncDemoKt",
+    compilationName = "test"
+) {
+    dependsOn("jvmTestClasses")
+}
+
 publishing {
     repositories {
         mavenLocal()
