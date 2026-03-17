@@ -19,6 +19,17 @@ kotlin {
                 implementation(libs.kotlinx.serialization.json)
             }
         }
+        getByName("commonTest") {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+        getByName("jvmTest") {
+            dependencies {
+                implementation(libs.bundles.junit)
+                runtimeOnly(libs.junit.platform.launcher)
+            }
+        }
         getByName("jvmMain") {
             dependencies {
                 runtimeOnly(libs.bundles.log4j.runtime)

@@ -17,6 +17,8 @@ data class GitHubControlPanelConfig(
     val pollIntervalMs: Long = 10.minutes.inWholeMilliseconds,
     val repositoriesBaseDir: String = "",
     val gitHubAuthor: String = "",
+    val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
+    val setupShell: String = "/bin/zsh",
 )
 
 val gitHubControlPanelConfigPath: Path =
