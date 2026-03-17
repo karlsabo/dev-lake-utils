@@ -183,6 +183,7 @@ class GitHubControlPanelViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 gitHubApi.approvePullRequestByUrl(apiUrl)
+                gitHubApi.markNotificationAsDone(notificationThreadId)
                 dismissedThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to approve PR $apiUrl" }
@@ -198,6 +199,7 @@ class GitHubControlPanelViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 gitHubApi.submitReview(apiUrl, event, reviewComment)
+                gitHubApi.markNotificationAsDone(notificationThreadId)
                 dismissedThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to submit review for $apiUrl" }
