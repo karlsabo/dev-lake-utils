@@ -77,7 +77,7 @@ fun NotificationItem(
                         onClick = { onCheckoutAndOpen(notification.repositoryFullName, notification.headRef) },
                         enabled = !checkoutInProgress && !actionInProgress,
                     ) {
-                        Text(if (checkoutInProgress) "Checking out\u2026" else "Checkout & Open IDEA")
+                        Text(if (checkoutInProgress) "Setting up..." else "Setup")
                     }
                 }
 

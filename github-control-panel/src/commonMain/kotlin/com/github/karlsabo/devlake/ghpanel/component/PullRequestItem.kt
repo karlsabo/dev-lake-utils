@@ -63,7 +63,7 @@ fun PullRequestItem(
                         onClick = { onCheckoutAndOpen(pr.repositoryFullName, pr.headRef) },
                         enabled = !checkoutInProgress,
                     ) {
-                        Text(if (checkoutInProgress) "Checking out\u2026" else "Checkout & Open IDEA")
+                        Text(if (checkoutInProgress) "Setting up..." else "Setup")
                     }
                 }
             }

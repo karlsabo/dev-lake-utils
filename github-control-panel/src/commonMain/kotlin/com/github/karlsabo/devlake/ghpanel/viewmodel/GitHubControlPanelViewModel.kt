@@ -5,6 +5,7 @@ package com.github.karlsabo.devlake.ghpanel.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.ghpanel.GitHubControlPanelConfig
+import com.github.karlsabo.devlake.ghpanel.runConfiguredWorktreeSetup
 import com.github.karlsabo.devlake.ghpanel.state.NotificationUiState
 import com.github.karlsabo.devlake.ghpanel.state.PullRequestUiState
 import com.github.karlsabo.devlake.ghpanel.state.toNotificationUiState
@@ -162,16 +163,26 @@ class GitHubControlPanelViewModel(
                 val repoName = repoFullName.substringAfterLast('/')
                 val repoPath = "${config.repositoriesBaseDir.trimEnd('/')}/$repoName"
                 val cloneUrl = "https://github.com/$repoFullName.git"
-                logger.info { "Checkout & open: ensuring repository at $repoPath" }
+                logger.info { "Setup: ensuring repository at $repoPath" }
                 gitWorktreeApi.ensureRepository(repoPath, cloneUrl)
-                logger.info { "Checkout & open: ensuring worktree for branch $branch" }
+                logger.info { "Setup: ensuring worktree for branch $branch" }
                 val worktreePath = gitWorktreeApi.ensureWorktree(repoPath, branch)
-                logger.info { "Checkout & open: opening IDEA at $worktreePath" }
-                desktopLauncher.openInIdea(worktreePath)
-                logger.info { "Checkout & open: done" }
+                val setupResult = runConfiguredWorktreeSetup(repoPath, worktreePath, config)
+                when {
+                    setupResult == null -> logger.info { "Setup: no configured commands for $repoPath" }
+                    setupResult.exitCode != 0 -> {
+                        val detail = setupResult.stderr.ifEmpty { setupResult.stdout }.ifBlank { "No command output" }
+                        val warningMessage =
+                            "Setup commands failed for $worktreePath (exit code ${setupResult.exitCode}): $detail"
+                        logger.warn { warningMessage }
+                        actionError.value = warningMessage
+                    }
+                    else -> logger.info { "Setup: commands completed for $worktreePath" }
+                }
+                logger.info { "Setup: done" }
             } catch (e: Exception) {
-                logger.error(e) { "Failed to checkout and open $repoFullName branch=$branch" }
-                actionError.value = e.message ?: "Failed to checkout and open"
+                logger.error(e) { "Failed to set up $repoFullName branch=$branch" }
+                actionError.value = e.message ?: "Failed to set up worktree"
             } finally {
                 checkoutInProgress.value = false
             }
