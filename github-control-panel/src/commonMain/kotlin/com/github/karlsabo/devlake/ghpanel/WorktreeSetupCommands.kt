@@ -2,6 +2,9 @@ package com.github.karlsabo.devlake.ghpanel
 
 import com.github.karlsabo.system.ProcessResult
 import com.github.karlsabo.system.executeCommand
+import io.github.oshai.kotlinlogging.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 internal fun runConfiguredWorktreeSetup(
     repoPath: String,
@@ -12,6 +15,7 @@ internal fun runConfiguredWorktreeSetup(
     if (commands.isEmpty()) return null
 
     val script = buildWorktreeSetupScript(commands)
+    logger.info { "Executing setup script: $script" }
     return executeCommand(listOf(config.setupShell, "-l", "-c", script), worktreePath)
 }
 

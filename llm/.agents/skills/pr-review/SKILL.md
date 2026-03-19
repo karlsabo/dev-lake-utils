@@ -7,8 +7,7 @@ allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Exp
 
 # PR Review Skill
 
-You are conducting a thorough, structured code review of a GitHub pull request. You produce a review analysis document
-and a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
+You are conducting a thorough, structured code review of a GitHub pull request. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
 
 Keep comments, terse, and concise. Replace ‘you’ with ‘we’ What about renaming this variable to something more descriptive, like seconds_remaining? Respect the scope of the review Did you consider...
 
@@ -70,11 +69,11 @@ For files that don't exist locally (deleted files, or repo not checked out), rel
 
 Load `references/review-lenses.md` and systematically analyze the PR through each lens:
 
-1. **Bugs & Correctness (P0)** — logic errors, edge cases, security issues
-2. **Code Quality (P1)** — readability, DRY, naming, idioms
-3. **Testing Gaps (P2)** — missing coverage, test quality, test ownership
-4. **Architecture & Design (P2)** — coupling, cohesion, abstraction
-5. **Redundancy (P3)** — dead code, duplicates, stale comments
+1. **Bugs & Correctness** — logic errors, edge cases, security issues
+2. **Code Quality** — readability, DRY, naming, idioms
+3. **Testing Gaps** — missing coverage, test quality, test ownership
+4. **Architecture & Design** — coupling, cohesion, abstraction
+5. **Redundancy** — dead code, duplicates, stale comments
 
 **Calibration:** Not every PR needs comments in every category. A clean PR may only warrant an approval with a brief
 note. Match comment volume to the risk and complexity of the change.
@@ -89,18 +88,16 @@ $HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md
 
 Follow the format in `references/output-templates.md` — this is the lean deliverable listing:
 
-- An overall PR comment (the review body)
 - Inline comments with File, Line, and comment body
 
-Each inline comment should be self-contained and actionable. Use the priority from the analysis to order them (P0
-first).
+Each inline comment should be self-contained and actionable. Use the priority from the analysis to order them.
 
 ### Step 6: Inform user and wait
 
 Present a summary to the user:
 
-- Path to both documents
-- Total comment count broken down by priority (e.g., "1 P0, 2 P1, 1 P2")
+- Path to the document
+- Total comment count
 - A brief 1-2 sentence overall assessment
 
 Ask the user to review the planned comments document and provide feedback.
@@ -150,9 +147,7 @@ Refer to `references/github-review-api.md` for the exact API calls.
 
 - Always read full files, not just diffs — context matters
 - Be constructive, not nitpicky — every comment should help the author
-- Prioritize bugs over style — a P0 bug matters more than a P3 naming nit
+- Prioritize bugs over style — a bug matters more than a naming nit
 - Include code suggestions where helpful — show, don't just tell
 - Reference principles by name (DRY, Orthogonality, etc.) but don't be preachy
 - If the PR is clean and well-written, say so — don't manufacture comments
-- The review and planned-comments are two separate documents with different purposes: the review is a full analysis
-  notebook, the planned-comments is a lean deliverable for GitHub

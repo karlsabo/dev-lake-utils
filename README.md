@@ -19,9 +19,54 @@
 
 # TODO
 
+* [ ] Rename all skills to start with a standard prefix
+    * Maybe ed for eng dashboard?
+* [ ] Add a UI button to sync skills, or always sync skills every X minutes
+* [ ] Rename git control panel to eng dashboard or something better
 * [ ] Create native executables
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
+
+## Set up MCP servers
+
+* [MCP Proxy](https://github.com/smart-mcp-proxy/mcpproxy-go)
+    * GitHub
+    * BuildKite
+    * Atlassian
+    * Linear
+    * Sentry
+    * Glean
+    * Whimsical
+    *
+
+## Auto start reviewing PRs
+
+* Auto kick off PR reviews when a notification comes in that requires it
+
+## Have multiple PR review styles
+
+* Use different PR review focuses, security, testing, mccabe complexity, architecture.
+* Use a directory for the reviews, each reviewing creates its own comment file
+* Consolidate the comments
+    * Probably ask the reviewers to use a JSON schema
+
+## Have an issues list
+
+* Show assigned issues
+* Show related issues that should be picked up next
+    * Maybe in the same Epic, or Project
+
+## Have a task list
+
+* Pull in tasks from multiple sources, Google Tasks etc.
+
+## Keep cli tools up to date
+
+* Run update scripts for claude code, codex cli, goose, etc
+
+## Notification panel
+
+* Have app notifications and logs for when it completes a task like pulling the latest git notifications, updating tools, etc.
 
 # Overview
 
