@@ -26,6 +26,7 @@
 * [ ] Create native executables
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
+* [ ] Look into <https://github.com/obra/superpowers/tree/main> for their skills
 
 ## Set up MCP servers
 
