@@ -5,6 +5,7 @@ import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.extractOwnerAndRepo
+import com.github.karlsabo.github.pullRequestApiUrl
 
 data class PullRequestUiState(
     val number: Int,
@@ -54,6 +55,6 @@ fun Issue.toPullRequestUiState(
         requestedCount = reviewSummary.requestedCount,
         reviewSummaryText = reviewSummaryText,
         headRef = headRef,
-        apiUrl = url ?: "",
+        apiUrl = pullRequestApiUrl.orEmpty(),
     )
 }

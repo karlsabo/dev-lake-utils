@@ -11,12 +11,17 @@ import com.github.karlsabo.devlake.ghpanel.state.PullRequestUiState
 import com.github.karlsabo.devlake.ghpanel.state.toNotificationUiState
 import com.github.karlsabo.devlake.ghpanel.state.toPullRequestUiState
 import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.github.CheckRunSummary
+import com.github.karlsabo.github.CiStatus.PENDING
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubNotificationService
+import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.NotificationAction
 import com.github.karlsabo.github.NotificationProcessingResult
 import com.github.karlsabo.github.ReviewStateValue
+import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.extractOwnerAndRepo
+import com.github.karlsabo.github.pullRequestDetailsUrl
 import com.github.karlsabo.system.DesktopLauncher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +33,27 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 
 private val logger = KotlinLogging.logger {}
+
+internal suspend fun GitHubApi.buildPullRequestUiStates(issues: List<Issue>): List<PullRequestUiState> {
+    return issues.map { issue ->
+        val pr = getPullRequestByUrl(issue.pullRequestDetailsUrl)
+        val headRef = pr.head?.ref
+        val headSha = pr.head?.sha
+        val repoUrl = issue.repositoryUrl ?: ""
+        val (owner, repo) = if (repoUrl.isNotEmpty()) extractOwnerAndRepo(repoUrl) else ("" to "")
+        val checkRunSummary = if (headSha != null && owner.isNotEmpty()) {
+            getCheckRunsForRef(owner, repo, headSha)
+        } else {
+            CheckRunSummary(0, 0, 0, 0, PENDING)
+        }
+        val reviewSummary = if (owner.isNotEmpty()) {
+            getReviewSummary(owner, repo, issue.number)
+        } else {
+            ReviewSummary(0, 0, emptyList())
+        }
+        issue.toPullRequestUiState(checkRunSummary, reviewSummary, headRef)
+    }
+}
 
 class GitHubControlPanelViewModel(
     private val gitHubApi: GitHubApi,
@@ -53,24 +79,7 @@ class GitHubControlPanelViewModel(
     val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = flow {
         while (true) {
             val issues = gitHubApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
-            val prStates = issues.map { issue ->
-                val pr = gitHubApi.getPullRequestByUrl(issue.url ?: issue.htmlUrl)
-                val headRef = pr.head?.ref
-                val headSha = pr.head?.sha
-                val repoUrl = issue.repositoryUrl ?: ""
-                val (owner, repo) = if (repoUrl.isNotEmpty()) extractOwnerAndRepo(repoUrl) else ("" to "")
-                val checkRunSummary = if (headSha != null && owner.isNotEmpty()) {
-                    gitHubApi.getCheckRunsForRef(owner, repo, headSha)
-                } else {
-                    com.github.karlsabo.github.CheckRunSummary(0, 0, 0, 0, com.github.karlsabo.github.CiStatus.PENDING)
-                }
-                val reviewSummary = if (owner.isNotEmpty()) {
-                    gitHubApi.getReviewSummary(owner, repo, issue.number)
-                } else {
-                    com.github.karlsabo.github.ReviewSummary(0, 0, emptyList())
-                }
-                issue.toPullRequestUiState(checkRunSummary, reviewSummary, headRef)
-            }
+            val prStates = gitHubApi.buildPullRequestUiStates(issues)
             emit(Result.success(prStates))
             delay(config.pollIntervalMs)
         }

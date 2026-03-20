@@ -29,3 +29,9 @@ data class Issue(
     val pullRequest: PullRequest? = null,
     val comments: Int?,
 )
+
+val Issue.pullRequestApiUrl: String?
+    get() = pullRequest?.url ?: url
+
+val Issue.pullRequestDetailsUrl: String
+    get() = pullRequestApiUrl ?: htmlUrl
