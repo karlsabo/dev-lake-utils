@@ -39,25 +39,33 @@ private val logger = KotlinLogging.logger {}
  * Implementation of the GitHubApi interface using REST.
  */
 class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
-    private val client: HttpClient = HttpClient(CIO) {
-        install(Auth) {
-            bearer {
-                loadTokens {
-                    BearerTokens(config.token, "")
+    constructor(config: GitHubApiRestConfig, httpClient: HttpClient) : this(config) {
+        clientOverride = httpClient
+    }
+
+    private var clientOverride: HttpClient? = null
+
+    private val client: HttpClient by lazy {
+        clientOverride ?: HttpClient(CIO) {
+            install(Auth) {
+                bearer {
+                    loadTokens {
+                        BearerTokens(config.token, "")
+                    }
+                    sendWithoutRequest { true }
                 }
-                sendWithoutRequest { true }
             }
+            install(ContentNegotiation) {
+                json(lenientJson)
+            }
+            defaultRequest {
+                header(HttpHeaders.Accept, "application/vnd.github.v3+json")
+                header("X-GitHub-Api-Version", "2022-11-28")
+            }
+            installHttpRetry()
+            install(HttpCache)
+            expectSuccess = false
         }
-        install(ContentNegotiation) {
-            json(lenientJson)
-        }
-        defaultRequest {
-            header(HttpHeaders.Accept, "application/vnd.github.v3+json")
-            header("X-GitHub-Api-Version", "2022-11-28")
-        }
-        installHttpRetry()
-        install(HttpCache)
-        expectSuccess = false
     }
 
     @Serializable
@@ -398,7 +406,8 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         if (requestedResponse.status.value in 200..299) {
             val requestedRoot = lenientJson.parseToJsonElement(requestedText).jsonObject
             val users = requestedRoot["users"]?.jsonArray
-            requestedCount = users?.size ?: 0
+            val teams = requestedRoot["teams"]?.jsonArray
+            requestedCount = (users?.size ?: 0) + (teams?.size ?: 0)
         }
 
         val reviews = latestByUser.map { (user, state) -> ReviewState(user, state) }

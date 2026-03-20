@@ -39,7 +39,12 @@ fun Issue.toPullRequestUiState(
         if (checkRunSummary.inProgress > 0) append(", ${checkRunSummary.inProgress} running")
     }
 
-    val reviewSummaryText = "${reviewSummary.approvedCount}/${reviewSummary.requestedCount} approved"
+    val pendingReviewers = (reviewSummary.requestedCount - reviewSummary.approvedCount).coerceAtLeast(0)
+    val reviewSummaryText = when {
+        pendingReviewers == 1 && reviewSummary.requestedCount == 1 -> "waiting on 1 reviewer"
+        pendingReviewers > 0 -> "waiting on $pendingReviewers/${reviewSummary.requestedCount} reviewers"
+        else -> "${reviewSummary.approvedCount}/${reviewSummary.requestedCount} approved"
+    }
 
     return PullRequestUiState(
         number = number,
