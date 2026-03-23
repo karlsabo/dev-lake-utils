@@ -14,7 +14,7 @@ Break features into stories where each story = 1 acceptance test = 1 ticket = 1 
 Argument is either:
 
 - Freeform text describing a feature or story
-- A Linear ticket ID (e.g., `IAM-123`) or URL
+- A Linear ticket ID (e.g., `ABC-123`) or URL
 
 If a Linear ticket ID/URL is given, fetch the ticket details for context.
 
