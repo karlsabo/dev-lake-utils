@@ -121,12 +121,12 @@ interface GitHubApi {
     suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String): List<Issue>
 
     /**
-     * Retrieves check run results for a specific commit reference.
+     * Retrieves the CI rollup for a specific commit reference, including check runs and commit status contexts.
      *
      * @param owner The repository owner.
      * @param repo The repository name.
      * @param ref The commit SHA or branch name.
-     * @return A summary of check run results.
+     * @return A summary of CI results for the ref.
      */
     suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary
 

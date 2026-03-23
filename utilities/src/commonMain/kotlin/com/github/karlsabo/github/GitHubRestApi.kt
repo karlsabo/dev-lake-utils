@@ -35,6 +35,39 @@ import kotlinx.serialization.json.jsonPrimitive
 
 private val logger = KotlinLogging.logger {}
 
+private data class CiCounts(
+    val total: Int,
+    val passed: Int,
+    val failed: Int,
+    val inProgress: Int,
+) {
+    operator fun plus(other: CiCounts): CiCounts {
+        return CiCounts(
+            total = total + other.total,
+            passed = passed + other.passed,
+            failed = failed + other.failed,
+            inProgress = inProgress + other.inProgress,
+        )
+    }
+
+    fun toSummary(): CheckRunSummary {
+        val ciStatus = when {
+            failed > 0 -> CiStatus.FAILED
+            inProgress > 0 -> CiStatus.RUNNING
+            total == 0 -> CiStatus.PENDING
+            else -> CiStatus.PASSED
+        }
+
+        return CheckRunSummary(
+            total = total,
+            passed = passed,
+            failed = failed,
+            inProgress = inProgress,
+            status = ciStatus,
+        )
+    }
+}
+
 /**
  * Implementation of the GitHubApi interface using REST.
  */
@@ -323,50 +356,34 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
     }
 
     override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary {
-        val url = "https://api.github.com/repos/$owner/$repo/commits/$ref/check-runs?per_page=100"
-        val response = client.get(url)
-        val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
-            logger.error { "Failed to get check runs for $owner/$repo ref=$ref response.status=${response.status} responseText=```$responseText```" }
-            throw Exception("Failed to get check runs: ${response.status.value} for $owner/$repo ref=$ref responseText=```$responseText```")
-        }
-
-        val root = lenientJson.parseToJsonElement(responseText).jsonObject
-        val checkRuns = root["check_runs"]?.jsonArray ?: return CheckRunSummary(0, 0, 0, 0, CiStatus.PENDING)
-
-        var passed = 0
-        var failed = 0
-        var inProgress = 0
-
-        for (checkRun in checkRuns) {
-            val obj = checkRun.jsonObject
-            val status = obj["status"]?.jsonPrimitive?.content
-            val conclusion = obj["conclusion"]?.jsonPrimitive?.content
-
-            when {
-                status == "completed" && conclusion == "success" -> passed++
-                status == "completed" && conclusion == "neutral" -> passed++
-                status == "completed" && conclusion == "skipped" -> passed++
-                status == "completed" -> failed++
-                status == "in_progress" || status == "queued" -> inProgress++
+        val checkRunsUrl = "https://api.github.com/repos/$owner/$repo/commits/$ref/check-runs?per_page=100"
+        val checkRunsResponse = client.get(checkRunsUrl)
+        val checkRunsText = checkRunsResponse.bodyAsText()
+        if (checkRunsResponse.status.value !in 200..299) {
+            logger.error {
+                "Failed to get check runs for $owner/$repo ref=$ref response.status=${checkRunsResponse.status} responseText=```$checkRunsText```"
             }
+            throw Exception("Failed to get check runs: ${checkRunsResponse.status.value} for $owner/$repo ref=$ref responseText=```$checkRunsText```")
         }
 
-        val total = checkRuns.size
-        val ciStatus = when {
-            failed > 0 -> CiStatus.FAILED
-            inProgress > 0 -> CiStatus.RUNNING
-            total == 0 -> CiStatus.PENDING
-            else -> CiStatus.PASSED
+        val statusContextsUrl = "https://api.github.com/repos/$owner/$repo/commits/$ref/status?per_page=100"
+        val statusContextsResponse = client.get(statusContextsUrl)
+        val statusContextsText = statusContextsResponse.bodyAsText()
+        if (statusContextsResponse.status.value !in 200..299) {
+            logger.error {
+                "Failed to get commit statuses for $owner/$repo ref=$ref response.status=${statusContextsResponse.status} responseText=```$statusContextsText```"
+            }
+            throw Exception(
+                "Failed to get commit statuses: ${statusContextsResponse.status.value} for $owner/$repo ref=$ref responseText=```$statusContextsText```"
+            )
         }
 
-        return CheckRunSummary(
-            total = total,
-            passed = passed,
-            failed = failed,
-            inProgress = inProgress,
-            status = ciStatus
-        )
+        val checkRunCounts =
+            parseCheckRunCounts(lenientJson.parseToJsonElement(checkRunsText).jsonObject["check_runs"]?.jsonArray.orEmpty())
+        val statusContextCounts =
+            parseCommitStatusCounts(lenientJson.parseToJsonElement(statusContextsText).jsonObject["statuses"]?.jsonArray.orEmpty())
+
+        return (checkRunCounts + statusContextCounts).toSummary()
     }
 
     override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary {
@@ -431,6 +448,44 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
             throw Exception("Failed to submit review: ${response.status.value} for url=$prApiUrl responseText=```$responseText```")
         }
     }
+}
+
+private fun parseCheckRunCounts(checkRuns: List<JsonElement>): CiCounts {
+    var passed = 0
+    var failed = 0
+    var inProgress = 0
+
+    for (checkRun in checkRuns) {
+        val obj = checkRun.jsonObject
+        val status = obj["status"]?.jsonPrimitive?.content
+        val conclusion = obj["conclusion"]?.jsonPrimitive?.content
+
+        when {
+            status == "completed" && conclusion == "success" -> passed++
+            status == "completed" && conclusion == "neutral" -> passed++
+            status == "completed" && conclusion == "skipped" -> passed++
+            status == "completed" -> failed++
+            status == "in_progress" || status == "queued" -> inProgress++
+        }
+    }
+
+    return CiCounts(total = checkRuns.size, passed = passed, failed = failed, inProgress = inProgress)
+}
+
+private fun parseCommitStatusCounts(statuses: List<JsonElement>): CiCounts {
+    var passed = 0
+    var failed = 0
+    var inProgress = 0
+
+    for (status in statuses) {
+        when (status.jsonObject["state"]?.jsonPrimitive?.content) {
+            "success" -> passed++
+            "failure", "error" -> failed++
+            "pending" -> inProgress++
+        }
+    }
+
+    return CiCounts(total = statuses.size, passed = passed, failed = failed, inProgress = inProgress)
 }
 
 private fun createMergedPrEncodedQuery(
