@@ -95,13 +95,30 @@ Keep the section headings exactly as defined in the template so later steps can 
 
 Each inline comment should be self-contained and actionable. Use the priority from the analysis to order them.
 
-### Step 6: Spawn a subagent with the following prompt, make sure to use the proper file path before spawning the subagent
+### Step 6: Run a skeptic subagent pass and wait for it to finish
+
+Compute the planned comments document path once and store it as `{planned_comments_path}`:
 
 ```text
-1. Review the PR comments in $HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md with an eye of skepticism and cynicism, are they reasonable?
-2. Also ensure the `Overall PR Comment` isn't lengthy, keep it terse and concise, don't repeat what's already in a comment. 
-3. Fix the comments
+$HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md
 ```
+
+Use that exact absolute path for the rest of this step. Do not continue if the file is missing; go back and fix Step 5 first.
+
+Spawn exactly one subagent and give it this prompt, substituting `{planned_comments_path}` with the absolute path you computed:
+
+```text
+Review the Pull Request comments document at {planned_comments_path} with an eye of skepticism and cynicism.
+
+1. Remove or rewrite comments that are weak, speculative, redundant, not actionable, or not well-supported by the PR.
+2. Keep the tone constructive, but be skeptical about whether each comment should really be posted.
+3. Ensure the `Overall PR Comment` is terse, concise, and does not repeat what is already covered by inline comments.
+4. Preserve the existing document structure and section headings.
+
+In your final response, state whether you changed the file and briefly summarize the changes.
+```
+
+Wait for the subagent to finish before moving on. Do not continue to Step 7 until the subagent has reported completion, even if it made no changes.
 
 ### Step 7: Inform user and wait
 
