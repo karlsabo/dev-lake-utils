@@ -30,7 +30,7 @@ This is the lean deliverable — exactly what will be posted to GitHub. No analy
 
 ## Inline Comments
 
-### Comment {n} — {short label} ({file_basename})
+### Comment {short label} ({file_basename})
 
 **File:** `{full_file_path}`
 **Line:** {line_number} {optional: brief description of what's on that line}
@@ -50,7 +50,7 @@ This is the lean deliverable — exactly what will be posted to GitHub. No analy
 
 ---
 
-{Repeat for each inline comment, ordered by priority (P0 first)}
+{Repeat for each inline comment, ordered by priority}
 
 ```
 
@@ -68,4 +68,4 @@ This is the lean deliverable — exactly what will be posted to GitHub. No analy
 - **(Quality):** Suggestive. "Consider using..." or "This duplicates..."
 - **(Testing/Architecture):** Questioning. "Is there a reason..." or "Testing gap:..." or "Did you consider..."
 - **(Minor):** Explicitly low-priority. "Minor:" or "Nit:" prefix
-- **General:** Use "we" or impersonal voice ("this could be..." not "you should..."). Assume good intent. Acknowledge when something is pre-existing rather than introduced by the PR.
+- **General:** Use "we" or impersonal voice ("this could be..." not "you should..."). Assume positive intent. Acknowledge when something is pre-existing rather than introduced by the PR.

@@ -46,7 +46,7 @@ gh pr view {number} --json commits --jq '.commits[] | "\(.oid[:7]) \(.messageHea
 
 From these, derive:
 
-- `{owner}/{repo}` — for API calls
+- `{owner}/{repo}`, for API calls
 - PR title, author, branch info, stats
 - The full diff and list of changed files
 - Commit messages for understanding intent
@@ -69,11 +69,11 @@ For files that don't exist locally (deleted files, or repo not checked out), rel
 
 Load `references/review-lenses.md` and systematically analyze the PR through each lens:
 
-1. **Bugs & Correctness** — logic errors, edge cases, security issues
-2. **Code Quality** — readability, DRY, naming, idioms
-3. **Testing Gaps** — missing coverage, test quality, test ownership
-4. **Architecture & Design** — coupling, cohesion, abstraction
-5. **Redundancy** — dead code, duplicates, stale comments
+1. **Bugs & Correctness**, logic errors, edge cases, security issues
+2. **Code Quality**, readability, DRY, naming, idioms
+3. **Testing Gaps**, missing coverage, test quality, test ownership
+4. **Architecture & Design**, coupling, cohesion, abstraction
+5. **Redundancy**, dead code, duplicates, stale comments
 
 **Calibration:** Not every PR needs comments in every category. A clean PR may only warrant an approval with a brief
 note. Match comment volume to the risk and complexity of the change.
@@ -86,23 +86,33 @@ Write the planned GitHub comments to:
 $HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md
 ```
 
-Follow the format in `references/output-templates.md` — this is the lean deliverable listing:
+Follow the format in `references/output-templates.md`. The planned comments document must include both of these sections:
 
-- Inline comments with File, Line, and comment body
+- `## Overall PR Comment`, the terse review body that will appear at the top of the GitHub review
+- `## Inline Comments`, the ordered list of inline comments with File, Line, and comment body
+
+Keep the section headings exactly as defined in the template so later steps can review the same artifact shape every time. If there are no inline comments, still include `## Inline Comments` and leave it empty rather than changing the document contract.
 
 Each inline comment should be self-contained and actionable. Use the priority from the analysis to order them.
 
-### Step 6: Inform user and wait
+### Step 6: Spawn a subagent with the following prompt, make sure to use the proper file path before spawning the subagent
+
+```text
+1. Review the PR comments in $HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md with an eye of skepticism and cynicism, are they reasonable?
+2. Also ensure the `Overall PR Comment` isn't lengthy, keep it terse and concise, don't repeat what's already in a comment. 
+3. Fix the comments
+```
+
+### Step 7: Inform user and wait
 
 Present a summary to the user:
 
-- Path to the document
-- Total comment count
+- Absolute path to the document
 - A brief 1-2 sentence overall assessment
 
 Ask the user to review the planned comments document and provide feedback.
 
-### Step 7: User iteration
+### Step 8: User iteration
 
 The user may:
 
@@ -116,7 +126,7 @@ Apply all requested changes to the planned comments document. Show the user what
 
 Repeat until the user is satisfied.
 
-### Step 8: Create a pending GitHub review
+### Step 9: Create a pending GitHub review
 
 When the user says they're ready (e.g., "looks good," "post it," "create the review"), create the review using `gh api`.
 
@@ -124,7 +134,7 @@ Refer to `references/github-review-api.md` for the exact API calls.
 
 **Critical rules:**
 
-- **ALWAYS** use `"event": "PENDING"` — this creates a draft review the user can inspect on GitHub before submitting
+- **ALWAYS** use `"event": "PENDING"`, this creates a draft review the user can inspect on GitHub before submitting
 - **NEVER** submit the review (no `APPROVE`, `REQUEST_CHANGES`, or `COMMENT` event) unless explicitly told to
 - Tell the user the review is pending, and they need to submit it from the GitHub UI
 
@@ -134,7 +144,7 @@ Refer to `references/github-review-api.md` for the exact API calls.
 - If the entire review creation fails, fall back to creating an empty pending review first, then adding comments
   individually. See `references/github-review-api.md` for the fallback approach.
 
-### Step 9: Optional submit
+### Step 10: Optional submit
 
 **Only** if the user explicitly says "submit" or "submit the review":
 
@@ -145,9 +155,9 @@ Refer to `references/github-review-api.md` for the exact API calls.
 
 ## Important Notes
 
-- Always read full files, not just diffs — context matters
-- Be constructive, not nitpicky — every comment should help the author
-- Prioritize bugs over style — a bug matters more than a naming nit
-- Include code suggestions where helpful — show, don't just tell
+- Always read full files, not just diffs, context matters
+- Be constructive, not nitpicky, every comment should help the author
+- Prioritize bugs over style, a bug matters more than a naming nit
+- Include code suggestions where helpful, show, don't just tell
 - Reference principles by name (DRY, Orthogonality, etc.) but don't be preachy
-- If the PR is clean and well-written, say so — don't manufacture comments
+- If the PR is clean and well-written, say so, don't manufacture comments

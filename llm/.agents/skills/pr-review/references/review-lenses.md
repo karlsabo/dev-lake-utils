@@ -5,7 +5,7 @@ every PR — that's expected and correct.
 
 ---
 
-## P0 — Bugs & Correctness
+## Bugs & Correctness
 
 The highest priority. A bug in production outweighs any number of style nits.
 
@@ -27,7 +27,7 @@ The highest priority. A bug in production outweighs any number of style nits.
 
 ---
 
-## P1 — Code Quality
+## Code Quality
 
 Code that works but is hard to read, maintain, or extend.
 
@@ -56,7 +56,7 @@ Code that works but is hard to read, maintain, or extend.
 
 ---
 
-## P2 — Testing Gaps
+## Testing Gaps
 
 Missing or weak test coverage that leaves the change inadequately verified.
 
@@ -79,7 +79,7 @@ view-level tests.
 
 ---
 
-## P2 — Architecture & Design
+## Architecture & Design
 
 Structural issues that affect long-term maintainability.
 
@@ -102,7 +102,7 @@ Structural issues that affect long-term maintainability.
 
 ---
 
-## P3 — Redundancy
+## Redundancy
 
 Low-priority cleanup that can be addressed in follow-up work.
 
@@ -131,10 +131,3 @@ Low-priority cleanup that can be addressed in follow-up work.
 5. **Am I being constructive?** Frame comments as suggestions, not commands. Use "Consider..." and "Suggest..." not "You
    should..." or "This is wrong."
 6. **Would I appreciate this comment on my PR?** If not, rephrase or drop it.
-
-**Volume calibration by PR type:**
-
-- **Bug fix (small):** 0-2 comments. Verify the fix is correct, check for regression risk.
-- **New feature (medium):** 2-5 comments. Focus on bugs, test coverage, and whether it fits the codebase.
-- **Refactor (large):** 1-3 comments. Verify no behavior changes, check boundary conditions at new module seams.
-- **Infrastructure/config:** 0-1 comments. Verify correctness, check for secret leakage.

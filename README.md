@@ -20,8 +20,14 @@
 # TODO
 
 * [ ] Rename all skills to start with a standard prefix
-    * Maybe ed for eng dashboard?
+    * Maybe eh for eng hub?
+* [ ] Fix skill paths to not be hard coded, e.g., remove `$HOME/karl-backup`, take it from a config variable
+* [ ] When launching a PR review via "Setup" it can hang forever.
+    * Run it in the background and terminate it after X minutes
+* [ ] Clicking "Setup" greys out all Setup buttons, it should only do it for the current task
+* [ ] 
 * [ ] Add a UI button to sync skills, or always sync skills every X minutes
+    * Maybe a searchable menu that pops up, like JB Fleet had with cmd+k
 * [ ] Rename git control panel to eng dashboard or something better
 * [ ] Create native executables
 * [ ] Add dependency injection
@@ -63,7 +69,7 @@
 
 ## Keep cli tools up to date
 
-* Run update scripts for claude code, codex cli, goose, etc
+* Run update scripts for claude code, codex cli, goose, OpenCode, etc
 
 ## Notification panel
 
