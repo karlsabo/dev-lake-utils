@@ -19,6 +19,8 @@
 
 # TODO
 
+* [ ] Can we write UI tests?
+    * Can an LLM execute some manual UI driven tests?
 * [ ] Rename all skills to start with a standard prefix
     * Maybe eh for eng hub?
 * [ ] Fix skill paths to not be hard coded, e.g., remove `$HOME/karl-backup`, take it from a config variable
@@ -33,6 +35,7 @@
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
 * [ ] Look into <https://github.com/obra/superpowers/tree/main> for their skills
+* [ ] Look into <https://github.com/garrytan/gstack> for their skills
 
 ## Set up MCP servers
 
