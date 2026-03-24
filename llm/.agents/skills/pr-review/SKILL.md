@@ -120,14 +120,17 @@ In your final response, state whether you changed the file and briefly summarize
 
 Wait for the subagent to finish before moving on. Do not continue to Step 7 until the subagent has reported completion, even if it made no changes.
 
-### Step 7: Inform user and wait
+### Step 7: Read the revised document, inform user, and wait
+
+After the Step 6 subagent reports completion, read `{planned_comments_path}` from disk again before you say anything to the user. Use the post-subagent contents of that file as the source of truth for the rest of the workflow; do not rely on the pre-subagent version from memory.
 
 Present a summary to the user:
 
 - Absolute path to the document
-- A brief 1-2 sentence overall assessment
+- A brief 1-2 sentence summary of the skeptic pass outcome, including whether the subagent changed the file
+- A brief 1-2 sentence overall assessment based on the current contents of the revised document
 
-Ask the user to review the planned comments document and provide feedback.
+Then ask the user to review the planned comments document and provide feedback.
 
 ### Step 8: User iteration
 
