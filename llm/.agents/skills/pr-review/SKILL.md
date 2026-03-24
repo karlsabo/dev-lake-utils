@@ -105,7 +105,7 @@ $HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md
 
 Use that exact absolute path for the rest of this step. Do not continue if the file is missing; go back and fix Step 5 first.
 
-Spawn exactly one subagent and give it this prompt, substituting `{planned_comments_path}` with the absolute path you computed:
+Spawn subagent: Set the subagent model to the best frontier thinking model and the reasoning effort high; do not use a mini model. Then give it this prompt, substituting `{planned_comments_path}` with the absolute path you computed:
 
 ```text
 Review the Pull Request comments document at {planned_comments_path} with an eye of skepticism and cynicism.
