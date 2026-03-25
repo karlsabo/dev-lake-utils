@@ -37,6 +37,24 @@
 * [ ] Look into <https://github.com/obra/superpowers/tree/main> for their skills
 * [ ] Look into <https://github.com/garrytan/gstack> for their skills
 
+## Implementation loop
+* Implement
+  * Create contracts
+  * Create Unit tests
+  * Review Unit tests
+  * Write code to satisfy unit tests
+  * Verify tests pass
+  * Create white box unit tests
+  * Review white box unit tests
+  * Verify tests pass
+  * Create integration tests
+  * Review integration tests
+  * Verify integration tests pass
+  * Verify all tests pass
+* Code review
+  * Review the code review
+* Feed code review into implement skill
+
 ## Set up MCP servers
 
 * [MCP Proxy](https://github.com/smart-mcp-proxy/mcpproxy-go)
