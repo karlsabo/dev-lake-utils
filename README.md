@@ -51,9 +51,15 @@
   * Review integration tests
   * Verify integration tests pass
   * Verify all tests pass
-* Code review
-  * Review the code review
+* [skill] Code review
 * Feed code review into implement skill
+* Profile - performance check
+  * Plan the profile check
+  * Run the profile check
+  * Create a report of areas to speed up
+  * Run report through plan [skill] to break up the work
+  * Implement [skill] all the tasks from the profile report
+* [skill] Code review
 
 ## Set up MCP servers
 
