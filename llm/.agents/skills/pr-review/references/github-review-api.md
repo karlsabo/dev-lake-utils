@@ -61,9 +61,13 @@ all comments are posted or none are.
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/reviews \
   --method POST \
-  --input - <<'EOF'
+  --input /tmp/review.json
+```
+
+Example `/tmp/review.json`:
+
+```json
 {
-  "event": "PENDING",
   "body": "The overall review comment that appears at the top.",
   "comments": [
     {
@@ -78,17 +82,22 @@ gh api repos/{owner}/{repo}/pulls/{number}/reviews \
     }
   ]
 }
-EOF
 ```
 
 **Key fields:**
 
-- `event`: MUST be `"PENDING"` — creates a draft review, does not submit
+- Omit `event` when creating a draft/pending review via the REST API. The create-review endpoint rejected
+  `"event": "PENDING"` with `422 Unprocessable Entity` in real usage; posting the review body and inline comments without
+  `event` created a pending review successfully.
 - `body`: The overall review comment (appears at the top of the review)
 - `comments[].path`: File path relative to repo root
 - `comments[].line`: The line number in the **new version** of the file (right side of diff). For deleted lines, use
   `side: "LEFT"` (see multi-line comments below)
 - `comments[].body`: The comment text (supports GitHub-flavored markdown)
+
+### Practical note on payload creation
+
+Prefer writing JSON to a temp file and passing it via `--input /path/to/file` rather than using a heredoc inline. This reduces shell-quoting mistakes when comment bodies include backticks, apostrophes, or fenced code blocks.
 
 ### Multi-line comments
 
@@ -133,12 +142,15 @@ If the atomic call fails (e.g., one bad comment position causes the whole reques
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/reviews \
   --method POST \
-  --input - <<'EOF'
+  --input /tmp/review.json
+```
+
+Example `/tmp/review.json`:
+
+```json
 {
-  "event": "PENDING",
   "body": "The overall review comment."
 }
-EOF
 ```
 
 This returns a review object with an `id` field. Save it as `{review_id}`.
@@ -220,14 +232,14 @@ gh api repos/{owner}/{repo}/pulls/{number}/reviews/{review_id} \
 
 ## Troubleshooting
 
-| Error                                            | Cause                                         | Fix                                                                                                                                                                                                      |
-|--------------------------------------------------|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `422 Unprocessable Entity` on comment            | Line number not in the diff hunk              | Use a line number that appears in the diff. Check the diff to find valid line numbers. If the line isn't in the diff, the comment can't be placed inline — suggest the user add it as a general comment. |
-| `422` with "pull_request_review_id is not valid" | Review ID doesn't match a pending review      | Re-fetch pending reviews and use the correct ID                                                                                                                                                          |
-| `404 Not Found`                                  | Wrong owner/repo or PR number                 | Verify with `gh repo view` and `gh pr view`                                                                                                                                                              |
-| `401 Unauthorized`                               | `gh` not authenticated or lacks scope         | Run `gh auth status` to check                                                                                                                                                                            |
-| `422` with "event is not valid"                  | Trying to submit with wrong event string      | Use exactly: `PENDING`, `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`                                                                                                                                       |
-| Comment appears as "outdated"                    | PR was force-pushed after comment was created | Use the latest commit SHA; re-fetch if needed                                                                                                                                                            |
+| Error                                            | Cause                                             | Fix                                                                                                                                                                                                      |
+|--------------------------------------------------|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `422 Unprocessable Entity` on comment            | Line number not in the diff hunk                  | Use a line number that appears in the diff. Check the diff to find valid line numbers. If the line isn't in the diff, the comment can't be placed inline — suggest the user add it as a general comment. |
+| `422` with "pull_request_review_id is not valid" | Review ID doesn't match a pending review          | Re-fetch pending reviews and use the correct ID                                                                                                                                                          |
+| `404 Not Found`                                  | Wrong owner/repo or PR number                     | Verify with `gh repo view` and `gh pr view`                                                                                                                                                              |
+| `401 Unauthorized`                               | `gh` not authenticated or lacks scope             | Run `gh auth status` to check                                                                                                                                                                            |
+| `422` with "event is not valid" on create-review | Using `"event": "PENDING"` during review creation | Omit `event` entirely when creating a pending review. Then submit the created review later with `COMMENT`, `APPROVE`, or `REQUEST_CHANGES` via `/reviews/{review_id}/events`.                            |
+| Comment appears as "outdated"                    | PR was force-pushed after comment was created     | Use the latest commit SHA; re-fetch if needed                                                                                                                                                            |
 
 ### Line number mapping tips
 

@@ -36,10 +36,11 @@
 * [ ] Consider consolidating into a single configuration file
 * [ ] Look into <https://github.com/obra/superpowers/tree/main> for their skills
 * [ ] Look into <https://github.com/garrytan/gstack> for their skills
+* [ ] Look into <https://github.com/mattpocock/skills/tree/main> for their skills
 
 ## Implementation loop
 * Implement
-  * Create contracts
+    * Create classes/interfaces/functions with contracts
   * Create Unit tests
   * Review Unit tests
   * Write code to satisfy unit tests
