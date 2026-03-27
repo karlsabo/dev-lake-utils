@@ -11,19 +11,18 @@
 
 # TODO
 
+* [ ] Add dependency injection
 * [ ] Can we write UI tests?
-    * Can an LLM execute some manual UI driven tests?
+    * Can an LLM execute some manual UI-driven tests?
 * [ ] Rename all skills to start with a standard prefix
     * Maybe eh for eng hub?
 * [ ] Fix skill paths to not be hard coded, e.g., remove `$HOME/karl-backup`, take it from a config variable
 * [ ] When launching a PR review via "Setup" it can hang forever.
     * Run it in the background and terminate it after X minutes
 * [ ] Clicking "Setup" greys out all Setup buttons, it should only do it for the current task
-* [ ] 
 * [ ] Add a UI button to sync skills, or always sync skills every X minutes
     * Maybe a searchable menu that pops up, like JB Fleet had with cmd+k
 * [ ] Create native executables
-* [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
 * [ ] Look into <https://github.com/obra/superpowers/tree/main> for their skills
 * [ ] Look into <https://github.com/garrytan/gstack> for their skills
