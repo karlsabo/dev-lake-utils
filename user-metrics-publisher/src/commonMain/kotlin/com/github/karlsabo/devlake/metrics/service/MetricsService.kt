@@ -47,6 +47,7 @@ object MetricsService {
 
         return UserMetrics(
             userId = user.id,
+            email = user.email ?: user.id,
             pullRequestsPastWeek = pullRequestsPastWeek,
             pullRequestsYearToDateCount = prCountYtd,
             prReviewCountYtd = prReviewCountYtd,

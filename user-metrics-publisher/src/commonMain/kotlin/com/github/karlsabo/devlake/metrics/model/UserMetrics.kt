@@ -11,6 +11,7 @@ import com.github.karlsabo.github.Issue as GitHubIssue
 @Serializable
 data class UserMetrics(
     val userId: String,
+    val email: String,
     val pullRequestsPastWeek: List<GitHubIssue>,
     val pullRequestsYearToDateCount: UInt,
     val prReviewCountYtd: UInt,

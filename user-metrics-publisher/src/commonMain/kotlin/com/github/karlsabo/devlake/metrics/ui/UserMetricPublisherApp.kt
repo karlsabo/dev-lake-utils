@@ -78,7 +78,7 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
                     var success = true
                     state.metrics.forEach { metric ->
                         val message = SlackMessage(
-                            userEmail = metric.userId,
+                            userEmail = metric.email,
                             message = "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n" +
                                     metric.toSlackMarkdown() +
                                     "\n" +

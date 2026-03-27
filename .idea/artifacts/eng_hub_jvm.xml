@@ -1,0 +1,6 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="eng-hub-jvm">
+    <output-path>$PROJECT_DIR$/eng-hub/build/libs</output-path>
+    <root id="archive" name="eng-hub-jvm.jar" />
+  </artifact>
+</component>
