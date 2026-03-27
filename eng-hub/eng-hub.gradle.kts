@@ -1,5 +1,8 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
+val engHubDisplayName = "Eng Hub"
+val engHubPackageName = "eng-hub"
+
 plugins {
     id("devlake.kotlin-multiplatform-compose-conventions")
 }
@@ -43,11 +46,11 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "com.github.karlsabo.devlake.enghub.MainKt"
-        jvmArgs += listOf("-Xdock:name=Git Control Panel")
+        jvmArgs += listOf("-Xdock:name=$engHubDisplayName")
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "github-control-panel"
+            packageName = engHubPackageName
             packageVersion = "1.0.0"
         }
     }

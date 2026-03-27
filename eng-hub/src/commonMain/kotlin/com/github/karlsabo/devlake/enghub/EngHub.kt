@@ -76,7 +76,7 @@ fun EngHub(onExitApplication: () -> Unit) {
 
     Window(
         onCloseRequest = onExitApplication,
-        title = "Git Control Panel",
+        title = ENG_HUB_DISPLAY_NAME,
         icon = painterResource(Res.drawable.icon),
         visible = !isLoadingConfiguration && viewModel != null,
         state = rememberWindowState(

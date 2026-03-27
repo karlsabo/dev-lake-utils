@@ -13,7 +13,7 @@ import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
 
 fun main() {
-    System.setProperty("apple.awt.application.name", "Git Control Panel")
+    System.setProperty("apple.awt.application.name", ENG_HUB_DISPLAY_NAME)
     setDockIcon()
     application {
         EngHub(onExitApplication = ::exitApplication)
