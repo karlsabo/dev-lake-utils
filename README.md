@@ -1,13 +1,5 @@
 - [TODO](#todo)
-- [GitHub Control Panel (Planned)](#github-control-panel-planned)
-    - [Design Principles](#design-principles)
-    - [Architecture](#architecture)
-    - [UI Layout](#ui-layout)
-    - [Open Pull Requests Panel](#open-pull-requests-panel)
-    - [Unread Notifications Panel](#unread-notifications-panel)
-    - [Interaction Flows](#interaction-flows)
-    - [New Utilities APIs (added to utilities subproject)](#new-utilities-apis-added-to-utilities-subproject)
-    - [Subproject Structure](#subproject-structure)
+- [Eng Hub](./eng-hub/README.md)
 - [Overview](#overview)
   - [Utilities](#utilities)
   - [Summary Publisher](#summary-publisher)
@@ -30,7 +22,6 @@
 * [ ] 
 * [ ] Add a UI button to sync skills, or always sync skills every X minutes
     * Maybe a searchable menu that pops up, like JB Fleet had with cmd+k
-* [ ] Rename git control panel to eng dashboard or something better
 * [ ] Create native executables
 * [ ] Add dependency injection
 * [ ] Consider consolidating into a single configuration file
@@ -238,4 +229,3 @@ is as follows:
   "metricInformationPostfix": "\n━━━━━━━━━━━━━━━━━━\n\n💡 *Why do we track these metrics?*  \nWe use these to *track our progress toward milestones* and ensure we are on pace to meet our goals. 📈\n\n🔗 *Helpful Links:*\n• 📜 <https://medium.com/@jamesacowling/stepping-stones-not-milestones-e6be0073563f#:~:text=The%20key%20thing%20about%20a,unknowns%20start%20to%20fall%20away.|Stepping stones, not milestones>\n• 🛠️ <https://ronjeffries.com/articles/019-01ff/story-points/Index.html|Slice stories down>\n• 📊 <https://jacobian.org/2021/may/25/my-estimation-technique/|Estimation technique>\n"
 }
 ```
-

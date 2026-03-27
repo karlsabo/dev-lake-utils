@@ -47,4 +47,9 @@ class EngHubConfigTest {
         assertEquals(emptyMap(), decoded.worktreeSetupCommands)
         assertEquals("/bin/zsh", decoded.setupShell)
     }
+
+    @Test
+    fun usesEngHubConfigFileName() {
+        assertTrue(engHubConfigPath.toString().endsWith("eng-hub-config.json"))
+    }
 }

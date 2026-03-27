@@ -22,7 +22,7 @@ data class EngHubConfig(
 )
 
 val engHubConfigPath: Path =
-    Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "github-control-panel-config.json")
+    Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "eng-hub-config.json")
 
 fun loadEngHubConfig(): EngHubConfig {
     val text = SystemFileSystem.source(engHubConfigPath).buffered().use { it.readString() }

@@ -1,4 +1,4 @@
-# GitHub Control Panel
+# Eng Hub
 
 Desktop Compose app for watching GitHub pull requests and notifications, then taking a few common actions without living in the browser.
 
@@ -74,7 +74,7 @@ Config directory by OS:
 Required files:
 
 - `github-config.json`
-- `github-control-panel-config.json`
+- `eng-hub-config.json`
 
 ### `github-config.json`
 
@@ -96,7 +96,7 @@ Example secret file:
 }
 ```
 
-### `github-control-panel-config.json`
+### `eng-hub-config.json`
 
 Example:
 
@@ -129,22 +129,22 @@ Field meanings:
 
 ### First run behavior
 
-If `github-control-panel-config.json` is missing or invalid, the app creates a default config file and shows an error dialog telling you to update it. The app does not continue into the main UI until configuration loads successfully.
+If `eng-hub-config.json` is missing or invalid, the app creates a default config file and shows an error dialog telling you to update it. The app does not continue into the main UI until configuration loads successfully.
 
 ## Launching
 
 Run from the repo root:
 
 ```bash
-./gradlew :github-control-panel:run
+./gradlew :eng-hub:run
 ```
 
 Other useful run tasks that exist today:
 
 ```bash
-./gradlew :github-control-panel:runRelease
-./gradlew :github-control-panel:runDistributable
-./gradlew :github-control-panel:hotRunJvm
+./gradlew :eng-hub:runRelease
+./gradlew :eng-hub:runDistributable
+./gradlew :eng-hub:hotRunJvm
 ```
 
 ## Building
@@ -152,23 +152,23 @@ Other useful run tasks that exist today:
 Build the module and run its tests:
 
 ```bash
-./gradlew :github-control-panel:build
+./gradlew :eng-hub:build
 ```
 
 Create a distributable for the current OS:
 
 ```bash
-./gradlew :github-control-panel:packageDistributionForCurrentOS
+./gradlew :eng-hub:packageDistributionForCurrentOS
 ```
 
 Other packaging tasks available today:
 
 ```bash
-./gradlew :github-control-panel:createDistributable
-./gradlew :github-control-panel:packageUberJarForCurrentOS
-./gradlew :github-control-panel:packageDmg
-./gradlew :github-control-panel:packageMsi
-./gradlew :github-control-panel:packageDeb
+./gradlew :eng-hub:createDistributable
+./gradlew :eng-hub:packageUberJarForCurrentOS
+./gradlew :eng-hub:packageDmg
+./gradlew :eng-hub:packageMsi
+./gradlew :eng-hub:packageDeb
 ```
 
 ## Development Notes
@@ -177,7 +177,7 @@ Other packaging tasks available today:
 - Kotlin JVM target: `17`
 - UI stack: Kotlin Multiplatform + Compose Desktop
 - The module currently includes `skiko-awt-runtime-macos-arm64`, so the current setup is clearly macOS Apple Silicon oriented even though Compose packaging tasks exist for other OS formats
-- The main window title is `Git Control Panel`
+- The main window title is `Eng Hub`
 
 ## What Else We Still Need
 
@@ -195,9 +195,9 @@ These are the most obvious gaps from the current implementation:
 
 ## Source Pointers
 
-- App entry point: `src/jvmMain/kotlin/com/github/karlsabo/devlake/ghpanel/main.kt`
-- App bootstrapping: `src/commonMain/kotlin/com/github/karlsabo/devlake/ghpanel/GitHubControlPanelApp.kt`
-- Config model: `src/commonMain/kotlin/com/github/karlsabo/devlake/ghpanel/GitHubControlPanelConfig.kt`
-- Main screen: `src/commonMain/kotlin/com/github/karlsabo/devlake/ghpanel/screen/GitHubControlPanelScreen.kt`
-- View model: `src/commonMain/kotlin/com/github/karlsabo/devlake/ghpanel/viewmodel/GitHubControlPanelViewModel.kt`
-- Worktree setup: `src/commonMain/kotlin/com/github/karlsabo/devlake/ghpanel/WorktreeSetupCommands.kt`
+- App entry point: `src/jvmMain/kotlin/com/github/karlsabo/devlake/enghub/main.kt`
+- App bootstrapping: `src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHub.kt`
+- Config model: `src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHubConfig.kt`
+- Main screen: `src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/screen/EngHubScreen.kt`
+- View model: `src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubViewModel.kt`
+- Worktree setup: `src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/WorktreeSetupCommands.kt`
