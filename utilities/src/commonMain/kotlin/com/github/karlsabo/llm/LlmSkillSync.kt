@@ -20,7 +20,7 @@ enum class ToolTarget(
     CLAUDE(".claude", "skills", "CLAUDE.md"),
     CODEX(".codex", "skills", "instructions.md"),
     GOOSE(".config/goose", "skills", null),
-    PI(".agent", "skills", "AGENTS.MD"),
+    PI(".pi/agent", "skills", "AGENTS.md"),
 }
 
 data class SyncResult(

@@ -261,7 +261,7 @@ class LlmSkillSyncTest {
             val result = sync.sync(sourceDir, homeDir, ToolTarget.PI)
 
             assertTrue(result.guidelinesCopied)
-            assertEquals("pi guidelines", readFile(Path(homeDir, ".agent", "AGENTS.MD")))
+            assertEquals("pi guidelines", readFile(Path(homeDir, ".pi", "agent", "AGENTS.md")))
         } finally {
             deleteRecursively(sourceDir)
             deleteRecursively(homeDir)
@@ -282,7 +282,7 @@ class LlmSkillSyncTest {
             val result = sync.sync(sourceDir, homeDir, ToolTarget.PI)
 
             assertEquals(listOf("my-skill"), result.skillsCopied)
-            assertEquals("pi skill content", readFile(Path(homeDir, ".agent", "skills", "my-skill", "prompt.md")))
+            assertEquals("pi skill content", readFile(Path(homeDir, ".pi", "agent", "skills", "my-skill", "prompt.md")))
         } finally {
             deleteRecursively(sourceDir)
             deleteRecursively(homeDir)
