@@ -233,16 +233,56 @@ class LlmSkillSyncTest {
 
             val results = sync.syncAll(sourceDir, homeDir)
 
-            assertEquals(3, results.size)
+            assertEquals(4, results.size)
             assertEquals(ToolTarget.CLAUDE, results[0].target)
             assertEquals(ToolTarget.CODEX, results[1].target)
             assertEquals(ToolTarget.GOOSE, results[2].target)
+            assertEquals(ToolTarget.PI, results[3].target)
 
             results.forEach { assertEquals(listOf("skill1"), it.skillsCopied) }
 
             assertTrue(results[0].guidelinesCopied)
             assertTrue(results[1].guidelinesCopied)
             assertFalse(results[2].guidelinesCopied)
+            assertTrue(results[3].guidelinesCopied)
+        } finally {
+            deleteRecursively(sourceDir)
+            deleteRecursively(homeDir)
+        }
+    }
+
+    @Test
+    fun piGuidelinesWrittenToAgentsMd() {
+        val sourceDir = createTempDir()
+        val homeDir = createTempDir()
+        try {
+            setupSourceDir(sourceDir, agentsContent = "pi guidelines")
+
+            val result = sync.sync(sourceDir, homeDir, ToolTarget.PI)
+
+            assertTrue(result.guidelinesCopied)
+            assertEquals("pi guidelines", readFile(Path(homeDir, ".agent", "AGENTS.MD")))
+        } finally {
+            deleteRecursively(sourceDir)
+            deleteRecursively(homeDir)
+        }
+    }
+
+    @Test
+    fun piSkillsCopiedToAgentDir() {
+        val sourceDir = createTempDir()
+        val homeDir = createTempDir()
+        try {
+            setupSourceDir(
+                sourceDir,
+                skills = mapOf("my-skill" to mapOf("prompt.md" to "pi skill content")),
+                agentsContent = "guidelines"
+            )
+
+            val result = sync.sync(sourceDir, homeDir, ToolTarget.PI)
+
+            assertEquals(listOf("my-skill"), result.skillsCopied)
+            assertEquals("pi skill content", readFile(Path(homeDir, ".agent", "skills", "my-skill", "prompt.md")))
         } finally {
             deleteRecursively(sourceDir)
             deleteRecursively(homeDir)
