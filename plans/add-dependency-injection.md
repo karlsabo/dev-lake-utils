@@ -26,7 +26,7 @@
 
 ## Stories
 
-### 1. Establish the DI pattern in `eng-hub`
+### 1. Partially done — Establish the DI pattern in `eng-hub`
 
 **Acceptance test:** Given `EngHub` is started with a test dependency provider, when startup runs, then the resulting `EngHubViewModel` is built only from the supplied collaborators and `EngHub.kt` no longer constructs concrete GitHub, worktree, or desktop-launcher services inline.
 

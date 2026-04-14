@@ -1,8 +1,8 @@
 ---
 name: karl-plan
-description: Break down features or stories into single-acceptance-test tickets and PRs. Conversational planning skill.
+description: "Break down features or stories into single-acceptance-test tickets and PRs. Conversational planning skill."
 user-invocable: true
-allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, WebFetch, Agent(subagent_type=Explore *)
+allowed-tools: "Bash(gh *), Read, Glob, Grep, Write, Edit, WebFetch, Agent(subagent_type=Explore *)"
 ---
 
 # Planning Skill
@@ -42,6 +42,7 @@ Start the doc with:
 
 - **Goal**: one sentence describing the feature
 - **Context**: relevant background, links, constraints
+- Cite repo evidence in **Context** with exact file paths whenever the plan relies on local code or config.
 
 ### Step 3: Enumerate acceptance tests
 
@@ -76,11 +77,12 @@ Once acceptance tests are agreed on, map each to a story:
 ### 1. {Story title}
 
 **Acceptance test:** Given X, when Y, then Z
+**Expected edits:** exact files/modules likely to change
 **Scope:** what's in, what's out
 **Notes:** implementation hints, dependencies, ordering
 ```
 
-Each story gets one PR. Call out ordering dependencies between stories.
+Each story gets one PR. Call out ordering dependencies between stories. Every story must name the expected files/modules to edit. Repo evidence should be cited in context/notes with exact paths.
 
 ### Step 5: Iterate
 
@@ -100,3 +102,5 @@ Update the planning doc as you go. The doc is the artifact — keep it current.
 - Each story must be a demonstrable change in functionality, not a technical task
 - If a story can't be done in a couple days, the acceptance test needs splitting
 - Reversibility: sequence easy-to-undo changes before hard-to-undo ones
+- Every story must name the expected files/modules to edit
+- Cite repo evidence in context/notes with exact paths when using local code/config to justify a story
