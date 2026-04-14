@@ -105,7 +105,9 @@ $HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md
 
 Use that exact absolute path for the rest of this step. Do not continue if the file is missing; go back and fix Step 5 first.
 
-Spawn subagent: Set the subagent model to the best frontier thinking model and the reasoning effort high; do not use a mini model. Then give it this prompt, substituting `{planned_comments_path}` with the absolute path you computed:
+Spawn a second-agent skeptic pass using whatever the current harness actually supports. If a native subagent or Task tool exists, use it. If there is no native subagent tool, launch tmux session, start a new process, send it commands, treat that subprocess as the subagent.
+
+Set the subagent model to the same model you are; do not use a mini model. Then give it this prompt, substituting `{planned_comments_path}` with the absolute path you computed:
 
 ```text
 Review the Pull Request comments document at {planned_comments_path} with an eye of skepticism and cynicism.
@@ -118,7 +120,7 @@ Review the Pull Request comments document at {planned_comments_path} with an eye
 In your final response, state whether you changed the file and briefly summarize the changes.
 ```
 
-Wait for the subagent to finish before moving on. Do not continue to Step 7 until the subagent has reported completion, even if it made no changes.
+Wait for the subagent or pi subprocess to finish before moving on. Do not continue to Step 7 until it has reported completion, even if it made no changes.
 
 ### Step 7: Read the revised document, inform user, and wait
 
