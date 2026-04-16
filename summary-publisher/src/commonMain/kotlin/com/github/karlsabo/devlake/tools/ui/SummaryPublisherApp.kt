@@ -17,7 +17,6 @@ import com.github.karlsabo.devlake.tools.loadSummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.rememberSummaryPublisherState
 import com.github.karlsabo.devlake.tools.saveSummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
-import com.github.karlsabo.devlake.tools.service.ZapierService
 import com.github.karlsabo.devlake.tools.summaryPublisherConfigPath
 import com.github.karlsabo.devlake.tools.ui.components.ErrorDialog
 import com.github.karlsabo.dto.toSlackMarkup
@@ -92,13 +91,7 @@ fun SummaryPublisherApp(
             isSendingSlackMessage = state.isSendingSlackMessage,
             onPublishClick = {
                 scope.launch {
-                    state.onPublishStarted()
-                    val summary = ZapierProjectSummary(
-                        state.topLevelSummary,
-                        state.projectSummaries.map { it.message }
-                    )
-                    val success = ZapierService.sendSummary(summary, state.summaryConfig.zapierSummaryUrl)
-                    state.onPublishCompleted(success)
+                    publishSummary(state)
                 }
             }
         )
@@ -178,4 +171,25 @@ internal suspend fun loadSummaryData(state: SummaryPublisherState) {
     }
 
     state.isLoadingSummary = false
+}
+
+internal suspend fun publishSummary(state: SummaryPublisherState) {
+    val summaryPublisher = requireNotNull(state.dependencies?.summaryPublisher) {
+        "Summary publisher dependencies must be loaded before publishing summaries"
+    }
+
+    state.onPublishStarted()
+
+    val summary = ZapierProjectSummary(
+        message = state.topLevelSummary,
+        projectMessages = state.projectSummaries.map { it.message },
+    )
+    val success = runCatching {
+        summaryPublisher.publishSummary(summary)
+    }.getOrElse { error ->
+        logger.error(error) { "Failed to publish summary" }
+        false
+    }
+
+    state.onPublishCompleted(success)
 }

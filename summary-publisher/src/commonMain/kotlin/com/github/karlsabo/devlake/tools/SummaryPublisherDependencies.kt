@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.tools
 
+import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
+import com.github.karlsabo.devlake.tools.service.ZapierService
 import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.loadGitHubConfig
@@ -20,10 +22,15 @@ import kotlin.time.Duration.Companion.days
 
 data class SummaryPublisherDependencies(
     val summaryBuilder: SummaryBuilder,
+    val summaryPublisher: SummaryMessagePublisher,
 )
 
 fun interface SummaryBuilder {
     suspend fun createSummary(): MultiProjectSummary
+}
+
+fun interface SummaryMessagePublisher {
+    suspend fun publishSummary(summary: ZapierProjectSummary): Boolean
 }
 
 typealias SummaryPublisherDependencyProvider = (SummaryPublisherConfig) -> SummaryPublisherDependencies
@@ -58,6 +65,9 @@ val defaultSummaryPublisherDependencyProvider: SummaryPublisherDependencyProvide
                 summaryName = config.summaryName,
                 isMiscellaneousProjectIncluded = config.isMiscellaneousProjectIncluded,
             )
+        },
+        summaryPublisher = { summary ->
+            ZapierService.sendSummary(summary, config.zapierSummaryUrl)
         },
     )
 }
