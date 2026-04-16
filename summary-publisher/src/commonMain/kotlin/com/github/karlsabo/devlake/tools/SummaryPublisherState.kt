@@ -5,11 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.github.karlsabo.dto.UsersConfig
-import com.github.karlsabo.github.config.GitHubApiRestConfig
-import com.github.karlsabo.linear.config.LinearApiRestConfig
-import com.github.karlsabo.pagerduty.PagerDutyApiRestConfig
-import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
 import com.github.karlsabo.tools.model.ProjectSummary
 
 data class ProjectSummaryHolder(val projectSummary: ProjectSummary, val message: String)
@@ -27,12 +22,8 @@ class SummaryPublisherState {
 
     var projectSummaries by mutableStateOf<List<ProjectSummaryHolder>>(emptyList())
 
+    var dependencies by mutableStateOf<SummaryPublisherDependencies?>(null)
     var summaryConfig by mutableStateOf(SummaryPublisherConfig())
-    var textSummarizerConfig by mutableStateOf<TextSummarizerOpenAiConfigNoSecrets?>(null)
-    var linearConfig by mutableStateOf<LinearApiRestConfig?>(null)
-    var gitHubConfig by mutableStateOf<GitHubApiRestConfig?>(null)
-    var pagerDutyConfig by mutableStateOf<PagerDutyApiRestConfig?>(null)
-    var usersConfig by mutableStateOf(UsersConfig(emptyList()))
 
     fun updateProjectMessage(index: Int, message: String) {
         projectSummaries = projectSummaries.toMutableList().also {

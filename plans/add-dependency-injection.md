@@ -29,7 +29,8 @@
 - Story 1 is done. `eng-hub` now uses `EngHubDependencies` and `loadEngHubViewModel(...)`, and `EngHubDependenciesTest` verifies the app can be started with supplied collaborators.
 - Story 2 is done. `user-metrics-publisher` now uses `UserMetricPublisherDependencies` and an injected `UserMetricsBuilder`, and `UserMetricPublisherDependenciesTest` verifies the metrics preview is generated from supplied collaborators.
 - Story 3 is done. `user-metrics-publisher` now publishes through an injected `UserMetricMessagePublisher`, and `UserMetricPublisherDependenciesTest` verifies publish success and failure paths with supplied publishers.
-- Stories 4 and 5 are not done. `SummaryPublisherApp.kt` still constructs concrete APIs and calls Zapier services directly from the UI layer.
+- Story 4 is done. `summary-publisher` now uses `SummaryPublisherDependencies` and an injected `SummaryBuilder`, and `SummaryPublisherDependenciesTest` verifies summary generation runs through supplied collaborators.
+- Story 5 is not done. `SummaryPublisherApp.kt` still calls `ZapierService` directly from the UI layer.
 
 ## Stories
 
@@ -57,13 +58,13 @@
 
 **Notes:** Completed via `UserMetricMessagePublisher`, default wiring in `defaultUserMetricPublisherDependencyProvider`, and `publishMetrics(...)` consuming the injected publisher instead of `ZapierMetricService` directly from the UI path. `UserMetricPublisherDependenciesTest` covers successful publishes, failed sends, and thrown exceptions while preserving the existing button-state behavior.
 
-### 4. Inject the summary-loading path in `summary-publisher`
+### 4. Done — Inject the summary-loading path in `summary-publisher`
 
 **Acceptance test:** Given `SummaryPublisherApp` is started with an injected summary builder, when summary data is loaded, then summary generation uses the injected collaborator instead of constructing `LinearRestApi`, `GitHubRestApi`, `PagerDutyRestApi`, and `TextSummarizerOpenAi` inside the UI layer.
 
 **Scope:** Introduce a `SummaryPublisherDependencies` type and move summary-building behavior behind an injected interface or function object. The UI should stop owning concrete API construction and instead consume a composed dependency bundle.
 
-**Notes:** Follow the same manual DI pattern as stories 1 and 2. Avoid changing the summary formatting rules in this story.
+**Notes:** Completed via `SummaryPublisherDependencies`, `defaultSummaryPublisherDependencyProvider`, and an injected `SummaryBuilder` consumed by `loadConfiguration(...)` and `loadSummaryData(...)`. `SummaryPublisherDependenciesTest` verifies summary generation runs through supplied collaborators while preserving the existing formatting behavior.
 
 ### 5. Inject the publish path in `summary-publisher`
 

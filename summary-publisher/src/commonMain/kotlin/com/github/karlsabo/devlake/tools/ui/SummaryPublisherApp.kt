@@ -10,7 +10,9 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.devlake.tools.ProjectSummaryHolder
 import com.github.karlsabo.devlake.tools.SummaryPublisherConfig
+import com.github.karlsabo.devlake.tools.SummaryPublisherDependencyProvider
 import com.github.karlsabo.devlake.tools.SummaryPublisherState
+import com.github.karlsabo.devlake.tools.defaultSummaryPublisherDependencyProvider
 import com.github.karlsabo.devlake.tools.loadSummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.rememberSummaryPublisherState
 import com.github.karlsabo.devlake.tools.saveSummaryPublisherConfig
@@ -20,36 +22,24 @@ import com.github.karlsabo.devlake.tools.summaryPublisherConfigPath
 import com.github.karlsabo.devlake.tools.ui.components.ErrorDialog
 import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.dto.toTerseSlackMarkup
-import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.GitHubConfig
-import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.github.config.saveGitHubConfig
-import com.github.karlsabo.linear.LinearRestApi
 import com.github.karlsabo.linear.config.LinearConfig
-import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.linear.config.saveLinearConfig
 import com.github.karlsabo.pagerduty.PagerDutyConfig
-import com.github.karlsabo.pagerduty.PagerDutyRestApi
-import com.github.karlsabo.pagerduty.loadPagerDutyConfig
 import com.github.karlsabo.pagerduty.savePagerDutyConfig
-import com.github.karlsabo.text.TextSummarizerOpenAi
 import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
-import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
 import com.github.karlsabo.text.saveTextSummarizerOpenAiNoSecrets
-import com.github.karlsabo.text.toTextSummarizerOpenAiConfig
-import com.github.karlsabo.tools.createSummary
 import com.github.karlsabo.tools.formatting.toSlackMarkup
 import com.github.karlsabo.tools.formatting.toVerboseSlackMarkdown
 import com.github.karlsabo.tools.gitHubConfigPath
 import com.github.karlsabo.tools.linearConfigPath
-import com.github.karlsabo.tools.loadUsersConfig
 import com.github.karlsabo.tools.pagerDutyConfigPath
 import com.github.karlsabo.tools.textSummarizerConfigPath
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import kotlin.time.Duration.Companion.days
 
 private val logger = KotlinLogging.logger {}
 
@@ -57,12 +47,13 @@ private val logger = KotlinLogging.logger {}
 fun SummaryPublisherApp(
     configFilePath: Path,
     onExitApplication: () -> Unit,
+    dependencyProvider: SummaryPublisherDependencyProvider = defaultSummaryPublisherDependencyProvider,
 ) {
     val state = rememberSummaryPublisherState()
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        loadConfiguration(state, configFilePath, onExitApplication)
+        loadConfiguration(state, configFilePath, dependencyProvider = dependencyProvider)
     }
 
     if (state.isDisplayErrorDialog) {
@@ -114,19 +105,16 @@ fun SummaryPublisherApp(
     }
 }
 
-private suspend fun loadConfiguration(
+internal fun loadConfiguration(
     state: SummaryPublisherState,
     configFilePath: Path,
-    onExitApplication: () -> Unit,
+    loadConfig: (Path) -> SummaryPublisherConfig = ::loadSummaryPublisherConfig,
+    dependencyProvider: SummaryPublisherDependencyProvider = defaultSummaryPublisherDependencyProvider,
 ) {
     logger.info { "Loading configuration $configFilePath" }
     try {
-        state.summaryConfig = loadSummaryPublisherConfig(configFilePath)
-        state.textSummarizerConfig = loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)
-        state.linearConfig = loadLinearConfig(linearConfigPath)
-        state.gitHubConfig = loadGitHubConfig(gitHubConfigPath)
-        state.pagerDutyConfig = loadPagerDutyConfig(pagerDutyConfigPath)
-        state.usersConfig = loadUsersConfig()!!
+        state.summaryConfig = loadConfig(configFilePath)
+        state.dependencies = dependencyProvider(state.summaryConfig)
         state.isConfigLoaded = true
         logger.info { "Summary config = ${state.summaryConfig}" }
     } catch (error: Exception) {
@@ -166,45 +154,28 @@ private fun buildConfigurationErrorMessage(error: Exception): String {
     return message
 }
 
-private suspend fun loadSummaryData(state: SummaryPublisherState) {
+internal suspend fun loadSummaryData(state: SummaryPublisherState) {
+    val summaryBuilder = requireNotNull(state.dependencies?.summaryBuilder) {
+        "Summary publisher dependencies must be loaded before loading summary data"
+    }
     val config = state.summaryConfig
-    val linearConfig = state.linearConfig ?: return
-    val gitHubConfig = state.gitHubConfig ?: return
-    val pagerDutyConfig = state.pagerDutyConfig
-    val textSummarizerConfig = state.textSummarizerConfig ?: return
-
-    val summaryLast7Days = createSummary(
-        LinearRestApi(linearConfig),
-        GitHubRestApi(gitHubConfig),
-        config.gitHubOrganizationIds,
-        if (config.pagerDutyServiceIds.isNotEmpty() && pagerDutyConfig != null) {
-            PagerDutyRestApi(pagerDutyConfig)
-        } else null,
-        config.pagerDutyServiceIds,
-        TextSummarizerOpenAi(textSummarizerConfig.toTextSummarizerOpenAiConfig()),
-        config.projects,
-        7.days,
-        state.usersConfig.users,
-        config.miscUserIds.map { userId -> state.usersConfig.users.first { it.id == userId } },
-        config.summaryName,
-        config.isMiscellaneousProjectIncluded,
-    )
+    val summaryLast7Days = summaryBuilder.createSummary()
 
     val slackSummary = if (config.isTerseSummaryUsed) {
-        summaryLast7Days?.toTerseSlackMarkup()
+        summaryLast7Days.toTerseSlackMarkup()
     } else {
-        summaryLast7Days?.toSlackMarkup()
+        summaryLast7Days.toSlackMarkup()
     }
 
-    state.topLevelSummary = slackSummary ?: "* Failed to generate a summary"
-    state.projectSummaries = summaryLast7Days?.projectSummaries?.map {
+    state.topLevelSummary = slackSummary
+    state.projectSummaries = summaryLast7Days.projectSummaries.map {
         val message = if (it.project.isVerboseMilestones) {
             it.toVerboseSlackMarkdown()
         } else {
             it.toSlackMarkup()
         }
         ProjectSummaryHolder(it, message)
-    } ?: emptyList()
+    }
 
     state.isLoadingSummary = false
 }
