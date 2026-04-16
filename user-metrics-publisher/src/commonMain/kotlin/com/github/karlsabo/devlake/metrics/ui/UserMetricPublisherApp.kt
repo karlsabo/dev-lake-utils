@@ -16,7 +16,6 @@ import com.github.karlsabo.devlake.metrics.model.toSlackMarkdown
 import com.github.karlsabo.devlake.metrics.rememberUserMetricPublisherState
 import com.github.karlsabo.devlake.metrics.saveUserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.service.SlackMessage
-import com.github.karlsabo.devlake.metrics.service.ZapierMetricService
 import com.github.karlsabo.devlake.metrics.ui.components.ErrorDialog
 import com.github.karlsabo.devlake.metrics.userMetricPublisherConfigPath
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -68,19 +67,7 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
             publishButtonEnabled = state.publishButtonEnabled,
             onPublishClick = {
                 scope.launch {
-                    state.onPublishStarted()
-                    var success = true
-                    state.metrics.forEach { metric ->
-                        val message = SlackMessage(
-                            userEmail = metric.email,
-                            message = "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n" +
-                                    metric.toSlackMarkdown() +
-                                    "\n" +
-                                    state.config.metricInformationPostfix
-                        )
-                        success = success && ZapierMetricService.sendMessage(message, state.config.zapierMetricUrl)
-                    }
-                    state.onPublishCompleted(success)
+                    publishMetrics(state)
                 }
             }
         )
@@ -146,4 +133,33 @@ internal suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.User
     }
 
     logger.info { "Metrics loaded" }
+}
+
+internal suspend fun publishMetrics(state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState) {
+    logger.info { "Publishing metrics" }
+    val messagePublisher = requireNotNull(state.dependencies?.messagePublisher) {
+        "User metric publisher dependencies must be loaded before publishing metrics"
+    }
+
+    state.onPublishStarted()
+
+    var success = true
+    state.metrics.forEach { metric ->
+        val message = SlackMessage(
+            userEmail = metric.email,
+            message = "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n" +
+                    metric.toSlackMarkdown() +
+                    "\n" +
+                    state.config.metricInformationPostfix
+        )
+        val publishSucceeded = runCatching {
+            messagePublisher.publishMessage(message)
+        }.getOrElse { error ->
+            logger.error(error) { "Failed to publish metrics for ${metric.userId}" }
+            false
+        }
+        success = success && publishSucceeded
+    }
+
+    state.onPublishCompleted(success)
 }

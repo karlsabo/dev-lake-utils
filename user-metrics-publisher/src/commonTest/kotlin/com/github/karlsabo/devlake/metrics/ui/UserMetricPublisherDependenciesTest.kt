@@ -1,11 +1,13 @@
 package com.github.karlsabo.devlake.metrics.ui
 
+import com.github.karlsabo.devlake.metrics.UserMetricMessagePublisher
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherDependencies
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherState
 import com.github.karlsabo.devlake.metrics.UserMetricsBuilder
 import com.github.karlsabo.devlake.metrics.model.UserMetrics
 import com.github.karlsabo.devlake.metrics.model.toSlackMarkdown
+import com.github.karlsabo.devlake.metrics.service.SlackMessage
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.CheckRunSummary
@@ -59,6 +61,7 @@ class UserMetricPublisherDependenciesTest {
             projectManagementApi = fakeProjectManagementApi,
             gitHubApi = fakeGitHubApi,
             metricsBuilder = recordingBuilder,
+            messagePublisher = NoOpMessagePublisher,
         )
         val state = UserMetricPublisherState()
 
@@ -90,6 +93,204 @@ class UserMetricPublisherDependenciesTest {
             state.metricsPreviewText,
         )
     }
+
+    @Test
+    fun publishMetricsUsesInjectedMessagePublisher() = runBlocking {
+        val metricOne = UserMetrics(
+            userId = "user-1",
+            email = "user-1@example.com",
+            pullRequestsPastWeek = emptyList(),
+            pullRequestsYearToDateCount = 5u,
+            prReviewCountYtd = 3u,
+            issuesClosedLastWeek = emptyList(),
+            issuesClosedYearToDateCount = 8u,
+        )
+        val metricTwo = UserMetrics(
+            userId = "user-2",
+            email = "user-2@example.com",
+            pullRequestsPastWeek = emptyList(),
+            pullRequestsYearToDateCount = 7u,
+            prReviewCountYtd = 4u,
+            issuesClosedLastWeek = emptyList(),
+            issuesClosedYearToDateCount = 9u,
+        )
+        val recordingPublisher = RecordingMessagePublisher()
+        val state = UserMetricPublisherState().apply {
+            config = UserMetricPublisherConfig(metricInformationPostfix = "Configured postfix")
+            dependencies = UserMetricPublisherDependencies(
+                usersConfig = UsersConfig(emptyList()),
+                projectManagementApi = NoOpProjectManagementApi(),
+                gitHubApi = NoOpGitHubApi(),
+                metricsBuilder = RecordingMetricsBuilder(metricOne),
+                messagePublisher = recordingPublisher,
+            )
+            metrics = listOf(metricOne, metricTwo)
+        }
+
+        publishMetrics(state)
+
+        assertEquals(
+            listOf(
+                SlackMessage(
+                    userEmail = metricOne.email,
+                    message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricOne.userId})\n" +
+                            metricOne.toSlackMarkdown() +
+                            "\nConfigured postfix",
+                ),
+                SlackMessage(
+                    userEmail = metricTwo.email,
+                    message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricTwo.userId})\n" +
+                            metricTwo.toSlackMarkdown() +
+                            "\nConfigured postfix",
+                ),
+            ),
+            recordingPublisher.messages,
+        )
+        assertEquals("Message sent!", state.publishButtonText)
+        assertEquals(false, state.publishButtonEnabled)
+    }
+
+    @Test
+    fun publishMetricsContinuesAfterFailedSendAndReportsFailure() = runBlocking {
+        val metricOne = UserMetrics(
+            userId = "user-1",
+            email = "user-1@example.com",
+            pullRequestsPastWeek = emptyList(),
+            pullRequestsYearToDateCount = 5u,
+            prReviewCountYtd = 3u,
+            issuesClosedLastWeek = emptyList(),
+            issuesClosedYearToDateCount = 8u,
+        )
+        val metricTwo = UserMetrics(
+            userId = "user-2",
+            email = "user-2@example.com",
+            pullRequestsPastWeek = emptyList(),
+            pullRequestsYearToDateCount = 7u,
+            prReviewCountYtd = 4u,
+            issuesClosedLastWeek = emptyList(),
+            issuesClosedYearToDateCount = 9u,
+        )
+        val metricThree = UserMetrics(
+            userId = "user-3",
+            email = "user-3@example.com",
+            pullRequestsPastWeek = emptyList(),
+            pullRequestsYearToDateCount = 11u,
+            prReviewCountYtd = 6u,
+            issuesClosedLastWeek = emptyList(),
+            issuesClosedYearToDateCount = 10u,
+        )
+        val recordingPublisher = RecordingMessagePublisher(results = listOf(true, false, true))
+        val state = UserMetricPublisherState().apply {
+            config = UserMetricPublisherConfig(metricInformationPostfix = "Configured postfix")
+            dependencies = UserMetricPublisherDependencies(
+                usersConfig = UsersConfig(emptyList()),
+                projectManagementApi = NoOpProjectManagementApi(),
+                gitHubApi = NoOpGitHubApi(),
+                metricsBuilder = RecordingMetricsBuilder(metricOne),
+                messagePublisher = recordingPublisher,
+            )
+            metrics = listOf(metricOne, metricTwo, metricThree)
+        }
+
+        publishMetrics(state)
+
+        assertEquals(
+            listOf(
+                SlackMessage(
+                    userEmail = metricOne.email,
+                    message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricOne.userId})\n" +
+                            metricOne.toSlackMarkdown() +
+                            "\nConfigured postfix",
+                ),
+                SlackMessage(
+                    userEmail = metricTwo.email,
+                    message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricTwo.userId})\n" +
+                            metricTwo.toSlackMarkdown() +
+                            "\nConfigured postfix",
+                ),
+                SlackMessage(
+                    userEmail = metricThree.email,
+                    message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricThree.userId})\n" +
+                            metricThree.toSlackMarkdown() +
+                            "\nConfigured postfix",
+                ),
+            ),
+            recordingPublisher.messages,
+        )
+        assertEquals("Failed to send message", state.publishButtonText)
+        assertEquals(false, state.publishButtonEnabled)
+    }
+
+    @Test
+    fun publishMetricsContinuesAfterThrownSendAndReportsFailure() = runBlocking {
+        val metricOne = UserMetrics(
+            userId = "user-1",
+            email = "user-1@example.com",
+            pullRequestsPastWeek = emptyList(),
+            pullRequestsYearToDateCount = 5u,
+            prReviewCountYtd = 3u,
+            issuesClosedLastWeek = emptyList(),
+            issuesClosedYearToDateCount = 8u,
+        )
+        val metricTwo = UserMetrics(
+            userId = "user-2",
+            email = "user-2@example.com",
+            pullRequestsPastWeek = emptyList(),
+            pullRequestsYearToDateCount = 7u,
+            prReviewCountYtd = 4u,
+            issuesClosedLastWeek = emptyList(),
+            issuesClosedYearToDateCount = 9u,
+        )
+        val metricThree = UserMetrics(
+            userId = "user-3",
+            email = "user-3@example.com",
+            pullRequestsPastWeek = emptyList(),
+            pullRequestsYearToDateCount = 11u,
+            prReviewCountYtd = 6u,
+            issuesClosedLastWeek = emptyList(),
+            issuesClosedYearToDateCount = 10u,
+        )
+        val recordingPublisher = ThrowingMessagePublisher(throwOnCallNumbers = setOf(2))
+        val state = UserMetricPublisherState().apply {
+            config = UserMetricPublisherConfig(metricInformationPostfix = "Configured postfix")
+            dependencies = UserMetricPublisherDependencies(
+                usersConfig = UsersConfig(emptyList()),
+                projectManagementApi = NoOpProjectManagementApi(),
+                gitHubApi = NoOpGitHubApi(),
+                metricsBuilder = RecordingMetricsBuilder(metricOne),
+                messagePublisher = recordingPublisher,
+            )
+            metrics = listOf(metricOne, metricTwo, metricThree)
+        }
+
+        publishMetrics(state)
+
+        assertEquals(
+            listOf(
+                SlackMessage(
+                    userEmail = metricOne.email,
+                    message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricOne.userId})\n" +
+                            metricOne.toSlackMarkdown() +
+                            "\nConfigured postfix",
+                ),
+                SlackMessage(
+                    userEmail = metricTwo.email,
+                    message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricTwo.userId})\n" +
+                            metricTwo.toSlackMarkdown() +
+                            "\nConfigured postfix",
+                ),
+                SlackMessage(
+                    userEmail = metricThree.email,
+                    message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricThree.userId})\n" +
+                            metricThree.toSlackMarkdown() +
+                            "\nConfigured postfix",
+                ),
+            ),
+            recordingPublisher.messages,
+        )
+        assertEquals("Failed to send message", state.publishButtonText)
+        assertEquals(false, state.publishButtonEnabled)
+    }
 }
 
 private class RecordingMetricsBuilder(
@@ -113,6 +314,46 @@ private class RecordingMetricsBuilder(
         this.projectManagementApi = projectManagementApi
         this.gitHubApi = gitHubApi
         return metrics
+    }
+}
+
+private class RecordingMessagePublisher : UserMetricMessagePublisher {
+    constructor() : this(emptyList())
+
+    constructor(results: List<Boolean>) {
+        remainingResults.addAll(results)
+    }
+
+    val messages = mutableListOf<SlackMessage>()
+    private val remainingResults = ArrayDeque<Boolean>()
+
+    override suspend fun publishMessage(message: SlackMessage): Boolean {
+        messages += message
+        return if (remainingResults.isEmpty()) {
+            true
+        } else {
+            remainingResults.removeFirst()
+        }
+    }
+}
+
+private object NoOpMessagePublisher : UserMetricMessagePublisher {
+    override suspend fun publishMessage(message: SlackMessage): Boolean = true
+}
+
+private class ThrowingMessagePublisher(
+    private val throwOnCallNumbers: Set<Int>,
+) : UserMetricMessagePublisher {
+    val messages = mutableListOf<SlackMessage>()
+    private var callCount = 0
+
+    override suspend fun publishMessage(message: SlackMessage): Boolean {
+        callCount += 1
+        messages += message
+        if (callCount in throwOnCallNumbers) {
+            throw IllegalStateException("boom")
+        }
+        return true
     }
 }
 

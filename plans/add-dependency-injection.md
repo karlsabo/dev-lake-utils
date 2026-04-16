@@ -28,7 +28,8 @@
 
 - Story 1 is done. `eng-hub` now uses `EngHubDependencies` and `loadEngHubViewModel(...)`, and `EngHubDependenciesTest` verifies the app can be started with supplied collaborators.
 - Story 2 is done. `user-metrics-publisher` now uses `UserMetricPublisherDependencies` and an injected `UserMetricsBuilder`, and `UserMetricPublisherDependenciesTest` verifies the metrics preview is generated from supplied collaborators.
-- Stories 3 through 5 are not done. `UserMetricPublisherApp.kt` still calls `ZapierMetricService` directly for publishing, and `SummaryPublisherApp.kt` still constructs concrete APIs and calls Zapier services directly from the UI layer.
+- Story 3 is done. `user-metrics-publisher` now publishes through an injected `UserMetricMessagePublisher`, and `UserMetricPublisherDependenciesTest` verifies publish success and failure paths with supplied publishers.
+- Stories 4 and 5 are not done. `SummaryPublisherApp.kt` still constructs concrete APIs and calls Zapier services directly from the UI layer.
 
 ## Stories
 
@@ -48,13 +49,13 @@
 
 **Notes:** Completed via `UserMetricPublisherDependencies`, `defaultUserMetricPublisherDependencyProvider`, and an injected `UserMetricsBuilder` used by `loadConfiguration(...)` and `loadMetrics(...)`. `UserMetricPublisherDependenciesTest` verifies the preview is built from supplied collaborators while keeping config parsing at the edge.
 
-### 3. Inject the publish path in `user-metrics-publisher`
+### 3. Done — Inject the publish path in `user-metrics-publisher`
 
 **Acceptance test:** Given `UserMetricPublisherApp` is started with an injected message publisher, when Publish is clicked, then Slack delivery goes through the injected publisher instead of calling `ZapierMetricService` directly.
 
 **Scope:** Replace direct `ZapierMetricService` usage with an injected publisher abstraction. The production implementation can still use the same HTTP behavior and payload shape. Add a focused test around the publish action.
 
-**Notes:** This should stay separate from story 2 so the data-loading refactor and the outbound publishing refactor can be reviewed independently.
+**Notes:** Completed via `UserMetricMessagePublisher`, default wiring in `defaultUserMetricPublisherDependencyProvider`, and `publishMetrics(...)` consuming the injected publisher instead of `ZapierMetricService` directly from the UI path. `UserMetricPublisherDependenciesTest` covers successful publishes, failed sends, and thrown exceptions while preserving the existing button-state behavior.
 
 ### 4. Inject the summary-loading path in `summary-publisher`
 
