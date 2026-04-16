@@ -12,13 +12,15 @@
 # TODO
 
 * [ ] Add dependency injection
+* [ ] Add DB storage for unsubscribed notifications
 * [ ] Can we write UI tests?
     * Can an LLM execute some manual UI-driven tests?
+* [ ] Add a UI panel for adding local git repos, showing the root and all worktrees and opening them the same way setup does
+* [ ] Start an auto review on PRs, show the copyable path to the review Markdown
 * [ ] Rename all skills to start with a standard prefix
     * Maybe eh for eng hub?
+* [ ] Add a queued status for PRs so we know if it's waying in a merge queue, maybe give the position in the queue too.
 * [ ] Fix skill paths to not be hard coded, e.g., remove `$HOME/karl-backup`, take it from a config variable
-* [ ] When launching a PR review via "Setup" it can hang forever.
-    * Run it in the background and terminate it after X minutes
 * [ ] Clicking "Setup" greys out all Setup buttons, it should only do it for the current task
 * [ ] Add a UI button to sync skills, or always sync skills every X minutes
     * Maybe a searchable menu that pops up, like JB Fleet had with cmd+k

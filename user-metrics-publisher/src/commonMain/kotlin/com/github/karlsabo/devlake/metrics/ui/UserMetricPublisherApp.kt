@@ -9,26 +9,20 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherConfig
+import com.github.karlsabo.devlake.metrics.UserMetricPublisherDependencyProvider
+import com.github.karlsabo.devlake.metrics.defaultUserMetricPublisherDependencyProvider
 import com.github.karlsabo.devlake.metrics.loadUserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.model.toSlackMarkdown
 import com.github.karlsabo.devlake.metrics.rememberUserMetricPublisherState
 import com.github.karlsabo.devlake.metrics.saveUserMetricPublisherConfig
-import com.github.karlsabo.devlake.metrics.service.MetricsService
 import com.github.karlsabo.devlake.metrics.service.SlackMessage
 import com.github.karlsabo.devlake.metrics.service.ZapierMetricService
 import com.github.karlsabo.devlake.metrics.ui.components.ErrorDialog
 import com.github.karlsabo.devlake.metrics.userMetricPublisherConfigPath
-import com.github.karlsabo.github.GitHubRestApi
-import com.github.karlsabo.github.config.loadGitHubConfig
-import com.github.karlsabo.linear.LinearRestApi
-import com.github.karlsabo.linear.config.loadLinearConfig
-import com.github.karlsabo.tools.gitHubConfigPath
-import com.github.karlsabo.tools.linearConfigPath
-import com.github.karlsabo.tools.loadUsersConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.io.files.SystemFileSystem
 import kotlin.time.measureTime
@@ -93,15 +87,15 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
     }
 }
 
-private fun loadConfiguration(
+internal fun loadConfiguration(
     state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState,
+    loadConfig: () -> UserMetricPublisherConfig = ::loadUserMetricPublisherConfig,
+    dependencyProvider: UserMetricPublisherDependencyProvider = defaultUserMetricPublisherDependencyProvider,
 ) {
     logger.info { "Loading configuration" }
     try {
-        state.config = loadUserMetricPublisherConfig()
-        state.projectManagementApi = LinearRestApi(loadLinearConfig(linearConfigPath))
-        state.gitHubApi = GitHubRestApi(loadGitHubConfig(gitHubConfigPath))
-        state.usersConfig = loadUsersConfig()!!
+        state.config = loadConfig()
+        state.dependencies = dependencyProvider(state.config)
         state.isLoadingConfig = false
         logger.info { "Config = ${state.config}" }
     } catch (error: Exception) {
@@ -112,35 +106,34 @@ private fun loadConfiguration(
             saveUserMetricPublisherConfig(UserMetricPublisherConfig())
         }
         state.isDisplayErrorDialog = true
+        state.isLoadingConfig = false
     }
 }
 
-private suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState) {
+internal suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState) {
     logger.info { "Loading metrics" }
-    val usersConfig = state.usersConfig ?: return
-    val projectManagementApi = state.projectManagementApi ?: return
-    val gitHubApi = state.gitHubApi ?: return
+    val dependencies = state.dependencies ?: return
 
-    val jobs = state.config.userIds.map { userId ->
-        kotlinx.coroutines.coroutineScope {
+    state.metrics = kotlinx.coroutines.coroutineScope {
+        state.config.userIds.map { userId ->
             async(Dispatchers.IO) {
+                lateinit var userMetrics: com.github.karlsabo.devlake.metrics.model.UserMetrics
                 measureTime {
-                    val user = usersConfig.users.firstOrNull { it.id == userId }
+                    val user = dependencies.usersConfig.users.firstOrNull { it.id == userId }
                         ?: throw Exception("User not found: $userId")
-                    val userMetrics = MetricsService.createUserMetrics(
+                    userMetrics = dependencies.metricsBuilder.createUserMetrics(
                         user,
                         state.config.organizationIds,
-                        projectManagementApi,
-                        gitHubApi
+                        dependencies.projectManagementApi,
+                        dependencies.gitHubApi,
                     )
-                    state.addMetric(userMetrics)
                 }.also {
                     logger.debug { "Time to load metrics for $userId: $it" }
                 }
+                userMetrics
             }
         }
-    }
-    jobs.joinAll()
+    }.awaitAll()
 
     state.metricsPreviewText = buildString {
         state.metrics.forEach { userMetrics ->

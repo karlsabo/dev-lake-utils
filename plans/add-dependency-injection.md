@@ -24,23 +24,29 @@
 4. Given `SummaryPublisherApp` is started with an injected summary builder, when summary data is loaded, then summary generation uses the injected collaborator instead of constructing `LinearRestApi`, `GitHubRestApi`, `PagerDutyRestApi`, and `TextSummarizerOpenAi` inside the UI layer.
 5. Given `SummaryPublisherApp` is started with an injected summary publisher, when Publish is clicked, then Zapier delivery goes through the injected publisher instead of calling `ZapierService` directly.
 
+## Current Status
+
+- Story 1 is done. `eng-hub` now uses `EngHubDependencies` and `loadEngHubViewModel(...)`, and `EngHubDependenciesTest` verifies the app can be started with supplied collaborators.
+- Story 2 is done. `user-metrics-publisher` now uses `UserMetricPublisherDependencies` and an injected `UserMetricsBuilder`, and `UserMetricPublisherDependenciesTest` verifies the metrics preview is generated from supplied collaborators.
+- Stories 3 through 5 are not done. `UserMetricPublisherApp.kt` still calls `ZapierMetricService` directly for publishing, and `SummaryPublisherApp.kt` still constructs concrete APIs and calls Zapier services directly from the UI layer.
+
 ## Stories
 
-### 1. Partially done — Establish the DI pattern in `eng-hub`
+### 1. Done — Establish the DI pattern in `eng-hub`
 
 **Acceptance test:** Given `EngHub` is started with a test dependency provider, when startup runs, then the resulting `EngHubViewModel` is built only from the supplied collaborators and `EngHub.kt` no longer constructs concrete GitHub, worktree, or desktop-launcher services inline.
 
 **Scope:** Add an `EngHubDependencies` type or small composition-root builder that owns construction of `GitHubApi`, `GitHubNotificationService`, `GitWorktreeApi`, and `DesktopLauncher`. Wire `EngHub` to accept default dependencies for production and override dependencies for tests. Keep the current runtime behavior unchanged.
 
-**Notes:** This is the tracer bullet. Use it to settle naming and shape for manual DI in the repo. Do not introduce a framework in this story.
+**Notes:** Completed via `EngHubDependencies`, `defaultEngHubDependencyProvider`, and `loadEngHubViewModel(...)`. `EngHubDependenciesTest` covers wiring the app with supplied collaborators. No DI framework was introduced.
 
-### 2. Inject the metrics-loading path in `user-metrics-publisher`
+### 2. Done — Inject the metrics-loading path in `user-metrics-publisher`
 
 **Acceptance test:** Given `UserMetricPublisherApp` is started with injected APIs and a fake metrics builder, when metrics are loaded, then the preview is generated from the injected collaborators without constructing `LinearRestApi`, `GitHubRestApi`, or using the `MetricsService` singleton directly from the UI layer.
 
 **Scope:** Introduce a `UserMetricPublisherDependencies` type and move metrics-building behavior behind an injected interface or function object. Refactor `loadConfiguration` and `loadMetrics` so the UI layer receives collaborators from the composition root instead of creating them itself.
 
-**Notes:** Depend on story 1 for the pattern only. Keep config-file parsing where it is; use the parsed config to build the default dependencies.
+**Notes:** Completed via `UserMetricPublisherDependencies`, `defaultUserMetricPublisherDependencyProvider`, and an injected `UserMetricsBuilder` used by `loadConfiguration(...)` and `loadMetrics(...)`. `UserMetricPublisherDependenciesTest` verifies the preview is built from supplied collaborators while keeping config parsing at the edge.
 
 ### 3. Inject the publish path in `user-metrics-publisher`
 
