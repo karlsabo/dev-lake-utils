@@ -27,6 +27,8 @@ import com.github.karlsabo.linear.config.LinearConfig
 import com.github.karlsabo.linear.config.saveLinearConfig
 import com.github.karlsabo.pagerduty.PagerDutyConfig
 import com.github.karlsabo.pagerduty.savePagerDutyConfig
+import com.github.karlsabo.system.DesktopAppBootstrapResult
+import com.github.karlsabo.system.runDesktopAppBootstrap
 import com.github.karlsabo.text.TextSummarizerOpenAiConfigNoSecrets
 import com.github.karlsabo.text.saveTextSummarizerOpenAiNoSecrets
 import com.github.karlsabo.tools.formatting.toSlackMarkup
@@ -41,6 +43,17 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 
 private val logger = KotlinLogging.logger {}
+
+private data class LoadedSummaryPublisherApp(
+    val config: SummaryPublisherConfig,
+    val dependencies: SummaryPublisherDependencies,
+)
+
+internal data class SummaryPublisherBootstrapTemplate(
+    val path: Path,
+    val missingMessage: String,
+    val createIfMissing: () -> Unit,
+)
 
 @Composable
 fun SummaryPublisherApp(
@@ -103,48 +116,96 @@ internal fun loadConfiguration(
     configFilePath: Path,
     loadConfig: (Path) -> SummaryPublisherConfig = ::loadSummaryPublisherConfig,
     loadDependencies: (SummaryPublisherConfig) -> SummaryPublisherDependencies = ::loadSummaryPublisherDependencies,
+    buildErrorMessage: (Exception) -> String = ::buildConfigurationErrorMessage,
 ) {
-    logger.info { "Loading configuration $configFilePath" }
-    try {
-        state.summaryConfig = loadConfig(configFilePath)
-        state.dependencies = loadDependencies(state.summaryConfig)
-        state.isConfigLoaded = true
-        logger.info { "Summary config = ${state.summaryConfig}" }
-    } catch (error: Exception) {
-        logger.error(error) { "Error loading summary config" }
-        state.errorMessage = buildConfigurationErrorMessage(error)
-        state.isDisplayErrorDialog = true
+    when (
+        val result = runDesktopAppBootstrap(
+            logger = logger,
+            description = "summary publisher configuration $configFilePath",
+            load = {
+                val config = loadConfig(configFilePath)
+                LoadedSummaryPublisherApp(
+                    config = config,
+                    dependencies = loadDependencies(config),
+                )
+            },
+            buildErrorMessage = buildErrorMessage,
+        )
+    ) {
+        is DesktopAppBootstrapResult.Loaded -> {
+            state.summaryConfig = result.value.config
+            state.dependencies = result.value.dependencies
+            state.errorMessage = ""
+            state.isDisplayErrorDialog = false
+            state.isConfigLoaded = true
+            logger.info { "Summary config = ${state.summaryConfig}" }
+        }
+
+        is DesktopAppBootstrapResult.Failed -> {
+            state.dependencies = null
+            state.errorMessage = result.errorMessage
+            state.isDisplayErrorDialog = true
+            state.isConfigLoaded = false
+        }
     }
 }
 
-private fun buildConfigurationErrorMessage(error: Exception): String {
+internal fun buildConfigurationErrorMessage(
+    error: Exception,
+    templates: List<SummaryPublisherBootstrapTemplate> = summaryPublisherBootstrapTemplates(),
+    exists: (Path) -> Boolean = SystemFileSystem::exists,
+): String {
     var message = "Failed to load configuration: $error."
 
-    if (!SystemFileSystem.exists(summaryPublisherConfigPath)) {
-        message += "\nCreating new configuration.\n Please update the configuration file:\n${summaryPublisherConfigPath}."
-        saveSummaryPublisherConfig(SummaryPublisherConfig())
-    }
-    if (!SystemFileSystem.exists(textSummarizerConfigPath)) {
-        message += "Please update the configuration file:\n${textSummarizerConfigPath}."
-        saveTextSummarizerOpenAiNoSecrets(
-            textSummarizerConfigPath,
-            TextSummarizerOpenAiConfigNoSecrets(apiKeyFilePath = "password.txt"),
-        )
-    }
-    if (!SystemFileSystem.exists(linearConfigPath)) {
-        message += "Please update the configuration file:\n${linearConfigPath}."
-        saveLinearConfig(linearConfigPath, LinearConfig(tokenPath = "/path/to/linear-api-key.json"))
-    }
-    if (!SystemFileSystem.exists(gitHubConfigPath)) {
-        message += "Please update the configuration file:\n${gitHubConfigPath}."
-        saveGitHubConfig(gitHubConfigPath, GitHubConfig("/path/to/github-token.json"))
-    }
-    if (!SystemFileSystem.exists(pagerDutyConfigPath)) {
-        message += "Please update the configuration file:\n${pagerDutyConfigPath}."
-        savePagerDutyConfig(PagerDutyConfig("/path/to/pagerduty-api-key.json"), pagerDutyConfigPath)
+    templates.forEach { template ->
+        if (!exists(template.path)) {
+            message += template.missingMessage
+            template.createIfMissing()
+        }
     }
 
     return message
+}
+
+internal fun summaryPublisherBootstrapTemplates(): List<SummaryPublisherBootstrapTemplate> {
+    return listOf(
+        SummaryPublisherBootstrapTemplate(
+            path = summaryPublisherConfigPath,
+            missingMessage = "\nCreating new configuration.\n Please update the configuration file:\n${summaryPublisherConfigPath}.",
+            createIfMissing = { saveSummaryPublisherConfig(SummaryPublisherConfig()) },
+        ),
+        SummaryPublisherBootstrapTemplate(
+            path = textSummarizerConfigPath,
+            missingMessage = "Please update the configuration file:\n${textSummarizerConfigPath}.",
+            createIfMissing = {
+                saveTextSummarizerOpenAiNoSecrets(
+                    textSummarizerConfigPath,
+                    TextSummarizerOpenAiConfigNoSecrets(apiKeyFilePath = "password.txt"),
+                )
+            },
+        ),
+        SummaryPublisherBootstrapTemplate(
+            path = linearConfigPath,
+            missingMessage = "Please update the configuration file:\n${linearConfigPath}.",
+            createIfMissing = {
+                saveLinearConfig(linearConfigPath, LinearConfig(tokenPath = "/path/to/linear-api-key.json"))
+            },
+        ),
+        SummaryPublisherBootstrapTemplate(
+            path = gitHubConfigPath,
+            missingMessage = "Please update the configuration file:\n${gitHubConfigPath}.",
+            createIfMissing = {
+                saveGitHubConfig(gitHubConfigPath, GitHubConfig("/path/to/github-token.json"))
+            },
+        ),
+        SummaryPublisherBootstrapTemplate(
+            path = pagerDutyConfigPath,
+            missingMessage = "Please update the configuration file:\n${pagerDutyConfigPath}.",
+            createIfMissing = {
+                savePagerDutyConfig(PagerDutyConfig("/path/to/pagerduty-api-key.json"), pagerDutyConfigPath)
+            },
+        ),
+    )
 }
 
 internal suspend fun loadSummaryData(state: SummaryPublisherState) {

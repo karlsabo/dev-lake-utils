@@ -21,9 +21,16 @@ import com.github.karlsabo.text.TextSummarizerOpenAiConfig
 import com.github.karlsabo.tools.model.ProjectSummary
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.SystemTemporaryDirectory
+import kotlinx.io.writeString
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class SummaryPublisherDependenciesTest {
 
@@ -124,6 +131,82 @@ class SummaryPublisherDependenciesTest {
         assertEquals(expectedSummary.toTerseSlackMarkup(), state.topLevelSummary)
         assertEquals(emptyList(), state.projectSummaries)
         assertEquals(false, state.isLoadingSummary)
+    }
+
+    @Test
+    fun loadConfigurationCreatesMissingTemplatesWhenBootstrapFails() {
+        val tempDir = createTempDir()
+        val summaryConfigPath = Path(tempDir, "summary-publisher-config.json")
+        val textSummarizerPath = Path(tempDir, "text-summarizer-config.json")
+        val linearPath = Path(tempDir, "linear-config.json")
+        val gitHubPath = Path(tempDir, "github-config.json")
+        val pagerDutyPath = Path(tempDir, "pagerduty-config.json")
+        val createdPaths = mutableListOf<Path>()
+        val state = SummaryPublisherState()
+
+        try {
+            val templates = listOf(
+                template(
+                    path = summaryConfigPath,
+                    message = "\nCreating new configuration.\n Please update the configuration file:\n$summaryConfigPath.",
+                    createdPaths = createdPaths,
+                ),
+                template(
+                    path = textSummarizerPath,
+                    message = "Please update the configuration file:\n$textSummarizerPath.",
+                    createdPaths = createdPaths,
+                ),
+                template(
+                    path = linearPath,
+                    message = "Please update the configuration file:\n$linearPath.",
+                    createdPaths = createdPaths,
+                ),
+                template(
+                    path = gitHubPath,
+                    message = "Please update the configuration file:\n$gitHubPath.",
+                    createdPaths = createdPaths,
+                ),
+                template(
+                    path = pagerDutyPath,
+                    message = "Please update the configuration file:\n$pagerDutyPath.",
+                    createdPaths = createdPaths,
+                ),
+            )
+
+            loadConfiguration(
+                state = state,
+                configFilePath = summaryConfigPath,
+                loadConfig = { throw IllegalStateException("missing config") },
+                loadDependencies = { error("Dependencies should not load when config loading fails") },
+                buildErrorMessage = { error ->
+                    buildConfigurationErrorMessage(
+                        error = error,
+                        templates = templates,
+                    )
+                },
+            )
+
+            assertEquals(false, state.isConfigLoaded)
+            assertEquals(true, state.isDisplayErrorDialog)
+            assertEquals(
+                "Failed to load configuration: java.lang.IllegalStateException: missing config." +
+                        "\nCreating new configuration.\n Please update the configuration file:\n$summaryConfigPath." +
+                        "Please update the configuration file:\n$textSummarizerPath." +
+                        "Please update the configuration file:\n$linearPath." +
+                        "Please update the configuration file:\n$gitHubPath." +
+                        "Please update the configuration file:\n$pagerDutyPath.",
+                state.errorMessage,
+            )
+            assertEquals(
+                listOf(summaryConfigPath, textSummarizerPath, linearPath, gitHubPath, pagerDutyPath),
+                createdPaths,
+            )
+            createdPaths.forEach { path ->
+                assertTrue(SystemFileSystem.exists(path))
+            }
+        } finally {
+            deleteRecursively(tempDir)
+        }
     }
 
     @Test
@@ -268,6 +351,36 @@ class SummaryPublisherDependenciesTest {
             throw IllegalStateException("boom")
         }
     }
+
+    private fun createTempDir(): Path {
+        val name = "summary-publisher-test-${Random.nextLong().toULong().toString(16)}"
+        val path = Path(SystemTemporaryDirectory, name)
+        SystemFileSystem.createDirectories(path)
+        return path
+    }
+
+    private fun deleteRecursively(path: Path) {
+        if (!SystemFileSystem.exists(path)) return
+        if (SystemFileSystem.metadataOrNull(path)?.isDirectory == true) {
+            SystemFileSystem.list(path).forEach(::deleteRecursively)
+        }
+        SystemFileSystem.delete(path, mustExist = false)
+    }
+
+    private fun template(
+        path: Path,
+        message: String,
+        createdPaths: MutableList<Path>,
+    ) = SummaryPublisherBootstrapTemplate(
+        path = path,
+        missingMessage = message,
+        createIfMissing = {
+            createdPaths += path
+            SystemFileSystem.sink(path).buffered().use { sink ->
+                sink.writeString("created for test")
+            }
+        },
+    )
 
     private companion object {
         val NoOpSummaryPublisher = SummaryMessagePublisher { true }
