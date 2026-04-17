@@ -1,27 +1,43 @@
 package com.github.karlsabo.devlake.metrics
 
 import com.github.karlsabo.devlake.metrics.model.UserMetrics
-import com.github.karlsabo.devlake.metrics.service.MetricsService
 import com.github.karlsabo.devlake.metrics.service.SlackMessage
 import com.github.karlsabo.devlake.metrics.service.ZapierMetricService
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
-import com.github.karlsabo.github.GitHubRestApi
+import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.github.config.loadGitHubConfig
-import com.github.karlsabo.linear.LinearRestApi
+import com.github.karlsabo.linear.config.LinearApiRestConfig
 import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.tools.gitHubConfigPath
 import com.github.karlsabo.tools.linearConfigPath
 import com.github.karlsabo.tools.loadUsersConfig
+import me.tatarka.inject.annotations.Inject
 
 data class UserMetricPublisherDependencies(
+    val previewDependencies: UserMetricPublisherPreviewDependencies,
+    val messagePublisher: UserMetricMessagePublisher,
+) {
+    val usersConfig: UsersConfig
+        get() = previewDependencies.usersConfig
+
+    val projectManagementApi: ProjectManagementApi
+        get() = previewDependencies.projectManagementApi
+
+    val gitHubApi: GitHubApi
+        get() = previewDependencies.gitHubApi
+
+    val metricsBuilder: UserMetricsBuilder
+        get() = previewDependencies.metricsBuilder
+}
+
+data class UserMetricPublisherPreviewDependencies @Inject constructor(
     val usersConfig: UsersConfig,
     val projectManagementApi: ProjectManagementApi,
     val gitHubApi: GitHubApi,
     val metricsBuilder: UserMetricsBuilder,
-    val messagePublisher: UserMetricMessagePublisher,
 )
 
 fun interface UserMetricsBuilder {
@@ -37,18 +53,26 @@ fun interface UserMetricMessagePublisher {
     suspend fun publishMessage(message: SlackMessage): Boolean
 }
 
-typealias UserMetricPublisherDependencyProvider = (UserMetricPublisherConfig) -> UserMetricPublisherDependencies
+internal typealias UserMetricPublisherComponentFactory = (
+    UsersConfig,
+    LinearApiRestConfig,
+    GitHubApiRestConfig,
+) -> UserMetricPublisherComponent
 
-val defaultUserMetricPublisherDependencyProvider: UserMetricPublisherDependencyProvider = { config ->
-    UserMetricPublisherDependencies(
-        usersConfig = requireNotNull(loadUsersConfig()) { "Users config is required" },
-        projectManagementApi = LinearRestApi(loadLinearConfig(linearConfigPath)),
-        gitHubApi = GitHubRestApi(loadGitHubConfig(gitHubConfigPath)),
-        metricsBuilder = { user, organizationIds, projectManagementApi, gitHubApi ->
-            MetricsService.createUserMetrics(user, organizationIds, projectManagementApi, gitHubApi)
-        },
-        messagePublisher = { message ->
-            ZapierMetricService.sendMessage(message, config.zapierMetricUrl)
-        },
-    )
+internal fun loadUserMetricPublisherPreviewDependencies(
+    loadUsersConfig: () -> UsersConfig? = ::loadUsersConfig,
+    loadLinearApiConfig: () -> LinearApiRestConfig = { loadLinearConfig(linearConfigPath) },
+    loadGitHubApiConfig: () -> GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) },
+    componentFactory: UserMetricPublisherComponentFactory = ::createUserMetricPublisherComponent,
+): UserMetricPublisherPreviewDependencies {
+    val usersConfig = requireNotNull(loadUsersConfig()) { "Users config is required" }
+    val linearApiConfig = loadLinearApiConfig()
+    val gitHubApiConfig = loadGitHubApiConfig()
+
+    return componentFactory(usersConfig, linearApiConfig, gitHubApiConfig).previewDependencies
 }
+
+internal fun defaultUserMetricMessagePublisher(config: UserMetricPublisherConfig): UserMetricMessagePublisher =
+    UserMetricMessagePublisher { message ->
+        ZapierMetricService.sendMessage(message, config.zapierMetricUrl)
+    }

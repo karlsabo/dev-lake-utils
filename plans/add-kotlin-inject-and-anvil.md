@@ -49,6 +49,8 @@ Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the deskto
 
 ### 2. Move `user-metrics-publisher` preview loading onto a generated component
 
+**Status:** Done on April 17, 2026.
+
 **Acceptance test:** Given `UserMetricPublisherApp` starts with a valid config, when metrics are loaded, then the preview is built from collaborators resolved by a generated component instead of `defaultUserMetricPublisherDependencyProvider`, and the preview text is unchanged.
 
 **Expected edits:** `user-metrics-publisher/user-metrics-publisher.gradle.kts`; `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherDependencies.kt`; `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt`; new DI files under `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/`; `user-metrics-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherDependenciesTest.kt`; possibly app-local provider interfaces for `GitHubApi`, `ProjectManagementApi`, `UsersConfig`, and `UserMetricsBuilder`.
