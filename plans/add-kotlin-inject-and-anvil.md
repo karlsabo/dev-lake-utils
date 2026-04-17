@@ -61,6 +61,8 @@ Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the deskto
 
 ### 3. Move `user-metrics-publisher` publish delivery onto the generated graph
 
+**Status:** Done on April 17, 2026.
+
 **Acceptance test:** Given `UserMetricPublisherApp` has loaded metrics, when Publish is clicked, then Slack delivery goes through a publisher bound in the generated graph and the existing success/failure button behavior is preserved.
 
 **Expected edits:** `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherDependencies.kt`; `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt`; new publisher adapter files under `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/`; `user-metrics-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherDependenciesTest.kt`; possibly `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/service/ZapierMetricService.kt` if a thin adapter is cleaner than binding the object directly.

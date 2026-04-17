@@ -1,6 +1,7 @@
 package com.github.karlsabo.devlake.metrics
 
 import com.github.karlsabo.devlake.metrics.service.MetricsService
+import com.github.karlsabo.devlake.metrics.service.ZapierMetricService
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubRestApi
@@ -33,20 +34,29 @@ interface UserMetricPublisherBindings {
             MetricsService.createUserMetrics(user, organizationIds, projectManagementApi, gitHubApi)
         }
     }
+
+    @Provides
+    fun provideMessagePublisher(config: UserMetricPublisherConfig): UserMetricMessagePublisher {
+        return UserMetricMessagePublisher { message ->
+            ZapierMetricService.sendMessage(message, config.zapierMetricUrl)
+        }
+    }
 }
 
 @MergeComponent(UserMetricPublisherScope::class)
 @SingleIn(UserMetricPublisherScope::class)
 abstract class UserMetricPublisherComponent(
+    @get:Provides val config: UserMetricPublisherConfig,
     @get:Provides val usersConfig: UsersConfig,
     @get:Provides val linearApiConfig: LinearApiRestConfig,
     @get:Provides val gitHubApiConfig: GitHubApiRestConfig,
 ) {
-    abstract val previewDependencies: UserMetricPublisherPreviewDependencies
+    abstract val dependencies: UserMetricPublisherDependencies
 }
 
 @CreateComponent
 expect fun createUserMetricPublisherComponent(
+    config: UserMetricPublisherConfig,
     usersConfig: UsersConfig,
     linearApiConfig: LinearApiRestConfig,
     gitHubApiConfig: GitHubApiRestConfig,

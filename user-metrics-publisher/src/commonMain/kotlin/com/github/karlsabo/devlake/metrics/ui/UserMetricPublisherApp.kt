@@ -8,13 +8,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import com.github.karlsabo.devlake.metrics.UserMetricMessagePublisher
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherDependencies
-import com.github.karlsabo.devlake.metrics.UserMetricPublisherPreviewDependencies
-import com.github.karlsabo.devlake.metrics.defaultUserMetricMessagePublisher
 import com.github.karlsabo.devlake.metrics.loadUserMetricPublisherConfig
-import com.github.karlsabo.devlake.metrics.loadUserMetricPublisherPreviewDependencies
+import com.github.karlsabo.devlake.metrics.loadUserMetricPublisherDependencies
 import com.github.karlsabo.devlake.metrics.model.toSlackMarkdown
 import com.github.karlsabo.devlake.metrics.rememberUserMetricPublisherState
 import com.github.karlsabo.devlake.metrics.saveUserMetricPublisherConfig
@@ -80,17 +77,13 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
 internal fun loadConfiguration(
     state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState,
     loadConfig: () -> UserMetricPublisherConfig = ::loadUserMetricPublisherConfig,
-    loadPreviewDependencies: () -> UserMetricPublisherPreviewDependencies =
-        ::loadUserMetricPublisherPreviewDependencies,
-    messagePublisherFactory: (UserMetricPublisherConfig) -> UserMetricMessagePublisher = ::defaultUserMetricMessagePublisher,
+    loadDependencies: (UserMetricPublisherConfig) -> UserMetricPublisherDependencies =
+        ::loadUserMetricPublisherDependencies,
 ) {
     logger.info { "Loading configuration" }
     try {
         state.config = loadConfig()
-        state.dependencies = UserMetricPublisherDependencies(
-            previewDependencies = loadPreviewDependencies(),
-            messagePublisher = messagePublisherFactory(state.config),
-        )
+        state.dependencies = loadDependencies(state.config)
         state.isLoadingConfig = false
         logger.info { "Config = ${state.config}" }
     } catch (error: Exception) {
