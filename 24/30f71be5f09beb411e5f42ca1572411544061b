@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "2430f71be5f09beb411e5f42ca1572411544061b",
+  "prompts": {
+    "b2233efd9ffa1907": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d9ce2-15cd-7780-90bc-66746b84ae35",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Karl Sabo",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 117,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
