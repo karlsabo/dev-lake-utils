@@ -73,6 +73,8 @@ Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the deskto
 
 ### 4. Move `summary-publisher` preview loading onto a generated component
 
+**Status:** Done on April 17, 2026.
+
 **Acceptance test:** Given `SummaryPublisherApp` starts with a valid config, when summary data is loaded, then the summary preview is built from collaborators resolved by a generated component instead of `defaultSummaryPublisherDependencyProvider`, and the preview text is unchanged.
 
 **Expected edits:** `summary-publisher/summary-publisher.gradle.kts`; `summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/SummaryPublisherDependencies.kt`; `summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/SummaryPublisherState.kt`; `summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/ui/SummaryPublisherApp.kt`; new DI files under `summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/`; `summary-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/tools/ui/SummaryPublisherDependenciesTest.kt`.
@@ -82,6 +84,8 @@ Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the deskto
 **Notes:** This story must reconcile with the current uncommitted worktree files in `summary-publisher`. Either absorb that work into this PR or land it before starting; do not plan against the older pre-DI version of `SummaryPublisherApp.kt`.
 
 ### 5. Move `summary-publisher` publish delivery onto the generated graph
+
+**Status:** Done on April 17, 2026.
 
 **Acceptance test:** Given `SummaryPublisherApp` has loaded a summary, when Publish is clicked, then Zapier delivery goes through a publisher bound in the generated graph instead of calling `ZapierService` directly from the composable.
 

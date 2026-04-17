@@ -1,7 +1,6 @@
 package com.github.karlsabo.devlake.tools
 
 import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
-import com.github.karlsabo.devlake.tools.service.ZapierService
 import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
@@ -103,10 +102,8 @@ interface SummaryPublisherBindings {
     }
 
     @Provides
-    fun provideSummaryPublisher(config: SummaryPublisherConfig): SummaryMessagePublisher {
-        return SummaryMessagePublisher { summary ->
-            ZapierService.sendSummary(summary, config.zapierSummaryUrl)
-        }
+    fun provideSummaryPublisher(zapierSummaryPublisher: ZapierSummaryPublisher): SummaryMessagePublisher {
+        return zapierSummaryPublisher
     }
 }
 
