@@ -1,0 +1,47 @@
+user-metrics-publisher/user-metrics-publisher.gradle.kts
+  3ed7444426156a8f 5
+user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherComponent.kt
+  3ed7444426156a8f 1-53
+user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherDependencies.kt
+  3ed7444426156a8f 9,11,17,20-36,56-72,74-78
+user-metrics-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherDependenciesTest.kt
+  bcc851f63b1c838e 4,7,10,24-25,40-92,116,127-130,132,138-139,180-186,247-253,320-326,362-369
+plans/add-kotlin-inject-and-anvil.md
+  3ed7444426156a8f 52-53
+user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt
+  bcc851f63b1c838e 13-14,83
+  3ed7444426156a8f 11,15,17,84-85,90-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "f7cd0c9ee82c513dd5e2845dccb9423402be203b",
+  "prompts": {
+    "3ed7444426156a8f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d9c43-402e-7950-80fa-713ea7b989fe",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Karl Sabo",
+      "messages": [],
+      "total_additions": 111,
+      "total_deletions": 23,
+      "accepted_lines": 107,
+      "overriden_lines": 0
+    },
+    "bcc851f63b1c838e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d9c4a-3447-78d1-9dec-070a04415a13",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Karl Sabo",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 27,
+      "accepted_lines": 103,
+      "overriden_lines": 0
+    }
+  }
+}
