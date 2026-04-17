@@ -1,0 +1,25 @@
+eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHubComponent.kt
+  09c365ce48fff5f8 1-51
+buildSrc/src/main/kotlin/devlake.kotlin-inject-conventions.gradle.kts
+  09c365ce48fff5f8 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "5e7584798c679166d0ba264d70801faedda0c7ab",
+  "prompts": {
+    "09c365ce48fff5f8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d9c1f-6211-7320-a7f8-bbec4a30a0d9",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Karl Sabo",
+      "messages": [],
+      "total_additions": 77,
+      "total_deletions": 96,
+      "accepted_lines": 74,
+      "overriden_lines": 0
+    }
+  }
+}
