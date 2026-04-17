@@ -3,13 +3,21 @@ package com.github.karlsabo.devlake.tools.ui
 import com.github.karlsabo.devlake.tools.ProjectSummaryHolder
 import com.github.karlsabo.devlake.tools.SummaryBuilder
 import com.github.karlsabo.devlake.tools.SummaryMessagePublisher
+import com.github.karlsabo.devlake.tools.SummaryPublisherComponent
 import com.github.karlsabo.devlake.tools.SummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.SummaryPublisherDependencies
 import com.github.karlsabo.devlake.tools.SummaryPublisherState
+import com.github.karlsabo.devlake.tools.loadSummaryPublisherDependencies
 import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
 import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.dto.Project
+import com.github.karlsabo.dto.User
+import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.dto.toTerseSlackMarkup
+import com.github.karlsabo.github.config.GitHubApiRestConfig
+import com.github.karlsabo.linear.config.LinearApiRestConfig
+import com.github.karlsabo.pagerduty.PagerDutyApiRestConfig
+import com.github.karlsabo.text.TextSummarizerOpenAiConfig
 import com.github.karlsabo.tools.model.ProjectSummary
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
@@ -20,7 +28,66 @@ import kotlin.test.assertSame
 class SummaryPublisherDependenciesTest {
 
     @Test
-    fun loadSummaryPreviewUsesProvidedDependencies() = runBlocking {
+    fun loadSummaryPublisherDependenciesUsesProvidedComponentFactory() {
+        val config = SummaryPublisherConfig(zapierSummaryUrl = "https://hooks.example.com/summary")
+        val usersConfig = UsersConfig(
+            users = listOf(
+                User(
+                    id = "user-1",
+                    email = "user-1@example.com",
+                    name = "User One",
+                    gitHubId = "user-one",
+                ),
+            ),
+        )
+        val linearApiConfig = LinearApiRestConfig(token = "linear-token")
+        val gitHubApiConfig = GitHubApiRestConfig(token = "github-token")
+        val pagerDutyApiConfig = PagerDutyApiRestConfig(apiKey = "pagerduty-token")
+        val textSummarizerConfig = TextSummarizerOpenAiConfig(apiKey = "openai-token")
+        val dependencies = SummaryPublisherDependencies(
+            summaryBuilder = RecordingSummaryBuilder(emptySummary()),
+            summaryPublisher = NoOpSummaryPublisher,
+        )
+
+        val loadedDependencies = loadSummaryPublisherDependencies(
+            config = config,
+            loadUsersConfig = { usersConfig },
+            loadLinearApiConfig = { linearApiConfig },
+            loadGitHubApiConfig = { gitHubApiConfig },
+            loadPagerDutyApiConfig = { pagerDutyApiConfig },
+            loadTextSummarizerConfig = { textSummarizerConfig },
+            componentFactory = {
+                    providedConfig,
+                    providedUsersConfig,
+                    providedLinearApiConfig,
+                    providedGitHubApiConfig,
+                    providedPagerDutyApiConfig,
+                    providedTextSummarizerConfig,
+                ->
+                assertEquals(config, providedConfig)
+                assertSame(usersConfig, providedUsersConfig)
+                assertEquals(linearApiConfig, providedLinearApiConfig)
+                assertEquals(gitHubApiConfig, providedGitHubApiConfig)
+                assertEquals(pagerDutyApiConfig, providedPagerDutyApiConfig)
+                assertEquals(textSummarizerConfig, providedTextSummarizerConfig)
+                object : SummaryPublisherComponent(
+                    providedConfig,
+                    providedUsersConfig,
+                    providedLinearApiConfig,
+                    providedGitHubApiConfig,
+                    providedPagerDutyApiConfig,
+                    providedTextSummarizerConfig,
+                ) {
+                    override val dependencies = dependencies
+                }
+            },
+        )
+
+        assertSame(dependencies, loadedDependencies)
+    }
+
+    @Test
+    fun loadSummaryPreviewUsesLoadedDependencies() = runBlocking {
         val config = SummaryPublisherConfig(
             summaryName = "Test Summary",
             isTerseSummaryUsed = true,
@@ -43,7 +110,7 @@ class SummaryPublisherDependenciesTest {
             state = state,
             configFilePath = com.github.karlsabo.devlake.tools.summaryPublisherConfigPath,
             loadConfig = { config },
-            dependencyProvider = { providedConfig ->
+            loadDependencies = { providedConfig ->
                 assertEquals(config, providedConfig)
                 dependencies
             },

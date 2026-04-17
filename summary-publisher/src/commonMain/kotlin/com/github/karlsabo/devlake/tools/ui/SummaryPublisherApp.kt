@@ -10,10 +10,10 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.devlake.tools.ProjectSummaryHolder
 import com.github.karlsabo.devlake.tools.SummaryPublisherConfig
-import com.github.karlsabo.devlake.tools.SummaryPublisherDependencyProvider
+import com.github.karlsabo.devlake.tools.SummaryPublisherDependencies
 import com.github.karlsabo.devlake.tools.SummaryPublisherState
-import com.github.karlsabo.devlake.tools.defaultSummaryPublisherDependencyProvider
 import com.github.karlsabo.devlake.tools.loadSummaryPublisherConfig
+import com.github.karlsabo.devlake.tools.loadSummaryPublisherDependencies
 import com.github.karlsabo.devlake.tools.rememberSummaryPublisherState
 import com.github.karlsabo.devlake.tools.saveSummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
@@ -46,13 +46,13 @@ private val logger = KotlinLogging.logger {}
 fun SummaryPublisherApp(
     configFilePath: Path,
     onExitApplication: () -> Unit,
-    dependencyProvider: SummaryPublisherDependencyProvider = defaultSummaryPublisherDependencyProvider,
+    loadDependencies: (SummaryPublisherConfig) -> SummaryPublisherDependencies = ::loadSummaryPublisherDependencies,
 ) {
     val state = rememberSummaryPublisherState()
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        loadConfiguration(state, configFilePath, dependencyProvider = dependencyProvider)
+        loadConfiguration(state, configFilePath, loadDependencies = loadDependencies)
     }
 
     if (state.isDisplayErrorDialog) {
@@ -102,12 +102,12 @@ internal fun loadConfiguration(
     state: SummaryPublisherState,
     configFilePath: Path,
     loadConfig: (Path) -> SummaryPublisherConfig = ::loadSummaryPublisherConfig,
-    dependencyProvider: SummaryPublisherDependencyProvider = defaultSummaryPublisherDependencyProvider,
+    loadDependencies: (SummaryPublisherConfig) -> SummaryPublisherDependencies = ::loadSummaryPublisherDependencies,
 ) {
     logger.info { "Loading configuration $configFilePath" }
     try {
         state.summaryConfig = loadConfig(configFilePath)
-        state.dependencies = dependencyProvider(state.summaryConfig)
+        state.dependencies = loadDependencies(state.summaryConfig)
         state.isConfigLoaded = true
         logger.info { "Summary config = ${state.summaryConfig}" }
     } catch (error: Exception) {

@@ -2,6 +2,7 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
     id("devlake.kotlin-multiplatform-compose-conventions")
+    id("devlake.kotlin-inject-conventions")
 }
 
 kotlin {
