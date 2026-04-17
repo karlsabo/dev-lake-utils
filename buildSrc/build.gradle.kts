@@ -11,6 +11,7 @@ repositories {
 dependencies {
     implementation(libs.kotlin.gradle.plugin)
     implementation(libs.compose.gradle.plugin)
+    implementation("com.google.devtools.ksp:symbol-processing-gradle-plugin:${libs.versions.ksp.get()}")
     // Serialization plugin dependency
     implementation("org.jetbrains.kotlin:kotlin-serialization:${libs.versions.kotlin.get()}")
     // Compose compiler plugin dependency

@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.tatarka.inject.annotations.Inject
 import java.io.IOException
 
 private val logger = KotlinLogging.logger {}
@@ -55,6 +56,7 @@ internal suspend fun GitHubApi.buildPullRequestUiStates(issues: List<Issue>): Li
     }
 }
 
+@Inject
 class EngHubViewModel(
     private val gitHubApi: GitHubApi,
     private val gitHubNotificationService: GitHubNotificationService,

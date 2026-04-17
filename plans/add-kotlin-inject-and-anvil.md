@@ -1,6 +1,6 @@
 ## Goal
 
-Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the desktop apps use generated composition roots instead of hand-written dependency providers, while preserving the current app behavior and test seams.
+Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the desktop apps use generated composition roots instead of handwritten dependency providers, while preserving the current app behavior and test seams.
 
 ## Context
 
@@ -15,11 +15,11 @@ Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the deskto
 - The official `kotlin-inject-anvil` docs add `@MergeComponent`, `@ContributesTo`, `@ContributesBinding`, and recommend `kspCommonMainMetadata` plus `runtime-optional` for `@SingleIn`: https://github.com/amzn/kotlin-inject-anvil
 - The official `kotlin-inject-anvil` Kotlin Multiplatform guidance says common code should use an `expect` create function next to the component because generated code is not reliably visible from `commonMain`: https://github.com/amzn/kotlin-inject-anvil
 - The official KSP multiplatform docs say KMP builds should use per-source-set configurations such as `kspCommonMainMetadata` instead of the older unified `ksp(...)`: https://kotlinlang.org/docs/ksp-multiplatform.html
-- The official KSP releases page shows a Kotlin `2.2.21`-aligned release (`2.2.21-2.0.4`) published on October 28, 2025. Implementation should pin a version that is confirmed compatible with the repo’s Kotlin `2.2.21` baseline before code lands: https://github.com/google/ksp/releases
+- The official KSP releases page shows a Kotlin `2.2.21`-aligned release (`2.2.21-2.0.4`) published on October 28, 2025. Implementation should pin a version confirmed compatible with the repo’s Kotlin `2.2.21` baseline before code lands: https://github.com/google/ksp/releases
 
 ## Assumptions
 
-- Keep config file loading at the application edge. Components should receive loaded config objects or derived values rather than own file I/O directly.
+- Keep the config file loading at the application edge. Components should receive loaded config objects or derived values rather than own file I/O directly.
 - Use one app scope per desktop app instead of introducing a shared repo-wide singleton scope.
 - Use plain `kotlin-inject` for the component root and constructor injection, and use `kotlin-inject-anvil` where it removes binding boilerplate or provider-interface glue.
 - Prefer app-local provider contributions for config-backed REST clients like `GitHubRestApi`, `LinearRestApi`, and `PagerDutyRestApi`; do not rewrite every utility constructor just to make it injectable.
@@ -37,13 +37,15 @@ Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the deskto
 
 ### 1. Replace `eng-hub` manual wiring with the first generated app component
 
+**Status:** Done on April 16, 2026.
+
 **Acceptance test:** Given `EngHub` starts with a valid GitHub config, when startup runs, then `EngHubViewModel` is created from a generated `kotlin-inject`/Anvil component in `commonMain` instead of `defaultEngHubDependencyProvider`, and the window still opens with the same behavior.
 
 **Expected edits:** `gradle/libs.versions.toml`; `buildSrc/src/main/kotlin/devlake.kotlin-multiplatform-conventions.gradle.kts` or a new inject-focused convention plugin under `buildSrc/src/main/kotlin/`; `eng-hub/eng-hub.gradle.kts`; `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHub.kt`; `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependencies.kt`; new DI files under `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/`; `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependenciesTest.kt`; likely utility bindings in `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeService.kt`, `utilities/src/commonMain/kotlin/com/github/karlsabo/github/GitHubNotificationService.kt`, and `utilities/src/commonMain/kotlin/com/github/karlsabo/system/DesktopLauncherService.kt`.
 
 **Scope:** Introduce the repo’s KSP + `kotlin-inject` + Anvil bootstrap and prove the pattern in the smallest existing app graph. The implementation should include the KMP-safe component creation pattern (`expect` create function next to the component) and remove production use of the manual `EngHubDependencyProvider`.
 
-**Notes:** This is the tracer-bullet PR. Keep the graph app-local with an `EngHubScope`. Use Anvil where it eliminates interface binding boilerplate, but do not generalize into a cross-app DI framework yet.
+**Notes:** This is the tracer-bullet PR. Keep the graph app-local with an `EngHubScope`. Use Anvil where it eliminates interface binding boilerplate but does not generalize into a cross-app DI framework yet.
 
 ### 2. Move `user-metrics-publisher` preview loading onto a generated component
 
@@ -51,9 +53,9 @@ Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the deskto
 
 **Expected edits:** `user-metrics-publisher/user-metrics-publisher.gradle.kts`; `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherDependencies.kt`; `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt`; new DI files under `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/`; `user-metrics-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherDependenciesTest.kt`; possibly app-local provider interfaces for `GitHubApi`, `ProjectManagementApi`, `UsersConfig`, and `UserMetricsBuilder`.
 
-**Scope:** Replace the manual dependency bundle for the preview path with a generated component, but keep the publish path as a separate story. Preserve the existing config-loading and concurrency behavior in `loadMetrics(...)`.
+**Scope:** Replace the manual dependency bundle for the preview path with a generated component but keep the publication path as a separate story. Preserve the existing config-loading and concurrency behavior in `loadMetrics(...)`.
 
-**Notes:** `LinearRestApi` and `GitHubRestApi` are config-backed, so prefer app-local `@Provides` contributions over broad constructor rewrites in `utilities`. If Story 1 introduces a reusable inject convention plugin, this story should only apply it and add app-specific graph files.
+**Notes:** `LinearRestApi` and `GitHubRestApi` are config-backed, so prefer app-local `@Provides` contributions over broad constructor rewrites in `utilities`. If Story 1 introduces a reusable injection convention plugin, this story should only apply it and add app-specific graph files.
 
 ### 3. Move `user-metrics-publisher` publish delivery onto the generated graph
 
@@ -81,7 +83,7 @@ Adopt `kotlin-inject` and `kotlin-inject-anvil` in this repository so the deskto
 
 **Expected edits:** `summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/ui/SummaryPublisherApp.kt`; new publisher adapter files under `summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/`; `summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/service/ZapierService.kt` only if a wrapper is cleaner than binding the object directly; `summary-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/tools/ui/SummaryPublisherDependenciesTest.kt` or a new focused publish-path test.
 
-**Scope:** Finish the `summary-publisher` migration by injecting the publish path and deleting the last direct production call to `ZapierService` from the UI layer.
+**Scope:** Finish the `summary-publisher` migration by injecting the publication path and deleting the last direct production call to `ZapierService` from the UI layer.
 
 **Notes:** Keep the existing `ZapierProjectSummary` payload unchanged. This should be reviewable as a behavior-preserving DI change, not a summary-formatting change.
 

@@ -34,19 +34,27 @@ class EngHubDependenciesTest {
         val notificationService = GitHubNotificationService(fakeGitHubApi)
         val fakeGitWorktreeApi = RecordingGitWorktreeApi()
         val fakeDesktopLauncher = RecordingDesktopLauncher()
-        val dependencies = EngHubDependencies(
+        val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
             gitHubApi = fakeGitHubApi,
             gitHubNotificationService = notificationService,
             gitWorktreeApi = fakeGitWorktreeApi,
             desktopLauncher = fakeDesktopLauncher,
+            config = config,
         )
 
         val viewModel = loadEngHubViewModel(
-            loadConfig = { config },
-            loadGitHubApiConfig = { gitHubApiConfig },
-            dependencyProvider = { providedGitHubApiConfig ->
+            loadConfig = {
+                config
+            },
+            loadGitHubApiConfig = {
+                gitHubApiConfig
+            },
+            componentFactory = { providedConfig, providedGitHubApiConfig ->
+                assertEquals(config, providedConfig)
                 assertEquals(gitHubApiConfig, providedGitHubApiConfig)
-                dependencies
+                object : EngHubComponent(providedConfig, providedGitHubApiConfig) {
+                    override val viewModel = providedViewModel
+                }
             },
         )
 

@@ -5,6 +5,7 @@ val engHubPackageName = "eng-hub"
 
 plugins {
     id("devlake.kotlin-multiplatform-compose-conventions")
+    id("devlake.kotlin-inject-conventions")
 }
 
 kotlin {
