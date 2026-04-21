@@ -1,16 +1,15 @@
 package com.github.karlsabo.devlake.metrics.ui
 
-import com.github.karlsabo.devlake.metrics.UserMetricMessagePublisher
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherComponent
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherDependencies
-import com.github.karlsabo.devlake.metrics.UserMetricPublisherPreviewDependencies
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherState
-import com.github.karlsabo.devlake.metrics.UserMetricsBuilder
 import com.github.karlsabo.devlake.metrics.loadUserMetricPublisherDependencies
 import com.github.karlsabo.devlake.metrics.model.UserMetrics
 import com.github.karlsabo.devlake.metrics.model.toSlackMarkdown
 import com.github.karlsabo.devlake.metrics.service.SlackMessage
+import com.github.karlsabo.devlake.metrics.service.UserMetricMessagePublisherService
+import com.github.karlsabo.devlake.metrics.service.UserMetricsService
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.CheckRunSummary
@@ -30,6 +29,7 @@ import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.projectmanagement.ProjectMilestone
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
+import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -52,23 +52,21 @@ class UserMetricPublisherDependenciesTest {
         val linearApiConfig = LinearApiRestConfig(token = "linear-token")
         val gitHubApiConfig = GitHubApiRestConfig(token = "github-token")
         val dependencies = testDependencies(
-            previewDependencies = UserMetricPublisherPreviewDependencies(
-                usersConfig = usersConfig,
-                projectManagementApi = NoOpProjectManagementApi(),
-                gitHubApi = NoOpGitHubApi(),
-                metricsBuilder = RecordingMetricsBuilder(
-                    UserMetrics(
-                        userId = "user-1",
-                        email = "user-1@example.com",
-                        pullRequestsPastWeek = emptyList(),
-                        pullRequestsYearToDateCount = 0u,
-                        prReviewCountYtd = 0u,
-                        issuesClosedLastWeek = emptyList(),
-                        issuesClosedYearToDateCount = 0u,
-                    ),
+            usersConfig = usersConfig,
+            projectManagementApi = NoOpProjectManagementApi(),
+            gitHubApi = NoOpGitHubApi(),
+            metricsService = RecordingMetricsService(
+                UserMetrics(
+                    userId = "user-1",
+                    email = "user-1@example.com",
+                    pullRequestsPastWeek = emptyList(),
+                    pullRequestsYearToDateCount = 0u,
+                    prReviewCountYtd = 0u,
+                    issuesClosedLastWeek = emptyList(),
+                    issuesClosedYearToDateCount = 0u,
                 ),
             ),
-            messagePublisher = NoOpMessagePublisher,
+            messagePublisherService = NoOpMessagePublisherService(config),
         )
 
         val loadedDependencies = loadUserMetricPublisherDependencies(
@@ -96,6 +94,39 @@ class UserMetricPublisherDependenciesTest {
     }
 
     @Test
+    fun loadUserMetricPublisherDependenciesExposesDirectDependencies() {
+        val usersConfig = UsersConfig(emptyList())
+        val projectManagementApi = NoOpProjectManagementApi()
+        val gitHubApi = NoOpGitHubApi()
+        val metricsService = RecordingMetricsService(
+            UserMetrics(
+                userId = "user-1",
+                email = "user-1@example.com",
+                pullRequestsPastWeek = emptyList(),
+                pullRequestsYearToDateCount = 0u,
+                prReviewCountYtd = 0u,
+                issuesClosedLastWeek = emptyList(),
+                issuesClosedYearToDateCount = 0u,
+            ),
+        )
+        val messagePublisherService = NoOpMessagePublisherService(UserMetricPublisherConfig())
+
+        val dependencies = UserMetricPublisherDependencies(
+            usersConfig = usersConfig,
+            projectManagementApi = projectManagementApi,
+            gitHubApi = gitHubApi,
+            metricsService = metricsService,
+            messagePublisherService = messagePublisherService,
+        )
+
+        assertSame(usersConfig, dependencies.usersConfig)
+        assertSame(projectManagementApi, dependencies.projectManagementApi)
+        assertSame(gitHubApi, dependencies.gitHubApi)
+        assertSame(metricsService, dependencies.metricsService)
+        assertSame(messagePublisherService, dependencies.messagePublisherService)
+    }
+
+    @Test
     fun loadMetricsPreviewUsesGeneratedDependencies() = runBlocking {
         val user = User(
             id = "user-1",
@@ -119,15 +150,13 @@ class UserMetricPublisherDependenciesTest {
             issuesClosedLastWeek = emptyList(),
             issuesClosedYearToDateCount = 8u,
         )
-        val recordingBuilder = RecordingMetricsBuilder(expectedMetrics)
+        val recordingMetricsService = RecordingMetricsService(expectedMetrics)
         val dependencies = testDependencies(
-            previewDependencies = UserMetricPublisherPreviewDependencies(
-                usersConfig = UsersConfig(listOf(user)),
-                projectManagementApi = fakeProjectManagementApi,
-                gitHubApi = fakeGitHubApi,
-                metricsBuilder = recordingBuilder,
-            ),
-            messagePublisher = NoOpMessagePublisher,
+            usersConfig = UsersConfig(listOf(user)),
+            projectManagementApi = fakeProjectManagementApi,
+            gitHubApi = fakeGitHubApi,
+            metricsService = recordingMetricsService,
+            messagePublisherService = NoOpMessagePublisherService(config),
         )
         val state = UserMetricPublisherState()
 
@@ -143,12 +172,12 @@ class UserMetricPublisherDependenciesTest {
 
         assertEquals(config, state.config)
         assertSame(dependencies, state.dependencies)
-        assertSame(NoOpMessagePublisher, state.dependencies?.messagePublisher)
+        assertSame(dependencies.messagePublisherService, state.dependencies?.messagePublisherService)
         assertEquals(listOf(expectedMetrics), state.metrics)
-        assertEquals(listOf(user.id), recordingBuilder.requestedUserIds)
-        assertEquals(listOf(config.organizationIds), recordingBuilder.requestedOrganizationIds)
-        assertSame(fakeProjectManagementApi, recordingBuilder.projectManagementApi)
-        assertSame(fakeGitHubApi, recordingBuilder.gitHubApi)
+        assertEquals(listOf(user.id), recordingMetricsService.requestedUserIds)
+        assertEquals(listOf(config.organizationIds), recordingMetricsService.requestedOrganizationIds)
+        assertSame(fakeProjectManagementApi, recordingMetricsService.projectManagementApi)
+        assertSame(fakeGitHubApi, recordingMetricsService.gitHubApi)
         assertEquals(
             buildString {
                 appendLine()
@@ -159,6 +188,64 @@ class UserMetricPublisherDependenciesTest {
             },
             state.metricsPreviewText,
         )
+    }
+
+    @Test
+    fun loadConfigurationCreatesDefaultConfigWhenConfigLoadingFailsAndFileIsMissing() {
+        val configFilePath = Path("/tmp/user-metrics-publisher-config.json")
+        val createdConfigs = mutableListOf<UserMetricPublisherConfig>()
+        val state = UserMetricPublisherState()
+
+        loadConfiguration(
+            state = state,
+            configFilePath = configFilePath,
+            loadConfig = { throw IllegalStateException("missing config") },
+            loadDependencies = { error("Dependencies should not load when config loading fails") },
+            configFileExists = { false },
+            saveDefaultConfig = { createdConfigs += it },
+        )
+
+        assertEquals(false, state.isLoadingConfig)
+        assertEquals(true, state.isDisplayErrorDialog)
+        assertEquals(
+            buildConfigurationErrorMessage(
+                error = IllegalStateException("missing config"),
+                configFilePath = configFilePath,
+            ),
+            state.errorMessage,
+        )
+        assertEquals(listOf(UserMetricPublisherConfig()), createdConfigs)
+    }
+
+    @Test
+    fun loadConfigurationDoesNotCreateDefaultConfigWhenDependenciesFail() {
+        val configFilePath = Path("/tmp/user-metrics-publisher-config.json")
+        val createdConfigs = mutableListOf<UserMetricPublisherConfig>()
+        val config = UserMetricPublisherConfig(zapierMetricUrl = "https://hooks.example.com/metrics")
+        val state = UserMetricPublisherState()
+
+        loadConfiguration(
+            state = state,
+            configFilePath = configFilePath,
+            loadConfig = { config },
+            loadDependencies = {
+                throw IllegalStateException("dependency failure")
+            },
+            configFileExists = { false },
+            saveDefaultConfig = { createdConfigs += it },
+        )
+
+        assertEquals(false, state.isLoadingConfig)
+        assertEquals(true, state.isDisplayErrorDialog)
+        assertEquals(
+            buildDependenciesErrorMessage(
+                error = IllegalStateException("dependency failure"),
+                configFilePath = configFilePath,
+            ),
+            state.errorMessage,
+        )
+        assertEquals(emptyList(), createdConfigs)
+        assertEquals(config, state.config)
     }
 
     @Test
@@ -181,17 +268,15 @@ class UserMetricPublisherDependenciesTest {
             issuesClosedLastWeek = emptyList(),
             issuesClosedYearToDateCount = 9u,
         )
-        val recordingPublisher = RecordingMessagePublisher()
+        val recordingPublisher = RecordingMessagePublisherService()
         val state = UserMetricPublisherState().apply {
             config = UserMetricPublisherConfig(metricInformationPostfix = "Configured postfix")
             dependencies = testDependencies(
-                previewDependencies = UserMetricPublisherPreviewDependencies(
-                    usersConfig = UsersConfig(emptyList()),
-                    projectManagementApi = NoOpProjectManagementApi(),
-                    gitHubApi = NoOpGitHubApi(),
-                    metricsBuilder = RecordingMetricsBuilder(metricOne),
-                ),
-                messagePublisher = recordingPublisher,
+                usersConfig = UsersConfig(emptyList()),
+                projectManagementApi = NoOpProjectManagementApi(),
+                gitHubApi = NoOpGitHubApi(),
+                metricsService = RecordingMetricsService(metricOne),
+                messagePublisherService = recordingPublisher,
             )
             metrics = listOf(metricOne, metricTwo)
         }
@@ -248,17 +333,15 @@ class UserMetricPublisherDependenciesTest {
             issuesClosedLastWeek = emptyList(),
             issuesClosedYearToDateCount = 10u,
         )
-        val recordingPublisher = RecordingMessagePublisher(results = listOf(true, false, true))
+        val recordingPublisher = RecordingMessagePublisherService(results = listOf(true, false, true))
         val state = UserMetricPublisherState().apply {
             config = UserMetricPublisherConfig(metricInformationPostfix = "Configured postfix")
             dependencies = testDependencies(
-                previewDependencies = UserMetricPublisherPreviewDependencies(
-                    usersConfig = UsersConfig(emptyList()),
-                    projectManagementApi = NoOpProjectManagementApi(),
-                    gitHubApi = NoOpGitHubApi(),
-                    metricsBuilder = RecordingMetricsBuilder(metricOne),
-                ),
-                messagePublisher = recordingPublisher,
+                usersConfig = UsersConfig(emptyList()),
+                projectManagementApi = NoOpProjectManagementApi(),
+                gitHubApi = NoOpGitHubApi(),
+                metricsService = RecordingMetricsService(metricOne),
+                messagePublisherService = recordingPublisher,
             )
             metrics = listOf(metricOne, metricTwo, metricThree)
         }
@@ -325,13 +408,11 @@ class UserMetricPublisherDependenciesTest {
         val state = UserMetricPublisherState().apply {
             config = UserMetricPublisherConfig(metricInformationPostfix = "Configured postfix")
             dependencies = testDependencies(
-                previewDependencies = UserMetricPublisherPreviewDependencies(
-                    usersConfig = UsersConfig(emptyList()),
-                    projectManagementApi = NoOpProjectManagementApi(),
-                    gitHubApi = NoOpGitHubApi(),
-                    metricsBuilder = RecordingMetricsBuilder(metricOne),
-                ),
-                messagePublisher = recordingPublisher,
+                usersConfig = UsersConfig(emptyList()),
+                projectManagementApi = NoOpProjectManagementApi(),
+                gitHubApi = NoOpGitHubApi(),
+                metricsService = RecordingMetricsService(metricOne),
+                messagePublisherService = recordingPublisher,
             )
             metrics = listOf(metricOne, metricTwo, metricThree)
         }
@@ -367,18 +448,24 @@ class UserMetricPublisherDependenciesTest {
 }
 
 private fun testDependencies(
-    previewDependencies: UserMetricPublisherPreviewDependencies,
-    messagePublisher: UserMetricMessagePublisher,
+    usersConfig: UsersConfig,
+    projectManagementApi: ProjectManagementApi,
+    gitHubApi: GitHubApi,
+    metricsService: UserMetricsService,
+    messagePublisherService: UserMetricMessagePublisherService,
 ): UserMetricPublisherDependencies {
     return UserMetricPublisherDependencies(
-        previewDependencies = previewDependencies,
-        messagePublisher = messagePublisher,
+        usersConfig = usersConfig,
+        projectManagementApi = projectManagementApi,
+        gitHubApi = gitHubApi,
+        metricsService = metricsService,
+        messagePublisherService = messagePublisherService,
     )
 }
 
-private class RecordingMetricsBuilder(
+private class RecordingMetricsService(
     private val metrics: UserMetrics,
-) : UserMetricsBuilder {
+) : UserMetricsService() {
     val requestedUserIds = mutableListOf<String>()
     val requestedOrganizationIds = mutableListOf<List<String>>()
     var projectManagementApi: ProjectManagementApi? = null
@@ -400,10 +487,12 @@ private class RecordingMetricsBuilder(
     }
 }
 
-private class RecordingMessagePublisher : UserMetricMessagePublisher {
-    constructor() : this(emptyList())
+private open class RecordingMessagePublisherService(
+    config: UserMetricPublisherConfig,
+) : UserMetricMessagePublisherService(config) {
+    constructor() : this(UserMetricPublisherConfig())
 
-    constructor(results: List<Boolean>) {
+    constructor(results: List<Boolean>, config: UserMetricPublisherConfig = UserMetricPublisherConfig()) : this(config) {
         remainingResults.addAll(results)
     }
 
@@ -420,13 +509,15 @@ private class RecordingMessagePublisher : UserMetricMessagePublisher {
     }
 }
 
-private object NoOpMessagePublisher : UserMetricMessagePublisher {
+private class NoOpMessagePublisherService(
+    config: UserMetricPublisherConfig,
+) : UserMetricMessagePublisherService(config) {
     override suspend fun publishMessage(message: SlackMessage): Boolean = true
 }
 
 private class ThrowingMessagePublisher(
     private val throwOnCallNumbers: Set<Int>,
-) : UserMetricMessagePublisher {
+) : UserMetricMessagePublisherService(UserMetricPublisherConfig()) {
     val messages = mutableListOf<SlackMessage>()
     private var callCount = 0
 

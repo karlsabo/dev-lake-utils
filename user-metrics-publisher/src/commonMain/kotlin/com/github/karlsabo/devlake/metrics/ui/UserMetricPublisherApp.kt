@@ -18,11 +18,14 @@ import com.github.karlsabo.devlake.metrics.saveUserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.service.SlackMessage
 import com.github.karlsabo.devlake.metrics.ui.components.ErrorDialog
 import com.github.karlsabo.devlake.metrics.userMetricPublisherConfigPath
+import com.github.karlsabo.system.DesktopAppBootstrapResult
+import com.github.karlsabo.system.runDesktopAppBootstrap
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlin.time.measureTime
 
@@ -76,26 +79,74 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
 
 internal fun loadConfiguration(
     state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState,
+    configFilePath: Path = userMetricPublisherConfigPath,
     loadConfig: () -> UserMetricPublisherConfig = ::loadUserMetricPublisherConfig,
     loadDependencies: (UserMetricPublisherConfig) -> UserMetricPublisherDependencies =
         ::loadUserMetricPublisherDependencies,
+    configFileExists: (Path) -> Boolean = SystemFileSystem::exists,
+    saveDefaultConfig: (UserMetricPublisherConfig) -> Unit = ::saveUserMetricPublisherConfig,
 ) {
-    logger.info { "Loading configuration" }
-    try {
-        state.config = loadConfig()
-        state.dependencies = loadDependencies(state.config)
-        state.isLoadingConfig = false
-        logger.info { "Config = ${state.config}" }
-    } catch (error: Exception) {
-        state.errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
-                "Please update the configuration file:\n${userMetricPublisherConfigPath}."
-        logger.error { state.errorMessage }
-        if (!SystemFileSystem.exists(userMetricPublisherConfigPath)) {
-            saveUserMetricPublisherConfig(UserMetricPublisherConfig())
+    when (
+        val result = runDesktopAppBootstrap(
+            logger = logger,
+            description = "configuration $configFilePath",
+            load = loadConfig,
+            buildErrorMessage = { error ->
+                buildConfigurationErrorMessage(
+                    error = error,
+                    configFilePath = configFilePath,
+                )
+            },
+        )
+    ) {
+        is DesktopAppBootstrapResult.Loaded -> {
+            logger.info { "Loading configuration dependencies" }
+            try {
+                state.config = result.value
+                state.dependencies = loadDependencies(result.value)
+                state.errorMessage = ""
+                state.isDisplayErrorDialog = false
+                state.isLoadingConfig = false
+                logger.info { "Config = ${state.config}" }
+            } catch (error: Exception) {
+                state.dependencies = null
+                state.errorMessage = buildDependenciesErrorMessage(
+                    error = error,
+                    configFilePath = configFilePath,
+                )
+                logger.error(error) { state.errorMessage }
+                state.isDisplayErrorDialog = true
+                state.isLoadingConfig = false
+            }
         }
-        state.isDisplayErrorDialog = true
-        state.isLoadingConfig = false
+
+        is DesktopAppBootstrapResult.Failed -> {
+            state.dependencies = null
+            state.errorMessage = result.errorMessage
+            logger.error { state.errorMessage }
+            if (!configFileExists(configFilePath)) {
+                saveDefaultConfig(UserMetricPublisherConfig())
+            }
+            state.isDisplayErrorDialog = true
+            state.isLoadingConfig = false
+        }
     }
+}
+
+internal fun buildConfigurationErrorMessage(
+    error: Exception,
+    configFilePath: Path = userMetricPublisherConfigPath,
+): String {
+    return "Failed to load configuration: $error.\nCreating new configuration.\n" +
+        "Please update the configuration file:\n$configFilePath."
+}
+
+internal fun buildDependenciesErrorMessage(
+    error: Exception,
+    configFilePath: Path = userMetricPublisherConfigPath,
+): String {
+    return "Failed to load dependencies: $error.\n" +
+        "Please update the configuration file:\n$configFilePath."
 }
 
 internal suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState) {
@@ -109,7 +160,7 @@ internal suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.User
                 measureTime {
                     val user = dependencies.usersConfig.users.firstOrNull { it.id == userId }
                         ?: throw Exception("User not found: $userId")
-                    userMetrics = dependencies.metricsBuilder.createUserMetrics(
+                    userMetrics = dependencies.metricsService.createUserMetrics(
                         user,
                         state.config.organizationIds,
                         dependencies.projectManagementApi,
@@ -138,7 +189,7 @@ internal suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.User
 
 internal suspend fun publishMetrics(state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState) {
     logger.info { "Publishing metrics" }
-    val messagePublisher = requireNotNull(state.dependencies?.messagePublisher) {
+    val messagePublisherService = requireNotNull(state.dependencies?.messagePublisherService) {
         "User metric publisher dependencies must be loaded before publishing metrics"
     }
 
@@ -154,7 +205,7 @@ internal suspend fun publishMetrics(state: com.github.karlsabo.devlake.metrics.U
                     state.config.metricInformationPostfix
         )
         val publishSucceeded = runCatching {
-            messagePublisher.publishMessage(message)
+            messagePublisherService.publishMessage(message)
         }.getOrElse { error ->
             logger.error(error) { "Failed to publish metrics for ${metric.userId}" }
             false

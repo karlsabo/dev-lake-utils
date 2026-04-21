@@ -7,12 +7,32 @@ import com.github.karlsabo.tools.gitHubConfigPath
 
 internal typealias EngHubComponentFactory = (EngHubConfig, GitHubApiRestConfig) -> EngHubComponent
 
+internal data class LoadedEngHubDependencies(
+    val config: EngHubConfig,
+    val viewModel: EngHubViewModel,
+)
+
+internal fun loadEngHubDependencies(
+    loadConfig: () -> EngHubConfig = ::loadEngHubConfig,
+    loadGitHubApiConfig: () -> GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) },
+    componentFactory: EngHubComponentFactory = ::createEngHubComponent,
+): LoadedEngHubDependencies {
+    val config = loadConfig()
+    val gitHubApiConfig = loadGitHubApiConfig()
+    return LoadedEngHubDependencies(
+        config = config,
+        viewModel = componentFactory(config, gitHubApiConfig).viewModel,
+    )
+}
+
 internal fun loadEngHubViewModel(
     loadConfig: () -> EngHubConfig = ::loadEngHubConfig,
     loadGitHubApiConfig: () -> GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) },
     componentFactory: EngHubComponentFactory = ::createEngHubComponent,
 ): EngHubViewModel {
-    val config = loadConfig()
-    val gitHubApiConfig = loadGitHubApiConfig()
-    return componentFactory(config, gitHubApiConfig).viewModel
+    return loadEngHubDependencies(
+        loadConfig = loadConfig,
+        loadGitHubApiConfig = loadGitHubApiConfig,
+        componentFactory = componentFactory,
+    ).viewModel
 }

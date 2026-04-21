@@ -1,7 +1,5 @@
 package com.github.karlsabo.devlake.tools
 
-import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
-import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubRestApi
@@ -20,32 +18,24 @@ import com.github.karlsabo.text.TextSummarizerOpenAi
 import com.github.karlsabo.text.TextSummarizerOpenAiConfig
 import com.github.karlsabo.text.loadTextSummarizerOpenAiNoSecrets
 import com.github.karlsabo.text.toTextSummarizerOpenAiConfig
-import com.github.karlsabo.tools.createSummary
 import com.github.karlsabo.tools.gitHubConfigPath
 import com.github.karlsabo.tools.linearConfigPath
 import com.github.karlsabo.tools.loadUsersConfig
 import com.github.karlsabo.tools.pagerDutyConfigPath
 import com.github.karlsabo.tools.textSummarizerConfigPath
+import com.github.karlsabo.devlake.tools.service.SummaryBuilderService
+import com.github.karlsabo.devlake.tools.service.SummaryMessagePublisherService
 import me.tatarka.inject.annotations.Inject
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
 import software.amazon.lastmile.kotlin.inject.anvil.MergeComponent
 import software.amazon.lastmile.kotlin.inject.anvil.MergeComponent.CreateComponent
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
-import kotlin.time.Duration.Companion.days
 
 data class SummaryPublisherDependencies @Inject constructor(
-    val summaryBuilder: SummaryBuilder,
-    val summaryPublisher: SummaryMessagePublisher,
+    val summaryBuilder: SummaryBuilderService,
+    val summaryPublisher: SummaryMessagePublisherService,
 )
-
-fun interface SummaryBuilder {
-    suspend fun createSummary(): MultiProjectSummary
-}
-
-fun interface SummaryMessagePublisher {
-    suspend fun publishSummary(summary: ZapierProjectSummary): Boolean
-}
 
 object SummaryPublisherScope
 
@@ -68,42 +58,6 @@ interface SummaryPublisherBindings {
     @Provides
     fun provideTextSummarizer(textSummarizerConfig: TextSummarizerOpenAiConfig): TextSummarizer {
         return TextSummarizerOpenAi(textSummarizerConfig)
-    }
-
-    @Provides
-    fun provideSummaryBuilder(
-        config: SummaryPublisherConfig,
-        usersConfig: UsersConfig,
-        projectManagementApi: ProjectManagementApi,
-        gitHubApi: GitHubApi,
-        pagerDutyApi: PagerDutyApi,
-        textSummarizer: TextSummarizer,
-    ): SummaryBuilder {
-        val miscUsers = config.miscUserIds.map { userId ->
-            usersConfig.users.first { it.id == userId }
-        }
-
-        return SummaryBuilder {
-            createSummary(
-                projectManagementApi = projectManagementApi,
-                gitHubApi = gitHubApi,
-                gitHubOrganizationIds = config.gitHubOrganizationIds,
-                pagerDutyApi = if (config.pagerDutyServiceIds.isNotEmpty()) pagerDutyApi else null,
-                pagerDutyServiceIds = config.pagerDutyServiceIds,
-                textSummarizer = textSummarizer,
-                projects = config.projects,
-                duration = 7.days,
-                users = usersConfig.users,
-                miscUsers = miscUsers,
-                summaryName = config.summaryName,
-                isMiscellaneousProjectIncluded = config.isMiscellaneousProjectIncluded,
-            )
-        }
-    }
-
-    @Provides
-    fun provideSummaryPublisher(zapierSummaryPublisher: ZapierSummaryPublisher): SummaryMessagePublisher {
-        return zapierSummaryPublisher
     }
 }
 

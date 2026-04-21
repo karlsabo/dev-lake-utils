@@ -19,6 +19,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 
 class EngHubDependenciesTest {
 
@@ -76,6 +77,39 @@ class EngHubDependenciesTest {
 
         viewModel.markNotificationDone("thread-1")
         assertEquals(listOf("thread-1"), fakeGitHubApi.markedDoneThreadIds.awaitValue())
+    }
+
+    @Test
+    fun loadEngHubDependenciesReturnsConfigAndViewModel() {
+        val config = EngHubConfig(
+            organizationIds = listOf("test-org"),
+            repositoriesBaseDir = "/tmp/repos",
+            gitHubAuthor = "test-user",
+        )
+        val gitHubApiConfig = GitHubApiRestConfig(token = "test-token")
+        val fakeGitHubApi = RecordingGitHubApi()
+        val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
+            gitHubApi = fakeGitHubApi,
+            gitHubNotificationService = GitHubNotificationService(fakeGitHubApi),
+            gitWorktreeApi = RecordingGitWorktreeApi(),
+            desktopLauncher = RecordingDesktopLauncher(),
+            config = config,
+        )
+
+        val loadedDependencies = loadEngHubDependencies(
+            loadConfig = { config },
+            loadGitHubApiConfig = { gitHubApiConfig },
+            componentFactory = { providedConfig, providedGitHubApiConfig ->
+                assertEquals(config, providedConfig)
+                assertEquals(gitHubApiConfig, providedGitHubApiConfig)
+                object : EngHubComponent(providedConfig, providedGitHubApiConfig) {
+                    override val viewModel = providedViewModel
+                }
+            },
+        )
+
+        assertEquals(config, loadedDependencies.config)
+        assertSame(providedViewModel, loadedDependencies.viewModel)
     }
 }
 

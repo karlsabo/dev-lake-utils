@@ -14,6 +14,8 @@ import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
 import com.github.karlsabo.devlake.enghub.screen.EngHubScreen
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
+import com.github.karlsabo.system.DesktopAppBootstrapResult
+import com.github.karlsabo.system.runDesktopAppBootstrap
 import dev_lake_utils.shared_resources.generated.resources.Res
 import dev_lake_utils.shared_resources.generated.resources.icon
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -30,20 +32,29 @@ fun EngHub(onExitApplication: () -> Unit) {
     var viewModel by remember { mutableStateOf<EngHubViewModel?>(null) }
 
     LaunchedEffect(Unit) {
-        logger.info { "Loading configuration" }
-        try {
-            viewModel = loadEngHubViewModel()
-            isLoadingConfiguration = false
-            logger.info { "Configuration loaded" }
-        } catch (error: Exception) {
-            errorMessage = "Failed to load configuration: $error.\nCreating new configuration.\n" +
-                    "Please update the configuration file:\n$engHubConfigPath."
-            logger.error { errorMessage }
-            if (!SystemFileSystem.exists(engHubConfigPath)) {
-                saveEngHubConfig(EngHubConfig())
+        when (
+            val result = runDesktopAppBootstrap(
+                logger = logger,
+                description = "EngHub configuration $engHubConfigPath",
+                load = ::loadEngHubDependencies,
+                buildErrorMessage = ::buildEngHubConfigurationErrorMessage,
+            )
+        ) {
+            is DesktopAppBootstrapResult.Loaded -> {
+                viewModel = result.value.viewModel
+                isLoadingConfiguration = false
+                logger.info { "Configuration loaded" }
             }
-            isDisplayErrorDialog = true
-            isLoadingConfiguration = false
+
+            is DesktopAppBootstrapResult.Failed -> {
+                errorMessage = result.errorMessage
+                logger.error { errorMessage }
+                if (!SystemFileSystem.exists(engHubConfigPath)) {
+                    saveEngHubConfig(EngHubConfig())
+                }
+                isDisplayErrorDialog = true
+                isLoadingConfiguration = false
+            }
         }
     }
 
@@ -70,4 +81,9 @@ fun EngHub(onExitApplication: () -> Unit) {
             EngHubScreen(viewModel = vm)
         }
     }
+}
+
+private fun buildEngHubConfigurationErrorMessage(error: Exception): String {
+    return "Failed to load configuration: $error.\nCreating new configuration.\n" +
+        "Please update the configuration file:\n$engHubConfigPath."
 }

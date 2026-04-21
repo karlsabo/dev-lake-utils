@@ -2,6 +2,8 @@ package com.github.karlsabo.devlake.metrics
 
 import com.github.karlsabo.devlake.metrics.model.UserMetrics
 import com.github.karlsabo.devlake.metrics.service.SlackMessage
+import com.github.karlsabo.devlake.metrics.service.UserMetricMessagePublisherService
+import com.github.karlsabo.devlake.metrics.service.UserMetricsService
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
@@ -16,41 +18,12 @@ import com.github.karlsabo.tools.loadUsersConfig
 import me.tatarka.inject.annotations.Inject
 
 data class UserMetricPublisherDependencies @Inject constructor(
-    val previewDependencies: UserMetricPublisherPreviewDependencies,
-    val messagePublisher: UserMetricMessagePublisher,
-) {
-    val usersConfig: UsersConfig
-        get() = previewDependencies.usersConfig
-
-    val projectManagementApi: ProjectManagementApi
-        get() = previewDependencies.projectManagementApi
-
-    val gitHubApi: GitHubApi
-        get() = previewDependencies.gitHubApi
-
-    val metricsBuilder: UserMetricsBuilder
-        get() = previewDependencies.metricsBuilder
-}
-
-data class UserMetricPublisherPreviewDependencies @Inject constructor(
     val usersConfig: UsersConfig,
     val projectManagementApi: ProjectManagementApi,
     val gitHubApi: GitHubApi,
-    val metricsBuilder: UserMetricsBuilder,
+    val metricsService: UserMetricsService,
+    val messagePublisherService: UserMetricMessagePublisherService,
 )
-
-fun interface UserMetricsBuilder {
-    suspend fun createUserMetrics(
-        user: User,
-        organizationIds: List<String>,
-        projectManagementApi: ProjectManagementApi,
-        gitHubApi: GitHubApi,
-    ): UserMetrics
-}
-
-fun interface UserMetricMessagePublisher {
-    suspend fun publishMessage(message: SlackMessage): Boolean
-}
 
 internal typealias UserMetricPublisherComponentFactory = (
     UserMetricPublisherConfig,

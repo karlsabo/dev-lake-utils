@@ -11,7 +11,6 @@
 
 # TODO
 
-* [ ] Add dependency injection
 * [ ] Add DB storage for unsubscribed notifications
 * [ ] Can we write UI tests?
     * Can an LLM execute some manual UI-driven tests?

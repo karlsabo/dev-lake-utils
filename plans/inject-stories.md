@@ -11,6 +11,11 @@
 - Tests already inject fake loaders or fake component factories rather than relying on generated DI code, which is a good base for this cleanup: [eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependenciesTest.kt](/Users/karl.sabo/git/dev-lake-utils/eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependenciesTest.kt:25), [summary-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/tools/ui/SummaryPublisherDependenciesTest.kt](/Users/karl.sabo/git/dev-lake-utils/summary-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/tools/ui/SummaryPublisherDependenciesTest.kt:30), [user-metrics-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherDependenciesTest.kt](/Users/karl.sabo/git/dev-lake-utils/user-metrics-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherDependenciesTest.kt:39).
 - Constraint: this plan keeps DI. No story should remove `kotlin-inject`, Anvil, or the app components defined under `buildSrc/src/main/kotlin/devlake.kotlin-inject-conventions.gradle.kts` and the app component files above.
 
+## Planning Review Status
+
+- Stories 2-7 completed a planning + skeptical review pass on **2026-04-20**.
+- All stories in this plan are now implemented in the workspace.
+
 ## Acceptance Tests
 
 1. Given `SummaryPublisherApp` starts with a missing `summary-publisher-config.json`, when startup fails, then the app still creates the same template files and shows the same error dialog, but does so through one reusable bootstrap path instead of app-specific startup code.
@@ -36,6 +41,8 @@ Status: **done 2026-04-17**
 
 ### 2. Flatten User Metrics Dependencies
 
+Status: **done 2026-04-20**
+
 **Acceptance test:** Given `UserMetricPublisherApp` loads successfully, when metrics are calculated and published, then the app still works without `previewDependencies` forwarding getters because one flat dependency object is injected and consumed directly.
 
 **Expected edits:** `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherDependencies.kt`, `user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt`, `user-metrics-publisher/src/commonTest/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherDependenciesTest.kt`.
@@ -44,7 +51,13 @@ Status: **done 2026-04-17**
 
 **Notes:** This addresses the awkward nesting at [user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherDependencies.kt](/Users/karl.sabo/git/dev-lake-utils/user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherDependencies.kt:18). Keep the user-visible metric preview and publish behavior unchanged, as exercised by [user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt](/Users/karl.sabo/git/dev-lake-utils/user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt:101).
 
+**Implementation dependency:** Can start now.
+
+**Parallelism:** Safe to run in parallel with Story 4 and Story 6.
+
 ### 3. Migrate User Metrics Publisher To Shared Bootstrap
+
+Status: **done 2026-04-20**
 
 **Acceptance test:** Given `UserMetricPublisherApp` starts with a missing config file, when startup fails, then it uses the shared bootstrap path and still creates the default config file and shows the error dialog.
 
@@ -54,7 +67,13 @@ Status: **done 2026-04-17**
 
 **Notes:** This story should come after Story 1 so the shared helper already exists, and after Story 2 so the app migrates on top of the flatter dependency shape. The current duplicated bootstrap is at [user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt](/Users/karl.sabo/git/dev-lake-utils/user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/ui/UserMetricPublisherApp.kt:77).
 
+**Implementation dependency:** Requires Story 1 and Story 2.
+
+**Parallelism:** After Story 2 lands, this can run independently of Story 4 and Story 6. Do not plan to run it in parallel with Story 5 unless the `user-metrics-publisher` write set is split more cleanly first.
+
 ### 4. Migrate Eng Hub To Shared Bootstrap
+
+Status: **done 2026-04-20**
 
 **Acceptance test:** Given `EngHub` starts with a valid config, when the app opens, then it uses the shared bootstrap pattern and still exposes the same `EngHubViewModel` behavior for opening URLs, checking out worktrees, and marking notifications done.
 
@@ -64,7 +83,13 @@ Status: **done 2026-04-17**
 
 **Notes:** This completes the bootstrap cleanup across all three apps. The current Eng Hub bootstrap is the lightest but still duplicated at [eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHub.kt](/Users/karl.sabo/git/dev-lake-utils/eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHub.kt:32). Use the existing test seam in [eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependenciesTest.kt](/Users/karl.sabo/git/dev-lake-utils/eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependenciesTest.kt:25) to preserve behavior.
 
+**Implementation dependency:** Requires Story 1 only, which is already done.
+
+**Parallelism:** Safe to run in parallel with Story 2 and Story 6.
+
 ### 5. Replace User Metrics Function Wrappers With Injected Services
+
+Status: **done 2026-04-20**
 
 **Acceptance test:** Given `UserMetricPublisherApp` calculates and publishes metrics, when DI constructs the graph, then it injects concrete application services instead of `UserMetricsBuilder` and `UserMetricMessagePublisher` function wrappers, while preserving the same preview text and publish results.
 
@@ -74,7 +99,13 @@ Status: **done 2026-04-17**
 
 **Notes:** The DI-only wrappers are created in [user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherComponent.kt](/Users/karl.sabo/git/dev-lake-utils/user-metrics-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/metrics/UserMetricPublisherComponent.kt:31). Prefer small, concrete services with explicit method names over lambdas stored inside dependency bags. This story should come after Story 2 so the dependency surface is already flat.
 
+**Implementation dependency:** Requires Story 2.
+
+**Parallelism:** After Story 2 lands, this can run independently of Story 4 and Story 6. Do not plan to run it in parallel with Story 3 unless the `user-metrics-publisher` write set is split more cleanly first.
+
 ### 6. Replace Summary Publisher Function Wrappers With Injected Services
+
+Status: **done 2026-04-20**
 
 **Acceptance test:** Given `SummaryPublisherApp` loads summaries and publishes them, when DI constructs the graph, then it injects concrete application services instead of `SummaryBuilder` and `SummaryMessagePublisher` wrappers, while preserving the same summary text and publish behavior.
 
@@ -84,7 +115,13 @@ Status: **done 2026-04-17**
 
 **Notes:** The current wrappers live in [summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/SummaryPublisherDependencies.kt](/Users/karl.sabo/git/dev-lake-utils/summary-publisher/src/commonMain/kotlin/com/github/karlsabo/devlake/tools/SummaryPublisherDependencies.kt:42). Keep `ZapierSummaryPublisher` if it remains a useful adapter, but inject a concrete publisher service rather than a wrapper interface if the interface is no longer pulling its weight.
 
+**Implementation dependency:** Can start now.
+
+**Parallelism:** Safe to run in parallel with Story 2 and Story 4.
+
 ### 7. Update README To Match The Chosen DI Direction
+
+Status: **done 2026-04-20**
 
 **Acceptance test:** Given a maintainer reads the root project docs after the cleanup lands, when they check the TODO list, then it no longer claims DI is missing.
 
@@ -93,6 +130,10 @@ Status: **done 2026-04-17**
 **Scope:** Remove or rewrite the stale `Add dependency injection` TODO. Do not broaden this into a larger docs rewrite.
 
 **Notes:** The stale note is at [README.md](/Users/karl.sabo/git/dev-lake-utils/README.md:10). Keep this story last so the docs reflect the actual end state rather than the intent mid-refactor.
+
+**Implementation dependency:** Requires Stories 2-6 to be merged first so the docs describe the settled code shape.
+
+**Parallelism:** Do not run in parallel with the code stories. Keep this as the final cleanup.
 
 ## Ordering
 
@@ -103,6 +144,12 @@ Status: **done 2026-04-17**
 5. Story 5 fifth. It removes DI-only wrappers in user-metrics-publisher after the dependency shape is flatter.
 6. Story 6 sixth. It applies the same cleanup to summary-publisher.
 7. Story 7 last. It updates docs after the code shape is settled.
+
+## Implementation Parallelism
+
+1. **Batch A after Story 1:** Story 2, Story 4, and Story 6 can run in parallel.
+2. **Batch B after Story 2:** Story 3 and Story 5 both become available, but they should be sequenced unless their `user-metrics-publisher` write sets are split more cleanly.
+3. **Batch C last:** Story 7 runs after the code stories are merged.
 
 ## Out Of Scope For This Slice
 

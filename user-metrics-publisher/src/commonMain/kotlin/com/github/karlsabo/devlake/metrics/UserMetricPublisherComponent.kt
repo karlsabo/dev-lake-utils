@@ -1,7 +1,5 @@
 package com.github.karlsabo.devlake.metrics
 
-import com.github.karlsabo.devlake.metrics.service.MetricsService
-import com.github.karlsabo.devlake.metrics.service.ZapierMetricService
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubRestApi
@@ -27,20 +25,6 @@ interface UserMetricPublisherBindings {
 
     @Provides
     fun provideGitHubApi(gitHubApiConfig: GitHubApiRestConfig): GitHubApi = GitHubRestApi(gitHubApiConfig)
-
-    @Provides
-    fun provideMetricsBuilder(): UserMetricsBuilder {
-        return UserMetricsBuilder { user, organizationIds, projectManagementApi, gitHubApi ->
-            MetricsService.createUserMetrics(user, organizationIds, projectManagementApi, gitHubApi)
-        }
-    }
-
-    @Provides
-    fun provideMessagePublisher(config: UserMetricPublisherConfig): UserMetricMessagePublisher {
-        return UserMetricMessagePublisher { message ->
-            ZapierMetricService.sendMessage(message, config.zapierMetricUrl)
-        }
-    }
 }
 
 @MergeComponent(UserMetricPublisherScope::class)

@@ -1,15 +1,15 @@
 package com.github.karlsabo.devlake.tools.ui
 
 import com.github.karlsabo.devlake.tools.ProjectSummaryHolder
-import com.github.karlsabo.devlake.tools.SummaryBuilder
-import com.github.karlsabo.devlake.tools.SummaryMessagePublisher
 import com.github.karlsabo.devlake.tools.SummaryPublisherComponent
 import com.github.karlsabo.devlake.tools.SummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.SummaryPublisherDependencies
 import com.github.karlsabo.devlake.tools.SummaryPublisherState
 import com.github.karlsabo.devlake.tools.loadSummaryPublisherDependencies
+import com.github.karlsabo.devlake.tools.service.SummaryBuilderService
+import com.github.karlsabo.devlake.tools.service.SummaryMessagePublisherService
 import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
-import com.github.karlsabo.dto.MultiProjectSummary
+import com.github.karlsabo.devlake.tools.ZapierSummaryPublisher
 import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
@@ -19,8 +19,11 @@ import com.github.karlsabo.linear.config.LinearApiRestConfig
 import com.github.karlsabo.pagerduty.PagerDutyApiRestConfig
 import com.github.karlsabo.text.TextSummarizerOpenAiConfig
 import com.github.karlsabo.tools.model.ProjectSummary
+import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.pagerduty.PagerDutyApi
+import com.github.karlsabo.projectmanagement.ProjectManagementApi
+import com.github.karlsabo.text.TextSummarizer
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.LocalDate
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -31,6 +34,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+
+private fun unexpected(): Nothing = error("unexpected call")
 
 class SummaryPublisherDependenciesTest {
 
@@ -52,8 +57,8 @@ class SummaryPublisherDependenciesTest {
         val pagerDutyApiConfig = PagerDutyApiRestConfig(apiKey = "pagerduty-token")
         val textSummarizerConfig = TextSummarizerOpenAiConfig(apiKey = "openai-token")
         val dependencies = SummaryPublisherDependencies(
-            summaryBuilder = RecordingSummaryBuilder(emptySummary()),
-            summaryPublisher = NoOpSummaryPublisher,
+            summaryBuilder = emptySummaryBuilderService(config, usersConfig),
+            summaryPublisher = summaryMessagePublisherService(config),
         )
 
         val loadedDependencies = loadSummaryPublisherDependencies(
@@ -91,6 +96,8 @@ class SummaryPublisherDependenciesTest {
         )
 
         assertSame(dependencies, loadedDependencies)
+        assertEquals(SummaryBuilderService::class, loadedDependencies.summaryBuilder::class)
+        assertEquals(SummaryMessagePublisherService::class, loadedDependencies.summaryPublisher::class)
     }
 
     @Test
@@ -98,19 +105,16 @@ class SummaryPublisherDependenciesTest {
         val config = SummaryPublisherConfig(
             summaryName = "Test Summary",
             isTerseSummaryUsed = true,
+            isMiscellaneousProjectIncluded = false,
         )
-        val expectedSummary = MultiProjectSummary(
-            startDate = LocalDate(2026, 4, 9),
-            endDate = LocalDate(2026, 4, 16),
-            summaryName = config.summaryName,
-            projectSummaries = emptyList(),
-            pagerDutyAlerts = null,
-        )
-        val recordingBuilder = RecordingSummaryBuilder(expectedSummary)
         val dependencies = SummaryPublisherDependencies(
-            summaryBuilder = recordingBuilder,
-            summaryPublisher = NoOpSummaryPublisher,
+            summaryBuilder = emptySummaryBuilderService(
+                config = config,
+                usersConfig = UsersConfig(users = emptyList()),
+            ),
+            summaryPublisher = summaryMessagePublisherService(config),
         )
+        val expectedSummary = dependencies.summaryBuilder.createSummary()
         val state = SummaryPublisherState()
 
         loadConfiguration(
@@ -127,7 +131,6 @@ class SummaryPublisherDependenciesTest {
 
         assertEquals(config, state.summaryConfig)
         assertSame(dependencies, state.dependencies)
-        assertEquals(1, recordingBuilder.callCount)
         assertEquals(expectedSummary.toTerseSlackMarkup(), state.topLevelSummary)
         assertEquals(emptyList(), state.projectSummaries)
         assertEquals(false, state.isLoadingSummary)
@@ -211,11 +214,12 @@ class SummaryPublisherDependenciesTest {
 
     @Test
     fun publishSummaryUsesInjectedPublisher() = runBlocking {
-        val recordingPublisher = RecordingSummaryPublisher()
+        val recordingPublisher = RecordingZapierSummaryPublisher()
+        val summaryPublisher = SummaryMessagePublisherService(recordingPublisher)
         val state = SummaryPublisherState().apply {
             dependencies = SummaryPublisherDependencies(
-                summaryBuilder = RecordingSummaryBuilder(emptySummary()),
-                summaryPublisher = recordingPublisher,
+                summaryBuilder = emptySummaryBuilderService(),
+                summaryPublisher = summaryPublisher,
             )
             topLevelSummary = "Top level summary"
             projectSummaries = listOf(
@@ -248,11 +252,12 @@ class SummaryPublisherDependenciesTest {
 
     @Test
     fun publishSummaryReportsFailureWhenPublisherReturnsFalse() = runBlocking {
-        val recordingPublisher = RecordingSummaryPublisher(results = listOf(false))
+        val recordingPublisher = RecordingZapierSummaryPublisher(results = listOf(false))
+        val summaryPublisher = SummaryMessagePublisherService(recordingPublisher)
         val state = SummaryPublisherState().apply {
             dependencies = SummaryPublisherDependencies(
-                summaryBuilder = RecordingSummaryBuilder(emptySummary()),
-                summaryPublisher = recordingPublisher,
+                summaryBuilder = emptySummaryBuilderService(),
+                summaryPublisher = summaryPublisher,
             )
             topLevelSummary = "Top level summary"
             projectSummaries = listOf(
@@ -281,11 +286,12 @@ class SummaryPublisherDependenciesTest {
 
     @Test
     fun publishSummaryReportsFailureWhenPublisherThrows() = runBlocking {
-        val recordingPublisher = ThrowingSummaryPublisher()
+        val recordingPublisher = RecordingZapierSummaryPublisher(shouldThrow = true)
+        val summaryPublisher = SummaryMessagePublisherService(recordingPublisher)
         val state = SummaryPublisherState().apply {
             dependencies = SummaryPublisherDependencies(
-                summaryBuilder = RecordingSummaryBuilder(emptySummary()),
-                summaryPublisher = recordingPublisher,
+                summaryBuilder = emptySummaryBuilderService(),
+                summaryPublisher = summaryPublisher,
             )
             topLevelSummary = "Top level summary"
             projectSummaries = listOf(
@@ -312,29 +318,41 @@ class SummaryPublisherDependenciesTest {
         assertEquals(false, state.isSendingSlackMessage)
     }
 
-    private class RecordingSummaryBuilder(
-        private val summary: MultiProjectSummary,
-    ) : SummaryBuilder {
-        var callCount = 0
-
-        override suspend fun createSummary(): MultiProjectSummary {
-            callCount += 1
-            return summary
-        }
+    private fun emptySummaryBuilderService(
+        config: SummaryPublisherConfig = SummaryPublisherConfig(),
+        usersConfig: UsersConfig = UsersConfig(users = emptyList()),
+    ): SummaryBuilderService {
+        return SummaryBuilderService(
+            config = config,
+            usersConfig = usersConfig,
+            projectManagementApi = NoOpProjectManagementApi,
+            gitHubApi = NoOpGitHubApi,
+            pagerDutyApi = NoOpPagerDutyApi,
+            textSummarizer = NoOpTextSummarizer,
+        )
     }
 
-    private class RecordingSummaryPublisher : SummaryMessagePublisher {
-        constructor() : this(emptyList())
+    private fun summaryMessagePublisherService(
+        config: SummaryPublisherConfig = SummaryPublisherConfig(),
+    ): SummaryMessagePublisherService {
+        return SummaryMessagePublisherService(
+            zapierSummaryPublisher = RecordingZapierSummaryPublisher(config = config),
+        )
+    }
 
-        constructor(results: List<Boolean>) {
-            remainingResults.addAll(results)
-        }
-
+    private class RecordingZapierSummaryPublisher(
+        config: SummaryPublisherConfig = SummaryPublisherConfig(),
+        results: List<Boolean> = emptyList(),
+        private val shouldThrow: Boolean = false,
+    ) : ZapierSummaryPublisher(config) {
         val publishedSummaries = mutableListOf<ZapierProjectSummary>()
-        private val remainingResults = ArrayDeque<Boolean>()
+        private val remainingResults = ArrayDeque(results)
 
         override suspend fun publishSummary(summary: ZapierProjectSummary): Boolean {
             publishedSummaries += summary
+            if (shouldThrow) {
+                throw IllegalStateException("boom")
+            }
             return if (remainingResults.isEmpty()) {
                 true
             } else {
@@ -343,13 +361,98 @@ class SummaryPublisherDependenciesTest {
         }
     }
 
-    private class ThrowingSummaryPublisher : SummaryMessagePublisher {
-        val publishedSummaries = mutableListOf<ZapierProjectSummary>()
+    private object NoOpProjectManagementApi : ProjectManagementApi {
+        override suspend fun getIssues(issueKeys: List<String>) = unexpected()
 
-        override suspend fun publishSummary(summary: ZapierProjectSummary): Boolean {
-            publishedSummaries += summary
-            throw IllegalStateException("boom")
-        }
+        override suspend fun getChildIssues(issueKeys: List<String>) = unexpected()
+
+        override suspend fun getDirectChildIssues(parentKey: String) = unexpected()
+
+        override suspend fun getRecentComments(issueKey: String, maxResults: Int) = unexpected()
+
+        override suspend fun getIssuesResolved(
+            user: User,
+            startDate: kotlinx.datetime.Instant,
+            endDate: kotlinx.datetime.Instant,
+        ) = unexpected()
+
+        override suspend fun getIssuesResolvedCount(
+            user: User,
+            startDate: kotlinx.datetime.Instant,
+            endDate: kotlinx.datetime.Instant,
+        ) = unexpected()
+
+        override suspend fun getIssuesByFilter(filter: com.github.karlsabo.projectmanagement.IssueFilter) = unexpected()
+
+        override suspend fun getMilestones(projectId: String) = unexpected()
+
+        override suspend fun getMilestoneIssues(milestoneId: String) = unexpected()
+    }
+
+    private object NoOpGitHubApi : GitHubApi {
+        override suspend fun getMergedPullRequestCount(
+            gitHubUserId: String,
+            organizationIds: List<String>,
+            startDate: kotlinx.datetime.Instant,
+            endDate: kotlinx.datetime.Instant,
+        ) = unexpected()
+
+        override suspend fun getPullRequestReviewCount(
+            gitHubUserId: String,
+            organizationIds: List<String>,
+            startDate: kotlinx.datetime.Instant,
+            endDate: kotlinx.datetime.Instant,
+        ) = unexpected()
+
+        override suspend fun getMergedPullRequests(
+            gitHubUserId: String,
+            organizationIds: List<String>,
+            startDate: kotlinx.datetime.Instant,
+            endDate: kotlinx.datetime.Instant,
+        ) = unexpected()
+
+        override suspend fun searchPullRequestsByText(
+            searchText: String,
+            organizationIds: List<String>,
+            startDateInclusive: kotlinx.datetime.Instant,
+            endDateInclusive: kotlinx.datetime.Instant,
+        ) = unexpected()
+
+        override suspend fun listNotifications() = unexpected()
+
+        override suspend fun getPullRequestByUrl(url: String) = unexpected()
+
+        override suspend fun approvePullRequestByUrl(url: String, body: String?) = unexpected()
+
+        override suspend fun markNotificationAsDone(threadId: String) = unexpected()
+
+        override suspend fun unsubscribeFromNotification(threadId: String) = unexpected()
+
+        override suspend fun hasAnyApprovedReview(url: String) = unexpected()
+
+        override suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String) = unexpected()
+
+        override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String) = unexpected()
+
+        override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int) = unexpected()
+
+        override suspend fun submitReview(
+            prApiUrl: String,
+            event: com.github.karlsabo.github.ReviewStateValue,
+            reviewComment: String?,
+        ) = unexpected()
+    }
+
+    private object NoOpPagerDutyApi : PagerDutyApi {
+        override suspend fun getServicePages(
+            serviceId: String,
+            startTimeInclusive: kotlinx.datetime.Instant,
+            endTimeExclusive: kotlinx.datetime.Instant,
+        ) = unexpected()
+    }
+
+    private object NoOpTextSummarizer : TextSummarizer {
+        override suspend fun summarize(text: String) = unexpected()
     }
 
     private fun createTempDir(): Path {
@@ -383,16 +486,6 @@ class SummaryPublisherDependenciesTest {
     )
 
     private companion object {
-        val NoOpSummaryPublisher = SummaryMessagePublisher { true }
-
-        fun emptySummary() = MultiProjectSummary(
-            startDate = LocalDate(2026, 4, 9),
-            endDate = LocalDate(2026, 4, 16),
-            summaryName = "Test Summary",
-            projectSummaries = emptyList(),
-            pagerDutyAlerts = null,
-        )
-
         fun emptyProjectSummary(projectId: String) = ProjectSummary(
             project = Project(
                 id = projectId.removePrefix("project-").toLongOrNull() ?: 0L,
