@@ -87,3 +87,15 @@ Here's the core process, drawn directly from Jeffries and Killick:
 - "Implement the first X, then the rest" → do just the first X
 
 The goal: breaking each story down to bits that require only a single acceptance test will almost invariably give you something that can be done in a couple of days. If it doesn't, your acceptance test needs splitting.
+
+# Milestones
+
+[Choosing Project Milestones That Actually Matter](https://www.youtube.com/watch?v=3OO9ZJEudPY)
+
+* Name milestones as outcomes, not activities.
+* Tie each milestone to meaningful progress or a turning point.
+* Make names specific and measurable with a clear yes/no completion test.
+* Prefer completed-state wording like “approved,” “launched,” “finalized,” or “deployed.”
+* Align milestone names to decision points, approvals, or major deliverables.
+* Keep them few and high-signal so they mark real progress, not clutter.
+* Write them so stakeholders can understand them instantly.

@@ -2,7 +2,8 @@ CREATE TABLE unsubscribed_notification_threads (
   thread_id TEXT NOT NULL PRIMARY KEY,
   repository_full_name TEXT NOT NULL,
   subject_type TEXT NOT NULL,
-  unsubscribed_at_epoch_ms INTEGER NOT NULL
+  unsubscribed_at_epoch_ms INTEGER NOT NULL,
+  ignored_at_epoch_ms INTEGER
 );
 
 selectAllThreadIds:

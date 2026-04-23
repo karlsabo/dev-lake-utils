@@ -4,6 +4,25 @@ plugins {
     `maven-publish`
 }
 
+abstract class VerifyNotificationMigrationBaselineTask : DefaultTask() {
+    @get:InputFile
+    @get:Optional
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val baselineFile: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val file = baselineFile.get().asFile
+        if (!file.isFile) {
+            throw GradleException(
+                "Missing SQLDelight migration baseline artifact " +
+                        "`${file.relativeTo(project.projectDir)}`. " +
+                        "Historical verification requires the committed `1.db` snapshot."
+            )
+        }
+    }
+}
+
 group = parent!!.group
 version = parent!!.version
 
@@ -92,8 +111,30 @@ sqldelight {
     databases {
         create("NotificationDatabase") {
             packageName.set("com.github.karlsabo.notifications")
+            schemaOutputDirectory.set(
+                file("src/commonMain/sqldelight/com/github/karlsabo/notifications")
+            )
         }
     }
+}
+
+val notificationMigrationBaseline = layout.projectDirectory.file(
+    "src/commonMain/sqldelight/com/github/karlsabo/notifications/1.db"
+)
+
+val requireNotificationMigrationBaseline by tasks.registering(VerifyNotificationMigrationBaselineTask::class) {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description =
+        "Fails when the committed SQLDelight baseline snapshot for notification migration verification is missing."
+    baselineFile.set(notificationMigrationBaseline)
+}
+
+tasks.named("verifySqlDelightMigration") {
+    dependsOn(requireNotificationMigrationBaseline)
+}
+
+tasks.named("check") {
+    dependsOn("verifySqlDelightMigration")
 }
 
 // Helper function to create JavaExec tasks with lazy configuration
