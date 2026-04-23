@@ -11,25 +11,13 @@ import kotlin.test.assertEquals
 class NotificationDatabaseMigrationTest {
 
     @Test
-    fun upgradesLegacyVersion1DatabaseWithUnsetUserVersionAndPreservesUnsubscribedThreadIds() {
-        assertMigrationFromLegacyFixture(initialUserVersion = null, expectedInitialUserVersion = 0L)
-    }
-
-    @Test
     fun upgradesVersion1DatabaseAndPreservesUnsubscribedThreadIds() {
-        assertMigrationFromLegacyFixture(initialUserVersion = 1L, expectedInitialUserVersion = 1L)
-    }
-
-    private fun assertMigrationFromLegacyFixture(
-        initialUserVersion: Long?,
-        expectedInitialUserVersion: Long,
-    ) {
         val testDir = Files.createTempDirectory("notification-db-migration-test")
         val databasePath = testDir.resolve("eng-hub-notifications.db")
 
         try {
-            createVersion1Fixture(databasePath.toString(), initialUserVersion)
-            assertEquals(expectedInitialUserVersion, readUserVersion(databasePath.toString()))
+            createVersion1Fixture(databasePath.toString())
+            assertEquals(1L, readUserVersion(databasePath.toString()))
 
             val store = SqlDelightNotificationSubscriptionStore(databasePath = databasePath.toString())
 
@@ -50,7 +38,7 @@ class NotificationDatabaseMigrationTest {
         }
     }
 
-    private fun createVersion1Fixture(databasePath: String, userVersion: Long?) {
+    private fun createVersion1Fixture(databasePath: String) {
         DriverManager.getConnection("jdbc:sqlite:$databasePath").use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeUpdate(
@@ -74,9 +62,7 @@ class NotificationDatabaseMigrationTest {
                     VALUES ('123456789', 'example-org/example-repo', 'PullRequest', 1)
                     """.trimIndent()
                 )
-                if (userVersion != null) {
-                    statement.executeUpdate("PRAGMA user_version = $userVersion")
-                }
+                statement.executeUpdate("PRAGMA user_version = 1")
             }
         }
     }

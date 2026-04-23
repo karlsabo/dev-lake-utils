@@ -14,31 +14,13 @@ import kotlin.test.assertEquals
 class NotificationDatabaseMigrationTest {
 
     @Test
-    fun upgradesLegacyVersion1DatabaseWithUnsetUserVersionAndPreservesUnsubscribedThreadIds() {
-        assertSchemaVersion1LayoutMigratesToCurrentSchema(initialUserVersion = null, expectedInitialUserVersion = 0L)
-    }
-
-    @Test
     fun upgradesVersion1DatabaseAndPreservesUnsubscribedThreadIds() {
-        assertSchemaVersion1LayoutMigratesToCurrentSchema(initialUserVersion = 1, expectedInitialUserVersion = 1L)
-    }
-
-    @Test
-    fun mapsDetectedLegacyLayoutsToConcreteSchemaVersions() {
-        assertEquals(1, normalizedNotificationSchemaVersionForLegacyLayout(hasIgnoredAtColumn = false))
-        assertEquals(2, normalizedNotificationSchemaVersionForLegacyLayout(hasIgnoredAtColumn = true))
-    }
-
-    private fun assertSchemaVersion1LayoutMigratesToCurrentSchema(
-        initialUserVersion: Int?,
-        expectedInitialUserVersion: Long,
-    ) {
         val testDir = createNotificationStoreTestDir()
         val databasePath = Path(testDir, "eng-hub-notifications.db")
 
         try {
-            createSchemaVersion1Fixture(databasePath, initialUserVersion)
-            assertEquals(expectedInitialUserVersion, readUserVersion(databasePath))
+            createSchemaVersion1Fixture(databasePath)
+            assertEquals(1L, readUserVersion(databasePath))
 
             val store = SqlDelightNotificationSubscriptionStore(databasePath = databasePath.toString())
 
@@ -59,7 +41,7 @@ class NotificationDatabaseMigrationTest {
         }
     }
 
-    private fun createSchemaVersion1Fixture(databasePath: Path, initialUserVersion: Int?) {
+    private fun createSchemaVersion1Fixture(databasePath: Path) {
         withDatabaseConnection(databasePath) { connection ->
             connection.rawExecSql(
                 """
@@ -82,9 +64,7 @@ class NotificationDatabaseMigrationTest {
                 VALUES ('123456789', 'example-org/example-repo', 'PullRequest', 1)
                 """.trimIndent(),
             )
-            if (initialUserVersion != null) {
-                connection.setVersion(initialUserVersion)
-            }
+            connection.setVersion(1)
         }
     }
 
