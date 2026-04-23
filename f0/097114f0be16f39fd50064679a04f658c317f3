@@ -1,0 +1,23 @@
+gradle/libs.versions.toml
+  697a3854b7fcdadb 26-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.1",
+  "base_commit_sha": "f0097114f0be16f39fd50064679a04f658c317f3",
+  "prompts": {
+    "697a3854b7fcdadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dbc10-33aa-7a22-8092-f3c514932ae7",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Karl Sabo",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
