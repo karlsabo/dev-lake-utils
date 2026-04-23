@@ -58,10 +58,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                     viewModel.submitReview(notificationThreadId, apiUrl, event, reviewComment)
                 },
                 onMarkDone = { viewModel.markNotificationDone(it) },
-                onUnsubscribe = {
-                    viewModel.unsubscribeFromNotification(it)
-                    viewModel.markNotificationDone(it)
-                },
+                onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },
                 modifier = Modifier.weight(1f),
             )
         }

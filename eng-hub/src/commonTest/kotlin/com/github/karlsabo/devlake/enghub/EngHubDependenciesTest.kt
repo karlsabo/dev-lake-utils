@@ -11,6 +11,7 @@ import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.config.GitHubApiRestConfig
+import com.github.karlsabo.notifications.NotificationSubscriptionStore
 import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -35,12 +36,14 @@ class EngHubDependenciesTest {
         val notificationService = GitHubNotificationService(fakeGitHubApi)
         val fakeGitWorktreeApi = RecordingGitWorktreeApi()
         val fakeDesktopLauncher = RecordingDesktopLauncher()
+        val fakeNotificationSubscriptionStore = RecordingNotificationSubscriptionStore()
         val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
             gitHubApi = fakeGitHubApi,
             gitHubNotificationService = notificationService,
             gitWorktreeApi = fakeGitWorktreeApi,
             desktopLauncher = fakeDesktopLauncher,
             config = config,
+            notificationSubscriptionStore = fakeNotificationSubscriptionStore,
         )
 
         val viewModel = loadEngHubViewModel(
@@ -88,12 +91,14 @@ class EngHubDependenciesTest {
         )
         val gitHubApiConfig = GitHubApiRestConfig(token = "test-token")
         val fakeGitHubApi = RecordingGitHubApi()
+        val fakeNotificationSubscriptionStore = RecordingNotificationSubscriptionStore()
         val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
             gitHubApi = fakeGitHubApi,
             gitHubNotificationService = GitHubNotificationService(fakeGitHubApi),
             gitWorktreeApi = RecordingGitWorktreeApi(),
             desktopLauncher = RecordingDesktopLauncher(),
             config = config,
+            notificationSubscriptionStore = fakeNotificationSubscriptionStore,
         )
 
         val loadedDependencies = loadEngHubDependencies(
@@ -215,4 +220,15 @@ private class RecordingGitHubApi : GitHubApi {
     }
 
     override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) = Unit
+}
+
+private class RecordingNotificationSubscriptionStore : NotificationSubscriptionStore {
+    override fun listUnsubscribedThreadIds(): Set<String> = emptySet()
+
+    override fun saveUnsubscribedThread(
+        threadId: String,
+        repositoryFullName: String,
+        subjectType: String,
+        unsubscribedAtEpochMs: Long,
+    ) = Unit
 }

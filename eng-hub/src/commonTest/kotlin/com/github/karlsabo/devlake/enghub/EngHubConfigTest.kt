@@ -14,6 +14,7 @@ class EngHubConfigTest {
             pollIntervalMs = 600_000,
             repositoriesBaseDir = "/tmp/example/repos",
             gitHubAuthor = "example-author",
+            planningMarkdownDir = "/tmp/example/llm-planning",
             worktreeSetupCommands = mapOf(
                 "/tmp/example/repos/app" to listOf(
                     "direnv allow",
@@ -29,6 +30,7 @@ class EngHubConfigTest {
         assertEquals(config, decoded)
         assertTrue(json.contains("\"worktreeSetupCommands\""))
         assertTrue(json.contains("\"setupShell\""))
+        assertTrue(json.contains("\"planningMarkdownDir\""))
     }
 
     @Test
@@ -46,6 +48,7 @@ class EngHubConfigTest {
 
         assertEquals(emptyMap(), decoded.worktreeSetupCommands)
         assertEquals("/bin/zsh", decoded.setupShell)
+        assertEquals("", decoded.planningMarkdownDir)
     }
 
     @Test

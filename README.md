@@ -16,6 +16,7 @@
 * [ ] Can we write UI tests?
     * Can an LLM execute some manual UI-driven tests?
 * [ ] Add a UI panel for adding local git repos, showing the root and all worktrees and opening them the same way setup does
+* [ ] Convert to panel type UI. Have PRs, Tickets, Notifications, etc that expand a panel and then you can click each one and they show options for what to do.
 * [ ] Start an auto review on PRs, show the copyable path to the review Markdown
 * [ ] Rename all skills to start with a standard prefix
     * Maybe eh for eng hub?
@@ -28,9 +29,11 @@
 * [ ] Consider consolidating into a single configuration file
 * [ ] Add a UI panel for showing tickets assigned to the user
     * If a related PR is closed, ask if the ticket should be closed
+* [ ] Search function for look at all PRs, notifications, etc
 * [ ] Look into <https://github.com/obra/superpowers/tree/main> for their skills
 * [ ] Look into <https://github.com/garrytan/gstack> for their skills
 * [ ] Look into <https://github.com/mattpocock/skills/tree/main> for their skills
+* [ ] Look into <https://worktrunk.dev/>
 
 ## Implementation loop
 * Implement

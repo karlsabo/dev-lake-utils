@@ -1,0 +1,19 @@
+CREATE TABLE unsubscribed_notification_threads (
+  thread_id TEXT NOT NULL PRIMARY KEY,
+  repository_full_name TEXT NOT NULL,
+  subject_type TEXT NOT NULL,
+  unsubscribed_at_epoch_ms INTEGER NOT NULL
+);
+
+selectAllThreadIds:
+SELECT thread_id
+FROM unsubscribed_notification_threads;
+
+upsertThread:
+INSERT OR REPLACE INTO unsubscribed_notification_threads(
+  thread_id,
+  repository_full_name,
+  subject_type,
+  unsubscribed_at_epoch_ms
+)
+VALUES (?, ?, ?, ?);

@@ -1,6 +1,6 @@
 # Output Templates
 
-One document is produced per review. Written to `$HOME/karl-backup/notebook/llm-planning/`.
+One document is produced per review. Written to `${PLANNING_MARKDOWN_DIR}/`.
 
 ## Overview
 

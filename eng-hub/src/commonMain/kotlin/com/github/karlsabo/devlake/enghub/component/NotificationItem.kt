@@ -31,7 +31,7 @@ fun NotificationItem(
     onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
     onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
     onMarkDone: (String) -> Unit,
-    onUnsubscribe: (String) -> Unit,
+    onUnsubscribe: (NotificationUiState) -> Unit,
 ) {
     var showReviewDialog by remember { mutableStateOf(false) }
 
@@ -104,7 +104,7 @@ fun NotificationItem(
                     Text("Done")
                 }
                 Button(
-                    onClick = { onUnsubscribe(notification.notificationThreadId) },
+                    onClick = { onUnsubscribe(notification) },
                     enabled = !actionInProgress,
                     colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error),
                 ) {

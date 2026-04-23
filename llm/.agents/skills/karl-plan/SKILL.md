@@ -33,7 +33,7 @@ Don't rush to decompose. Understand first.
 Create a markdown file at:
 
 ```
-$HOME/karl-backup/notebook/llm-planning/{descriptive-name}.md
+${PLANNING_MARKDOWN_DIR}/{descriptive-name}.md
 ```
 
 Name it based on the feature (e.g., `oauth-rate-limiting.md`, `bulk-user-invite.md`).

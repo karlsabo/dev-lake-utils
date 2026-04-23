@@ -17,6 +17,7 @@ data class EngHubConfig(
     val pollIntervalMs: Long = 10.minutes.inWholeMilliseconds,
     val repositoriesBaseDir: String = "",
     val gitHubAuthor: String = "",
+    val planningMarkdownDir: String = "",
     val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     val setupShell: String = "/bin/zsh",
 )

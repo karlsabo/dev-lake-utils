@@ -22,6 +22,7 @@ import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.extractOwnerAndRepo
 import com.github.karlsabo.github.pullRequestDetailsUrl
+import com.github.karlsabo.notifications.NotificationSubscriptionStore
 import com.github.karlsabo.system.DesktopLauncher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -30,10 +31,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Clock
 import me.tatarka.inject.annotations.Inject
 import java.io.IOException
 
 private val logger = KotlinLogging.logger {}
+
+private fun loadHiddenThreadIds(
+    notificationSubscriptionStore: NotificationSubscriptionStore,
+): Set<String> {
+    return runCatching { notificationSubscriptionStore.listUnsubscribedThreadIds() }
+        .onFailure { logger.error(it) { "Failed to load persisted unsubscribed notifications" } }
+        .getOrElse { emptySet() }
+}
 
 internal suspend fun GitHubApi.buildPullRequestUiStates(issues: List<Issue>): List<PullRequestUiState> {
     return issues.map { issue ->
@@ -63,6 +73,7 @@ class EngHubViewModel(
     private val gitWorktreeApi: GitWorktreeApi,
     private val desktopLauncher: DesktopLauncher,
     private val config: EngHubConfig,
+    private val notificationSubscriptionStore: NotificationSubscriptionStore,
 ) : ViewModel() {
 
     private val actionError = MutableStateFlow<String?>(null)
@@ -101,7 +112,7 @@ class EngHubViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private val dismissedThreadIds = MutableStateFlow<Set<String>>(emptySet())
+    private val hiddenThreadIds = MutableStateFlow(loadHiddenThreadIds(notificationSubscriptionStore))
 
     private val polledNotifications: Flow<Result<List<NotificationUiState>>> =
         flow {
@@ -109,6 +120,7 @@ class EngHubViewModel(
                 val notifs = gitHubApi.listNotifications()
                 val uiStates: List<NotificationUiState> =
                     notifs
+                        .filterNot { it.id in hiddenThreadIds.value }
                         .asSequence()
                         .asFlow()
                         .flatMapMerge(concurrency = 16) { notif ->
@@ -156,9 +168,9 @@ class EngHubViewModel(
 
     val notifications: StateFlow<Result<List<NotificationUiState>>?> = combine(
         polledNotifications,
-        dismissedThreadIds,
-    ) { result, dismissed ->
-        result.map { list -> list.filter { it.notificationThreadId !in dismissed } }
+        hiddenThreadIds,
+    ) { result, hidden ->
+        result.map { list -> list.filter { it.notificationThreadId !in hidden } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun openInBrowser(url: String) {
@@ -207,7 +219,7 @@ class EngHubViewModel(
             try {
                 gitHubApi.approvePullRequestByUrl(apiUrl)
                 gitHubApi.markNotificationAsDone(notificationThreadId)
-                dismissedThreadIds.value += notificationThreadId
+                hiddenThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to approve PR $apiUrl" }
                 actionError.value = e.message ?: "Failed to approve pull request"
@@ -223,7 +235,7 @@ class EngHubViewModel(
             try {
                 gitHubApi.submitReview(apiUrl, event, reviewComment)
                 gitHubApi.markNotificationAsDone(notificationThreadId)
-                dismissedThreadIds.value += notificationThreadId
+                hiddenThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to submit review for $apiUrl" }
                 actionError.value = e.message ?: "Failed to submit review"
@@ -235,31 +247,62 @@ class EngHubViewModel(
 
     fun markNotificationDone(notificationThreadId: String) {
         actingOnThreadIds.value += notificationThreadId
-        dismissedThreadIds.value += notificationThreadId
+        hiddenThreadIds.value += notificationThreadId
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 gitHubApi.markNotificationAsDone(notificationThreadId)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to mark notification done $notificationThreadId" }
-                dismissedThreadIds.value -= notificationThreadId
-                actingOnThreadIds.value -= notificationThreadId
+                hiddenThreadIds.value -= notificationThreadId
                 actionError.value = e.message ?: "Failed to mark notification as done"
-            }
-        }
-    }
-
-    fun unsubscribeFromNotification(notificationThreadId: String) {
-        actingOnThreadIds.value += notificationThreadId
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                gitHubApi.unsubscribeFromNotification(notificationThreadId)
-                dismissedThreadIds.value += notificationThreadId
-            } catch (e: Exception) {
-                logger.error(e) { "Failed to unsubscribe from notification $notificationThreadId" }
-                actionError.value = e.message ?: "Failed to unsubscribe from notification"
             } finally {
                 actingOnThreadIds.value -= notificationThreadId
             }
         }
+    }
+
+    fun unsubscribeFromNotification(notification: NotificationUiState) {
+        val notificationThreadId = notification.notificationThreadId
+        actingOnThreadIds.value += notificationThreadId
+        hiddenThreadIds.value += notificationThreadId
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                gitHubApi.unsubscribeFromNotification(notificationThreadId)
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to unsubscribe from notification $notificationThreadId" }
+                hiddenThreadIds.value -= notificationThreadId
+                actionError.value = e.message ?: "Failed to unsubscribe from notification"
+                actingOnThreadIds.value -= notificationThreadId
+                return@launch
+            }
+
+            try {
+                persistUnsubscribedThread(notification)
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to persist unsubscribed notification $notificationThreadId" }
+                hiddenThreadIds.value -= notificationThreadId
+                actionError.value = e.message ?: "Failed to persist unsubscribed notification locally"
+                actingOnThreadIds.value -= notificationThreadId
+                return@launch
+            }
+
+            try {
+                gitHubApi.markNotificationAsDone(notificationThreadId)
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to mark unsubscribed notification done $notificationThreadId" }
+                actionError.value = e.message ?: "Failed to mark notification as done"
+            } finally {
+                actingOnThreadIds.value -= notificationThreadId
+            }
+        }
+    }
+
+    private fun persistUnsubscribedThread(notification: NotificationUiState) {
+        notificationSubscriptionStore.saveUnsubscribedThread(
+            threadId = notification.notificationThreadId,
+            repositoryFullName = notification.repositoryFullName,
+            subjectType = notification.subjectType,
+            unsubscribedAtEpochMs = Clock.System.now().toEpochMilliseconds(),
+        )
     }
 }

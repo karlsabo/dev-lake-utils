@@ -83,7 +83,7 @@ note. Match comment volume to the risk and complexity of the change.
 Write the planned GitHub comments to:
 
 ```
-$HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md
+${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md
 ```
 
 Follow the format in `references/output-templates.md`. The planned comments document must include both of these sections:
@@ -100,7 +100,7 @@ Each inline comment should be self-contained and actionable. Use the priority fr
 Compute the planned comments document path once and store it as `{planned_comments_path}`:
 
 ```text
-$HOME/karl-backup/notebook/llm-planning/pr-{number}-planned-comments.md
+${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md
 ```
 
 Use that exact absolute path for the rest of this step. Do not continue if the file is missing; go back and fix Step 5 first.

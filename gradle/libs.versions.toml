@@ -23,6 +23,7 @@ junit = "5.10.0"
 junitPlatform = "1.10.0"
 foojayResolver = "0.8.0"
 lifecycleViewModel = "2.10.0-alpha06"
+sqldelight = "2.3.2"
 
 [libraries]
 # Existing
@@ -81,6 +82,11 @@ compose-desktop = { module = "org.jetbrains.compose.desktop:desktop", version.re
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
 skiko-macos-arm64 = { module = "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64", version.ref = "skiko" }
 
+# SQLDelight
+sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+
 # Gradle Plugins (for buildSrc)
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "compose" }
@@ -100,3 +106,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 compose = { id = "org.jetbrains.compose", version.ref = "compose" }
 foojay-resolver = { id = "org.gradle.toolchains.foojay-resolver-convention", version.ref = "foojayResolver" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }

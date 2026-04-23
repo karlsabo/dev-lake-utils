@@ -1,19 +1,13 @@
 # The Pragmatic Programmer
 
-* You own your career — Take responsibility; don't blame tools, teams, or circumstances.
 * DRY (Don't Repeat Yourself) — Every piece of knowledge should have a single, authoritative representation.
 * Don't live with broken windows — Fix bad code, poor design, and wrong decisions as soon as you see them.
-* Be a generalist — Know enough across many areas to adapt quickly.
 * Make it easy to change — Good design is code that's easy to modify. If in doubt, make it replaceable.
 * Use tracer bullets — Build thin, end-to-end slices of functionality early to validate your approach.
-* Prototype to learn — Prototypes are disposable experiments, not foundations.
-* Estimate everything — Develop intuition for the size and complexity of tasks.
-* Write code that writes code — Use code generation to avoid repetition at scale.
 * Design with contracts — Use preconditions, postconditions, and invariants to make expectations explicit.
 * Crash early — A dead program causes less damage than a broken, limping one.
 * Decouple ruthlessly — Avoid coupling between components so changes don't ripple everywhere.
 * Use the power of plain text — Store knowledge in plain text; it outlives all other formats.
-* Know your tools deeply — Master your editor, shell, and debugger.
 * Iterate with users — Requirements are found, not given. Work closely and continuously with users.
 * Test relentlessly — Test your software, or your users will.
 * Don't assume — prove it — Assumptions in code are the root of most bugs.
@@ -29,7 +23,6 @@
 6. **Communication style matters** — synchronous vs. asynchronous, choreography vs. orchestration each affect coupling, scalability, and fault tolerance differently.
 7. **Contracts between services need managing** — strict vs. loose contracts, consumer-driven contracts, and versioning all require deliberate strategies.
 8. **Architecture fitness functions** — use automated tests to guard architectural characteristics (e.g., coupling thresholds, response times) over time.
-9. **Document decisions with ADRs** — Architectural Decision Records capture the *why* behind choices, not just the what.
 10. **Architecture quanta** — independently deployable components with high functional cohesion are the unit of analysis for distributed systems.
 
 | Pattern Name         | Communication | Consistency | Coordination  |

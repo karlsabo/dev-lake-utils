@@ -108,6 +108,7 @@ Example:
   "pollIntervalMs": 600000,
   "repositoriesBaseDir": "/Users/you/git",
   "gitHubAuthor": "your-github-login",
+  "planningMarkdownDir": "/Users/you/karl-backup/notebook/llm-planning",
   "worktreeSetupCommands": {
     "/Users/you/git/example-repo": [
       "direnv allow",
@@ -124,6 +125,7 @@ Field meanings:
 - `pollIntervalMs`: refresh interval for both panes
 - `repositoriesBaseDir`: where repos are cloned if missing
 - `gitHubAuthor`: GitHub login used for the pull request query
+- `planningMarkdownDir`: absolute directory used when syncing LLM markdown templates that contain `${PLANNING_MARKDOWN_DIR}`
 - `worktreeSetupCommands`: optional commands keyed by the base repo path
 - `setupShell`: login shell used to run setup commands
 
@@ -145,6 +147,7 @@ Other useful run tasks that exist today:
 ./gradlew :eng-hub:runRelease
 ./gradlew :eng-hub:runDistributable
 ./gradlew :eng-hub:hotRunJvm
+./gradlew :eng-hub:syncLlmFiles
 ```
 
 ## Building

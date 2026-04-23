@@ -1,5 +1,6 @@
 plugins {
     id("devlake.kotlin-multiplatform-conventions")
+    alias(libs.plugins.sqldelight)
     `maven-publish`
 }
 
@@ -27,6 +28,8 @@ kotlin {
                 // Logging
                 api(libs.kotlinLogging)
 
+                implementation(libs.sqldelight.runtime)
+
                 // IO
                 api(libs.kotlinx.io.core)
 
@@ -45,6 +48,18 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(libs.ktor.client.mock)
                 implementation(libs.kotlinx.coroutines.core)
+            }
+        }
+
+        getByName("jvmMain") {
+            dependencies {
+                implementation(libs.sqldelight.sqlite.driver)
+            }
+        }
+
+        getByName("macosArm64Main") {
+            dependencies {
+                implementation(libs.sqldelight.native.driver)
             }
         }
 
@@ -69,6 +84,14 @@ kotlin {
                     )
                 }
             }
+        }
+    }
+}
+
+sqldelight {
+    databases {
+        create("NotificationDatabase") {
+            packageName.set("com.github.karlsabo.notifications")
         }
     }
 }
@@ -122,14 +145,6 @@ createJvmExecTask(
 createJvmExecTask(
     taskName = "markdownImageExtractorDemo",
     mainClassName = "com.github.karlsabo.markdown.MarkdownImageExtractorDemoKt",
-    compilationName = "test"
-) {
-    dependsOn("jvmTestClasses")
-}
-
-createJvmExecTask(
-    taskName = "syncLlmFiles",
-    mainClassName = "com.github.karlsabo.llm.LlmSkillSyncDemoKt",
     compilationName = "test"
 ) {
     dependsOn("jvmTestClasses")

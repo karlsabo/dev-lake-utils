@@ -56,3 +56,35 @@ compose.desktop {
         }
     }
 }
+
+fun createJvmExecTask(
+    taskName: String,
+    mainClassName: String,
+    compilationName: String = "main",
+    taskGroup: String = "application",
+    configure: JavaExec.() -> Unit = {},
+) {
+    tasks.register<JavaExec>(taskName) {
+        group = taskGroup
+        mainClass.set(mainClassName)
+
+        val jvmTarget = kotlin.targets.named("jvm")
+        val compilation = jvmTarget.flatMap { target ->
+            target.compilations.named(compilationName)
+        }
+
+        classpath(
+            compilation.map { it.output.allOutputs },
+            compilation.map { it.runtimeDependencyFiles ?: files() }
+        )
+
+        configure()
+    }
+}
+
+createJvmExecTask(
+    taskName = "syncLlmFiles",
+    mainClassName = "com.github.karlsabo.devlake.enghub.LlmSkillSyncMainKt",
+) {
+    args(rootProject.projectDir.resolve("llm").absolutePath)
+}
