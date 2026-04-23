@@ -23,7 +23,8 @@ junit = "5.10.0"
 junitPlatform = "1.10.0"
 foojayResolver = "0.8.0"
 lifecycleViewModel = "2.10.0-alpha06"
-sqldelight = "2.3.2"
+# Keep SQLDelight on a Kotlin 2.2-compatible line until the repo toolchain moves forward.
+sqldelight = "2.1.0"
 
 [libraries]
 # Existing
