@@ -11,8 +11,6 @@
 
 # TODO
 
-* [ ] Add DB storage for unsubscribed notifications
-* [ ] Add PR number to notifications
 * [ ] Can we write UI tests?
     * Can an LLM execute some manual UI-driven tests?
 * [ ] Add a UI panel for adding local git repos, showing the root and all worktrees and opening them the same way setup does

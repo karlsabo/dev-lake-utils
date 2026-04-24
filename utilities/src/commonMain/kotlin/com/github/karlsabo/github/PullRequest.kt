@@ -12,6 +12,7 @@ data class PullRequestHead(
 
 @Serializable
 data class PullRequest(
+    val number: Int? = null,
     val url: String? = null,
     @SerialName("html_url")
     val htmlUrl: String? = null,

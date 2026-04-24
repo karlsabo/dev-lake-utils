@@ -54,7 +54,7 @@ fun NotificationItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = notification.title, style = MaterialTheme.typography.subtitle1)
+                Text(text = notification.displayTitle, style = MaterialTheme.typography.subtitle1)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(text = notification.repositoryFullName, style = MaterialTheme.typography.caption)
                     Text(text = notification.reason, style = MaterialTheme.typography.caption)

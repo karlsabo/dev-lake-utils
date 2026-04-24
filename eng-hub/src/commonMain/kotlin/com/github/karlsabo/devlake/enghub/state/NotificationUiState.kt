@@ -12,11 +12,17 @@ data class NotificationUiState(
     val htmlUrl: String?,
     val apiUrl: String?,
     val isPullRequest: Boolean,
+    val pullRequestNumber: Int? = null,
     val unread: Boolean,
     val headRef: String? = null,
-)
+) {
+    val displayTitle: String get() = pullRequestNumber?.let { "#$it $title" } ?: title
+}
 
-fun Notification.toNotificationUiState(headRef: String? = null): NotificationUiState {
+fun Notification.toNotificationUiState(
+    pullRequestNumber: Int? = null,
+    headRef: String? = null,
+): NotificationUiState {
     val subjectUrl = subject.url
     val htmlUrl = if (subjectUrl != null) apiUrlToHtmlUrl(subjectUrl) else null
 
@@ -29,6 +35,7 @@ fun Notification.toNotificationUiState(headRef: String? = null): NotificationUiS
         htmlUrl = htmlUrl,
         apiUrl = subjectUrl,
         isPullRequest = subject.type == "PullRequest",
+        pullRequestNumber = pullRequestNumber,
         unread = unread,
         headRef = headRef,
     )

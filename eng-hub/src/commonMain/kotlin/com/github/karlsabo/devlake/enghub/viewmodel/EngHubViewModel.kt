@@ -16,6 +16,7 @@ import com.github.karlsabo.github.CiStatus.PENDING
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubNotificationService
 import com.github.karlsabo.github.Issue
+import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.NotificationAction
 import com.github.karlsabo.github.NotificationProcessingResult
 import com.github.karlsabo.github.ReviewStateValue
@@ -34,6 +35,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import me.tatarka.inject.annotations.Inject
 import java.io.IOException
+import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -43,6 +45,45 @@ private fun loadHiddenThreadIds(
     return runCatching { notificationSubscriptionStore.listUnsubscribedThreadIds() }
         .onFailure { logger.error(it) { "Failed to load persisted unsubscribed notifications" } }
         .getOrElse { emptySet() }
+}
+
+private data class NotificationPullRequestDetails(
+    val number: Int?,
+    val headRef: String?,
+)
+
+private suspend fun GitHubApi.getNotificationPullRequestDetails(
+    subjectType: String,
+    subjectUrl: String?,
+): NotificationPullRequestDetails? {
+    if (subjectType != "PullRequest" || subjectUrl == null) return null
+
+    return try {
+        withContext(Dispatchers.IO) {
+            getPullRequestByUrl(subjectUrl).let { pullRequest ->
+                NotificationPullRequestDetails(
+                    number = pullRequest.number,
+                    headRef = pullRequest.head?.ref,
+                )
+            }
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private suspend fun GitHubApi.toNotificationUiStateOrNull(notif: Notification): NotificationUiState? {
+    val prDetails = getNotificationPullRequestDetails(
+        subjectType = notif.subject.type,
+        subjectUrl = notif.subject.url,
+    )
+
+    if (notif.subject.type == "PullRequest" && prDetails == null) return null
+
+    return notif.toNotificationUiState(
+        pullRequestNumber = prDetails?.number,
+        headRef = prDetails?.headRef,
+    )
 }
 
 internal suspend fun GitHubApi.buildPullRequestUiStates(issues: List<Issue>): List<PullRequestUiState> {
@@ -94,13 +135,13 @@ class EngHubViewModel(
             val issues = gitHubApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
             val prStates = gitHubApi.buildPullRequestUiStates(issues)
             emit(Result.success(prStates))
-            delay(config.pollIntervalMs)
+            delay(config.pollIntervalMs.milliseconds)
         }
     }
         .flowOn(Dispatchers.IO)
         .retry(5) { cause ->
             if (cause is IOException) {
-                delay(5_000)
+                delay(5_000.milliseconds)
                 true
             } else {
                 false
@@ -133,29 +174,16 @@ class EngHubViewModel(
                                 if (!markedDone) emit(notif)
                             }
                         }
-                        .map { notif ->
-                            val headRef =
-                                if (notif.subject.type == "PullRequest" && notif.subject.url != null) {
-                                    try {
-                                        withContext(Dispatchers.IO) {
-                                            gitHubApi.getPullRequestByUrl(notif.subject.url!!).head?.ref
-                                        }
-                                    } catch (_: Exception) {
-                                        null
-                                    }
-                                } else null
-
-                            notif.toNotificationUiState(headRef)
-                        }
+                        .mapNotNull { notif -> gitHubApi.toNotificationUiStateOrNull(notif) }
                         .toList()
                 emit(Result.success(uiStates))
-                delay(config.pollIntervalMs)
+                delay(config.pollIntervalMs.milliseconds)
             }
         }
             .flowOn(Dispatchers.IO)
             .retry(5) { cause ->
                 if (cause is IOException) {
-                    delay(5_000)
+                    delay(5_000.milliseconds)
                     true
                 } else {
                     false
