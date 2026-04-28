@@ -14,6 +14,9 @@
 * [ ] Can we write UI tests?
     * Can an LLM execute some manual UI-driven tests?
 * [ ] Add a UI panel for adding local git repos, showing the root and all worktrees and opening them the same way setup does
+* [ ] If I mark a notification as done, add it to our marked done database table, they keep coming back from GitHub
+* [ ] Filter draft PR notifications
+* [ ] Show my review status on PR notifications
 * [ ] Convert to panel type UI. Have PRs, Tickets, Notifications, etc that expand a panel and then you can click each one and they show options for what to do.
 * [ ] Start an auto review on PRs, show the copyable path to the review Markdown
 * [ ] Rename all skills to start with a standard prefix
