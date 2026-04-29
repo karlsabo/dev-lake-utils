@@ -11,9 +11,8 @@
 
 # TODO
 
-* [ ] Can we write UI tests?
-    * Can an LLM execute some manual UI-driven tests?
 * [ ] Add a UI panel for adding local git repos, showing the root and all worktrees and opening them the same way setup does
+* [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] If I mark a notification as done, add it to our marked done database table, they keep coming back from GitHub
 * [ ] Filter draft PR notifications
 * [ ] Show my review status on PR notifications
@@ -31,6 +30,11 @@
 * [ ] Add a UI panel for showing tickets assigned to the user
     * If a related PR is closed, ask if the ticket should be closed
 * [ ] Search function for look at all PRs, notifications, etc
+*
+    * [ ] Can we write UI tests?
+        * Can an LLM execute some manual UI-driven tests?
+        * Want the UI to be universal. So the web UI will have to call the backend server to run desktop style functions.
+        * Might need to split eng-hub into eng-hub-ui and backend
 * [ ] Look into <https://github.com/obra/superpowers/tree/main> for their skills
 * [ ] Look into <https://github.com/garrytan/gstack> for their skills
 * [ ] Look into <https://github.com/mattpocock/skills/tree/main> for their skills
