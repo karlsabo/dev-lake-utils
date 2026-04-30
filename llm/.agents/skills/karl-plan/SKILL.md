@@ -76,13 +76,13 @@ Once acceptance tests are agreed on, map each to a story:
 
 ### 1. {Story title}
 
-**Acceptance test:** Given X, when Y, then Z
+**Acceptance criteria:** Given X, when Y, then Z
 **Expected edits:** exact files/modules likely to change
 **Scope:** what's in, what's out
-**Notes:** implementation hints, dependencies, ordering
+**Notes:** implementation hints, full self-contained context
 ```
 
-Each story gets one PR. Call out ordering dependencies between stories. Every story must name the expected files/modules to edit. Repo evidence should be cited in context/notes with exact paths.
+Each story gets one PR. Every story must name the acceptance criteria, any notes that can help with the expected files/modules to edit should be added. Repo evidence should be cited in context/notes with exact paths. Make sure the acceptance criteria, e.g., what needs to be done, is clear and concise. Also ensure that the story has enough context for anyone to pick it up. The context that we have above will not appear in every story, so ensure the story is self contained.
 
 ### Step 5: Iterate
 
