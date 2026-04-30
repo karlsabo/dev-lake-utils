@@ -12,6 +12,8 @@
 # TODO
 
 * [ ] Add a UI panel for adding local git repos, showing the root and all worktrees and opening them the same way setup does
+    * We also want menu buttons to take actions on the worktree, open them, archive them.
+* [ ] Add ability to put worktrees into categories
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] If I mark a notification as done, add it to our marked done database table, they keep coming back from GitHub
 * [ ] Filter draft PR notifications
