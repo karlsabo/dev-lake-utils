@@ -15,6 +15,12 @@
     * We also want menu buttons to take actions on the worktree, open them, archive them.
 * [ ] Add the ability to put worktrees into categories
     * E.g., In progress, In review, Done
+* [ ] Add a notification badge on the tab when attention of the user is needed
+    * Then put a notification badge on the item(s) that needs attention within that tab
+    * If there's a notification to review
+    * If a PR build has failed, or there's a new comment, etc.
+    * If a worktree agent has finished or needs attention
+* [ ] Optimize GitHub API requests: When refreshing notifications, only pull extra information if needed. Same with PRs.
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] If I mark a notification as done, add it to our marked done database table, they keep coming back from GitHub
 * [ ] Filter draft PR notifications
