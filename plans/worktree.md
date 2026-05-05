@@ -75,7 +75,9 @@
 
 **Notes:** This is a layout slice so the later Worktrees stories do not have to also migrate the main screen structure. Preserve the existing state collection in `EngHubScreen` and only change where the existing panels are rendered. Use tooltips or accessible labels so emoji-only buttons still have clear names.
 
-### 2. Render Configured Repositories In Worktrees View
+### 2. Render Configured Repositories In Worktrees View - Done
+
+**Done:** 2026 05 05
 
 **Acceptance criteria:** Given `eng-hub-config.json` contains local repositories named `k-repo`, `app`, `infrastructure`, and `fender`, when I open the Worktrees view, then I see top-level repository rows ordered `app`, `fender`, `infrastructure`, `k-repo`.
 

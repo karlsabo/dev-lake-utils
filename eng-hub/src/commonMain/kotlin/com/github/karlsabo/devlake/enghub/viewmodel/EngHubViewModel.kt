@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.runConfiguredWorktreeSetup
+import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
 import com.github.karlsabo.devlake.enghub.state.toNotificationUiState
 import com.github.karlsabo.devlake.enghub.state.toPullRequestUiState
 import com.github.karlsabo.git.GitWorktreeApi
@@ -122,6 +124,9 @@ class EngHubViewModel(
 
     private val checkoutInProgress = MutableStateFlow(false)
     val checkoutInProgressStateFlow: StateFlow<Boolean> = checkoutInProgress.asStateFlow()
+
+    private val localRepositories = MutableStateFlow(config.localRepositories.toLocalRepositoryUiStates())
+    val localRepositoriesStateFlow: StateFlow<List<LocalRepositoryUiState>> = localRepositories.asStateFlow()
 
     private val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> = actingOnThreadIds.asStateFlow()

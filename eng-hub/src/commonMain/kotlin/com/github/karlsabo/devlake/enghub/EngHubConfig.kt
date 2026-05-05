@@ -18,6 +18,7 @@ data class EngHubConfig(
     val repositoriesBaseDir: String = "",
     val gitHubAuthor: String = "",
     val planningMarkdownDir: String = "",
+    val localRepositories: List<String> = emptyList(),
     val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     val setupShell: String = "/bin/zsh",
 )

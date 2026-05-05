@@ -49,6 +49,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
     val actionError by viewModel.actionErrorStateFlow.collectAsState()
     val checkoutInProgress by viewModel.checkoutInProgressStateFlow.collectAsState()
     val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
+    val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
     var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
 
     actionError?.let { error ->
@@ -100,7 +101,10 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                         modifier = Modifier.weight(1f),
                     )
 
-                    EngHubPane.Worktrees -> WorktreePanel(modifier = Modifier.weight(1f))
+                    EngHubPane.Worktrees -> WorktreePanel(
+                        localRepositories = localRepositories,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }

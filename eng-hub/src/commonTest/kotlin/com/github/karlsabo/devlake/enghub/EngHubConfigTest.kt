@@ -15,6 +15,10 @@ class EngHubConfigTest {
             repositoriesBaseDir = "/tmp/example/repos",
             gitHubAuthor = "example-author",
             planningMarkdownDir = "/tmp/example/llm-planning",
+            localRepositories = listOf(
+                "/tmp/example/repos/app",
+                "/tmp/example/repos/fender",
+            ),
             worktreeSetupCommands = mapOf(
                 "/tmp/example/repos/app" to listOf(
                     "direnv allow",
@@ -31,6 +35,7 @@ class EngHubConfigTest {
         assertTrue(json.contains("\"worktreeSetupCommands\""))
         assertTrue(json.contains("\"setupShell\""))
         assertTrue(json.contains("\"planningMarkdownDir\""))
+        assertTrue(json.contains("\"localRepositories\""))
     }
 
     @Test
@@ -49,6 +54,7 @@ class EngHubConfigTest {
         assertEquals(emptyMap(), decoded.worktreeSetupCommands)
         assertEquals("/bin/zsh", decoded.setupShell)
         assertEquals("", decoded.planningMarkdownDir)
+        assertEquals(emptyList(), decoded.localRepositories)
     }
 
     @Test
