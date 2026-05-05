@@ -1,20 +1,46 @@
 package com.github.karlsabo.devlake.enghub.screen
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.Divider
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
 import com.github.karlsabo.devlake.enghub.component.NotificationPanel
 import com.github.karlsabo.devlake.enghub.component.PullRequestPanel
+import com.github.karlsabo.devlake.enghub.component.WorktreePanel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
+
+private enum class EngHubPane(
+    val label: String,
+    val icon: String,
+) {
+    PullRequests("Pull Requests", "PR"),
+    Notifications("Notifications", "🔔"),
+    Worktrees("Worktrees", "🌳"),
+}
 
 @Composable
 fun EngHubScreen(viewModel: EngHubViewModel) {
@@ -23,43 +49,116 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
     val actionError by viewModel.actionErrorStateFlow.collectAsState()
     val checkoutInProgress by viewModel.checkoutInProgressStateFlow.collectAsState()
     val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
+    var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
 
     actionError?.let { error ->
         ErrorDialog(message = error, onDismiss = { viewModel.clearActionError() })
     }
 
     MaterialTheme {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            Text("Pull Requests", style = MaterialTheme.typography.h5)
-            PullRequestPanel(
-                pullRequestsResult = pullRequestsResult,
-                onOpenInBrowser = { viewModel.openInBrowser(it) },
-                onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
-                checkoutInProgress = checkoutInProgress,
-                modifier = Modifier.weight(1f),
+        Row(modifier = Modifier.fillMaxSize()) {
+            EngHubSidebar(
+                selectedPane = selectedPane,
+                onPaneSelected = { selectedPane = it },
             )
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(MaterialTheme.colors.onSurface.copy(alpha = 0.12f)),
+            )
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Text(selectedPane.label, style = MaterialTheme.typography.h5)
+                Spacer(modifier = Modifier.size(8.dp))
 
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text("Notifications", style = MaterialTheme.typography.h5)
-            NotificationPanel(
-                notificationsResult = notificationsResult,
-                onOpenInBrowser = { viewModel.openInBrowser(it) },
-                onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
-                checkoutInProgress = checkoutInProgress,
-                actingOnThreadIds = actingOnThreadIds,
-                onApprove = { notificationThreadId, apiUrl ->
-                    viewModel.approvePullRequest(
-                        notificationThreadId,
-                        apiUrl
+                when (selectedPane) {
+                    EngHubPane.PullRequests -> PullRequestPanel(
+                        pullRequestsResult = pullRequestsResult,
+                        onOpenInBrowser = { viewModel.openInBrowser(it) },
+                        onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
+                        checkoutInProgress = checkoutInProgress,
+                        modifier = Modifier.weight(1f),
                     )
-                },
-                onSubmitReview = { notificationThreadId, apiUrl, event, reviewComment ->
-                    viewModel.submitReview(notificationThreadId, apiUrl, event, reviewComment)
-                },
-                onMarkDone = { viewModel.markNotificationDone(it) },
-                onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },
-                modifier = Modifier.weight(1f),
+
+                    EngHubPane.Notifications -> NotificationPanel(
+                        notificationsResult = notificationsResult,
+                        onOpenInBrowser = { viewModel.openInBrowser(it) },
+                        onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
+                        checkoutInProgress = checkoutInProgress,
+                        actingOnThreadIds = actingOnThreadIds,
+                        onApprove = { notificationThreadId, apiUrl ->
+                            viewModel.approvePullRequest(
+                                notificationThreadId,
+                                apiUrl
+                            )
+                        },
+                        onSubmitReview = { notificationThreadId, apiUrl, event, reviewComment ->
+                            viewModel.submitReview(notificationThreadId, apiUrl, event, reviewComment)
+                        },
+                        onMarkDone = { viewModel.markNotificationDone(it) },
+                        onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },
+                        modifier = Modifier.weight(1f),
+                    )
+
+                    EngHubPane.Worktrees -> WorktreePanel(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EngHubSidebar(
+    selectedPane: EngHubPane,
+    onPaneSelected: (EngHubPane) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxHeight().width(56.dp).padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        EngHubPane.entries.forEach { pane ->
+            EngHubSidebarButton(
+                pane = pane,
+                selected = pane == selectedPane,
+                onClick = { onPaneSelected(pane) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EngHubSidebarButton(
+    pane: EngHubPane,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val backgroundColor = if (selected) {
+        MaterialTheme.colors.primary.copy(alpha = 0.16f)
+    } else {
+        Color.Transparent
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colors.primary
+    } else {
+        MaterialTheme.colors.onSurface
+    }
+
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .background(backgroundColor)
+            .semantics { contentDescription = pane.label },
+    ) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Text(
+                text = pane.icon,
+                color = contentColor,
+                style = MaterialTheme.typography.button,
+                textAlign = TextAlign.Center,
             )
         }
     }
