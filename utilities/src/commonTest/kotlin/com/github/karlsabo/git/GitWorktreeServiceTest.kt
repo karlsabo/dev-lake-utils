@@ -21,6 +21,7 @@ private class FakeGitCommandApi : GitCommandApi {
     var worktreeListResult: String = ""
     var worktreeListAction: (String) -> String = { worktreeListResult }
     var worktreeRemoveAction: (String, String) -> Unit = { _, _ -> }
+    var revParseAction: (String, Array<out String>) -> String = { _, _ -> "" }
     var executeAction: (String?, Array<out String>) -> String = { _, _ -> "" }
 
     override fun clone(url: String, targetPath: String) {
@@ -74,7 +75,7 @@ private class FakeGitCommandApi : GitCommandApi {
 
     override fun revParse(repoPath: String, vararg args: String): String {
         calls.add(Call("revParse", listOf(repoPath) + args.toList()))
-        return ""
+        return revParseAction(repoPath, args)
     }
 
     override fun execute(repoPath: String?, vararg args: String): String {
@@ -217,6 +218,36 @@ class GitWorktreeServiceTest {
             service.listWorktrees("/tmp/not-a-repo")
         }
         assertTrue(ex.message!!.contains("Failed to list worktrees"))
+    }
+
+    @Test
+    fun resolveRepositoryRoot_returnsMainRootForLinkedWorktree() {
+        val fake = FakeGitCommandApi()
+        fake.revParseAction = { _, args ->
+            assertEquals(listOf("--show-toplevel"), args.toList())
+            "/repos/dev-lake-utils-feature-worktree-panel"
+        }
+        fake.worktreeListResult = """
+            worktree /repos/dev-lake-utils
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree /repos/dev-lake-utils-feature-worktree-panel
+            HEAD def456
+            branch refs/heads/feature/worktree-panel
+        """.trimIndent()
+        val service = GitWorktreeService(fake)
+
+        val repositoryWorktrees = service.resolveRepositoryRoot(
+            "/repos/dev-lake-utils-feature-worktree-panel",
+        )
+
+        assertEquals("/repos/dev-lake-utils", repositoryWorktrees.rootPath)
+        assertEquals(
+            "/repos/dev-lake-utils-feature-worktree-panel",
+            repositoryWorktrees.selectedWorktreePath,
+        )
+        assertEquals(listOf("main", "feature/worktree-panel"), repositoryWorktrees.worktrees.map { it.branch })
     }
 
     @Test

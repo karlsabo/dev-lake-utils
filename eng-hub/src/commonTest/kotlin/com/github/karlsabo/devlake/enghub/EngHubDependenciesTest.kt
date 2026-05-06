@@ -1,6 +1,7 @@
 package com.github.karlsabo.devlake.enghub
 
 import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.GitHubApi
@@ -42,6 +43,8 @@ class EngHubDependenciesTest {
             gitHubNotificationService = notificationService,
             gitWorktreeApi = fakeGitWorktreeApi,
             desktopLauncher = fakeDesktopLauncher,
+            directoryPicker = RecordingDirectoryPicker(),
+            configWriter = RecordingEngHubConfigWriter(),
             config = config,
             notificationSubscriptionStore = fakeNotificationSubscriptionStore,
         )
@@ -97,6 +100,8 @@ class EngHubDependenciesTest {
             gitHubNotificationService = GitHubNotificationService(fakeGitHubApi),
             gitWorktreeApi = RecordingGitWorktreeApi(),
             desktopLauncher = RecordingDesktopLauncher(),
+            directoryPicker = RecordingDirectoryPicker(),
+            configWriter = RecordingEngHubConfigWriter(),
             config = config,
             notificationSubscriptionStore = fakeNotificationSubscriptionStore,
         )
@@ -146,9 +151,25 @@ private class RecordingGitWorktreeApi : GitWorktreeApi {
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        error("Unexpected call")
+    }
+
     override fun listWorktrees(repoPath: String) = emptyList<com.github.karlsabo.git.Worktree>()
 
     override fun removeWorktree(worktreePath: String) = Unit
+}
+
+private class RecordingDirectoryPicker : DirectoryPicker {
+    override suspend fun pickDirectory(title: String): String? = null
+}
+
+private class RecordingEngHubConfigWriter : EngHubConfigWriter {
+    val savedConfigs = MutableStateFlow<List<EngHubConfig>>(emptyList())
+
+    override fun save(config: EngHubConfig) {
+        savedConfigs.value += config
+    }
 }
 
 private class RecordingDesktopLauncher : DesktopLauncher {

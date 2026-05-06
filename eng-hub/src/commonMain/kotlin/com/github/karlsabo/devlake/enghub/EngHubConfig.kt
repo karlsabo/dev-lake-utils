@@ -36,3 +36,7 @@ fun saveEngHubConfig(config: EngHubConfig) {
         it.writeString(lenientJson.encodeToString(EngHubConfig.serializer(), config))
     }
 }
+
+fun interface EngHubConfigWriter {
+    fun save(config: EngHubConfig)
+}

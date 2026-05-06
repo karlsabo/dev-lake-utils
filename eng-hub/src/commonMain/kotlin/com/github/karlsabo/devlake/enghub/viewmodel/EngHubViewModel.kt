@@ -4,12 +4,16 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
+import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import com.github.karlsabo.devlake.enghub.runConfiguredWorktreeSetup
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
+import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
+import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.devlake.enghub.state.toNotificationUiState
 import com.github.karlsabo.devlake.enghub.state.toPullRequestUiState
 import com.github.karlsabo.git.GitWorktreeApi
@@ -115,9 +119,12 @@ class EngHubViewModel(
     private val gitHubNotificationService: GitHubNotificationService,
     private val gitWorktreeApi: GitWorktreeApi,
     private val desktopLauncher: DesktopLauncher,
+    private val directoryPicker: DirectoryPicker,
+    private val configWriter: EngHubConfigWriter,
     private val config: EngHubConfig,
     private val notificationSubscriptionStore: NotificationSubscriptionStore,
 ) : ViewModel() {
+    private var currentConfig = config
 
     private val actionError = MutableStateFlow<String?>(null)
     val actionErrorStateFlow: StateFlow<String?> = actionError.asStateFlow()
@@ -209,6 +216,42 @@ class EngHubViewModel(
     fun openInBrowser(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             desktopLauncher.openUrl(url)
+        }
+    }
+
+    fun pickAndAddLocalRepository() {
+        viewModelScope.launch {
+            val selectedPath = directoryPicker.pickDirectory("Add Local Repository")
+            if (selectedPath != null) {
+                addLocalRepository(selectedPath)
+            }
+        }
+    }
+
+    fun addLocalRepository(selectedPath: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val repositoryWorktrees = gitWorktreeApi.resolveRepositoryRoot(selectedPath)
+                val rootPath = repositoryWorktrees.rootPath
+                if (currentConfig.localRepositories.any { it.normalizedRepoPath() == rootPath.normalizedRepoPath() }) {
+                    actionError.value = "Repository already configured: $rootPath"
+                    return@launch
+                }
+
+                val newConfig = currentConfig.copy(localRepositories = currentConfig.localRepositories + rootPath)
+                configWriter.save(newConfig)
+                currentConfig = newConfig
+                localRepositories.value = currentConfig.localRepositories
+                    .toLocalRepositoryUiStates()
+                    .withPreservedWorktrees(
+                        previousRepositories = localRepositories.value,
+                        updatedRootPath = rootPath,
+                        updatedWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(),
+                    )
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to add local repository from $selectedPath" }
+                actionError.value = e.message ?: "Failed to add local repository"
+            }
         }
     }
 
@@ -337,5 +380,28 @@ class EngHubViewModel(
             subjectType = notification.subjectType,
             unsubscribedAtEpochMs = Clock.System.now().toEpochMilliseconds(),
         )
+    }
+}
+
+private fun String.normalizedRepoPath(): String = trim().trimEnd('/', '\\')
+
+private fun List<LocalRepositoryUiState>.withPreservedWorktrees(
+    previousRepositories: List<LocalRepositoryUiState>,
+    updatedRootPath: String,
+    updatedWorktrees: List<LocalWorktreeUiState>,
+): List<LocalRepositoryUiState> {
+    val normalizedUpdatedRootPath = updatedRootPath.normalizedRepoPath()
+    val previousWorktreesByPath = previousRepositories.associate { repository ->
+        repository.path.normalizedRepoPath() to repository.worktrees
+    }
+
+    return map { repository ->
+        val normalizedPath = repository.path.normalizedRepoPath()
+        val worktrees = if (normalizedPath == normalizedUpdatedRootPath) {
+            updatedWorktrees
+        } else {
+            previousWorktreesByPath[normalizedPath].orEmpty()
+        }
+        repository.copy(worktrees = worktrees)
     }
 }

@@ -1,7 +1,15 @@
 package com.github.karlsabo.devlake.enghub.state
 
+import com.github.karlsabo.git.Worktree
+
 data class LocalRepositoryUiState(
     val name: String,
+    val path: String,
+    val worktrees: List<LocalWorktreeUiState> = emptyList(),
+)
+
+data class LocalWorktreeUiState(
+    val branch: String,
     val path: String,
 )
 
@@ -20,6 +28,15 @@ fun List<String>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> {
                 .thenBy { it.path.lowercase() }
         )
         .toList()
+}
+
+fun List<Worktree>.toLocalWorktreeUiStates(): List<LocalWorktreeUiState> {
+    return map { worktree ->
+        LocalWorktreeUiState(
+            branch = worktree.branch.ifBlank { "(detached)" },
+            path = worktree.path,
+        )
+    }
 }
 
 private fun String.repositoryFolderName(): String {

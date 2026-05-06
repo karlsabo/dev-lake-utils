@@ -62,6 +62,36 @@ class GitWorktreeService(
         return listWorktrees(repoPath).any { it.path == worktreePath }
     }
 
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        if (!gitCommandApi.isGitRepository(selectedPath)) {
+            throw GitWorktreeException("Directory $selectedPath is not a git repository")
+        }
+
+        val selectedWorktreePath = try {
+            gitCommandApi.revParse(selectedPath, "--show-toplevel")
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Could not resolve a worktree root for $selectedPath. Please add the repository root directory.",
+                e,
+            )
+        }
+        val worktrees = listWorktrees(selectedWorktreePath)
+        val rootPath = worktrees.firstOrNull()?.path
+            ?: throw GitWorktreeException("No git worktrees found for $selectedPath")
+
+        if (worktrees.none { it.path == selectedWorktreePath }) {
+            throw GitWorktreeException(
+                "Could not match $selectedPath to a git worktree. Please add the repository root directory.",
+            )
+        }
+
+        return RepositoryWorktrees(
+            rootPath = rootPath,
+            selectedWorktreePath = selectedWorktreePath,
+            worktrees = worktrees,
+        )
+    }
+
     override fun listWorktrees(repoPath: String): List<Worktree> {
         val output = try {
             gitCommandApi.worktreeList(repoPath)

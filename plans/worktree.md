@@ -87,7 +87,9 @@
 
 **Notes:** `EngHubConfig` is already serializable and saved with `saveEngHubConfig`, so the smallest persistence path is likely adding `localRepositories: List<String> = emptyList()` to the config model. Render the folder name as the row title and the absolute path as secondary text. Sort by folder name, not by full path, so `/Users/karl.sabo/git/app` appears before `/Users/karl.sabo/git/fender`.
 
-### 3. Add Local Repository With Directory Picker
+### 3. Add Local Repository With Directory Picker - Done
+
+**Done:** 2026 05 05
 
 **Acceptance criteria:** Given Eng Hub is running with no configured local repositories, when I pick linked worktree `/Users/karl.sabo/git/dev-lake-utils-feature-worktree-panel` from the Worktrees view directory picker, then Eng Hub writes canonical root `/Users/karl.sabo/git/dev-lake-utils` to `eng-hub-config.json` and shows `dev-lake-utils` as a top-level repository row with `feature/worktree-panel` underneath it.
 

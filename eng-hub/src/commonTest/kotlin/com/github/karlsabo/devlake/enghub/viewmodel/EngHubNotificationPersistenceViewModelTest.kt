@@ -1,8 +1,11 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
+import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.GitHubApi
@@ -242,6 +245,8 @@ private fun createViewModel(
         gitHubNotificationService = GitHubNotificationService(api),
         gitWorktreeApi = NoOpGitWorktreeApi(),
         desktopLauncher = NoOpDesktopLauncher(),
+        directoryPicker = NoOpDirectoryPicker(),
+        configWriter = NoOpEngHubConfigWriter(),
         config = EngHubConfig(
             organizationIds = listOf("test-org"),
             repositoriesBaseDir = "/tmp/repos",
@@ -262,9 +267,21 @@ private class NoOpGitWorktreeApi : GitWorktreeApi {
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        error("Unexpected call")
+    }
+
     override fun listWorktrees(repoPath: String) = emptyList<com.github.karlsabo.git.Worktree>()
 
     override fun removeWorktree(worktreePath: String) = Unit
+}
+
+private class NoOpDirectoryPicker : DirectoryPicker {
+    override suspend fun pickDirectory(title: String): String? = null
+}
+
+private class NoOpEngHubConfigWriter : EngHubConfigWriter {
+    override fun save(config: EngHubConfig) = Unit
 }
 
 private class NoOpDesktopLauncher : DesktopLauncher {

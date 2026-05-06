@@ -1,8 +1,15 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.DirectoryPicker
+import com.github.karlsabo.devlake.enghub.EngHubConfig
+import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
+import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.git.RepositoryWorktrees
+import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubNotificationService
 import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.Label
 import com.github.karlsabo.github.Notification
@@ -11,11 +18,21 @@ import com.github.karlsabo.github.PullRequestHead
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.User
+import com.github.karlsabo.notifications.NotificationSubscriptionStore
+import com.github.karlsabo.system.DesktopLauncher
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+
+private const val DEV_LAKE_ROOT = "/repos/dev-lake-utils"
+private const val DEV_LAKE_SELECTED_WORKTREE = "/repos/dev-lake-utils-feature-worktree-panel"
+private const val DOCS_ROOT = "/repos/docs"
+private const val DOCS_SELECTED_WORKTREE = "/repos/docs-feature-notes"
 
 class EngHubViewModelTest {
 
@@ -59,6 +76,135 @@ class EngHubViewModelTest {
         assertEquals("feature/fallback", uiState.headRef)
         assertEquals("3/3 passed", uiState.ciSummaryText)
         assertEquals(issueApiUrl, uiState.apiUrl)
+    }
+
+    @Test
+    fun addingLinkedWorktreePersistsCanonicalRootAndShowsSelectedBranch() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktrees = RepositoryWorktrees(
+                rootPath = DEV_LAKE_ROOT,
+                selectedWorktreePath = DEV_LAKE_SELECTED_WORKTREE,
+                worktrees = listOf(
+                    Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                    Worktree(
+                        path = DEV_LAKE_SELECTED_WORKTREE,
+                        branch = "feature/worktree-panel",
+                        commitHash = "def456",
+                    ),
+                ),
+            ),
+        )
+        val configWriter = RecordingEngHubConfigWriter()
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = configWriter,
+        )
+
+        viewModel.addLocalRepository(DEV_LAKE_SELECTED_WORKTREE)
+
+        val repositories = withTimeout(2_000) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.any { it.path == DEV_LAKE_ROOT && it.worktrees.isNotEmpty() }
+            }
+        }
+
+        assertEquals(listOf(DEV_LAKE_SELECTED_WORKTREE), api.resolvedPaths)
+        assertEquals(listOf(DEV_LAKE_ROOT), configWriter.savedConfigs.value.single().localRepositories)
+        assertEquals(listOf("dev-lake-utils"), repositories.map { it.name })
+        assertEquals(listOf("main", "feature/worktree-panel"), repositories.single().worktrees.map { it.branch })
+    }
+
+    @Test
+    fun addingLocalRepositoryPreservesExistingRepositoryWorktrees() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = mapOf(
+                DEV_LAKE_SELECTED_WORKTREE to RepositoryWorktrees(
+                    rootPath = DEV_LAKE_ROOT,
+                    selectedWorktreePath = DEV_LAKE_SELECTED_WORKTREE,
+                    worktrees = listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/worktree-panel",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+                DOCS_SELECTED_WORKTREE to RepositoryWorktrees(
+                    rootPath = DOCS_ROOT,
+                    selectedWorktreePath = DOCS_SELECTED_WORKTREE,
+                    worktrees = listOf(
+                        Worktree(path = DOCS_ROOT, branch = "main", commitHash = "123abc"),
+                        Worktree(
+                            path = DOCS_SELECTED_WORKTREE,
+                            branch = "feature/notes",
+                            commitHash = "456def",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val configWriter = RecordingEngHubConfigWriter()
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = configWriter,
+        )
+
+        viewModel.addLocalRepository(DEV_LAKE_SELECTED_WORKTREE)
+        withTimeout(2_000) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.any { it.path == DEV_LAKE_ROOT && it.worktrees.isNotEmpty() }
+            }
+        }
+
+        viewModel.addLocalRepository(DOCS_SELECTED_WORKTREE)
+        val repositories = withTimeout(2_000) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.size == 2 && repositories.any { it.path == DOCS_ROOT && it.worktrees.isNotEmpty() }
+            }
+        }
+
+        assertEquals(listOf(DEV_LAKE_SELECTED_WORKTREE, DOCS_SELECTED_WORKTREE), api.resolvedPaths)
+        assertEquals(listOf(DEV_LAKE_ROOT, DOCS_ROOT), configWriter.savedConfigs.value.last().localRepositories)
+        assertEquals(
+            listOf("main", "feature/worktree-panel"),
+            repositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.branch },
+        )
+        assertEquals(
+            listOf("main", "feature/notes"),
+            repositories.single { it.path == DOCS_ROOT }.worktrees.map { it.branch },
+        )
+    }
+
+    @Test
+    fun addingDuplicateLocalRepositorySetsErrorWithoutSavingOrChangingRepositories() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktrees = RepositoryWorktrees(
+                rootPath = DEV_LAKE_ROOT,
+                selectedWorktreePath = DEV_LAKE_SELECTED_WORKTREE,
+                worktrees = listOf(
+                    Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                ),
+            ),
+        )
+        val configWriter = RecordingEngHubConfigWriter()
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = configWriter,
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+        val initialRepositories = viewModel.localRepositoriesStateFlow.value
+
+        viewModel.addLocalRepository(DEV_LAKE_SELECTED_WORKTREE)
+
+        val actionError = withTimeout(2_000) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals(listOf(DEV_LAKE_SELECTED_WORKTREE), api.resolvedPaths)
+        assertEquals("Repository already configured: $DEV_LAKE_ROOT", actionError)
+        assertEquals(emptyList(), configWriter.savedConfigs.value)
+        assertEquals(initialRepositories, viewModel.localRepositoriesStateFlow.value)
     }
 }
 
@@ -171,4 +317,81 @@ private fun testIssue(issueApiUrl: String, pullApiUrl: String?): Issue {
         pullRequest = pullApiUrl?.let { PullRequest(url = it) },
         comments = 0,
     )
+}
+
+private fun createLocalRepositoryViewModel(
+    gitWorktreeApi: RecordingGitWorktreeApi,
+    configWriter: RecordingEngHubConfigWriter,
+    localRepositories: List<String> = emptyList(),
+): EngHubViewModel {
+    val gitHubApi = RecordingGitHubApi(emptyMap())
+    return EngHubViewModel(
+        gitHubApi = gitHubApi,
+        gitHubNotificationService = GitHubNotificationService(gitHubApi),
+        gitWorktreeApi = gitWorktreeApi,
+        desktopLauncher = LocalRepositoryNoOpDesktopLauncher(),
+        directoryPicker = LocalRepositoryNoOpDirectoryPicker(),
+        configWriter = configWriter,
+        config = EngHubConfig(
+            pollIntervalMs = 60_000,
+            localRepositories = localRepositories,
+        ),
+        notificationSubscriptionStore = NoOpNotificationSubscriptionStore(),
+    )
+}
+
+private class RecordingGitWorktreeApi(
+    private val repositoryWorktreesBySelectedPath: Map<String, RepositoryWorktrees>,
+) : GitWorktreeApi {
+    constructor(repositoryWorktrees: RepositoryWorktrees) : this(
+        mapOf(repositoryWorktrees.selectedWorktreePath to repositoryWorktrees),
+    )
+
+    val resolvedPaths = mutableListOf<String>()
+
+    override fun ensureRepository(repoPath: String, cloneUrl: String) = Unit
+
+    override fun ensureWorktree(repoPath: String, branch: String): String = "$repoPath/$branch"
+
+    override fun worktreeExists(repoPath: String, branch: String): Boolean = false
+
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        resolvedPaths += selectedPath
+        return repositoryWorktreesBySelectedPath.getValue(selectedPath)
+    }
+
+    override fun listWorktrees(repoPath: String): List<Worktree> {
+        return repositoryWorktreesBySelectedPath.values.first().worktrees
+    }
+
+    override fun removeWorktree(worktreePath: String) = Unit
+}
+
+private class RecordingEngHubConfigWriter : EngHubConfigWriter {
+    val savedConfigs = MutableStateFlow<List<EngHubConfig>>(emptyList())
+
+    override fun save(config: EngHubConfig) {
+        savedConfigs.value += config
+    }
+}
+
+private class LocalRepositoryNoOpDirectoryPicker : DirectoryPicker {
+    override suspend fun pickDirectory(title: String): String? = null
+}
+
+private class LocalRepositoryNoOpDesktopLauncher : DesktopLauncher {
+    override fun openUrl(url: String) = Unit
+
+    override fun openInIdea(projectPath: String) = Unit
+}
+
+private class NoOpNotificationSubscriptionStore : NotificationSubscriptionStore {
+    override fun listUnsubscribedThreadIds(): Set<String> = emptySet()
+
+    override fun saveUnsubscribedThread(
+        threadId: String,
+        repositoryFullName: String,
+        subjectType: String,
+        unsubscribedAtEpochMs: Long,
+    ) = Unit
 }

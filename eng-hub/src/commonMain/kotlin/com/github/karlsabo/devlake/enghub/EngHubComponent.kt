@@ -37,6 +37,12 @@ interface EngHubBindings {
     fun provideDesktopLauncher(): DesktopLauncher = DesktopLauncherService()
 
     @Provides
+    fun provideDirectoryPicker(): DirectoryPicker = createDirectoryPicker()
+
+    @Provides
+    fun provideEngHubConfigWriter(): EngHubConfigWriter = EngHubConfigWriter(::saveEngHubConfig)
+
+    @Provides
     fun provideNotificationSubscriptionStore(): NotificationSubscriptionStore {
         return SqlDelightNotificationSubscriptionStore()
     }
