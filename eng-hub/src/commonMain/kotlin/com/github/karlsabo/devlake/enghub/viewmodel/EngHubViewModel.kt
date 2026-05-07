@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import me.tatarka.inject.annotations.Inject
 import java.io.IOException
+import java.util.Collections
 import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = KotlinLogging.logger {}
@@ -134,6 +135,7 @@ class EngHubViewModel(
 
     private val localRepositories = MutableStateFlow(config.localRepositories.toLocalRepositoryUiStates())
     val localRepositoriesStateFlow: StateFlow<List<LocalRepositoryUiState>> = localRepositories.asStateFlow()
+    private val localRepositoryExpansionsInFlight = Collections.synchronizedSet(mutableSetOf<String>())
 
     private val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> = actingOnThreadIds.asStateFlow()
@@ -241,16 +243,63 @@ class EngHubViewModel(
                 val newConfig = currentConfig.copy(localRepositories = currentConfig.localRepositories + rootPath)
                 configWriter.save(newConfig)
                 currentConfig = newConfig
-                localRepositories.value = currentConfig.localRepositories
-                    .toLocalRepositoryUiStates()
-                    .withPreservedWorktrees(
-                        previousRepositories = localRepositories.value,
-                        updatedRootPath = rootPath,
-                        updatedWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(),
-                    )
+                localRepositories.update { repositories ->
+                    newConfig.localRepositories
+                        .toLocalRepositoryUiStates()
+                        .withPreservedWorktrees(
+                            previousRepositories = repositories,
+                            updatedRootPath = rootPath,
+                            updatedWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(),
+                            expandUpdatedRepository = true,
+                        )
+                }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to add local repository from $selectedPath" }
                 actionError.value = e.message ?: "Failed to add local repository"
+            }
+        }
+    }
+
+    fun toggleLocalRepositoryExpansion(repoRootPath: String) {
+        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        val repository = localRepositories.value.firstOrNull {
+            it.path.normalizedRepoPath() == normalizedRepoRootPath
+        } ?: return
+
+        if (repository.isExpanded) {
+            localRepositoryExpansionsInFlight -= normalizedRepoRootPath
+            localRepositories.update { repositories ->
+                repositories.map { currentRepository ->
+                    if (currentRepository.path.normalizedRepoPath() == normalizedRepoRootPath) {
+                        currentRepository.copy(isExpanded = false)
+                    } else {
+                        currentRepository
+                    }
+                }
+            }
+            return
+        }
+
+        if (!localRepositoryExpansionsInFlight.add(normalizedRepoRootPath)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val worktrees = gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates()
+                if (normalizedRepoRootPath !in localRepositoryExpansionsInFlight) return@launch
+                localRepositories.update { repositories ->
+                    repositories.map { currentRepository ->
+                        if (currentRepository.path.normalizedRepoPath() == normalizedRepoRootPath) {
+                            currentRepository.copy(isExpanded = true, worktrees = worktrees)
+                        } else {
+                            currentRepository
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to list worktrees for $repoRootPath" }
+                actionError.value = e.message ?: "Failed to list worktrees"
+            } finally {
+                localRepositoryExpansionsInFlight -= normalizedRepoRootPath
             }
         }
     }
@@ -389,19 +438,26 @@ private fun List<LocalRepositoryUiState>.withPreservedWorktrees(
     previousRepositories: List<LocalRepositoryUiState>,
     updatedRootPath: String,
     updatedWorktrees: List<LocalWorktreeUiState>,
+    expandUpdatedRepository: Boolean = false,
 ): List<LocalRepositoryUiState> {
     val normalizedUpdatedRootPath = updatedRootPath.normalizedRepoPath()
-    val previousWorktreesByPath = previousRepositories.associate { repository ->
-        repository.path.normalizedRepoPath() to repository.worktrees
+    val previousRepositoriesByPath = previousRepositories.associateBy { repository ->
+        repository.path.normalizedRepoPath()
     }
 
     return map { repository ->
         val normalizedPath = repository.path.normalizedRepoPath()
+        val previousRepository = previousRepositoriesByPath[normalizedPath]
         val worktrees = if (normalizedPath == normalizedUpdatedRootPath) {
             updatedWorktrees
         } else {
-            previousWorktreesByPath[normalizedPath].orEmpty()
+            previousRepository?.worktrees.orEmpty()
         }
-        repository.copy(worktrees = worktrees)
+        val isExpanded = if (normalizedPath == normalizedUpdatedRootPath && expandUpdatedRepository) {
+            true
+        } else {
+            previousRepository?.isExpanded ?: repository.isExpanded
+        }
+        repository.copy(isExpanded = isExpanded, worktrees = worktrees)
     }
 }

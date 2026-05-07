@@ -11,7 +11,6 @@ import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubNotificationService
 import com.github.karlsabo.github.Issue
-import com.github.karlsabo.github.Label
 import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.PullRequestHead
@@ -20,6 +19,7 @@ import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.User
 import com.github.karlsabo.notifications.NotificationSubscriptionStore
 import com.github.karlsabo.system.DesktopLauncher
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -28,6 +28,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val DEV_LAKE_ROOT = "/repos/dev-lake-utils"
 private const val DEV_LAKE_SELECTED_WORKTREE = "/repos/dev-lake-utils-feature-worktree-panel"
@@ -102,7 +103,7 @@ class EngHubViewModelTest {
 
         viewModel.addLocalRepository(DEV_LAKE_SELECTED_WORKTREE)
 
-        val repositories = withTimeout(2_000) {
+        val repositories = withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->
                 repositories.any { it.path == DEV_LAKE_ROOT && it.worktrees.isNotEmpty() }
             }
@@ -151,14 +152,14 @@ class EngHubViewModelTest {
         )
 
         viewModel.addLocalRepository(DEV_LAKE_SELECTED_WORKTREE)
-        withTimeout(2_000) {
+        withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->
                 repositories.any { it.path == DEV_LAKE_ROOT && it.worktrees.isNotEmpty() }
             }
         }
 
         viewModel.addLocalRepository(DOCS_SELECTED_WORKTREE)
-        val repositories = withTimeout(2_000) {
+        val repositories = withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->
                 repositories.size == 2 && repositories.any { it.path == DOCS_ROOT && it.worktrees.isNotEmpty() }
             }
@@ -197,7 +198,7 @@ class EngHubViewModelTest {
 
         viewModel.addLocalRepository(DEV_LAKE_SELECTED_WORKTREE)
 
-        val actionError = withTimeout(2_000) {
+        val actionError = withTimeout(2_000.milliseconds) {
             viewModel.actionErrorStateFlow.first { it != null }
         }
 
@@ -205,6 +206,150 @@ class EngHubViewModelTest {
         assertEquals("Repository already configured: $DEV_LAKE_ROOT", actionError)
         assertEquals(emptyList(), configWriter.savedConfigs.value)
         assertEquals(initialRepositories, viewModel.localRepositoriesStateFlow.value)
+    }
+
+    @Test
+    fun expandingConfiguredRepositoryListsWorktreesAndShowsBranches() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            worktreesByRepoPath = mapOf(
+                DEV_LAKE_ROOT to listOf(
+                    Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                    Worktree(
+                        path = DEV_LAKE_SELECTED_WORKTREE,
+                        branch = "feature/worktree-panel",
+                        commitHash = "def456",
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().isExpanded && repositories.single().worktrees.size == 2
+            }.single()
+        }
+
+        assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
+        assertEquals(listOf("main", "feature/worktree-panel"), repository.worktrees.map { it.branch })
+    }
+
+    @Test
+    fun concurrentRepositoryExpansionsPreserveBothRepositoryStates() = runBlocking {
+        val devLakeListStarted = CompletableDeferred<Unit>()
+        val docsListStarted = CompletableDeferred<Unit>()
+        val releaseLists = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            worktreesByRepoPath = mapOf(
+                DEV_LAKE_ROOT to listOf(
+                    Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                ),
+                DOCS_ROOT to listOf(
+                    Worktree(path = DOCS_ROOT, branch = "docs-main", commitHash = "123abc"),
+                ),
+            ),
+            onListWorktrees = { repoPath ->
+                when (repoPath) {
+                    DEV_LAKE_ROOT -> devLakeListStarted.complete(Unit)
+                    DOCS_ROOT -> docsListStarted.complete(Unit)
+                }
+                runBlocking { releaseLists.await() }
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT, DOCS_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        viewModel.toggleLocalRepositoryExpansion(DOCS_ROOT)
+        withTimeout(2_000.milliseconds) {
+            devLakeListStarted.await()
+            docsListStarted.await()
+        }
+
+        releaseLists.complete(Unit)
+        val repositories = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.all { it.isExpanded && it.worktrees.isNotEmpty() }
+            }
+        }
+
+        assertEquals(setOf(DEV_LAKE_ROOT, DOCS_ROOT), api.listWorktreeRepoPaths.toSet())
+        assertEquals(listOf("main"), repositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.branch })
+        assertEquals(listOf("docs-main"), repositories.single { it.path == DOCS_ROOT }.worktrees.map { it.branch })
+    }
+
+    @Test
+    fun expandingConfiguredRepositoryFailureSetsActionErrorWithoutExpanding() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            listWorktreesFailure = IllegalStateException("git worktree list failed"),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
+        assertEquals("git worktree list failed", actionError)
+        assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
+        assertEquals(emptyList(), viewModel.localRepositoriesStateFlow.value.single().worktrees)
+    }
+
+    @Test
+    fun duplicateExpandClicksWhileLoadingDoNotStartStaleExpansionJobs() = runBlocking {
+        val listStarted = CompletableDeferred<Unit>()
+        val releaseList = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            worktreesByRepoPath = mapOf(
+                DEV_LAKE_ROOT to listOf(
+                    Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                ),
+            ),
+            onListWorktrees = {
+                listStarted.complete(Unit)
+                runBlocking { releaseList.await() }
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            listStarted.await()
+        }
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+
+        assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
+
+        releaseList.complete(Unit)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().isExpanded
+            }
+        }
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+
+        assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
     }
 }
 
@@ -291,7 +436,7 @@ private class RecordingGitHubApi(
     }
 }
 
-private fun testIssue(issueApiUrl: String, pullApiUrl: String?): Issue {
+private fun testIssue(@Suppress("SameParameterValue") issueApiUrl: String, pullApiUrl: String?): Issue {
     val now = Clock.System.now()
     return Issue(
         url = issueApiUrl,
@@ -309,7 +454,7 @@ private fun testIssue(issueApiUrl: String, pullApiUrl: String?): Issue {
         ),
         body = null,
         htmlUrl = "https://github.com/test-org/test-repo/pull/25843",
-        labels = emptyList<Label>(),
+        labels = emptyList(),
         draft = false,
         createdAt = now,
         updatedAt = now,
@@ -342,12 +487,34 @@ private fun createLocalRepositoryViewModel(
 
 private class RecordingGitWorktreeApi(
     private val repositoryWorktreesBySelectedPath: Map<String, RepositoryWorktrees>,
+    worktreesByRepoPath: Map<String, List<Worktree>>? = null,
+    private val listWorktreesFailure: RuntimeException? = null,
+    private val onListWorktrees: (String) -> Unit = {},
 ) : GitWorktreeApi {
+    constructor(
+        worktreesByRepoPath: Map<String, List<Worktree>>,
+        onListWorktrees: (String) -> Unit = {},
+    ) : this(
+        repositoryWorktreesBySelectedPath = emptyMap(),
+        worktreesByRepoPath = worktreesByRepoPath,
+        onListWorktrees = onListWorktrees,
+    )
+
+    constructor(
+        listWorktreesFailure: RuntimeException,
+    ) : this(
+        repositoryWorktreesBySelectedPath = emptyMap(),
+        listWorktreesFailure = listWorktreesFailure,
+    )
+
     constructor(repositoryWorktrees: RepositoryWorktrees) : this(
         mapOf(repositoryWorktrees.selectedWorktreePath to repositoryWorktrees),
     )
 
     val resolvedPaths = mutableListOf<String>()
+    val listWorktreeRepoPaths = mutableListOf<String>()
+    private val worktreesByRepoPath = worktreesByRepoPath
+        ?: repositoryWorktreesBySelectedPath.values.associate { it.rootPath to it.worktrees }
 
     override fun ensureRepository(repoPath: String, cloneUrl: String) = Unit
 
@@ -361,7 +528,10 @@ private class RecordingGitWorktreeApi(
     }
 
     override fun listWorktrees(repoPath: String): List<Worktree> {
-        return repositoryWorktreesBySelectedPath.values.first().worktrees
+        listWorktreeRepoPaths += repoPath
+        onListWorktrees(repoPath)
+        listWorktreesFailure?.let { throw it }
+        return worktreesByRepoPath.getValue(repoPath)
     }
 
     override fun removeWorktree(worktreePath: String) = Unit

@@ -5,6 +5,7 @@ import com.github.karlsabo.git.Worktree
 data class LocalRepositoryUiState(
     val name: String,
     val path: String,
+    val isExpanded: Boolean = false,
     val worktrees: List<LocalWorktreeUiState> = emptyList(),
 )
 

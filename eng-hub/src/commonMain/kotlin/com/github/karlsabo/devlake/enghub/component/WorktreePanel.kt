@@ -13,11 +13,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.Button
 import androidx.compose.material.Card
+import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
@@ -26,6 +29,7 @@ import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 fun WorktreePanel(
     localRepositories: List<LocalRepositoryUiState>,
     onAddRepository: () -> Unit,
+    onToggleRepository: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -48,7 +52,10 @@ fun WorktreePanel(
             } else {
                 LazyColumn {
                     items(localRepositories, key = { it.path }) { repository ->
-                        LocalRepositoryRow(repository = repository)
+                        LocalRepositoryRow(
+                            repository = repository,
+                            onToggleRepository = { onToggleRepository(repository.path) },
+                        )
                     }
                 }
             }
@@ -57,18 +64,44 @@ fun WorktreePanel(
 }
 
 @Composable
-private fun LocalRepositoryRow(repository: LocalRepositoryUiState) {
+private fun LocalRepositoryRow(
+    repository: LocalRepositoryUiState,
+    onToggleRepository: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         elevation = 2.dp,
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            Text(
-                text = repository.name,
-                style = MaterialTheme.typography.subtitle1,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = onToggleRepository,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .semantics {
+                            contentDescription = if (repository.isExpanded) {
+                                "Collapse ${repository.name}"
+                            } else {
+                                "Expand ${repository.name}"
+                            }
+                        },
+                ) {
+                    Text(
+                        text = if (repository.isExpanded) "-" else "+",
+                        style = MaterialTheme.typography.button,
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = repository.name,
+                    style = MaterialTheme.typography.subtitle1,
+                )
+            }
             Text(text = repository.path, style = MaterialTheme.typography.caption)
-            if (repository.worktrees.isNotEmpty()) {
+            if (repository.isExpanded && repository.worktrees.isNotEmpty()) {
                 Spacer(modifier = Modifier.size(8.dp))
                 repository.worktrees.forEach { worktree ->
                     LocalWorktreeRow(worktree = worktree)

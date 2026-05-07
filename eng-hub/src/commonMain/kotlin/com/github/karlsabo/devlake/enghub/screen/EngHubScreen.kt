@@ -104,6 +104,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                     EngHubPane.Worktrees -> WorktreePanel(
                         localRepositories = localRepositories,
                         onAddRepository = { viewModel.pickAndAddLocalRepository() },
+                        onToggleRepository = { viewModel.toggleLocalRepositoryExpansion(it) },
                         modifier = Modifier.weight(1f),
                     )
                 }
