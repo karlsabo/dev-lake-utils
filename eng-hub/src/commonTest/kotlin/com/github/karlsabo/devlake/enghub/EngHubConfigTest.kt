@@ -12,6 +12,7 @@ class EngHubConfigTest {
         val config = EngHubConfig(
             organizationIds = listOf("example-org"),
             pollIntervalMs = 600_000,
+            worktreePollIntervalMs = 120_000,
             repositoriesBaseDir = "/tmp/example/repos",
             gitHubAuthor = "example-author",
             planningMarkdownDir = "/tmp/example/llm-planning",
@@ -36,6 +37,7 @@ class EngHubConfigTest {
         assertTrue(json.contains("\"setupShell\""))
         assertTrue(json.contains("\"planningMarkdownDir\""))
         assertTrue(json.contains("\"localRepositories\""))
+        assertTrue(json.contains("\"worktreePollIntervalMs\""))
     }
 
     @Test
@@ -55,6 +57,7 @@ class EngHubConfigTest {
         assertEquals("/bin/zsh", decoded.setupShell)
         assertEquals("", decoded.planningMarkdownDir)
         assertEquals(emptyList(), decoded.localRepositories)
+        assertEquals(120_000, decoded.worktreePollIntervalMs)
     }
 
     @Test

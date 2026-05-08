@@ -15,6 +15,7 @@ import kotlin.time.Duration.Companion.minutes
 data class EngHubConfig(
     val organizationIds: List<String> = emptyList(),
     val pollIntervalMs: Long = 10.minutes.inWholeMilliseconds,
+    val worktreePollIntervalMs: Long = 2.minutes.inWholeMilliseconds,
     val repositoriesBaseDir: String = "",
     val gitHubAuthor: String = "",
     val planningMarkdownDir: String = "",

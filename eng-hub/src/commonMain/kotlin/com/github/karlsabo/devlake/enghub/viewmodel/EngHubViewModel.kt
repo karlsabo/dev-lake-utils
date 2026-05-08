@@ -32,6 +32,7 @@ import com.github.karlsabo.github.pullRequestDetailsUrl
 import com.github.karlsabo.notifications.NotificationSubscriptionStore
 import com.github.karlsabo.system.DesktopLauncher
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -139,6 +140,12 @@ class EngHubViewModel(
 
     private val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> = actingOnThreadIds.asStateFlow()
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            pollConfiguredLocalRepositoryWorktrees()
+        }
+    }
 
     fun clearActionError() {
         actionError.value = null
@@ -284,17 +291,9 @@ class EngHubViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val worktrees = gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates()
+                val worktrees = listLocalWorktreeUiStates(repoRootPath)
                 if (normalizedRepoRootPath !in localRepositoryExpansionsInFlight) return@launch
-                localRepositories.update { repositories ->
-                    repositories.map { currentRepository ->
-                        if (currentRepository.path.normalizedRepoPath() == normalizedRepoRootPath) {
-                            currentRepository.copy(isExpanded = true, worktrees = worktrees)
-                        } else {
-                            currentRepository
-                        }
-                    }
-                }
+                updateLocalRepositoryWorktrees(repoRootPath, worktrees, isExpanded = true)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to list worktrees for $repoRootPath" }
                 actionError.value = e.message ?: "Failed to list worktrees"
@@ -429,6 +428,54 @@ class EngHubViewModel(
             subjectType = notification.subjectType,
             unsubscribedAtEpochMs = Clock.System.now().toEpochMilliseconds(),
         )
+    }
+
+    private suspend fun pollConfiguredLocalRepositoryWorktrees() {
+        while (true) {
+            delay(currentConfig.worktreePollIntervalMs.coerceAtLeast(1).milliseconds)
+            refreshConfiguredLocalRepositoryWorktrees()
+        }
+    }
+
+    private fun refreshConfiguredLocalRepositoryWorktrees() {
+        currentConfig.localRepositories
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinctBy { it.normalizedRepoPath() }
+            .forEach { repoRootPath ->
+                try {
+                    updateLocalRepositoryWorktrees(repoRootPath, listLocalWorktreeUiStates(repoRootPath))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.error(e) { "Failed to poll worktrees for $repoRootPath" }
+                }
+            }
+    }
+
+    private fun listLocalWorktreeUiStates(repoRootPath: String): List<LocalWorktreeUiState> {
+        return gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates()
+    }
+
+    private fun updateLocalRepositoryWorktrees(
+        repoRootPath: String,
+        worktrees: List<LocalWorktreeUiState>,
+        isExpanded: Boolean? = null,
+    ) {
+        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        localRepositories.update { repositories ->
+            repositories.map { currentRepository ->
+                if (currentRepository.path.normalizedRepoPath() == normalizedRepoRootPath) {
+                    currentRepository.copy(
+                        isExpanded = isExpanded ?: currentRepository.isExpanded,
+                        worktrees = worktrees,
+                    )
+                } else {
+                    currentRepository
+                }
+            }
+        }
     }
 }
 

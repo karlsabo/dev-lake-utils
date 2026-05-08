@@ -123,7 +123,9 @@
 
 **Notes:** Dirty status can be based on `git status --porcelain` for the worktree path. Keep the row display compact: branch name plus a green light for clean or yellow light for dirty.
 
-### 6. Poll All Configured Repositories Every 2 Minutes
+### 6. Poll All Configured Repositories Every 2 Minutes - Done
+
+**Done:** 2026 05 08
 
 **Acceptance criteria:** Given `dev-lake-utils` is configured and linked worktree `feature/worktree-panel` is created outside Eng Hub, when the 2-minute local worktree poll interval elapses, then the next time I view or expand `dev-lake-utils`, the `feature/worktree-panel` worktree row appears with current dirty status without refreshing PRs or notifications.
 

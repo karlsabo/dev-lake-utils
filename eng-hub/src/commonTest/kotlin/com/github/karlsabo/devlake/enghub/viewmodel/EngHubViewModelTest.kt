@@ -243,6 +243,63 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun worktreePollRefreshesAllConfiguredRepositoriesWithoutRefreshingGitHubData() = runBlocking {
+        val listCountsByRepo = mutableMapOf<String, Int>()
+        val api = RecordingGitWorktreeApi(
+            worktreesForRepoPath = { repoPath ->
+                val callCount = listCountsByRepo.getOrElse(repoPath) { 0 } + 1
+                listCountsByRepo[repoPath] = callCount
+                when (repoPath) {
+                    DEV_LAKE_ROOT -> if (callCount == 1) {
+                        listOf(Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"))
+                    } else {
+                        listOf(
+                            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                            Worktree(
+                                path = DEV_LAKE_SELECTED_WORKTREE,
+                                branch = "feature/worktree-panel",
+                                commitHash = "def456",
+                                isDirty = true,
+                            ),
+                        )
+                    }
+
+                    DOCS_ROOT -> listOf(Worktree(path = DOCS_ROOT, branch = "docs-main", commitHash = "123abc"))
+                    else -> error("Unexpected repo path $repoPath")
+                }
+            },
+        )
+        val gitHubApi = RecordingGitHubApi(emptyMap())
+        val viewModel = createLocalRepositoryViewModel(
+            gitHubApi = gitHubApi,
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT, DOCS_ROOT),
+            worktreePollIntervalMs = 25,
+        )
+
+        val repositories = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                val devLake = repositories.single { it.path == DEV_LAKE_ROOT }
+                val docs = repositories.single { it.path == DOCS_ROOT }
+                !devLake.isExpanded &&
+                        !docs.isExpanded &&
+                        devLake.worktrees.size == 2 &&
+                        docs.worktrees.size == 1
+            }
+        }
+
+        assertEquals(setOf(DEV_LAKE_ROOT, DOCS_ROOT), api.listWorktreeRepoPaths.toSet())
+        assertEquals(
+            listOf("main", "feature/worktree-panel"),
+            repositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.branch })
+        assertEquals(listOf(false, true), repositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.isDirty })
+        assertEquals(listOf("docs-main"), repositories.single { it.path == DOCS_ROOT }.worktrees.map { it.branch })
+        assertEquals(0, gitHubApi.openPullRequestCalls)
+        assertEquals(0, gitHubApi.notificationListCalls)
+    }
+
+    @Test
     fun concurrentRepositoryExpansionsPreserveBothRepositoryStates() = runBlocking {
         val devLakeListStarted = CompletableDeferred<Unit>()
         val docsListStarted = CompletableDeferred<Unit>()
@@ -359,6 +416,10 @@ private class RecordingGitHubApi(
     private val pullRequestsByUrl: Map<String, PullRequest>,
 ) : GitHubApi {
     val pullRequestByUrlCalls = mutableListOf<String>()
+    var openPullRequestCalls = 0
+        private set
+    var notificationListCalls = 0
+        private set
 
     override suspend fun getPullRequestByUrl(url: String): PullRequest {
         pullRequestByUrlCalls += url
@@ -366,6 +427,7 @@ private class RecordingGitHubApi(
     }
 
     override suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String): List<Issue> {
+        openPullRequestCalls += 1
         error("Unexpected call")
     }
 
@@ -414,6 +476,7 @@ private class RecordingGitHubApi(
     }
 
     override suspend fun listNotifications(): List<Notification> {
+        notificationListCalls += 1
         error("Unexpected call")
     }
 
@@ -467,11 +530,12 @@ private fun testIssue(@Suppress("SameParameterValue") issueApiUrl: String, pullA
 }
 
 private fun createLocalRepositoryViewModel(
+    gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()),
     gitWorktreeApi: RecordingGitWorktreeApi,
     configWriter: RecordingEngHubConfigWriter,
     localRepositories: List<String> = emptyList(),
+    worktreePollIntervalMs: Long = 120_000,
 ): EngHubViewModel {
-    val gitHubApi = RecordingGitHubApi(emptyMap())
     return EngHubViewModel(
         gitHubApi = gitHubApi,
         gitHubNotificationService = GitHubNotificationService(gitHubApi),
@@ -481,6 +545,7 @@ private fun createLocalRepositoryViewModel(
         configWriter = configWriter,
         config = EngHubConfig(
             pollIntervalMs = 60_000,
+            worktreePollIntervalMs = worktreePollIntervalMs,
             localRepositories = localRepositories,
         ),
         notificationSubscriptionStore = NoOpNotificationSubscriptionStore(),
@@ -490,9 +555,17 @@ private fun createLocalRepositoryViewModel(
 private class RecordingGitWorktreeApi(
     private val repositoryWorktreesBySelectedPath: Map<String, RepositoryWorktrees>,
     worktreesByRepoPath: Map<String, List<Worktree>>? = null,
+    private val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
     private val listWorktreesFailure: RuntimeException? = null,
     private val onListWorktrees: (String) -> Unit = {},
 ) : GitWorktreeApi {
+    constructor(
+        worktreesForRepoPath: (String) -> List<Worktree>,
+    ) : this(
+        repositoryWorktreesBySelectedPath = emptyMap(),
+        worktreesForRepoPath = worktreesForRepoPath,
+    )
+
     constructor(
         worktreesByRepoPath: Map<String, List<Worktree>>,
         onListWorktrees: (String) -> Unit = {},
@@ -533,7 +606,7 @@ private class RecordingGitWorktreeApi(
         listWorktreeRepoPaths += repoPath
         onListWorktrees(repoPath)
         listWorktreesFailure?.let { throw it }
-        return worktreesByRepoPath.getValue(repoPath)
+        return worktreesForRepoPath?.invoke(repoPath) ?: worktreesByRepoPath.getValue(repoPath)
     }
 
     override fun removeWorktree(worktreePath: String) = Unit
