@@ -111,7 +111,9 @@
 
 **Notes:** The git layer already parses porcelain worktree output into `Worktree(path, branch, commitHash)` (`utilities/src/commonMain/kotlin/com/github/karlsabo/git/Worktree.kt`). Keep this first expand story focused on the tree structure: repo rows at the top level, worktree rows underneath expanded repo roots.
 
-### 5. Show Dirty Status When Expanding Worktrees
+### 5. Show Dirty Status When Expanding Worktrees - Done
+
+**Done:** 2026 05 08
 
 **Acceptance criteria:** Given `/Users/karl.sabo/git/dev-lake-utils` is a configured local repository with clean `main` and dirty `feature/worktree-panel` worktrees, when I expand the `dev-lake-utils` repository row, then the `main` row shows a green light emoji and the `feature/worktree-panel` row shows a yellow light emoji.
 
