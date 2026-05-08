@@ -124,6 +124,7 @@ class EngHubViewModelTest {
         assertEquals(listOf(DEV_LAKE_ROOT), configWriter.savedConfigs.value.single().localRepositories)
         assertEquals(listOf("dev-lake-utils"), repositories.map { it.name })
         assertEquals(listOf("main", "feature/worktree-panel"), repositories.single().worktrees.map { it.branch })
+        assertEquals(listOf(true, false), repositories.single().worktrees.map { it.isRoot })
     }
 
     @Test
@@ -251,6 +252,7 @@ class EngHubViewModelTest {
         assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
         assertEquals(listOf("main", "feature/worktree-panel"), repository.worktrees.map { it.branch })
         assertEquals(listOf(false, true), repository.worktrees.map { it.isDirty })
+        assertEquals(listOf(true, false), repository.worktrees.map { it.isRoot })
     }
 
     @Test

@@ -147,7 +147,9 @@
 
 **Notes:** This deliberately matches current setup semantics rather than forcing `DesktopLauncher.openInIdea`, because the configured setup commands are expected to eventually call `idea .` (`eng-hub/README.md:112`). Reuse the same setup-command behavior as current PR/notification setup, but target the existing selected worktree path rather than ensuring a new branch worktree.
 
-### 8. Prevent Archiving Root Worktree
+### 8. Prevent Archiving Root Worktree - Done
+
+**Done:** 2026 05 08
 
 **Acceptance criteria:** Given the `dev-lake-utils` repository row is expanded and shows root worktree `/Users/karl.sabo/git/dev-lake-utils`, when I open that worktree row menu, then `Archive` is not available for the root worktree.
 

@@ -40,12 +40,13 @@ class LocalRepositoryUiStateTest {
     }
 
     @Test
-    fun mapsWorktreeDirtyStatus() {
+    fun mapsWorktreeDirtyStatusAndRootStatus() {
         val uiStates = listOf(
             Worktree(path = "/repo", branch = "main", commitHash = "abc123", isDirty = false),
             Worktree(path = "/repo-feature", branch = "feature/x", commitHash = "def456", isDirty = true),
-        ).toLocalWorktreeUiStates()
+        ).toLocalWorktreeUiStates("/repo/")
 
         assertEquals(listOf(false, true), uiStates.map { it.isDirty })
+        assertEquals(listOf(true, false), uiStates.map { it.isRoot })
     }
 }

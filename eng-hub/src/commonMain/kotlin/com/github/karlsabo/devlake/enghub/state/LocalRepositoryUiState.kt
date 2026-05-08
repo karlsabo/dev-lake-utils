@@ -13,6 +13,7 @@ data class LocalWorktreeUiState(
     val branch: String,
     val path: String,
     val isDirty: Boolean = false,
+    val isRoot: Boolean = false,
 )
 
 fun List<String>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> {
@@ -32,17 +33,21 @@ fun List<String>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> {
         .toList()
 }
 
-fun List<Worktree>.toLocalWorktreeUiStates(): List<LocalWorktreeUiState> {
+fun List<Worktree>.toLocalWorktreeUiStates(repositoryRootPath: String): List<LocalWorktreeUiState> {
+    val normalizedRepositoryRootPath = repositoryRootPath.normalizedLocalPath()
     return map { worktree ->
         LocalWorktreeUiState(
             branch = worktree.branch.ifBlank { "(detached)" },
             path = worktree.path,
             isDirty = worktree.isDirty,
+            isRoot = worktree.path.normalizedLocalPath() == normalizedRepositoryRootPath,
         )
     }
 }
 
 private fun String.repositoryFolderName(): String {
-    val normalized = trimEnd('/', '\\')
+    val normalized = normalizedLocalPath()
     return normalized.substringAfterLast('/').substringAfterLast('\\').ifEmpty { normalized }
 }
+
+private fun String.normalizedLocalPath(): String = trim().trimEnd('/', '\\')

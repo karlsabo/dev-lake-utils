@@ -258,7 +258,7 @@ class EngHubViewModel(
                         .withPreservedWorktrees(
                             previousRepositories = repositories,
                             updatedRootPath = rootPath,
-                            updatedWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(),
+                            updatedWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(rootPath),
                             expandUpdatedRepository = true,
                         )
                 }
@@ -463,7 +463,7 @@ class EngHubViewModel(
     }
 
     private fun listLocalWorktreeUiStates(repoRootPath: String): List<LocalWorktreeUiState> {
-        return gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates()
+        return gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
     }
 
     private fun markLocalWorktreeOpening(normalizedWorktreePath: String): Boolean {

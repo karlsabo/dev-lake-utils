@@ -32,6 +32,18 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 
+internal enum class WorktreeMenuAction {
+    Open,
+    Archive,
+}
+
+internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<WorktreeMenuAction> {
+    return buildList {
+        add(WorktreeMenuAction.Open)
+        if (!worktree.isRoot) add(WorktreeMenuAction.Archive)
+    }
+}
+
 @Composable
 fun WorktreePanel(
     localRepositories: List<LocalRepositoryUiState>,
@@ -175,14 +187,25 @@ private fun LocalWorktreeRow(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
             ) {
-                DropdownMenuItem(
-                    onClick = {
-                        menuExpanded = false
-                        onOpen()
-                    },
-                    enabled = !isOpening,
-                ) {
-                    Text(if (isOpening) "Setting up..." else "Open")
+                visibleWorktreeMenuActions(worktree).forEach { action ->
+                    when (action) {
+                        WorktreeMenuAction.Open -> DropdownMenuItem(
+                            onClick = {
+                                menuExpanded = false
+                                onOpen()
+                            },
+                            enabled = !isOpening,
+                        ) {
+                            Text(if (isOpening) "Setting up..." else "Open")
+                        }
+
+                        WorktreeMenuAction.Archive -> DropdownMenuItem(
+                            onClick = { menuExpanded = false },
+                            enabled = false,
+                        ) {
+                            Text("Archive")
+                        }
+                    }
                 }
             }
         }
