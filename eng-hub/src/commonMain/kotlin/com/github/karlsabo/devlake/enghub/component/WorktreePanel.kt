@@ -13,10 +13,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.Button
 import androidx.compose.material.Card
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -30,6 +37,8 @@ fun WorktreePanel(
     localRepositories: List<LocalRepositoryUiState>,
     onAddRepository: () -> Unit,
     onToggleRepository: (String) -> Unit,
+    onOpenWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
+    openingWorktreePaths: Set<String>,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -55,6 +64,8 @@ fun WorktreePanel(
                         LocalRepositoryRow(
                             repository = repository,
                             onToggleRepository = { onToggleRepository(repository.path) },
+                            onOpenWorktree = onOpenWorktree,
+                            openingWorktreePaths = openingWorktreePaths,
                         )
                     }
                 }
@@ -67,6 +78,8 @@ fun WorktreePanel(
 private fun LocalRepositoryRow(
     repository: LocalRepositoryUiState,
     onToggleRepository: () -> Unit,
+    onOpenWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
+    openingWorktreePaths: Set<String>,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -104,7 +117,14 @@ private fun LocalRepositoryRow(
             if (repository.isExpanded && repository.worktrees.isNotEmpty()) {
                 Spacer(modifier = Modifier.size(8.dp))
                 repository.worktrees.forEach { worktree ->
-                    LocalWorktreeRow(worktree = worktree)
+                    val normalizedWorktreePath = worktree.path.normalizedWorktreePath()
+                    key(normalizedWorktreePath) {
+                        LocalWorktreeRow(
+                            worktree = worktree,
+                            isOpening = normalizedWorktreePath in openingWorktreePaths,
+                            onOpen = { onOpenWorktree(repository.path, worktree.path) },
+                        )
+                    }
                 }
             }
         }
@@ -112,7 +132,13 @@ private fun LocalRepositoryRow(
 }
 
 @Composable
-private fun LocalWorktreeRow(worktree: LocalWorktreeUiState) {
+private fun LocalWorktreeRow(
+    worktree: LocalWorktreeUiState,
+    isOpening: Boolean,
+    onOpen: () -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -126,6 +152,41 @@ private fun LocalWorktreeRow(worktree: LocalWorktreeUiState) {
             style = MaterialTheme.typography.body2,
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = worktree.branch, style = MaterialTheme.typography.body2)
+        Text(
+            text = worktree.branch,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.body2,
+        )
+        if (isOpening) {
+            Text(text = "Setting up...", style = MaterialTheme.typography.caption)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Box {
+            IconButton(
+                onClick = { menuExpanded = true },
+                enabled = !isOpening,
+                modifier = Modifier
+                    .size(32.dp)
+                    .semantics { contentDescription = "Worktree actions for ${worktree.branch}" },
+            ) {
+                Text(text = "⋮", style = MaterialTheme.typography.button)
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    onClick = {
+                        menuExpanded = false
+                        onOpen()
+                    },
+                    enabled = !isOpening,
+                ) {
+                    Text(if (isOpening) "Setting up..." else "Open")
+                }
+            }
+        }
     }
 }
+
+private fun String.normalizedWorktreePath(): String = trim().trimEnd('/', '\\')

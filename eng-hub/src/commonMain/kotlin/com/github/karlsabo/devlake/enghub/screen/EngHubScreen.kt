@@ -50,6 +50,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
     val checkoutInProgress by viewModel.checkoutInProgressStateFlow.collectAsState()
     val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
+    val openingLocalWorktreePaths by viewModel.openingLocalWorktreePathsStateFlow.collectAsState()
     var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
 
     actionError?.let { error ->
@@ -105,6 +106,10 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                         localRepositories = localRepositories,
                         onAddRepository = { viewModel.pickAndAddLocalRepository() },
                         onToggleRepository = { viewModel.toggleLocalRepositoryExpansion(it) },
+                        onOpenWorktree = { repoRootPath, worktreePath ->
+                            viewModel.openLocalWorktree(repoRootPath, worktreePath)
+                        },
+                        openingWorktreePaths = openingLocalWorktreePaths,
                         modifier = Modifier.weight(1f),
                     )
                 }

@@ -20,14 +20,25 @@ import com.github.karlsabo.github.User
 import com.github.karlsabo.notifications.NotificationSubscriptionStore
 import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.SystemTemporaryDirectory
+import kotlinx.io.readString
+import kotlinx.io.writeString
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val DEV_LAKE_ROOT = "/repos/dev-lake-utils"
@@ -410,6 +421,184 @@ class EngHubViewModelTest {
 
         assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
     }
+
+    @Test
+    fun openingExistingWorktreeRunsConfiguredSetupInSelectedWorktreePath() = runBlocking {
+        val repoRoot = createTempDir("repo")
+        val worktreePath = createTempDir("worktree")
+        try {
+            val api = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = api,
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositories = listOf(repoRoot),
+                worktreeSetupCommands = mapOf(repoRoot to listOf("pwd > opened-path.txt")),
+                setupShell = "/bin/bash",
+            )
+
+            viewModel.openLocalWorktree(repoRoot, worktreePath)
+
+            withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+            }
+
+            val openedPath = readText(Path(worktreePath, "opened-path.txt")).trim()
+            assertTrue(openedPath.endsWith(worktreePath.substringAfterLast('/')))
+            assertEquals(emptyList(), api.ensureWorktreeCalls)
+            assertEquals(emptyList(), api.ensureRepositoryCalls)
+        } finally {
+            removeTempDir(repoRoot)
+            removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
+    fun openingExistingWorktreeTracksProgressForSelectedWorktreeOnly() = runBlocking {
+        val repoRoot = createTempDir("repo")
+        val worktreePath = createTempDir("worktree")
+        try {
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositories = listOf(repoRoot),
+                worktreeSetupCommands = mapOf(
+                    repoRoot to listOf("while [ ! -f release-open ]; do sleep 0.01; done"),
+                ),
+                setupShell = "/bin/bash",
+            )
+
+            viewModel.openLocalWorktree(repoRoot, worktreePath)
+
+            val inProgress = withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath in it }
+            }
+            assertEquals(setOf(worktreePath), inProgress)
+
+            writeText(Path(worktreePath, "release-open"), "")
+            val completed = withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+            }
+            assertEquals(emptySet(), completed)
+        } finally {
+            removeTempDir(repoRoot)
+            removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
+    fun concurrentExistingWorktreeCompletionsClearAllProgress() = runBlocking {
+        val repoRoot = createTempDir("repo")
+        val firstWorktreePath = createTempDir("worktree-first")
+        val secondWorktreePath = createTempDir("worktree-second")
+        try {
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositories = listOf(repoRoot),
+                worktreeSetupCommands = mapOf(
+                    repoRoot to listOf("while [ ! -f release-open ]; do sleep 0.01; done"),
+                ),
+                setupShell = "/bin/bash",
+            )
+
+            viewModel.openLocalWorktree(repoRoot, firstWorktreePath)
+            viewModel.openLocalWorktree(repoRoot, secondWorktreePath)
+
+            val inProgress = withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { paths ->
+                    firstWorktreePath in paths && secondWorktreePath in paths
+                }
+            }
+            assertEquals(setOf(firstWorktreePath, secondWorktreePath), inProgress)
+
+            writeText(Path(firstWorktreePath, "release-open"), "")
+            writeText(Path(secondWorktreePath, "release-open"), "")
+            val completed = withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { paths ->
+                    firstWorktreePath !in paths && secondWorktreePath !in paths
+                }
+            }
+            assertEquals(emptySet(), completed)
+        } finally {
+            removeTempDir(repoRoot)
+            removeTempDir(firstWorktreePath)
+            removeTempDir(secondWorktreePath)
+        }
+    }
+
+    @Test
+    fun concurrentDuplicateOpenAttemptsStartOneSetupJob() = runBlocking {
+        val repoRoot = createTempDir("repo")
+        val worktreePath = createTempDir("worktree")
+        val setupCountPath = Path(repoRoot, "setup-count.txt")
+        try {
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositories = listOf(repoRoot),
+                worktreeSetupCommands = mapOf(
+                    repoRoot to listOf(
+                        "printf x >> '$setupCountPath'",
+                        "while [ ! -f release-open ]; do sleep 0.01; done",
+                    ),
+                ),
+                setupShell = "/bin/bash",
+            )
+            val releaseOpenAttempts = CompletableDeferred<Unit>()
+            val openAttempts = List(50) {
+                async(Dispatchers.Default) {
+                    releaseOpenAttempts.await()
+                    viewModel.openLocalWorktree(repoRoot, worktreePath)
+                }
+            }
+
+            releaseOpenAttempts.complete(Unit)
+            openAttempts.awaitAll()
+            val inProgress = withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath in it }
+            }
+            assertEquals(setOf(worktreePath), inProgress)
+
+            writeText(Path(worktreePath, "release-open"), "")
+            withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+            }
+
+            assertEquals("x", readText(setupCountPath))
+        } finally {
+            removeTempDir(repoRoot)
+            removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
+    fun openingExistingWorktreeSetupFailureSetsActionError() = runBlocking {
+        val repoRoot = createTempDir("repo")
+        val worktreePath = createTempDir("worktree")
+        try {
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositories = listOf(repoRoot),
+                worktreeSetupCommands = mapOf(repoRoot to listOf("echo setup failed >&2", "exit 23")),
+                setupShell = "/bin/bash",
+            )
+
+            viewModel.openLocalWorktree(repoRoot, worktreePath)
+
+            val actionError = withTimeout(2_000.milliseconds) {
+                viewModel.actionErrorStateFlow.first { it != null }
+            }
+
+            assertTrue(actionError!!.contains("Setup commands failed for $worktreePath"))
+            assertTrue(actionError.contains("exit code 23"))
+            assertTrue(actionError.contains("setup failed"))
+            assertEquals(emptySet(), viewModel.openingLocalWorktreePathsStateFlow.value)
+        } finally {
+            removeTempDir(repoRoot)
+            removeTempDir(worktreePath)
+        }
+    }
 }
 
 private class RecordingGitHubApi(
@@ -535,6 +724,8 @@ private fun createLocalRepositoryViewModel(
     configWriter: RecordingEngHubConfigWriter,
     localRepositories: List<String> = emptyList(),
     worktreePollIntervalMs: Long = 120_000,
+    worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
+    setupShell: String = "/bin/zsh",
 ): EngHubViewModel {
     return EngHubViewModel(
         gitHubApi = gitHubApi,
@@ -547,6 +738,8 @@ private fun createLocalRepositoryViewModel(
             pollIntervalMs = 60_000,
             worktreePollIntervalMs = worktreePollIntervalMs,
             localRepositories = localRepositories,
+            worktreeSetupCommands = worktreeSetupCommands,
+            setupShell = setupShell,
         ),
         notificationSubscriptionStore = NoOpNotificationSubscriptionStore(),
     )
@@ -588,12 +781,19 @@ private class RecordingGitWorktreeApi(
 
     val resolvedPaths = mutableListOf<String>()
     val listWorktreeRepoPaths = mutableListOf<String>()
+    val ensureRepositoryCalls = mutableListOf<Pair<String, String>>()
+    val ensureWorktreeCalls = mutableListOf<Pair<String, String>>()
     private val worktreesByRepoPath = worktreesByRepoPath
         ?: repositoryWorktreesBySelectedPath.values.associate { it.rootPath to it.worktrees }
 
-    override fun ensureRepository(repoPath: String, cloneUrl: String) = Unit
+    override fun ensureRepository(repoPath: String, cloneUrl: String) {
+        ensureRepositoryCalls += repoPath to cloneUrl
+    }
 
-    override fun ensureWorktree(repoPath: String, branch: String): String = "$repoPath/$branch"
+    override fun ensureWorktree(repoPath: String, branch: String): String {
+        ensureWorktreeCalls += repoPath to branch
+        return "$repoPath/$branch"
+    }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 
@@ -610,6 +810,34 @@ private class RecordingGitWorktreeApi(
     }
 
     override fun removeWorktree(worktreePath: String) = Unit
+}
+
+private fun createTempDir(prefix: String): String {
+    val dirName = "$prefix-${Random.nextLong().toULong().toString(16)}"
+    val path = Path(SystemTemporaryDirectory, dirName)
+    SystemFileSystem.createDirectories(path)
+    return path.toString()
+}
+
+private fun removeTempDir(path: String) {
+    val root = Path(path)
+    if (!SystemFileSystem.exists(root)) return
+    deleteRecursively(root)
+}
+
+private fun deleteRecursively(path: Path) {
+    if (SystemFileSystem.metadataOrNull(path)?.isDirectory == true) {
+        SystemFileSystem.list(path).forEach { deleteRecursively(it) }
+    }
+    SystemFileSystem.delete(path, mustExist = false)
+}
+
+private fun readText(path: Path): String {
+    return SystemFileSystem.source(path).buffered().use { it.readString() }
+}
+
+private fun writeText(path: Path, @Suppress("SameParameterValue") text: String) {
+    SystemFileSystem.sink(path).buffered().use { it.writeString(text) }
 }
 
 private class RecordingEngHubConfigWriter : EngHubConfigWriter {

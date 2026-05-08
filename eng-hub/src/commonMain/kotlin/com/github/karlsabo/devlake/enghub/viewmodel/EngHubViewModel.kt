@@ -137,6 +137,8 @@ class EngHubViewModel(
     private val localRepositories = MutableStateFlow(config.localRepositories.toLocalRepositoryUiStates())
     val localRepositoriesStateFlow: StateFlow<List<LocalRepositoryUiState>> = localRepositories.asStateFlow()
     private val localRepositoryExpansionsInFlight = Collections.synchronizedSet(mutableSetOf<String>())
+    private val openingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
+    val openingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = openingLocalWorktreePaths.asStateFlow()
 
     private val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> = actingOnThreadIds.asStateFlow()
@@ -307,32 +309,38 @@ class EngHubViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             checkoutInProgress.value = true
             try {
+                val activeConfig = currentConfig
                 val repoName = repoFullName.substringAfterLast('/')
-                val repoPath = "${config.repositoriesBaseDir.trimEnd('/')}/$repoName"
+                val repoPath = "${activeConfig.repositoriesBaseDir.trimEnd('/')}/$repoName"
                 val cloneUrl = "https://github.com/$repoFullName.git"
                 logger.info { "Setup: ensuring repository at $repoPath" }
                 gitWorktreeApi.ensureRepository(repoPath, cloneUrl)
                 logger.info { "Setup: ensuring worktree for branch $branch" }
                 val worktreePath = gitWorktreeApi.ensureWorktree(repoPath, branch)
-                val setupResult = runConfiguredWorktreeSetup(repoPath, worktreePath, config)
-                when {
-                    setupResult == null -> logger.info { "Setup: no configured commands for $repoPath" }
-                    setupResult.exitCode != 0 -> {
-                        val detail = setupResult.stderr.ifEmpty { setupResult.stdout }.ifBlank { "No command output" }
-                        val warningMessage =
-                            "Setup commands failed for $worktreePath (exit code ${setupResult.exitCode}): $detail"
-                        logger.warn { warningMessage }
-                        actionError.value = warningMessage
-                    }
-
-                    else -> logger.info { "Setup: commands completed for $worktreePath" }
-                }
+                runConfiguredSetupForWorktree(repoPath, worktreePath, activeConfig)
                 logger.info { "Setup: done" }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to set up $repoFullName branch=$branch" }
                 actionError.value = e.message ?: "Failed to set up worktree"
             } finally {
                 checkoutInProgress.value = false
+            }
+        }
+    }
+
+    fun openLocalWorktree(repoRootPath: String, worktreePath: String) {
+        val normalizedWorktreePath = worktreePath.normalizedRepoPath()
+        if (normalizedWorktreePath.isEmpty() || !markLocalWorktreeOpening(normalizedWorktreePath)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                logger.info { "Setup: opening existing worktree $worktreePath for $repoRootPath" }
+                runConfiguredSetupForWorktree(repoRootPath, worktreePath, currentConfig)
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to set up existing worktree $worktreePath" }
+                actionError.value = e.message ?: "Failed to set up worktree"
+            } finally {
+                openingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
             }
         }
     }
@@ -456,6 +464,36 @@ class EngHubViewModel(
 
     private fun listLocalWorktreeUiStates(repoRootPath: String): List<LocalWorktreeUiState> {
         return gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates()
+    }
+
+    private fun markLocalWorktreeOpening(normalizedWorktreePath: String): Boolean {
+        while (true) {
+            val currentPaths = openingLocalWorktreePaths.value
+            if (normalizedWorktreePath in currentPaths) return false
+            if (openingLocalWorktreePaths.compareAndSet(currentPaths, currentPaths + normalizedWorktreePath)) {
+                return true
+            }
+        }
+    }
+
+    private fun runConfiguredSetupForWorktree(
+        repoPath: String,
+        worktreePath: String,
+        setupConfig: EngHubConfig,
+    ) {
+        val setupResult = runConfiguredWorktreeSetup(repoPath, worktreePath, setupConfig)
+        when {
+            setupResult == null -> logger.info { "Setup: no configured commands for $repoPath" }
+            setupResult.exitCode != 0 -> {
+                val detail = setupResult.stderr.ifEmpty { setupResult.stdout }.ifBlank { "No command output" }
+                val warningMessage =
+                    "Setup commands failed for $worktreePath (exit code ${setupResult.exitCode}): $detail"
+                logger.warn { warningMessage }
+                actionError.value = warningMessage
+            }
+
+            else -> logger.info { "Setup: commands completed for $worktreePath" }
+        }
     }
 
     private fun updateLocalRepositoryWorktrees(
