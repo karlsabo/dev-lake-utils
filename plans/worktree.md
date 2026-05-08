@@ -135,7 +135,9 @@
 
 **Notes:** Use a new config value such as `worktreePollIntervalMs`. Verify the worktree polling flow does not trigger PR or notification refreshes. If a user tries to add a linked worktree whose canonical root is already configured, treat it as a duplicate root; the poller should already discover that worktree under the existing root.
 
-### 7. Open Worktree From Row Menu
+### 7. Open Worktree From Row Menu - Done
+
+**Done:** 2026 05 08
 
 **Acceptance criteria:** Given the `dev-lake-utils` repository row is expanded and shows `/Users/karl.sabo/git/dev-lake-utils-feature-worktree-panel`, when I choose `Open` from that worktree row menu, then Eng Hub runs the same configured worktree setup behavior used by notification setup for that repo/worktree and reports any setup failure through the existing action error dialog.
 
