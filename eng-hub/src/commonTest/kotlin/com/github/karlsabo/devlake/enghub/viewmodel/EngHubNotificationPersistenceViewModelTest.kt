@@ -274,6 +274,8 @@ private class NoOpGitWorktreeApi : GitWorktreeApi {
     override fun listWorktrees(repoPath: String) = emptyList<com.github.karlsabo.git.Worktree>()
 
     override fun removeWorktree(worktreePath: String) = Unit
+
+    override fun archiveWorktree(repoPath: String, worktreePath: String) = Unit
 }
 
 private class NoOpDirectoryPicker : DirectoryPicker {

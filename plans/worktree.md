@@ -161,6 +161,8 @@
 
 ### 9. Archive Clean Non-Root Worktree
 
+**Done:** 2026 05 08
+
 **Acceptance criteria:** Given the `dev-lake-utils` repository row is expanded and shows clean non-root worktree `/Users/karl.sabo/git/dev-lake-utils-feature-worktree-panel`, when I choose `Archive` from that worktree row menu and confirm, then Eng Hub removes the git worktree, deletes any leftover checkout directory, prunes worktree metadata, and the row disappears from the expanded worktree list.
 
 **Expected edits:** the Worktrees view component, `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubViewModel.kt`, `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeApi.kt`, `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeService.kt`, and tests under `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/` plus `utilities/src/commonTest/kotlin/com/github/karlsabo/git/GitWorktreeServiceTest.kt`.

@@ -10,6 +10,7 @@ class GitWorktreeException(message: String, cause: Throwable? = null) : RuntimeE
 
 class GitWorktreeService(
     private val gitCommandApi: GitCommandApi = GitCommandService(),
+    private val deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
 ) : GitWorktreeApi {
 
     override fun ensureRepository(repoPath: String, cloneUrl: String) {
@@ -105,12 +106,25 @@ class GitWorktreeService(
     }
 
     override fun removeWorktree(worktreePath: String) {
-        try {
+        removeWorktree(worktreePath) {
             gitCommandApi.execute(null, "worktree", "remove", worktreePath)
-        } catch (e: GitCommandException) {
-            throw GitWorktreeException("Failed to remove worktree at $worktreePath: ${e.gitOutput}", e)
         }
-        logger.info { "Removed worktree at $worktreePath" }
+    }
+
+    override fun archiveWorktree(repoPath: String, worktreePath: String) {
+        removeWorktree(repoPath, worktreePath)
+        val deleteFailure = runCatching { deleteCheckoutDirectory(worktreePath) }.exceptionOrNull()
+        val pruneFailure = runCatching { pruneWorktrees(repoPath) }.exceptionOrNull()
+
+        if (deleteFailure != null) {
+            if (pruneFailure != null) deleteFailure.addSuppressed(pruneFailure)
+            throw GitWorktreeException(
+                "Failed to delete leftover worktree directory at $worktreePath",
+                deleteFailure,
+            )
+        }
+
+        if (pruneFailure != null) throw pruneFailure
     }
 
     companion object {
@@ -164,4 +178,42 @@ class GitWorktreeService(
         }
         return output.isNotBlank()
     }
+
+    private fun removeWorktree(repoPath: String, worktreePath: String) {
+        removeWorktree(worktreePath) {
+            gitCommandApi.worktreeRemove(repoPath, worktreePath)
+        }
+    }
+
+    private fun removeWorktree(worktreePath: String, removeCommand: () -> Unit) {
+        try {
+            removeCommand()
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to remove worktree at $worktreePath: ${e.gitOutput}", e)
+        }
+        logger.info { "Removed worktree at $worktreePath" }
+    }
+
+    private fun pruneWorktrees(repoPath: String) {
+        try {
+            gitCommandApi.execute(repoPath, "worktree", "prune")
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to prune worktrees for $repoPath: ${e.gitOutput}", e)
+        }
+        logger.info { "Pruned worktree metadata for $repoPath" }
+    }
+}
+
+private fun deleteCheckoutDirectory(worktreePath: String) {
+    val path = Path(worktreePath)
+    if (!SystemFileSystem.exists(path)) return
+    deleteRecursively(path)
+    logger.info { "Deleted leftover worktree directory at $worktreePath" }
+}
+
+private fun deleteRecursively(path: Path) {
+    if (SystemFileSystem.metadataOrNull(path)?.isDirectory == true) {
+        SystemFileSystem.list(path).forEach { deleteRecursively(it) }
+    }
+    SystemFileSystem.delete(path, mustExist = false)
 }

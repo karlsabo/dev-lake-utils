@@ -18,6 +18,7 @@
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] Add linter to Gradle, formatting, etc.
 * [ ] When setting up worktrees, do we have to disable all setup buttons? It would be great to set up multiple worktrees at a time.
+* [ ] Add information log in the app, like app notifications so we can see what has happened, when a worktree is created, archived, etc.
 * [ ] Add the ability to put worktrees into categories
     * E.g., In progress, In review, Done
 * [ ] Add a notification badge on the tab when attention of the user is needed

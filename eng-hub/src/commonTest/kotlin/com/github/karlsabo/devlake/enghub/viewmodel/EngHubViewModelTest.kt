@@ -601,6 +601,141 @@ class EngHubViewModelTest {
             removeTempDir(worktreePath)
         }
     }
+
+    @Test
+    fun archivingCleanNonRootWorktreeArchivesAndRefreshesRepository() = runBlocking {
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val featureWorktree = Worktree(
+            path = DEV_LAKE_SELECTED_WORKTREE,
+            branch = "feature/worktree-panel",
+            commitHash = "def456",
+        )
+        var currentWorktrees = listOf(rootWorktree, featureWorktree)
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = { currentWorktrees },
+            onArchiveWorktree = { repoPath, worktreePath ->
+                assertEquals(DEV_LAKE_ROOT, repoPath)
+                assertEquals(DEV_LAKE_SELECTED_WORKTREE, worktreePath)
+                currentWorktrees = listOf(rootWorktree)
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT)
+            }.single()
+        }
+
+        assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
+        assertEquals(listOf("main"), repository.worktrees.map { it.branch })
+        assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun archivingWorktreeFailureSetsActionErrorWithoutRefreshingRows() = runBlocking {
+        val worktrees = listOf(
+            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+            Worktree(
+                path = DEV_LAKE_SELECTED_WORKTREE,
+                branch = "feature/worktree-panel",
+                commitHash = "def456",
+            ),
+        )
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+            archiveWorktreeFailure = IllegalStateException("archive failed"),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals("archive failed", actionError)
+        assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
+        assertEquals(
+            listOf("main", "feature/worktree-panel"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
+        assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
+    }
+
+    @Test
+    fun archivingPostRemoveFailureRefreshesRepositoryRows() = runBlocking {
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val featureWorktree = Worktree(
+            path = DEV_LAKE_SELECTED_WORKTREE,
+            branch = "feature/worktree-panel",
+            commitHash = "def456",
+        )
+        var currentWorktrees = listOf(rootWorktree, featureWorktree)
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = { currentWorktrees },
+            onArchiveWorktree = { _, _ ->
+                currentWorktrees = listOf(rootWorktree)
+                throw IllegalStateException("cleanup failed")
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT)
+            }.single()
+        }
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals("cleanup failed", actionError)
+        assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
+        assertEquals(listOf("main"), repository.worktrees.map { it.branch })
+        assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
+    }
 }
 
 private class RecordingGitHubApi(
@@ -753,6 +888,8 @@ private class RecordingGitWorktreeApi(
     private val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
     private val listWorktreesFailure: RuntimeException? = null,
     private val onListWorktrees: (String) -> Unit = {},
+    private val archiveWorktreeFailure: RuntimeException? = null,
+    private val onArchiveWorktree: (String, String) -> Unit = { _, _ -> },
 ) : GitWorktreeApi {
     constructor(
         worktreesForRepoPath: (String) -> List<Worktree>,
@@ -785,6 +922,7 @@ private class RecordingGitWorktreeApi(
     val listWorktreeRepoPaths = mutableListOf<String>()
     val ensureRepositoryCalls = mutableListOf<Pair<String, String>>()
     val ensureWorktreeCalls = mutableListOf<Pair<String, String>>()
+    val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
     private val worktreesByRepoPath = worktreesByRepoPath
         ?: repositoryWorktreesBySelectedPath.values.associate { it.rootPath to it.worktrees }
 
@@ -812,6 +950,12 @@ private class RecordingGitWorktreeApi(
     }
 
     override fun removeWorktree(worktreePath: String) = Unit
+
+    override fun archiveWorktree(repoPath: String, worktreePath: String) {
+        archiveWorktreeCalls += repoPath to worktreePath
+        archiveWorktreeFailure?.let { throw it }
+        onArchiveWorktree(repoPath, worktreePath)
+    }
 }
 
 private fun createTempDir(prefix: String): String {

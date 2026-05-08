@@ -139,6 +139,8 @@ class EngHubViewModel(
     private val localRepositoryExpansionsInFlight = Collections.synchronizedSet(mutableSetOf<String>())
     private val openingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val openingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = openingLocalWorktreePaths.asStateFlow()
+    private val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
+    val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = archivingLocalWorktreePaths.asStateFlow()
 
     private val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> = actingOnThreadIds.asStateFlow()
@@ -345,6 +347,31 @@ class EngHubViewModel(
         }
     }
 
+    fun archiveLocalWorktree(repoRootPath: String, worktreePath: String) {
+        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        val normalizedWorktreePath = worktreePath.normalizedRepoPath()
+        if (normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty()) return
+        if (normalizedRepoRootPath == normalizedWorktreePath) {
+            actionError.value = "Cannot archive root worktree: $worktreePath"
+            return
+        }
+        if (!markLocalWorktreeArchiving(normalizedWorktreePath)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                logger.info { "Archiving worktree $worktreePath for $repoRootPath" }
+                gitWorktreeApi.archiveWorktree(repoRootPath, worktreePath)
+                updateLocalRepositoryWorktrees(repoRootPath, listLocalWorktreeUiStates(repoRootPath))
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to archive worktree $worktreePath" }
+                actionError.value = e.message ?: "Failed to archive worktree"
+                refreshLocalRepositoryAfterArchiveFailure(repoRootPath)
+            } finally {
+                archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
+            }
+        }
+    }
+
     fun approvePullRequest(notificationThreadId: String, apiUrl: String) {
         actingOnThreadIds.value += notificationThreadId
         viewModelScope.launch(Dispatchers.IO) {
@@ -466,11 +493,31 @@ class EngHubViewModel(
         return gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
     }
 
+    private fun refreshLocalRepositoryAfterArchiveFailure(repoRootPath: String) {
+        try {
+            updateLocalRepositoryWorktrees(repoRootPath, listLocalWorktreeUiStates(repoRootPath))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (refreshFailure: Exception) {
+            logger.error(refreshFailure) { "Failed to refresh worktrees after archive failure for $repoRootPath" }
+        }
+    }
+
     private fun markLocalWorktreeOpening(normalizedWorktreePath: String): Boolean {
         while (true) {
             val currentPaths = openingLocalWorktreePaths.value
             if (normalizedWorktreePath in currentPaths) return false
             if (openingLocalWorktreePaths.compareAndSet(currentPaths, currentPaths + normalizedWorktreePath)) {
+                return true
+            }
+        }
+    }
+
+    private fun markLocalWorktreeArchiving(normalizedWorktreePath: String): Boolean {
+        while (true) {
+            val currentPaths = archivingLocalWorktreePaths.value
+            if (normalizedWorktreePath in currentPaths) return false
+            if (archivingLocalWorktreePaths.compareAndSet(currentPaths, currentPaths + normalizedWorktreePath)) {
                 return true
             }
         }

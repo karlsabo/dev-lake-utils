@@ -22,6 +22,7 @@ import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
+import kotlin.time.Duration.Companion.milliseconds
 
 class EngHubDependenciesTest {
 
@@ -134,7 +135,7 @@ private data class EnsureWorktreeCall(
 )
 
 private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> =
-    withTimeout(2_000) { first { it.isNotEmpty() } }
+    withTimeout(2_000.milliseconds) { first { it.isNotEmpty() } }
 
 private class RecordingGitWorktreeApi : GitWorktreeApi {
     val ensureRepositoryCalls = MutableStateFlow<List<EnsureRepositoryCall>>(emptyList())
@@ -158,6 +159,8 @@ private class RecordingGitWorktreeApi : GitWorktreeApi {
     override fun listWorktrees(repoPath: String) = emptyList<com.github.karlsabo.git.Worktree>()
 
     override fun removeWorktree(worktreePath: String) = Unit
+
+    override fun archiveWorktree(repoPath: String, worktreePath: String) = Unit
 }
 
 private class RecordingDirectoryPicker : DirectoryPicker {
