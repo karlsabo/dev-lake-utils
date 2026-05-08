@@ -17,6 +17,7 @@
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] Add linter to Gradle, formatting, etc.
+* [ ] When setting up worktrees, do we have to disable all setup buttons? It would be great to set up multiple worktrees at a time.
 * [ ] Add the ability to put worktrees into categories
     * E.g., In progress, In review, Done
 * [ ] Add a notification badge on the tab when attention of the user is needed

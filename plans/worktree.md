@@ -99,7 +99,9 @@
 
 **Notes:** Validation can use existing `GitCommandApi.isGitRepository` through a new small repository-facing method if the current `GitWorktreeApi` surface stays worktree-only. Canonical root detection can use git metadata such as `git rev-parse --git-common-dir`/`--show-toplevel` plus worktree list parsing, as long as linked worktrees resolve to the same stored root as the main checkout. Use the current global `actionError` dialog for invalid paths. Directory picker implementation is a Compose Desktop/JVM concern; keep it behind a small launcher abstraction if that avoids putting AWT/Swing directly into the composable.
 
-### 4. Expand Repository To Show Worktrees
+### 4. Expand Repository To Show Worktrees - Done
+
+**Done:** 2026 05 08
 
 **Acceptance criteria:** Given `/Users/karl.sabo/git/dev-lake-utils` is a configured local repository and git reports worktrees for `main` and `feature/worktree-panel`, when I expand the `dev-lake-utils` repository row, then I see child worktree rows for both branch names.
 
