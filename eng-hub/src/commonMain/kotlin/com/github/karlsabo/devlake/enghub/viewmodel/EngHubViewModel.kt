@@ -8,6 +8,7 @@ import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import com.github.karlsabo.devlake.enghub.runConfiguredWorktreeSetup
+import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
@@ -16,6 +17,7 @@ import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
 import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.devlake.enghub.state.toNotificationUiState
 import com.github.karlsabo.devlake.enghub.state.toPullRequestUiState
+import com.github.karlsabo.git.GitCommandException
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus.PENDING
@@ -141,6 +143,9 @@ class EngHubViewModel(
     val openingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = openingLocalWorktreePaths.asStateFlow()
     private val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = archivingLocalWorktreePaths.asStateFlow()
+    private val forceArchiveWorktreeRequest = MutableStateFlow<ForceArchiveWorktreeUiState?>(null)
+    val forceArchiveWorktreeRequestStateFlow: StateFlow<ForceArchiveWorktreeUiState?> =
+        forceArchiveWorktreeRequest.asStateFlow()
 
     private val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> = actingOnThreadIds.asStateFlow()
@@ -348,6 +353,20 @@ class EngHubViewModel(
     }
 
     fun archiveLocalWorktree(repoRootPath: String, worktreePath: String) {
+        archiveLocalWorktree(repoRootPath, worktreePath, force = false)
+    }
+
+    fun confirmForceArchiveLocalWorktree(repoRootPath: String, worktreePath: String) {
+        val request = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
+        if (!forceArchiveWorktreeRequest.compareAndSet(expect = request, update = null)) return
+        archiveLocalWorktree(repoRootPath, worktreePath, force = true)
+    }
+
+    fun dismissForceArchiveWorktreeRequest() {
+        forceArchiveWorktreeRequest.value = null
+    }
+
+    private fun archiveLocalWorktree(repoRootPath: String, worktreePath: String, force: Boolean) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
         val normalizedWorktreePath = worktreePath.normalizedRepoPath()
         if (normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty()) return
@@ -359,12 +378,17 @@ class EngHubViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                logger.info { "Archiving worktree $worktreePath for $repoRootPath" }
-                gitWorktreeApi.archiveWorktree(repoRootPath, worktreePath)
+                logger.info { "Archiving worktree $worktreePath for $repoRootPath force=$force" }
+                gitWorktreeApi.archiveWorktree(repoRootPath, worktreePath, force = force)
                 updateLocalRepositoryWorktrees(repoRootPath, listLocalWorktreeUiStates(repoRootPath))
             } catch (e: Exception) {
                 logger.error(e) { "Failed to archive worktree $worktreePath" }
-                actionError.value = e.message ?: "Failed to archive worktree"
+                if (!force && e.isDirtyWorktreeArchiveFailure()) {
+                    archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
+                    forceArchiveWorktreeRequest.value = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
+                } else {
+                    actionError.value = e.message ?: "Failed to archive worktree"
+                }
                 refreshLocalRepositoryAfterArchiveFailure(repoRootPath)
             } finally {
                 archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
@@ -565,6 +589,37 @@ class EngHubViewModel(
 }
 
 private fun String.normalizedRepoPath(): String = trim().trimEnd('/', '\\')
+
+private val dirtyWorktreeGitOutputMarkers = listOf(
+    "contains modified",
+    "modified or untracked",
+    "contains untracked",
+    "dirty",
+)
+
+private val dirtyWorktreeMessageMarkers = dirtyWorktreeGitOutputMarkers - "dirty"
+
+private fun Throwable.isDirtyWorktreeArchiveFailure(): Boolean {
+    val commandOutput = causeSequence()
+        .filterIsInstance<GitCommandException>()
+        .joinToString(separator = "\n") { it.gitOutput }
+        .lowercase()
+    if (commandOutput.isNotBlank()) return commandOutput.containsAny(dirtyWorktreeGitOutputMarkers)
+
+    return message.orEmpty()
+        .lowercase()
+        .containsAny(dirtyWorktreeMessageMarkers)
+}
+
+private fun Throwable.causeSequence(): Sequence<Throwable> = sequence {
+    var current: Throwable? = this@causeSequence
+    while (current != null) {
+        yield(current)
+        current = current.cause
+    }
+}
+
+private fun String.containsAny(markers: List<String>): Boolean = markers.any(::contains)
 
 private fun List<LocalRepositoryUiState>.withPreservedWorktrees(
     previousRepositories: List<LocalRepositoryUiState>,

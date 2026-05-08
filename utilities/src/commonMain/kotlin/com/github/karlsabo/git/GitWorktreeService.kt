@@ -105,14 +105,18 @@ class GitWorktreeService(
         }
     }
 
-    override fun removeWorktree(worktreePath: String) {
+    override fun removeWorktree(worktreePath: String, force: Boolean) {
         removeWorktree(worktreePath) {
-            gitCommandApi.execute(null, "worktree", "remove", worktreePath)
+            if (force) {
+                gitCommandApi.execute(null, "worktree", "remove", "--force", worktreePath)
+            } else {
+                gitCommandApi.execute(null, "worktree", "remove", worktreePath)
+            }
         }
     }
 
-    override fun archiveWorktree(repoPath: String, worktreePath: String) {
-        removeWorktree(repoPath, worktreePath)
+    override fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean) {
+        removeWorktree(repoPath, worktreePath, force)
         val deleteFailure = runCatching { deleteCheckoutDirectory(worktreePath) }.exceptionOrNull()
         val pruneFailure = runCatching { pruneWorktrees(repoPath) }.exceptionOrNull()
 
@@ -179,9 +183,13 @@ class GitWorktreeService(
         return output.isNotBlank()
     }
 
-    private fun removeWorktree(repoPath: String, worktreePath: String) {
+    private fun removeWorktree(repoPath: String, worktreePath: String, force: Boolean) {
         removeWorktree(worktreePath) {
-            gitCommandApi.worktreeRemove(repoPath, worktreePath)
+            if (force) {
+                gitCommandApi.execute(repoPath, "worktree", "remove", "--force", worktreePath)
+            } else {
+                gitCommandApi.worktreeRemove(repoPath, worktreePath)
+            }
         }
     }
 

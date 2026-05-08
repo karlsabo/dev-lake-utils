@@ -6,8 +6,8 @@ interface GitWorktreeApi {
     fun worktreeExists(repoPath: String, branch: String): Boolean
     fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees
     fun listWorktrees(repoPath: String): List<Worktree>
-    fun removeWorktree(worktreePath: String)
-    fun archiveWorktree(repoPath: String, worktreePath: String)
+    fun removeWorktree(worktreePath: String, force: Boolean = false)
+    fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean = false)
 }
 
 data class RepositoryWorktrees(

@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
+import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import dev_lake_utils.shared_resources.generated.resources.Res
@@ -59,6 +60,9 @@ fun WorktreePanel(
     onToggleRepository: (String) -> Unit,
     onOpenWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     onArchiveWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
+    forceArchiveRequest: ForceArchiveWorktreeUiState?,
+    onConfirmForceArchiveWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
+    onDismissForceArchiveWorktree: () -> Unit,
     openingWorktreePaths: Set<String>,
     archivingWorktreePaths: Set<String>,
     modifier: Modifier = Modifier,
@@ -73,6 +77,16 @@ fun WorktreePanel(
                 onArchiveWorktree(archive.repoRootPath, archive.worktreePath)
             },
             onDismiss = { pendingArchive = null },
+        )
+    }
+
+    forceArchiveRequest?.let { archive ->
+        ForceArchiveWorktreeDialog(
+            worktreePath = archive.worktreePath,
+            onConfirm = {
+                onConfirmForceArchiveWorktree(archive.repoRootPath, archive.worktreePath)
+            },
+            onDismiss = onDismissForceArchiveWorktree,
         )
     }
 
@@ -282,6 +296,47 @@ private fun ArchiveWorktreeDialog(
                     Row {
                         Button(onClick = onConfirm) {
                             Text("Archive")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForceArchiveWorktreeDialog(
+    worktreePath: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DialogWindow(
+        onCloseRequest = onDismiss,
+        title = "Force Archive Worktree",
+        icon = painterResource(Res.drawable.icon),
+        visible = true,
+    ) {
+        MaterialTheme {
+            Surface {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                ) {
+                    Text(text = "Force Archive Worktree", style = MaterialTheme.typography.h6)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "This worktree has local changes. Force removal will discard them.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = worktreePath, style = MaterialTheme.typography.caption)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row {
+                        Button(onClick = onConfirm) {
+                            Text("Force Archive")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         TextButton(onClick = onDismiss) {

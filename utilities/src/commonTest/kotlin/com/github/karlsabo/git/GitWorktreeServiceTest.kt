@@ -331,10 +331,21 @@ class GitWorktreeServiceTest {
         val fake = FakeGitCommandApi()
         val service = GitWorktreeService(fake)
 
-        service.removeWorktree("/tmp/repo-feature")
+        service.removeWorktree("/tmp/repo-feature", force = false)
 
         val executeCall = fake.calls.find { it.method == "execute" }
         assertEquals(listOf("worktree", "remove", "/tmp/repo-feature"), executeCall?.args)
+    }
+
+    @Test
+    fun removeWorktree_forceUsesForceFlag() {
+        val fake = FakeGitCommandApi()
+        val service = GitWorktreeService(fake)
+
+        service.removeWorktree("/tmp/repo-feature", force = true)
+
+        val executeCall = fake.calls.find { it.method == "execute" }
+        assertEquals(listOf("worktree", "remove", "--force", "/tmp/repo-feature"), executeCall?.args)
     }
 
     @Test
@@ -350,7 +361,7 @@ class GitWorktreeServiceTest {
         val service = GitWorktreeService(fake)
 
         val ex = assertFailsWith<GitWorktreeException> {
-            service.removeWorktree("/tmp/repo-feature")
+            service.removeWorktree("/tmp/repo-feature", force = false)
         }
         assertTrue(ex.message!!.contains("Failed to remove worktree"))
     }
@@ -364,12 +375,36 @@ class GitWorktreeServiceTest {
             sink.writeString("leftover")
         }
 
-        service.archiveWorktree("/tmp/repo", worktreePath)
+        service.archiveWorktree("/tmp/repo", worktreePath, force = false)
 
         assertFalse(SystemFileSystem.exists(Path(worktreePath)))
         assertEquals(
             listOf(
                 FakeGitCommandApi.Call("worktreeRemove", listOf("/tmp/repo", worktreePath)),
+                FakeGitCommandApi.Call("execute", listOf("/tmp/repo", "worktree", "prune")),
+            ),
+            fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" },
+        )
+    }
+
+    @Test
+    fun archiveWorktree_forceRemovesLeftoverDirectoryAndPrunes() {
+        val fake = FakeGitCommandApi()
+        val service = GitWorktreeService(fake)
+        val worktreePath = createTempDir("repo-feature")
+        SystemFileSystem.sink(Path(worktreePath, "leftover.txt")).buffered().use { sink ->
+            sink.writeString("leftover")
+        }
+
+        service.archiveWorktree("/tmp/repo", worktreePath, force = true)
+
+        assertFalse(SystemFileSystem.exists(Path(worktreePath)))
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call(
+                    "execute",
+                    listOf("/tmp/repo", "worktree", "remove", "--force", worktreePath),
+                ),
                 FakeGitCommandApi.Call("execute", listOf("/tmp/repo", "worktree", "prune")),
             ),
             fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" },
@@ -388,7 +423,7 @@ class GitWorktreeServiceTest {
         val worktreePath = "/tmp/repo-feature"
 
         val ex = assertFailsWith<GitWorktreeException> {
-            service.archiveWorktree("/tmp/repo", worktreePath)
+            service.archiveWorktree("/tmp/repo", worktreePath, force = false)
         }
 
         assertTrue(ex.message!!.contains("Failed to delete leftover worktree directory"))
@@ -417,7 +452,7 @@ class GitWorktreeServiceTest {
         val service = GitWorktreeService(fake)
 
         val ex = assertFailsWith<GitWorktreeException> {
-            service.archiveWorktree("/tmp/repo", worktreePath)
+            service.archiveWorktree("/tmp/repo", worktreePath, force = false)
         }
 
         assertTrue(ex.message!!.contains("Failed to remove worktree"))

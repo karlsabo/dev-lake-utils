@@ -52,6 +52,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
     val openingLocalWorktreePaths by viewModel.openingLocalWorktreePathsStateFlow.collectAsState()
     val archivingLocalWorktreePaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
+    val forceArchiveWorktreeRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
     var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
 
     actionError?.let { error ->
@@ -112,6 +113,13 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                         },
                         onArchiveWorktree = { repoRootPath, worktreePath ->
                             viewModel.archiveLocalWorktree(repoRootPath, worktreePath)
+                        },
+                        forceArchiveRequest = forceArchiveWorktreeRequest,
+                        onConfirmForceArchiveWorktree = { repoRootPath, worktreePath ->
+                            viewModel.confirmForceArchiveLocalWorktree(repoRootPath, worktreePath)
+                        },
+                        onDismissForceArchiveWorktree = {
+                            viewModel.dismissForceArchiveWorktreeRequest()
                         },
                         openingWorktreePaths = openingLocalWorktreePaths,
                         archivingWorktreePaths = archivingLocalWorktreePaths,

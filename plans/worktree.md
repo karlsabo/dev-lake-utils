@@ -173,6 +173,8 @@
 
 ### 10. Force Archive Dirty Non-Root Worktree
 
+**Done:** 2026 05 08
+
 **Acceptance criteria:** Given normal archive fails because `/Users/karl.sabo/git/dev-lake-utils-feature-worktree-panel` is dirty, when I confirm force removal, then Eng Hub force-removes the git worktree, deletes any leftover checkout directory, prunes worktree metadata, and the row disappears from the expanded worktree list.
 
 **Expected edits:** the Worktrees view component, `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubViewModel.kt`, `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeApi.kt`, `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeService.kt`, tests under `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/`, and `utilities/src/commonTest/kotlin/com/github/karlsabo/git/GitWorktreeServiceTest.kt`.

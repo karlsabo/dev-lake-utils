@@ -614,7 +614,7 @@ class EngHubViewModelTest {
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             worktreesForRepoPath = { currentWorktrees },
-            onArchiveWorktree = { repoPath, worktreePath ->
+            onArchiveWorktree = { repoPath, worktreePath, _ ->
                 assertEquals(DEV_LAKE_ROOT, repoPath)
                 assertEquals(DEV_LAKE_SELECTED_WORKTREE, worktreePath)
                 currentWorktrees = listOf(rootWorktree)
@@ -645,6 +645,233 @@ class EngHubViewModelTest {
         assertEquals(listOf("main"), repository.worktrees.map { it.branch })
         assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
         assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun dirtyArchiveFailurePromptsForForceArchiveThenForceArchivesAndRefreshesRepository() = runBlocking {
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val featureWorktree = Worktree(
+            path = DEV_LAKE_SELECTED_WORKTREE,
+            branch = "feature/worktree-panel",
+            commitHash = "def456",
+            isDirty = true,
+        )
+        var currentWorktrees = listOf(rootWorktree, featureWorktree)
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = { currentWorktrees },
+            onArchiveWorktree = { _, _, force ->
+                if (!force) throw IllegalStateException("fatal: contains modified files")
+                currentWorktrees = listOf(rootWorktree)
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+
+        val forceRequest = withTimeout(2_000.milliseconds) {
+            viewModel.forceArchiveWorktreeRequestStateFlow.first { it != null }!!
+        }
+        assertEquals(DEV_LAKE_ROOT, forceRequest.repoRootPath)
+        assertEquals(DEV_LAKE_SELECTED_WORKTREE, forceRequest.worktreePath)
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+
+        viewModel.confirmForceArchiveLocalWorktree(forceRequest.repoRootPath, forceRequest.worktreePath)
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT)
+            }.single()
+        }
+
+        assertEquals(
+            listOf(
+                DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE,
+                DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE,
+            ),
+            api.archiveWorktreeCalls,
+        )
+        assertEquals(listOf(false, true), api.archiveWorktreeForceValues)
+        assertEquals(listOf("main"), repository.worktrees.map { it.branch })
+        assertEquals(null, viewModel.forceArchiveWorktreeRequestStateFlow.value)
+        assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun cleanupFailureForDirtyPathDoesNotPromptForForceArchive() = runBlocking {
+        val dirtyPath = "$DEV_LAKE_ROOT-dirty-cleanup"
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val featureWorktree = Worktree(
+            path = dirtyPath,
+            branch = "feature/dirty-cleanup",
+            commitHash = "def456",
+        )
+        val worktrees = listOf(rootWorktree, featureWorktree)
+        val failureMessage = "Failed to delete leftover worktree directory at $dirtyPath"
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+            onArchiveWorktree = { _, _, _ ->
+                throw IllegalStateException(failureMessage)
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, dirtyPath)
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals(failureMessage, actionError)
+        assertEquals(null, viewModel.forceArchiveWorktreeRequestStateFlow.value)
+        assertEquals(listOf(DEV_LAKE_ROOT to dirtyPath), api.archiveWorktreeCalls)
+        assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
+    }
+
+    @Test
+    fun forceArchiveConfirmationStartsWhileDirtyFailureRefreshIsStillRunning() = runBlocking {
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val featureWorktree = Worktree(
+            path = DEV_LAKE_SELECTED_WORKTREE,
+            branch = "feature/worktree-panel",
+            commitHash = "def456",
+            isDirty = true,
+        )
+        var currentWorktrees = listOf(rootWorktree, featureWorktree)
+        var archiveAttempts = 0
+        val dirtyFailureRefreshStarted = CompletableDeferred<Unit>()
+        val releaseDirtyFailureRefresh = CompletableDeferred<Unit>()
+        val forceArchiveStarted = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = { currentWorktrees },
+            onListWorktrees = {
+                if (archiveAttempts == 1) {
+                    dirtyFailureRefreshStarted.complete(Unit)
+                    runBlocking { releaseDirtyFailureRefresh.await() }
+                }
+            },
+            onArchiveWorktree = { _, _, force ->
+                archiveAttempts += 1
+                if (!force) throw IllegalStateException("fatal: contains modified files")
+                forceArchiveStarted.complete(Unit)
+                currentWorktrees = listOf(rootWorktree)
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+        val forceRequest = withTimeout(2_000.milliseconds) {
+            viewModel.forceArchiveWorktreeRequestStateFlow.first { it != null }!!
+        }
+        withTimeout(2_000.milliseconds) {
+            dirtyFailureRefreshStarted.await()
+        }
+
+        try {
+            viewModel.confirmForceArchiveLocalWorktree(forceRequest.repoRootPath, forceRequest.worktreePath)
+
+            withTimeout(2_000.milliseconds) {
+                forceArchiveStarted.await()
+            }
+        } finally {
+            releaseDirtyFailureRefresh.complete(Unit)
+        }
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT)
+            }.single()
+        }
+
+        assertEquals(listOf(false, true), api.archiveWorktreeForceValues)
+        assertEquals(listOf("main"), repository.worktrees.map { it.branch })
+        assertEquals(null, viewModel.forceArchiveWorktreeRequestStateFlow.value)
+        assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
+    }
+
+    @Test
+    fun forceArchiveFailureSetsActionErrorAndLeavesRowsVisible() = runBlocking {
+        val worktrees = listOf(
+            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+            Worktree(
+                path = DEV_LAKE_SELECTED_WORKTREE,
+                branch = "feature/worktree-panel",
+                commitHash = "def456",
+                isDirty = true,
+            ),
+        )
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+            onArchiveWorktree = { _, _, force ->
+                if (force) throw IllegalStateException("force archive failed")
+                throw IllegalStateException("fatal: contains modified files")
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+        val forceRequest = withTimeout(2_000.milliseconds) {
+            viewModel.forceArchiveWorktreeRequestStateFlow.first { it != null }!!
+        }
+
+        viewModel.confirmForceArchiveLocalWorktree(forceRequest.repoRootPath, forceRequest.worktreePath)
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+        assertEquals("force archive failed", actionError)
+        assertEquals(listOf(false, true), api.archiveWorktreeForceValues)
+        assertEquals(
+            listOf("main", "feature/worktree-panel"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
+        assertEquals(null, viewModel.forceArchiveWorktreeRequestStateFlow.value)
+        assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
     }
 
     @Test
@@ -702,7 +929,7 @@ class EngHubViewModelTest {
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             worktreesForRepoPath = { currentWorktrees },
-            onArchiveWorktree = { _, _ ->
+            onArchiveWorktree = { _, _, _ ->
                 currentWorktrees = listOf(rootWorktree)
                 throw IllegalStateException("cleanup failed")
             },
@@ -889,7 +1116,7 @@ private class RecordingGitWorktreeApi(
     private val listWorktreesFailure: RuntimeException? = null,
     private val onListWorktrees: (String) -> Unit = {},
     private val archiveWorktreeFailure: RuntimeException? = null,
-    private val onArchiveWorktree: (String, String) -> Unit = { _, _ -> },
+    private val onArchiveWorktree: (String, String, Boolean) -> Unit = { _, _, _ -> },
 ) : GitWorktreeApi {
     constructor(
         worktreesForRepoPath: (String) -> List<Worktree>,
@@ -923,6 +1150,7 @@ private class RecordingGitWorktreeApi(
     val ensureRepositoryCalls = mutableListOf<Pair<String, String>>()
     val ensureWorktreeCalls = mutableListOf<Pair<String, String>>()
     val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
+    val archiveWorktreeForceValues = mutableListOf<Boolean>()
     private val worktreesByRepoPath = worktreesByRepoPath
         ?: repositoryWorktreesBySelectedPath.values.associate { it.rootPath to it.worktrees }
 
@@ -949,12 +1177,13 @@ private class RecordingGitWorktreeApi(
         return worktreesForRepoPath?.invoke(repoPath) ?: worktreesByRepoPath.getValue(repoPath)
     }
 
-    override fun removeWorktree(worktreePath: String) = Unit
+    override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
 
-    override fun archiveWorktree(repoPath: String, worktreePath: String) {
+    override fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean) {
         archiveWorktreeCalls += repoPath to worktreePath
+        archiveWorktreeForceValues += force
         archiveWorktreeFailure?.let { throw it }
-        onArchiveWorktree(repoPath, worktreePath)
+        onArchiveWorktree(repoPath, worktreePath, force)
     }
 }
 

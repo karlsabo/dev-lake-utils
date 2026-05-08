@@ -16,6 +16,11 @@ data class LocalWorktreeUiState(
     val isRoot: Boolean = false,
 )
 
+data class ForceArchiveWorktreeUiState(
+    val repoRootPath: String,
+    val worktreePath: String,
+)
+
 fun List<String>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> {
     return asSequence()
         .map { it.trim() }
