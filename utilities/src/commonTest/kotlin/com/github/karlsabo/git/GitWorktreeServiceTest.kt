@@ -21,6 +21,7 @@ private class FakeGitCommandApi : GitCommandApi {
     var worktreeListResult: String = ""
     var worktreeListAction: (String) -> String = { worktreeListResult }
     var worktreeRemoveAction: (String, String) -> Unit = { _, _ -> }
+    var statusAction: (String) -> String = { "" }
     var revParseAction: (String, Array<out String>) -> String = { _, _ -> "" }
     var executeAction: (String?, Array<out String>) -> String = { _, _ -> "" }
 
@@ -60,7 +61,7 @@ private class FakeGitCommandApi : GitCommandApi {
 
     override fun status(repoPath: String): String {
         calls.add(Call("status", listOf(repoPath)))
-        return ""
+        return statusAction(repoPath)
     }
 
     override fun log(repoPath: String, vararg args: String): String {
@@ -200,6 +201,74 @@ class GitWorktreeServiceTest {
         assertEquals("main", worktrees[0].branch)
         assertEquals("/tmp/repo-feature", worktrees[1].path)
         assertEquals("feature/x", worktrees[1].branch)
+    }
+
+    @Test
+    fun listWorktrees_marksDirtyStatusFromGitStatus() {
+        val fake = FakeGitCommandApi()
+        fake.worktreeListResult = """
+            worktree /tmp/repo
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree /tmp/repo-feature
+            HEAD def456
+            branch refs/heads/feature/x
+        """.trimIndent()
+        fake.statusAction = { path ->
+            when (path) {
+                "/tmp/repo" -> ""
+                "/tmp/repo-feature" -> " M README.md"
+                else -> error("Unexpected status path $path")
+            }
+        }
+
+        val service = GitWorktreeService(fake)
+        val worktrees = service.listWorktrees("/tmp/repo")
+
+        assertEquals(false, worktrees[0].isDirty)
+        assertEquals(true, worktrees[1].isDirty)
+        assertEquals(
+            listOf("/tmp/repo", "/tmp/repo-feature"),
+            fake.calls.filter { it.method == "status" }.map { it.args.single() },
+        )
+    }
+
+    @Test
+    fun listWorktrees_statusFailure_marksOnlyThatWorktreeDirty() {
+        val fake = FakeGitCommandApi()
+        fake.worktreeListResult = """
+            worktree /tmp/repo
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree /tmp/repo-feature
+            HEAD def456
+            branch refs/heads/feature/x
+        """.trimIndent()
+        fake.statusAction = { path ->
+            when (path) {
+                "/tmp/repo" -> ""
+                "/tmp/repo-feature" -> throw GitCommandException(
+                    command = listOf("git", "status"),
+                    exitCode = 128,
+                    gitOutput = "fatal: not a git repository",
+                )
+
+                else -> error("Unexpected status path $path")
+            }
+        }
+        val service = GitWorktreeService(fake)
+
+        val worktrees = service.listWorktrees("/tmp/repo")
+
+        assertEquals(2, worktrees.size)
+        assertEquals(false, worktrees[0].isDirty)
+        assertEquals(true, worktrees[1].isDirty)
+        assertEquals(
+            listOf("/tmp/repo", "/tmp/repo-feature"),
+            fake.calls.filter { it.method == "status" }.map { it.args.single() },
+        )
     }
 
     @Test

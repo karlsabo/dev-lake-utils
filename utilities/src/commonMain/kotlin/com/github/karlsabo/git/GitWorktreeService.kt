@@ -99,7 +99,9 @@ class GitWorktreeService(
             throw GitWorktreeException("Failed to list worktrees for $repoPath: ${e.gitOutput}", e)
         }
 
-        return parseWorktreeListPorcelain(output)
+        return parseWorktreeListPorcelain(output).map { worktree ->
+            worktree.copy(isDirty = isWorktreeDirty(worktree.path))
+        }
     }
 
     override fun removeWorktree(worktreePath: String) {
@@ -151,5 +153,15 @@ class GitWorktreeService(
 
             return worktrees
         }
+    }
+
+    private fun isWorktreeDirty(worktreePath: String): Boolean {
+        val output = try {
+            gitCommandApi.status(worktreePath)
+        } catch (e: GitCommandException) {
+            logger.warn(e) { "Failed to read worktree status for $worktreePath; treating it as dirty" }
+            return true
+        }
+        return output.isNotBlank()
     }
 }

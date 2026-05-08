@@ -12,6 +12,7 @@ data class LocalRepositoryUiState(
 data class LocalWorktreeUiState(
     val branch: String,
     val path: String,
+    val isDirty: Boolean = false,
 )
 
 fun List<String>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> {
@@ -36,6 +37,7 @@ fun List<Worktree>.toLocalWorktreeUiStates(): List<LocalWorktreeUiState> {
         LocalWorktreeUiState(
             branch = worktree.branch.ifBlank { "(detached)" },
             path = worktree.path,
+            isDirty = worktree.isDirty,
         )
     }
 }

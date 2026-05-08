@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.state
 
+import com.github.karlsabo.git.Worktree
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -36,5 +37,15 @@ class LocalRepositoryUiStateTest {
         val uiStates = listOf("/Users/karl.sabo/git/app/").toLocalRepositoryUiStates()
 
         assertEquals(listOf(LocalRepositoryUiState(name = "app", path = "/Users/karl.sabo/git/app/")), uiStates)
+    }
+
+    @Test
+    fun mapsWorktreeDirtyStatus() {
+        val uiStates = listOf(
+            Worktree(path = "/repo", branch = "main", commitHash = "abc123", isDirty = false),
+            Worktree(path = "/repo-feature", branch = "feature/x", commitHash = "def456", isDirty = true),
+        ).toLocalWorktreeUiStates()
+
+        assertEquals(listOf(false, true), uiStates.map { it.isDirty })
     }
 }

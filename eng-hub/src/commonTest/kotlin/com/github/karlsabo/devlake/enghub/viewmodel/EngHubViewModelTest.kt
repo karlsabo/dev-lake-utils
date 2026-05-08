@@ -209,7 +209,7 @@ class EngHubViewModelTest {
     }
 
     @Test
-    fun expandingConfiguredRepositoryListsWorktreesAndShowsBranches() = runBlocking {
+    fun expandingConfiguredRepositoryListsWorktreesAndShowsBranchesWithDirtyStatus() = runBlocking {
         val api = RecordingGitWorktreeApi(
             worktreesByRepoPath = mapOf(
                 DEV_LAKE_ROOT to listOf(
@@ -218,6 +218,7 @@ class EngHubViewModelTest {
                         path = DEV_LAKE_SELECTED_WORKTREE,
                         branch = "feature/worktree-panel",
                         commitHash = "def456",
+                        isDirty = true,
                     ),
                 ),
             ),
@@ -238,6 +239,7 @@ class EngHubViewModelTest {
 
         assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
         assertEquals(listOf("main", "feature/worktree-panel"), repository.worktrees.map { it.branch })
+        assertEquals(listOf(false, true), repository.worktrees.map { it.isDirty })
     }
 
     @Test

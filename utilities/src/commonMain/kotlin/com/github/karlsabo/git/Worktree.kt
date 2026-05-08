@@ -4,4 +4,5 @@ data class Worktree(
     val path: String,
     val branch: String,
     val commitHash: String,
+    val isDirty: Boolean = false,
 )

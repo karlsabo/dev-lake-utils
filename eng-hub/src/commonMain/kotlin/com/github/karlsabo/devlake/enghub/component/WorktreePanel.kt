@@ -118,6 +118,14 @@ private fun LocalWorktreeRow(worktree: LocalWorktreeUiState) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = if (worktree.isDirty) "🟡" else "🟢",
+            modifier = Modifier.semantics {
+                contentDescription = if (worktree.isDirty) "Dirty worktree" else "Clean worktree"
+            },
+            style = MaterialTheme.typography.body2,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
         Text(text = worktree.branch, style = MaterialTheme.typography.body2)
     }
 }
