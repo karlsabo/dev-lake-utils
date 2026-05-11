@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
+import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.runConfiguredWorktreeSetup
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
@@ -251,12 +252,14 @@ class EngHubViewModel(
             try {
                 val repositoryWorktrees = gitWorktreeApi.resolveRepositoryRoot(selectedPath)
                 val rootPath = repositoryWorktrees.rootPath
-                if (currentConfig.localRepositories.any { it.normalizedRepoPath() == rootPath.normalizedRepoPath() }) {
+                if (currentConfig.localRepositories.any { it.path.normalizedRepoPath() == rootPath.normalizedRepoPath() }) {
                     actionError.value = "Repository already configured: $rootPath"
                     return@launch
                 }
 
-                val newConfig = currentConfig.copy(localRepositories = currentConfig.localRepositories + rootPath)
+                val newConfig = currentConfig.copy(
+                    localRepositories = currentConfig.localRepositories + LocalRepositoryConfig(path = rootPath),
+                )
                 configWriter.save(newConfig)
                 currentConfig = newConfig
                 localRepositories.update { repositories ->
@@ -499,7 +502,7 @@ class EngHubViewModel(
     private fun refreshConfiguredLocalRepositoryWorktrees() {
         currentConfig.localRepositories
             .asSequence()
-            .map { it.trim() }
+            .map { it.path.trim() }
             .filter { it.isNotEmpty() }
             .distinctBy { it.normalizedRepoPath() }
             .forEach { repoRootPath ->

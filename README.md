@@ -26,6 +26,7 @@
     * If there's a notification to review
     * If a PR build has failed, or there's a new comment, etc.
     * If a worktree agent has finished or needs attention
+* [ ] Fix all test names, either camelCase or back tick names `hello moto`
 * [ ] Optimize GitHub API requests: When refreshing notifications, only pull extra information if needed. Same with PRs.
 * [ ] If I mark a notification as done, add it to our marked done database table, they keep coming back from GitHub
 * [ ] Filter draft PR notifications

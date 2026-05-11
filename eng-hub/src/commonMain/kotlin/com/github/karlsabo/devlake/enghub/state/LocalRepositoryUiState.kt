@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.state
 
+import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.Worktree
 
 data class LocalRepositoryUiState(
@@ -21,9 +22,9 @@ data class ForceArchiveWorktreeUiState(
     val worktreePath: String,
 )
 
-fun List<String>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> {
+fun List<LocalRepositoryConfig>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> {
     return asSequence()
-        .map { it.trim() }
+        .map { it.path.trim() }
         .filter { it.isNotEmpty() }
         .map { path ->
             LocalRepositoryUiState(

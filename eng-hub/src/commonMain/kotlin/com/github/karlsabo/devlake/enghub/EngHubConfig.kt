@@ -8,7 +8,17 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.minutes
 
 @Serializable
@@ -19,9 +29,53 @@ data class EngHubConfig(
     val repositoriesBaseDir: String = "",
     val gitHubAuthor: String = "",
     val planningMarkdownDir: String = "",
-    val localRepositories: List<String> = emptyList(),
+    val localRepositories: List<LocalRepositoryConfig> = emptyList(),
     val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     val setupShell: String = "/bin/zsh",
+)
+
+@Serializable(with = LocalRepositoryConfigSerializer::class)
+data class LocalRepositoryConfig(
+    val path: String,
+    val setupCommands: List<String> = emptyList(),
+)
+
+private object LocalRepositoryConfigSerializer : KSerializer<LocalRepositoryConfig> {
+    override val descriptor: SerialDescriptor = LocalRepositoryConfigSurrogate.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): LocalRepositoryConfig {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("LocalRepositoryConfig can only be decoded from JSON")
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonPrimitive -> LocalRepositoryConfig(path = element.jsonPrimitive.content)
+            is JsonObject -> {
+                val value = jsonDecoder.json.decodeFromJsonElement(
+                    LocalRepositoryConfigSurrogate.serializer(),
+                    element,
+                )
+                LocalRepositoryConfig(path = value.path, setupCommands = value.setupCommands)
+            }
+
+            else -> throw SerializationException("localRepositories entries must be strings or objects")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: LocalRepositoryConfig) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("LocalRepositoryConfig can only be encoded to JSON")
+        jsonEncoder.encodeJsonElement(
+            jsonEncoder.json.encodeToJsonElement(
+                LocalRepositoryConfigSurrogate.serializer(),
+                LocalRepositoryConfigSurrogate(path = value.path, setupCommands = value.setupCommands),
+            )
+        )
+    }
+}
+
+@Serializable
+private data class LocalRepositoryConfigSurrogate(
+    val path: String,
+    val setupCommands: List<String> = emptyList(),
 )
 
 val engHubConfigPath: Path =

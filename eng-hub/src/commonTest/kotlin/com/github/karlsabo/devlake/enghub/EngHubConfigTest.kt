@@ -17,11 +17,17 @@ class EngHubConfigTest {
             gitHubAuthor = "example-author",
             planningMarkdownDir = "/tmp/example/llm-planning",
             localRepositories = listOf(
-                "/tmp/example/repos/app",
-                "/tmp/example/repos/fender",
+                LocalRepositoryConfig(
+                    path = "/tmp/example/repos/example-web",
+                    setupCommands = listOf(
+                        "direnv allow",
+                        "idea ./",
+                    ),
+                ),
+                LocalRepositoryConfig(path = "/tmp/example/repos/example-worker"),
             ),
             worktreeSetupCommands = mapOf(
-                "/tmp/example/repos/app" to listOf(
+                "/tmp/example/repos/example-web" to listOf(
                     "direnv allow",
                     "idea ./"
                 )
@@ -38,6 +44,64 @@ class EngHubConfigTest {
         assertTrue(json.contains("\"planningMarkdownDir\""))
         assertTrue(json.contains("\"localRepositories\""))
         assertTrue(json.contains("\"worktreePollIntervalMs\""))
+    }
+
+    @Test
+    fun deserializesUnifiedLocalRepositoryObjects() {
+        val json = """
+            {
+              "localRepositories": [
+                {
+                  "path": "/tmp/example/repos/example-web",
+                  "setupCommands": [
+                    "direnv allow",
+                    "idea ./"
+                  ]
+                },
+                {
+                  "path": "/tmp/example/repos/example-worker"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val decoded = lenientJson.decodeFromString(EngHubConfig.serializer(), json)
+
+        assertEquals(
+            listOf(
+                LocalRepositoryConfig(
+                    path = "/tmp/example/repos/example-web",
+                    setupCommands = listOf(
+                        "direnv allow",
+                        "idea ./",
+                    ),
+                ),
+                LocalRepositoryConfig(path = "/tmp/example/repos/example-worker"),
+            ),
+            decoded.localRepositories,
+        )
+    }
+
+    @Test
+    fun deserializesLegacyLocalRepositoryStringsAsEntries() {
+        val json = """
+            {
+              "localRepositories": [
+                "/tmp/example/repos/example-web",
+                "/tmp/example/repos/example-worker"
+              ]
+            }
+        """.trimIndent()
+
+        val decoded = lenientJson.decodeFromString(EngHubConfig.serializer(), json)
+
+        assertEquals(
+            listOf(
+                LocalRepositoryConfig(path = "/tmp/example/repos/example-web"),
+                LocalRepositoryConfig(path = "/tmp/example/repos/example-worker"),
+            ),
+            decoded.localRepositories,
+        )
     }
 
     @Test

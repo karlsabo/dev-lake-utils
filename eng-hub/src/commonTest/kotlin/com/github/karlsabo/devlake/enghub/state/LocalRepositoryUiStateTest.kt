@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.state
 
+import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.Worktree
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,24 +10,24 @@ class LocalRepositoryUiStateTest {
     @Test
     fun sortsRepositoriesByFolderName() {
         val repositories = listOf(
-            "/Users/karl.sabo/git/k-repo",
-            "/Users/karl.sabo/git/app",
-            "/Users/karl.sabo/git/infrastructure",
-            "/Users/karl.sabo/git/fender",
+            LocalRepositoryConfig(path = "/workspace/zephyr-service"),
+            LocalRepositoryConfig(path = "/workspace/atlas-tooling"),
+            LocalRepositoryConfig(path = "/workspace/orion-platform"),
+            LocalRepositoryConfig(path = "/workspace/cedar-worker"),
         )
 
         val uiStates = repositories.toLocalRepositoryUiStates()
 
         assertEquals(
-            listOf("app", "fender", "infrastructure", "k-repo"),
+            listOf("atlas-tooling", "cedar-worker", "orion-platform", "zephyr-service"),
             uiStates.map { it.name },
         )
         assertEquals(
             listOf(
-                "/Users/karl.sabo/git/app",
-                "/Users/karl.sabo/git/fender",
-                "/Users/karl.sabo/git/infrastructure",
-                "/Users/karl.sabo/git/k-repo",
+                "/workspace/atlas-tooling",
+                "/workspace/cedar-worker",
+                "/workspace/orion-platform",
+                "/workspace/zephyr-service",
             ),
             uiStates.map { it.path },
         )
@@ -34,9 +35,12 @@ class LocalRepositoryUiStateTest {
 
     @Test
     fun derivesFolderNameFromTrailingSlashPath() {
-        val uiStates = listOf("/Users/karl.sabo/git/app/").toLocalRepositoryUiStates()
+        val uiStates = listOf(LocalRepositoryConfig(path = "/workspace/atlas-tooling/")).toLocalRepositoryUiStates()
 
-        assertEquals(listOf(LocalRepositoryUiState(name = "app", path = "/Users/karl.sabo/git/app/")), uiStates)
+        assertEquals(
+            listOf(LocalRepositoryUiState(name = "atlas-tooling", path = "/workspace/atlas-tooling/")),
+            uiStates
+        )
     }
 
     @Test

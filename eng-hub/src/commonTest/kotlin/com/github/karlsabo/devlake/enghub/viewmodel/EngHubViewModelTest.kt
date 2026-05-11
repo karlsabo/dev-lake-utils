@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
+import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
@@ -121,7 +122,10 @@ class EngHubViewModelTest {
         }
 
         assertEquals(listOf(DEV_LAKE_SELECTED_WORKTREE), api.resolvedPaths)
-        assertEquals(listOf(DEV_LAKE_ROOT), configWriter.savedConfigs.value.single().localRepositories)
+        assertEquals(
+            listOf(LocalRepositoryConfig(path = DEV_LAKE_ROOT)),
+            configWriter.savedConfigs.value.single().localRepositories,
+        )
         assertEquals(listOf("dev-lake-utils"), repositories.map { it.name })
         assertEquals(listOf("main", "feature/worktree-panel"), repositories.single().worktrees.map { it.branch })
         assertEquals(listOf(true, false), repositories.single().worktrees.map { it.isRoot })
@@ -178,7 +182,13 @@ class EngHubViewModelTest {
         }
 
         assertEquals(listOf(DEV_LAKE_SELECTED_WORKTREE, DOCS_SELECTED_WORKTREE), api.resolvedPaths)
-        assertEquals(listOf(DEV_LAKE_ROOT, DOCS_ROOT), configWriter.savedConfigs.value.last().localRepositories)
+        assertEquals(
+            listOf(
+                LocalRepositoryConfig(path = DEV_LAKE_ROOT),
+                LocalRepositoryConfig(path = DOCS_ROOT),
+            ),
+            configWriter.savedConfigs.value.last().localRepositories,
+        )
         assertEquals(
             listOf("main", "feature/worktree-panel"),
             repositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.branch },
@@ -1101,7 +1111,7 @@ private fun createLocalRepositoryViewModel(
         config = EngHubConfig(
             pollIntervalMs = 60_000,
             worktreePollIntervalMs = worktreePollIntervalMs,
-            localRepositories = localRepositories,
+            localRepositories = localRepositories.map { LocalRepositoryConfig(path = it) },
             worktreeSetupCommands = worktreeSetupCommands,
             setupShell = setupShell,
         ),
