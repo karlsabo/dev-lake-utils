@@ -231,6 +231,42 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun rendersConfiguredLocalRepositoryObjectsInFolderNameOrder() {
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = "/workspace/example-service",
+                    setupCommands = listOf("direnv allow"),
+                ),
+                LocalRepositoryConfig(
+                    path = "/workspace/example-web",
+                    setupCommands = listOf("direnv exec . idea ./"),
+                ),
+                LocalRepositoryConfig(path = "/workspace/example-worker"),
+                LocalRepositoryConfig(path = "/workspace/example-infra"),
+            ),
+        )
+
+        val repositories = viewModel.localRepositoriesStateFlow.value
+
+        assertEquals(
+            listOf("example-infra", "example-service", "example-web", "example-worker"),
+            repositories.map { it.name },
+        )
+        assertEquals(
+            listOf(
+                "/workspace/example-infra",
+                "/workspace/example-service",
+                "/workspace/example-web",
+                "/workspace/example-worker",
+            ),
+            repositories.map { it.path },
+        )
+    }
+
+    @Test
     fun expandingConfiguredRepositoryListsWorktreesAndShowsBranchesWithDirtyStatus() = runBlocking {
         val api = RecordingGitWorktreeApi(
             worktreesByRepoPath = mapOf(
@@ -1097,6 +1133,8 @@ private fun createLocalRepositoryViewModel(
     gitWorktreeApi: RecordingGitWorktreeApi,
     configWriter: RecordingEngHubConfigWriter,
     localRepositories: List<String> = emptyList(),
+    localRepositoryConfigs: List<LocalRepositoryConfig> =
+        localRepositories.map { LocalRepositoryConfig(path = it) },
     worktreePollIntervalMs: Long = 120_000,
     worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     setupShell: String = "/bin/zsh",
@@ -1111,7 +1149,7 @@ private fun createLocalRepositoryViewModel(
         config = EngHubConfig(
             pollIntervalMs = 60_000,
             worktreePollIntervalMs = worktreePollIntervalMs,
-            localRepositories = localRepositories.map { LocalRepositoryConfig(path = it) },
+            localRepositories = localRepositoryConfigs,
             worktreeSetupCommands = worktreeSetupCommands,
             setupShell = setupShell,
         ),

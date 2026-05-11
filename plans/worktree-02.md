@@ -76,7 +76,9 @@ Use `localRepositories` as a list of repository objects:
 
 **Notes:** This is only the schema foundation, but it must keep the codebase compiling after the type change. Backward compatibility with the already-implemented `localRepositories: List<String>` shape is required: decode string entries as legacy input and normalize them to entries with empty `setupCommands`. Add small helper APIs on `EngHubConfig` or `LocalRepositoryConfig` if needed so follow-up stories can consistently read normalized paths without reimplementing list traversal.
 
-### 2. Render And Expand Repositories From Unified Local Repository Entries
+### 2. Render And Expand Repositories From Unified Local Repository Entries - Done
+
+**Done:** 2026 05 11
 
 **Acceptance criteria:** Given the config contains local repository objects for `/workspace/example-service`, `/workspace/example-web`, `/workspace/example-worker`, and `/workspace/example-infra`, when I open the Worktrees view, then I see repository rows ordered `example-infra`, `example-service`, `example-web`, `example-worker` instead of `No repositories configured`.
 
