@@ -88,7 +88,9 @@ Use `localRepositories` as a list of repository objects:
 
 **Notes:** Preserve the exact `path` from each config entry in `LocalRepositoryUiState.path`, because later actions use that path to list worktrees and find setup commands. Expansion already receives `repoRootPath` from the row in `EngHubViewModel.toggleLocalRepositoryExpansion`, so this should mostly be a regression test that the object-backed row path still drives `GitWorktreeApi.listWorktrees(repoRootPath)`.
 
-### 3. Normalize Legacy Worktree Setup Commands In Memory
+### 3. Normalize Legacy Worktree Setup Commands In Memory - Done
+
+**Done:** 2026 05 11
 
 **Acceptance criteria:** Given `<app-config-dir>/eng-hub-config.json` has no `localRepositories` field and has `worktreeSetupCommands` keys for `/workspace/example-service`, `/workspace/example-web`, `/workspace/example-worker`, and `/workspace/example-infra`, when Eng Hub loads the config, then the in-memory config has four `localRepositories` objects containing those paths and setup commands.
 

@@ -501,6 +501,64 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun openingExistingWorktreeRunsUnifiedRepositorySetupCommands() = runBlocking {
+        val repoRoot = createTempDir("repo")
+        val worktreePath = createTempDir("worktree")
+        try {
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = "$repoRoot/",
+                        setupCommands = listOf("pwd > unified-opened-path.txt"),
+                    ),
+                ),
+                setupShell = "/bin/bash",
+            )
+
+            viewModel.openLocalWorktree(repoRoot, worktreePath)
+
+            withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+            }
+
+            val openedPath = readText(Path(worktreePath, "unified-opened-path.txt")).trim()
+            assertTrue(openedPath.endsWith(worktreePath.substringAfterLast('/')))
+        } finally {
+            removeTempDir(repoRoot)
+            removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
+    fun openingExistingWorktreeFallsBackToLegacySetupWhenUnifiedRepositoryEntryIsEmpty() = runBlocking {
+        val repoRoot = createTempDir("repo")
+        val worktreePath = createTempDir("worktree")
+        try {
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositoryConfigs = listOf(LocalRepositoryConfig(path = "$repoRoot/")),
+                worktreeSetupCommands = mapOf(repoRoot to listOf("pwd > legacy-opened-path.txt")),
+                setupShell = "/bin/bash",
+            )
+
+            viewModel.openLocalWorktree(repoRoot, worktreePath)
+
+            withTimeout(2_000.milliseconds) {
+                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+            }
+
+            val openedPath = readText(Path(worktreePath, "legacy-opened-path.txt")).trim()
+            assertTrue(openedPath.endsWith(worktreePath.substringAfterLast('/')))
+        } finally {
+            removeTempDir(repoRoot)
+            removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
     fun openingExistingWorktreeTracksProgressForSelectedWorktreeOnly() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")
