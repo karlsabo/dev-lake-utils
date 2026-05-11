@@ -302,7 +302,7 @@ class EngHubViewModelTest {
     }
 
     @Test
-    fun worktreePollRefreshesAllConfiguredRepositoriesWithoutRefreshingGitHubData() = runBlocking {
+    fun worktreePollRefreshesUnifiedRepositoryEntriesWithoutRefreshingGitHubData() = runBlocking {
         val listCountsByRepo = mutableMapOf<String, Int>()
         val api = RecordingGitWorktreeApi(
             worktreesForRepoPath = { repoPath ->
@@ -333,7 +333,16 @@ class EngHubViewModelTest {
             gitHubApi = gitHubApi,
             gitWorktreeApi = api,
             configWriter = RecordingEngHubConfigWriter(),
-            localRepositories = listOf(DEV_LAKE_ROOT, DOCS_ROOT),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("direnv allow"),
+                ),
+                LocalRepositoryConfig(
+                    path = DOCS_ROOT,
+                    setupCommands = listOf("direnv exec . idea ./"),
+                ),
+            ),
             worktreePollIntervalMs = 25,
         )
 

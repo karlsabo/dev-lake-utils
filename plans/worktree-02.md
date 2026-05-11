@@ -102,6 +102,8 @@ Use `localRepositories` as a list of repository objects:
 
 ### 4. Poll Unified Local Repository Entries
 
+**Done:** 2026 05 11
+
 **Acceptance criteria:** Given `/workspace/example-worker` is a `localRepositories` object and a linked worktree is created outside Eng Hub, when the worktree poll interval elapses, then the `example-worker` repository state includes the new worktree without refreshing PRs or notifications.
 
 **Expected edits:** `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubViewModel.kt` and `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubViewModelTest.kt`.

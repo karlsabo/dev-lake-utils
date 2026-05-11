@@ -13,6 +13,8 @@
 
 * [ ] Add a UI panel for adding local git repos, showing the root and all worktrees and opening them the same way setup does
     * We also want menu buttons to take actions on the worktree, open them, archive them.
+* [ ] Worktrees should start expanded
+    * Clicking on the worktree to expand it sometimes takes multiple clicks
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
