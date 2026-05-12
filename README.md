@@ -11,8 +11,8 @@
 
 # TODO
 
-* [ ] Add a UI panel for adding local git repos, showing the root and all worktrees and opening them the same way setup does
-    * We also want menu buttons to take actions on the worktree, open them, archive them.
+* [ ] Error dialog needs a scrollpane and the ok button to always be present
+* [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
     * Clicking on the worktree to expand it sometimes takes multiple clicks
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better

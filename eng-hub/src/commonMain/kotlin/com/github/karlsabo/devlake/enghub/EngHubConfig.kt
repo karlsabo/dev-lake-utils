@@ -12,20 +12,10 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.JsonDecoder
-import kotlinx.serialization.json.JsonEncoder
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.minutes
 
-@Serializable(with = EngHubConfigSerializer::class)
+@Serializable
 data class EngHubConfig(
     val organizationIds: List<String> = emptyList(),
     val pollIntervalMs: Long = 10.minutes.inWholeMilliseconds,
@@ -34,6 +24,7 @@ data class EngHubConfig(
     val gitHubAuthor: String = "",
     val planningMarkdownDir: String = "",
     val localRepositories: List<LocalRepositoryConfig> = emptyList(),
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     val setupShell: String = "/bin/zsh",
 ) {
@@ -50,100 +41,10 @@ data class EngHubConfig(
     }
 }
 
-object EngHubConfigSerializer : KSerializer<EngHubConfig> {
-    override val descriptor: SerialDescriptor = EngHubConfigSurrogate.serializer().descriptor
-
-    override fun deserialize(decoder: Decoder): EngHubConfig {
-        val value = decoder.decodeSerializableValue(EngHubConfigSurrogate.serializer())
-        return EngHubConfig(
-            organizationIds = value.organizationIds,
-            pollIntervalMs = value.pollIntervalMs,
-            worktreePollIntervalMs = value.worktreePollIntervalMs,
-            repositoriesBaseDir = value.repositoriesBaseDir,
-            gitHubAuthor = value.gitHubAuthor,
-            planningMarkdownDir = value.planningMarkdownDir,
-            localRepositories = normalizeLocalRepositories(
-                localRepositories = value.localRepositories,
-                worktreeSetupCommands = value.worktreeSetupCommands,
-            ),
-            worktreeSetupCommands = value.worktreeSetupCommands,
-            setupShell = value.setupShell,
-        )
-    }
-
-    override fun serialize(encoder: Encoder, value: EngHubConfig) {
-        encoder.encodeSerializableValue(
-            EngHubConfigSurrogate.serializer(),
-            EngHubConfigSurrogate(
-                organizationIds = value.organizationIds,
-                pollIntervalMs = value.pollIntervalMs,
-                worktreePollIntervalMs = value.worktreePollIntervalMs,
-                repositoriesBaseDir = value.repositoriesBaseDir,
-                gitHubAuthor = value.gitHubAuthor,
-                planningMarkdownDir = value.planningMarkdownDir,
-                localRepositories = value.localRepositories,
-                worktreeSetupCommands = value.worktreeSetupCommands,
-                setupShell = value.setupShell,
-            ),
-        )
-    }
-}
-
 @Serializable
-private data class EngHubConfigSurrogate(
-    val organizationIds: List<String> = emptyList(),
-    val pollIntervalMs: Long = 10.minutes.inWholeMilliseconds,
-    val worktreePollIntervalMs: Long = 2.minutes.inWholeMilliseconds,
-    val repositoriesBaseDir: String = "",
-    val gitHubAuthor: String = "",
-    val planningMarkdownDir: String = "",
-    val localRepositories: List<LocalRepositoryConfig> = emptyList(),
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
-    val setupShell: String = "/bin/zsh",
-)
-
-@Serializable(with = LocalRepositoryConfigSerializer::class)
 data class LocalRepositoryConfig(
     val path: String,
-    val setupCommands: List<String> = emptyList(),
-)
-
-object LocalRepositoryConfigSerializer : KSerializer<LocalRepositoryConfig> {
-    override val descriptor: SerialDescriptor = LocalRepositoryConfigSurrogate.serializer().descriptor
-
-    override fun deserialize(decoder: Decoder): LocalRepositoryConfig {
-        val jsonDecoder = decoder as? JsonDecoder
-            ?: throw SerializationException("LocalRepositoryConfig can only be decoded from JSON")
-        return when (val element = jsonDecoder.decodeJsonElement()) {
-            is JsonPrimitive -> LocalRepositoryConfig(path = element.jsonPrimitive.content)
-            is JsonObject -> {
-                val value = jsonDecoder.json.decodeFromJsonElement(
-                    LocalRepositoryConfigSurrogate.serializer(),
-                    element,
-                )
-                LocalRepositoryConfig(path = value.path, setupCommands = value.setupCommands)
-            }
-
-            else -> throw SerializationException("localRepositories entries must be strings or objects")
-        }
-    }
-
-    override fun serialize(encoder: Encoder, value: LocalRepositoryConfig) {
-        val jsonEncoder = encoder as? JsonEncoder
-            ?: throw SerializationException("LocalRepositoryConfig can only be encoded to JSON")
-        jsonEncoder.encodeJsonElement(
-            jsonEncoder.json.encodeToJsonElement(
-                LocalRepositoryConfigSurrogate.serializer(),
-                LocalRepositoryConfigSurrogate(path = value.path, setupCommands = value.setupCommands),
-            )
-        )
-    }
-}
-
-@Serializable
-private data class LocalRepositoryConfigSurrogate(
-    val path: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val setupCommands: List<String> = emptyList(),
 )
 
