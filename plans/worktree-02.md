@@ -138,6 +138,8 @@ Use `localRepositories` as a list of repository objects:
 
 ### 7. Run PR And Notification Setup Commands From The Local Repository Entry
 
+**Done:** 2026 05 12
+
 **Acceptance criteria:** Given `/workspace/example-service` is a `localRepositories` object with setup commands, when the existing `checkoutAndOpen("example-org/example-service", "feature/worktree-loading")` setup flow runs, then Eng Hub creates or reuses the branch worktree and runs the setup commands from that local repository object.
 
 **Expected edits:** `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubViewModel.kt`, `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/WorktreeSetupCommands.kt` if the setup helper needs a reusable lookup API, and tests in `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubViewModelTest.kt` or `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependenciesTest.kt`.

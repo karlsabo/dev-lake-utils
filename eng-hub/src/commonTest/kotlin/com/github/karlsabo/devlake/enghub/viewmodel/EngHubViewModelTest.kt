@@ -24,6 +24,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -584,6 +585,47 @@ class EngHubViewModelTest {
         } finally {
             removeTempDir(repoRoot)
             removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
+    fun checkoutAndOpenRunsUnifiedRepositorySetupCommands() = runBlocking {
+        val repositoriesBaseDir = createTempDir("repositories")
+        val repoPath = Path(repositoriesBaseDir, "example-service").toString()
+        val worktreePath = Path(repoPath, "feature", "worktree-loading")
+        SystemFileSystem.createDirectories(worktreePath)
+        try {
+            val api = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = api,
+                configWriter = RecordingEngHubConfigWriter(),
+                repositoriesBaseDir = repositoriesBaseDir,
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = "$repoPath/",
+                        setupCommands = listOf("pwd > unified-checkout-path.txt"),
+                    ),
+                ),
+                setupShell = "/bin/bash",
+            )
+
+            viewModel.checkoutAndOpen("example-org/example-service", "feature/worktree-loading")
+
+            withTimeout(2_000.milliseconds) {
+                while (!SystemFileSystem.exists(Path(worktreePath, "unified-checkout-path.txt"))) {
+                    delay(10.milliseconds)
+                }
+            }
+
+            val openedPath = readText(Path(worktreePath, "unified-checkout-path.txt")).trim()
+            assertTrue(openedPath.endsWith("/example-service/feature/worktree-loading"))
+            assertEquals(
+                listOf(repoPath to "https://github.com/example-org/example-service.git"),
+                api.ensureRepositoryCalls,
+            )
+            assertEquals(listOf(repoPath to "feature/worktree-loading"), api.ensureWorktreeCalls)
+        } finally {
+            removeTempDir(repositoriesBaseDir)
         }
     }
 
@@ -1251,6 +1293,7 @@ private fun createLocalRepositoryViewModel(
         localRepositories.map { LocalRepositoryConfig(path = it) },
     worktreePollIntervalMs: Long = 120_000,
     worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
+    repositoriesBaseDir: String = "",
     setupShell: String = "/bin/zsh",
 ): EngHubViewModel {
     return EngHubViewModel(
@@ -1263,6 +1306,7 @@ private fun createLocalRepositoryViewModel(
         config = EngHubConfig(
             pollIntervalMs = 60_000,
             worktreePollIntervalMs = worktreePollIntervalMs,
+            repositoriesBaseDir = repositoriesBaseDir,
             localRepositories = localRepositoryConfigs,
             worktreeSetupCommands = worktreeSetupCommands,
             setupShell = setupShell,
