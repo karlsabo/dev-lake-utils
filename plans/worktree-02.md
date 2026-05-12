@@ -124,7 +124,9 @@ Use `localRepositories` as a list of repository objects:
 
 **Notes:** Current duplicate detection checks strings in `currentConfig.localRepositories` (`EngHubViewModel.kt:254`). After the schema change, it should compare normalized entry paths. Adding a repository should not create or update legacy `worktreeSetupCommands`.
 
-### 6. Run Worktree Open Setup Commands From The Local Repository Entry
+### 6. Run Worktree Open Setup Commands From The Local Repository Entry - Done
+
+**Done:** 2026 05 12
 
 **Acceptance criteria:** Given `/workspace/example-service` is a `localRepositories` object with setup commands and its repository row shows worktree `/workspace/example-service-feature-worktree-loading`, when I choose `Open`, then Eng Hub runs the setup commands from that local repository object in the selected worktree path.
 
