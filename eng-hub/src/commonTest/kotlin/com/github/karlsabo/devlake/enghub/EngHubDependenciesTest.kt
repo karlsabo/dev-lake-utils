@@ -122,6 +122,70 @@ class EngHubDependenciesTest {
         assertEquals(config, loadedDependencies.config)
         assertSame(providedViewModel, loadedDependencies.viewModel)
     }
+
+    @Test
+    fun loadEngHubDependenciesPersistsMigratedConfigAndUsesMigratedRuntimeConfig() {
+        val loadedConfig = EngHubConfig(
+            organizationIds = listOf("test-org"),
+            repositoriesBaseDir = "/tmp/repos",
+            gitHubAuthor = "test-user",
+            worktreeSetupCommands = mapOf(
+                "/workspace/example-service" to listOf(
+                    "direnv allow",
+                    "direnv exec . idea ./",
+                ),
+                "/workspace/example-web" to listOf("npm install"),
+            ),
+        )
+        val migratedConfig = EngHubConfig(
+            organizationIds = listOf("test-org"),
+            repositoriesBaseDir = "/tmp/repos",
+            gitHubAuthor = "test-user",
+            localRepositories = listOf(
+                LocalRepositoryConfig(
+                    path = "/workspace/example-service",
+                    setupCommands = listOf(
+                        "direnv allow",
+                        "direnv exec . idea ./",
+                    ),
+                ),
+                LocalRepositoryConfig(
+                    path = "/workspace/example-web",
+                    setupCommands = listOf("npm install"),
+                ),
+            ),
+        )
+        val gitHubApiConfig = GitHubApiRestConfig(token = "test-token")
+        val configWriter = RecordingEngHubConfigWriter()
+        val fakeGitHubApi = RecordingGitHubApi()
+        val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
+            gitHubApi = fakeGitHubApi,
+            gitHubNotificationService = GitHubNotificationService(fakeGitHubApi),
+            gitWorktreeApi = RecordingGitWorktreeApi(),
+            desktopLauncher = RecordingDesktopLauncher(),
+            directoryPicker = RecordingDirectoryPicker(),
+            configWriter = RecordingEngHubConfigWriter(),
+            config = migratedConfig,
+            notificationSubscriptionStore = RecordingNotificationSubscriptionStore(),
+        )
+
+        val loadedDependencies = loadEngHubDependencies(
+            loadConfig = { loadedConfig },
+            loadGitHubApiConfig = { gitHubApiConfig },
+            configWriter = configWriter,
+            componentFactory = { providedConfig, providedGitHubApiConfig ->
+                assertEquals(migratedConfig, providedConfig)
+                assertEquals(gitHubApiConfig, providedGitHubApiConfig)
+                object : EngHubComponent(providedConfig, providedGitHubApiConfig) {
+                    override val viewModel = providedViewModel
+                }
+            },
+        )
+
+        assertEquals(migratedConfig, loadedDependencies.config)
+        assertSame(providedViewModel, loadedDependencies.viewModel)
+        assertEquals(listOf(migratedConfig), configWriter.savedConfigs.value)
+    }
 }
 
 private data class EnsureRepositoryCall(

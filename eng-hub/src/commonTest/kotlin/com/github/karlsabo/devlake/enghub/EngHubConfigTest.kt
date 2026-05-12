@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub
 import com.github.karlsabo.tools.lenientJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class EngHubConfigTest {
@@ -80,6 +81,24 @@ class EngHubConfigTest {
             ),
             decoded.localRepositories,
         )
+    }
+
+    @Test
+    fun omitsEmptyLegacyWorktreeSetupCommandsWhenSerializing() {
+        val config = EngHubConfig(
+            localRepositories = listOf(
+                LocalRepositoryConfig(
+                    path = "/workspace/example-service",
+                    setupCommands = listOf("direnv allow"),
+                ),
+            ),
+            worktreeSetupCommands = emptyMap(),
+        )
+
+        val json = lenientJson.encodeToString(EngHubConfig.serializer(), config)
+
+        assertTrue(json.contains("\"localRepositories\""))
+        assertFalse(json.contains("\"worktreeSetupCommands\""))
     }
 
     @Test

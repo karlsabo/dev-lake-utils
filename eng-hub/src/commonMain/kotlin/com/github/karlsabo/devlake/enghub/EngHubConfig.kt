@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.github.karlsabo.devlake.enghub
 
 import com.github.karlsabo.tools.DEV_METRICS_APP_NAME
@@ -8,6 +10,8 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -32,7 +36,19 @@ data class EngHubConfig(
     val localRepositories: List<LocalRepositoryConfig> = emptyList(),
     val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     val setupShell: String = "/bin/zsh",
-)
+) {
+    internal fun migratedForStartup(): EngHubConfig {
+        if (worktreeSetupCommands.isEmpty()) return this
+
+        return copy(
+            localRepositories = normalizeLocalRepositories(
+                localRepositories = localRepositories,
+                worktreeSetupCommands = worktreeSetupCommands,
+            ),
+            worktreeSetupCommands = emptyMap(),
+        )
+    }
+}
 
 object EngHubConfigSerializer : KSerializer<EngHubConfig> {
     override val descriptor: SerialDescriptor = EngHubConfigSurrogate.serializer().descriptor
@@ -82,6 +98,7 @@ private data class EngHubConfigSurrogate(
     val gitHubAuthor: String = "",
     val planningMarkdownDir: String = "",
     val localRepositories: List<LocalRepositoryConfig> = emptyList(),
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     val setupShell: String = "/bin/zsh",
 )

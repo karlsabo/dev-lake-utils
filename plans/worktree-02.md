@@ -148,7 +148,9 @@ Use `localRepositories` as a list of repository objects:
 
 **Notes:** This closes the regression risk where Worktree `Open` works but notification `Setup` silently stops running commands because it used the old `worktreeSetupCommands` map. The UI has pull request and notification entry points, but both route through `checkoutAndOpen`; keep the acceptance test focused on that shared behavior unless separate UI-entry tests are explicitly needed.
 
-### 8. Persist Migrated Config On Startup
+### 8. Persist Migrated Config On Startup - Done
+
+**Done:** 2026 05 12
 
 **Acceptance criteria:** Given Eng Hub normalized legacy `worktreeSetupCommands` into `localRepositories`, when startup dependency loading completes, then `eng-hub-config.json` is saved with the unified `localRepositories` object shape and without relying on `worktreeSetupCommands` for runtime behavior.
 
