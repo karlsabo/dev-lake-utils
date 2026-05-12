@@ -25,9 +25,7 @@ data class EngHubConfig(
     val planningMarkdownDir: String = "",
     val localRepositories: List<LocalRepositoryConfig> = emptyList(),
     val setupShell: String = "/bin/zsh",
-) {
-    internal fun migratedForStartup(): EngHubConfig = this
-}
+)
 
 @Serializable
 data class LocalRepositoryConfig(

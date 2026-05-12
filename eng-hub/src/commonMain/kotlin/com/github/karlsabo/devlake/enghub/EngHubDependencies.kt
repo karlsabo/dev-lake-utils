@@ -15,14 +15,9 @@ internal data class LoadedEngHubDependencies(
 internal fun loadEngHubDependencies(
     loadConfig: () -> EngHubConfig = ::loadEngHubConfig,
     loadGitHubApiConfig: () -> GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) },
-    configWriter: EngHubConfigWriter = EngHubConfigWriter(::saveEngHubConfig),
     componentFactory: EngHubComponentFactory = ::createEngHubComponent,
 ): LoadedEngHubDependencies {
-    val loadedConfig = loadConfig()
-    val config = loadedConfig.migratedForStartup()
-    if (config != loadedConfig) {
-        configWriter.save(config)
-    }
+    val config = loadConfig()
     val gitHubApiConfig = loadGitHubApiConfig()
     return LoadedEngHubDependencies(
         config = config,
@@ -33,13 +28,11 @@ internal fun loadEngHubDependencies(
 internal fun loadEngHubViewModel(
     loadConfig: () -> EngHubConfig = ::loadEngHubConfig,
     loadGitHubApiConfig: () -> GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) },
-    configWriter: EngHubConfigWriter = EngHubConfigWriter(::saveEngHubConfig),
     componentFactory: EngHubComponentFactory = ::createEngHubComponent,
 ): EngHubViewModel {
     return loadEngHubDependencies(
         loadConfig = loadConfig,
         loadGitHubApiConfig = loadGitHubApiConfig,
-        configWriter = configWriter,
         componentFactory = componentFactory,
     ).viewModel
 }

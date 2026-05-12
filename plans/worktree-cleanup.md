@@ -73,7 +73,9 @@ The cleanup intentionally stops accepting `worktreeSetupCommands` and string ent
 
 **Notes:** The helper `createLocalRepositoryViewModel` should stop accepting `worktreeSetupCommands` and should prefer `localRepositoryConfigs` for tests that need setup commands. The explicit legacy fallback test should be removed.
 
-### 3. Remove Startup Migration Plumbing
+### 3. Remove Startup Migration Plumbing - Done
+
+**Status:** Done 2026 05 12.
 
 **Acceptance criteria:** Given Eng Hub loads a canonical config, when `loadEngHubDependencies` runs, then it passes that config directly to `createEngHubComponent` and does not call `configWriter.save`.
 
