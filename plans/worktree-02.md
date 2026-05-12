@@ -100,7 +100,7 @@ Use `localRepositories` as a list of repository objects:
 
 **Notes:** Use representative placeholder paths in the test so it proves the current broken config shape is handled without encoding machine-specific fixtures. If both unified `localRepositories` and legacy `worktreeSetupCommands` are present, prefer the unified local repository entry and only fill missing setup commands from the legacy map when the matching entry has no commands.
 
-### 4. Poll Unified Local Repository Entries
+### 4. Poll Unified Local Repository Entries - Done
 
 **Done:** 2026 05 11
 
@@ -112,7 +112,9 @@ Use `localRepositories` as a list of repository objects:
 
 **Notes:** This is separate from render/expand because polling has different timing and side-effect risks. After migration, `localRepositories` is the only runtime list that should drive Worktrees.
 
-### 5. Add Repositories As Unified Local Repository Entries
+### 5. Add Repositories As Unified Local Repository Entries - Done
+
+**Done:** 2026 05 11
 
 **Acceptance criteria:** Given the config already has a `localRepositories` object for `/workspace/example-web`, when I use Add Repository to pick `/workspace/new-local-repo`, then Eng Hub saves a new local repository object with that path and an empty setup command list without modifying the existing `example-web` setup commands.
 

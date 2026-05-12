@@ -46,6 +46,8 @@ private const val DEV_LAKE_ROOT = "/repos/dev-lake-utils"
 private const val DEV_LAKE_SELECTED_WORKTREE = "/repos/dev-lake-utils-feature-worktree-panel"
 private const val DOCS_ROOT = "/repos/docs"
 private const val DOCS_SELECTED_WORKTREE = "/repos/docs-feature-notes"
+private const val EXAMPLE_WEB_ROOT = "/workspace/example-web"
+private const val NEW_LOCAL_REPO_ROOT = "/workspace/new-local-repo"
 
 class EngHubViewModelTest {
 
@@ -196,6 +198,51 @@ class EngHubViewModelTest {
         assertEquals(
             listOf("main", "feature/notes"),
             repositories.single { it.path == DOCS_ROOT }.worktrees.map { it.branch },
+        )
+    }
+
+    @Test
+    fun addingLocalRepositoryPersistsUnifiedEntryWithoutChangingExistingSetupCommands() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktrees = RepositoryWorktrees(
+                rootPath = NEW_LOCAL_REPO_ROOT,
+                selectedWorktreePath = NEW_LOCAL_REPO_ROOT,
+                worktrees = listOf(
+                    Worktree(path = NEW_LOCAL_REPO_ROOT, branch = "main", commitHash = "abc123"),
+                ),
+            ),
+        )
+        val configWriter = RecordingEngHubConfigWriter()
+        val existingRepository = LocalRepositoryConfig(
+            path = EXAMPLE_WEB_ROOT,
+            setupCommands = listOf("direnv allow", "direnv exec . idea ./"),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = configWriter,
+            localRepositoryConfigs = listOf(existingRepository),
+        )
+
+        viewModel.addLocalRepository(NEW_LOCAL_REPO_ROOT)
+
+        val repositories = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.any { it.path == NEW_LOCAL_REPO_ROOT && it.worktrees.isNotEmpty() }
+            }
+        }
+        val savedConfig = configWriter.savedConfigs.value.single()
+
+        assertEquals(
+            listOf(
+                existingRepository,
+                LocalRepositoryConfig(path = NEW_LOCAL_REPO_ROOT, setupCommands = emptyList()),
+            ),
+            savedConfig.localRepositories,
+        )
+        assertEquals(emptyMap(), savedConfig.worktreeSetupCommands)
+        assertEquals(
+            listOf("example-web", "new-local-repo"),
+            repositories.map { it.name },
         )
     }
 
