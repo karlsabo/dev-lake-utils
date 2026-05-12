@@ -240,7 +240,6 @@ class EngHubViewModelTest {
             ),
             savedConfig.localRepositories,
         )
-        assertEquals(emptyMap(), savedConfig.worktreeSetupCommands)
         assertEquals(
             listOf("example-web", "new-local-repo"),
             repositories.map { it.name },
@@ -536,8 +535,12 @@ class EngHubViewModelTest {
             val viewModel = createLocalRepositoryViewModel(
                 gitWorktreeApi = api,
                 configWriter = RecordingEngHubConfigWriter(),
-                localRepositories = listOf(repoRoot),
-                worktreeSetupCommands = mapOf(repoRoot to listOf("pwd > opened-path.txt")),
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = repoRoot,
+                        setupCommands = listOf("pwd > opened-path.txt"),
+                    ),
+                ),
                 setupShell = "/bin/bash",
             )
 
@@ -630,33 +633,6 @@ class EngHubViewModelTest {
     }
 
     @Test
-    fun openingExistingWorktreeFallsBackToLegacySetupWhenUnifiedRepositoryEntryIsEmpty() = runBlocking {
-        val repoRoot = createTempDir("repo")
-        val worktreePath = createTempDir("worktree")
-        try {
-            val viewModel = createLocalRepositoryViewModel(
-                gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
-                configWriter = RecordingEngHubConfigWriter(),
-                localRepositoryConfigs = listOf(LocalRepositoryConfig(path = "$repoRoot/")),
-                worktreeSetupCommands = mapOf(repoRoot to listOf("pwd > legacy-opened-path.txt")),
-                setupShell = "/bin/bash",
-            )
-
-            viewModel.openLocalWorktree(repoRoot, worktreePath)
-
-            withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
-            }
-
-            val openedPath = readText(Path(worktreePath, "legacy-opened-path.txt")).trim()
-            assertTrue(openedPath.endsWith(worktreePath.substringAfterLast('/')))
-        } finally {
-            removeTempDir(repoRoot)
-            removeTempDir(worktreePath)
-        }
-    }
-
-    @Test
     fun openingExistingWorktreeTracksProgressForSelectedWorktreeOnly() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")
@@ -664,9 +640,11 @@ class EngHubViewModelTest {
             val viewModel = createLocalRepositoryViewModel(
                 gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
                 configWriter = RecordingEngHubConfigWriter(),
-                localRepositories = listOf(repoRoot),
-                worktreeSetupCommands = mapOf(
-                    repoRoot to listOf("while [ ! -f release-open ]; do sleep 0.01; done"),
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = repoRoot,
+                        setupCommands = listOf("while [ ! -f release-open ]; do sleep 0.01; done"),
+                    ),
                 ),
                 setupShell = "/bin/bash",
             )
@@ -698,9 +676,11 @@ class EngHubViewModelTest {
             val viewModel = createLocalRepositoryViewModel(
                 gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
                 configWriter = RecordingEngHubConfigWriter(),
-                localRepositories = listOf(repoRoot),
-                worktreeSetupCommands = mapOf(
-                    repoRoot to listOf("while [ ! -f release-open ]; do sleep 0.01; done"),
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = repoRoot,
+                        setupCommands = listOf("while [ ! -f release-open ]; do sleep 0.01; done"),
+                    ),
                 ),
                 setupShell = "/bin/bash",
             )
@@ -739,11 +719,13 @@ class EngHubViewModelTest {
             val viewModel = createLocalRepositoryViewModel(
                 gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
                 configWriter = RecordingEngHubConfigWriter(),
-                localRepositories = listOf(repoRoot),
-                worktreeSetupCommands = mapOf(
-                    repoRoot to listOf(
-                        "printf x >> '$setupCountPath'",
-                        "while [ ! -f release-open ]; do sleep 0.01; done",
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = repoRoot,
+                        setupCommands = listOf(
+                            "printf x >> '$setupCountPath'",
+                            "while [ ! -f release-open ]; do sleep 0.01; done",
+                        ),
                     ),
                 ),
                 setupShell = "/bin/bash",
@@ -783,8 +765,12 @@ class EngHubViewModelTest {
             val viewModel = createLocalRepositoryViewModel(
                 gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
                 configWriter = RecordingEngHubConfigWriter(),
-                localRepositories = listOf(repoRoot),
-                worktreeSetupCommands = mapOf(repoRoot to listOf("echo setup failed >&2", "exit 23")),
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = repoRoot,
+                        setupCommands = listOf("echo setup failed >&2", "exit 23"),
+                    ),
+                ),
                 setupShell = "/bin/bash",
             )
 
@@ -1292,7 +1278,6 @@ private fun createLocalRepositoryViewModel(
     localRepositoryConfigs: List<LocalRepositoryConfig> =
         localRepositories.map { LocalRepositoryConfig(path = it) },
     worktreePollIntervalMs: Long = 120_000,
-    worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     repositoriesBaseDir: String = "",
     setupShell: String = "/bin/zsh",
 ): EngHubViewModel {
@@ -1308,7 +1293,6 @@ private fun createLocalRepositoryViewModel(
             worktreePollIntervalMs = worktreePollIntervalMs,
             repositoriesBaseDir = repositoriesBaseDir,
             localRepositories = localRepositoryConfigs,
-            worktreeSetupCommands = worktreeSetupCommands,
             setupShell = setupShell,
         ),
         notificationSubscriptionStore = NoOpNotificationSubscriptionStore(),

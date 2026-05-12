@@ -24,21 +24,9 @@ data class EngHubConfig(
     val gitHubAuthor: String = "",
     val planningMarkdownDir: String = "",
     val localRepositories: List<LocalRepositoryConfig> = emptyList(),
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val worktreeSetupCommands: Map<String, List<String>> = emptyMap(),
     val setupShell: String = "/bin/zsh",
 ) {
-    internal fun migratedForStartup(): EngHubConfig {
-        if (worktreeSetupCommands.isEmpty()) return this
-
-        return copy(
-            localRepositories = normalizeLocalRepositories(
-                localRepositories = localRepositories,
-                worktreeSetupCommands = worktreeSetupCommands,
-            ),
-            worktreeSetupCommands = emptyMap(),
-        )
-    }
+    internal fun migratedForStartup(): EngHubConfig = this
 }
 
 @Serializable
@@ -47,37 +35,6 @@ data class LocalRepositoryConfig(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val setupCommands: List<String> = emptyList(),
 )
-
-private fun normalizeLocalRepositories(
-    localRepositories: List<LocalRepositoryConfig>,
-    worktreeSetupCommands: Map<String, List<String>>,
-): List<LocalRepositoryConfig> {
-    val legacyCommandsByNormalizedPath = mutableMapOf<String, List<String>>()
-    worktreeSetupCommands.forEach { (path, commands) ->
-        val normalizedPath = path.normalizedRepositoryPath()
-        if (normalizedPath !in legacyCommandsByNormalizedPath) {
-            legacyCommandsByNormalizedPath[normalizedPath] = commands
-        }
-    }
-    val normalizedUnifiedPaths = mutableSetOf<String>()
-    val normalizedRepositories = localRepositories.mapNotNull { repository ->
-        val normalizedPath = repository.path.normalizedRepositoryPath()
-        if (!normalizedUnifiedPaths.add(normalizedPath)) return@mapNotNull null
-
-        if (repository.setupCommands.isEmpty()) {
-            repository.copy(setupCommands = legacyCommandsByNormalizedPath[normalizedPath].orEmpty())
-        } else {
-            repository
-        }
-    }
-
-    val legacyRepositories = worktreeSetupCommands.entries
-        .filter { it.key.normalizedRepositoryPath() !in normalizedUnifiedPaths }
-        .distinctBy { it.key.normalizedRepositoryPath() }
-        .map { LocalRepositoryConfig(path = it.key, setupCommands = it.value) }
-
-    return normalizedRepositories + legacyRepositories
-}
 
 internal fun String.normalizedRepositoryPath(): String = trim().trimEnd('/', '\\')
 

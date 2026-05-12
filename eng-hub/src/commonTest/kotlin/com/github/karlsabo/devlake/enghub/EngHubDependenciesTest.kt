@@ -124,20 +124,8 @@ class EngHubDependenciesTest {
     }
 
     @Test
-    fun loadEngHubDependenciesPersistsMigratedConfigAndUsesMigratedRuntimeConfig() {
-        val loadedConfig = EngHubConfig(
-            organizationIds = listOf("test-org"),
-            repositoriesBaseDir = "/tmp/repos",
-            gitHubAuthor = "test-user",
-            worktreeSetupCommands = mapOf(
-                "/workspace/example-service" to listOf(
-                    "direnv allow",
-                    "direnv exec . idea ./",
-                ),
-                "/workspace/example-web" to listOf("npm install"),
-            ),
-        )
-        val migratedConfig = EngHubConfig(
+    fun loadEngHubDependenciesUsesCanonicalConfigWithoutSaving() {
+        val config = EngHubConfig(
             organizationIds = listOf("test-org"),
             repositoriesBaseDir = "/tmp/repos",
             gitHubAuthor = "test-user",
@@ -165,16 +153,16 @@ class EngHubDependenciesTest {
             desktopLauncher = RecordingDesktopLauncher(),
             directoryPicker = RecordingDirectoryPicker(),
             configWriter = RecordingEngHubConfigWriter(),
-            config = migratedConfig,
+            config = config,
             notificationSubscriptionStore = RecordingNotificationSubscriptionStore(),
         )
 
         val loadedDependencies = loadEngHubDependencies(
-            loadConfig = { loadedConfig },
+            loadConfig = { config },
             loadGitHubApiConfig = { gitHubApiConfig },
             configWriter = configWriter,
             componentFactory = { providedConfig, providedGitHubApiConfig ->
-                assertEquals(migratedConfig, providedConfig)
+                assertEquals(config, providedConfig)
                 assertEquals(gitHubApiConfig, providedGitHubApiConfig)
                 object : EngHubComponent(providedConfig, providedGitHubApiConfig) {
                     override val viewModel = providedViewModel
@@ -182,9 +170,9 @@ class EngHubDependenciesTest {
             },
         )
 
-        assertEquals(migratedConfig, loadedDependencies.config)
+        assertEquals(config, loadedDependencies.config)
         assertSame(providedViewModel, loadedDependencies.viewModel)
-        assertEquals(listOf(migratedConfig), configWriter.savedConfigs.value)
+        assertEquals(emptyList(), configWriter.savedConfigs.value)
     }
 }
 

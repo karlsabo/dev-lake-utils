@@ -61,7 +61,9 @@ The cleanup intentionally stops accepting `worktreeSetupCommands` and string ent
 
 **Notes:** This story deliberately drops support for `localRepositories: ["..."]`. If the saved JSON should avoid `"setupCommands": []`, use a small field annotation on `LocalRepositoryConfig.setupCommands`; do not keep the custom serializer just for that formatting preference.
 
-### 2. Remove Legacy Worktree Setup Commands
+### 2. Remove Legacy Worktree Setup Commands - Done
+
+**Status:** Done 2026 05 12.
 
 **Acceptance criteria:** Given `/workspace/example-service` is a `localRepositories` object with setup commands, when I open an existing worktree or run `checkoutAndOpen("example-org/example-service", "feature/worktree-loading")`, then Eng Hub runs setup commands only from the matching local repository entry.
 
@@ -77,7 +79,7 @@ The cleanup intentionally stops accepting `worktreeSetupCommands` and string ent
 
 **Expected edits:** `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHubConfig.kt`, `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependencies.kt`, `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/EngHubDependenciesTest.kt`.
 
-**Scope:** Delete `EngHubConfig.migratedForStartup`, delete `normalizeLocalRepositories`, and remove the migration save branch from `loadEngHubDependencies`. Update dependency tests so they assert ordinary dependency wiring only, not migration persistence.
+**Scope:** Delete `EngHubConfig.migratedForStartup` and remove the migration save branch from `loadEngHubDependencies`. Update dependency tests so they assert ordinary dependency wiring only, not migration persistence.
 
 **Notes:** This story should land after the legacy setup-command field is gone so no production code can still construct a meaningful migrated config. `EngHubConfigWriter` remains useful for view-model saves such as Add Repository and should not be removed as part of this story.
 

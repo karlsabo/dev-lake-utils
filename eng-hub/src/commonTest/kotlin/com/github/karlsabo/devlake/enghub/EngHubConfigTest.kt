@@ -79,7 +79,7 @@ class EngHubConfigTest {
     }
 
     @Test
-    fun omitsEmptyLegacyWorktreeSetupCommandsWhenSerializing() {
+    fun omitsEmptySetupCommandsWhenSerializing() {
         val config = EngHubConfig(
             localRepositories = listOf(
                 LocalRepositoryConfig(
@@ -87,7 +87,6 @@ class EngHubConfigTest {
                     setupCommands = listOf("direnv allow"),
                 ),
             ),
-            worktreeSetupCommands = emptyMap(),
         )
 
         val json = lenientJson.encodeToString(EngHubConfig.serializer(), config)
@@ -110,7 +109,6 @@ class EngHubConfigTest {
 
         val decoded = lenientJson.decodeFromString(EngHubConfig.serializer(), legacyJson)
 
-        assertEquals(emptyMap(), decoded.worktreeSetupCommands)
         assertEquals("/bin/zsh", decoded.setupShell)
         assertEquals("", decoded.planningMarkdownDir)
         assertEquals(emptyList(), decoded.localRepositories)
