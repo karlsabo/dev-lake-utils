@@ -106,15 +106,19 @@ Example:
     "example-org"
   ],
   "pollIntervalMs": 600000,
+  "worktreePollIntervalMs": 120000,
   "repositoriesBaseDir": "/Users/you/git",
   "gitHubAuthor": "your-github-login",
-  "planningMarkdownDir": "/Users/you/karl-backup/notebook/llm-planning",
-  "worktreeSetupCommands": {
-    "/Users/you/git/example-repo": [
-      "direnv allow",
-      "idea ./"
-    ]
-  },
+  "planningMarkdownDir": "/Users/you/notebook/llm-planning",
+  "localRepositories": [
+    {
+      "path": "/Users/you/git/example-repo",
+      "setupCommands": [
+        "direnv allow",
+        "idea ./"
+      ]
+    }
+  ],
   "setupShell": "/bin/zsh"
 }
 ```
@@ -122,11 +126,12 @@ Example:
 Field meanings:
 
 - `organizationIds`: orgs searched for authored PRs
-- `pollIntervalMs`: refresh interval for both panes
+- `pollIntervalMs`: refresh interval for pull requests and notifications
+- `worktreePollIntervalMs`: refresh interval for local worktree discovery and status
 - `repositoriesBaseDir`: where repos are cloned if missing
 - `gitHubAuthor`: GitHub login used for the pull request query
 - `planningMarkdownDir`: absolute directory used when syncing LLM markdown templates that contain `${PLANNING_MARKDOWN_DIR}`
-- `worktreeSetupCommands`: optional commands keyed by the base repo path
+- `localRepositories`: local repository roots managed by Eng Hub; each entry has an absolute `path` and optional `setupCommands`
 - `setupShell`: login shell used to run setup commands
 
 ### First run behavior
