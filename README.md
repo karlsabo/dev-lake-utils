@@ -11,10 +11,13 @@
 
 # TODO
 
-* [ ] Error dialog needs a scrollpane and the ok button to always be present
 * [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
-    * Clicking on the worktree to expand it sometimes takes multiple clicks
+    * Clicking on the worktree to expand it sometimes takes too long to expand
+    * Should be able to expand anywhere with a double click
+    * Should be able to right click to get all the menu options
+    * Should have PR information if there's a PR connected to the branch
+        * Should have menu options to open the PR in the web
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
