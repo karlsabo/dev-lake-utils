@@ -11,11 +11,14 @@
 
 # TODO
 
+* [ ] Allow running multiple set-up commands at a time from the notification view
+* [ ] Update PR review skill to be named `eh-pr-review`
+    * Also update the skill to ensure that AI prefixes all its comments with ${LLM-NAME}-${REASONING-LEVEL}: ${THE_COMMENT}. This way it's clear the comment is from an LLM.
 * [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
-    * Clicking on the worktree to expand it sometimes takes too long to expand
+    * Clicking on the worktree to expand, it sometimes takes too long to expand
     * Should be able to expand anywhere with a double click
-    * Should be able to right click to get all the menu options
+    * Should be able to right-click to get all the menu options
     * Should have PR information if there's a PR connected to the branch
         * Should have menu options to open the PR in the web
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
@@ -23,7 +26,7 @@
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] Add linter to Gradle, formatting, etc.
 * [ ] When setting up worktrees, do we have to disable all setup buttons? It would be great to set up multiple worktrees at a time.
-* [ ] Add information log in the app, like app notifications so we can see what has happened, when a worktree is created, archived, etc.
+* [ ] Add information log in the app, like app notifications, so we can see what has happened, when a worktree is created, archived, etc.
 * [ ] Add the ability to put worktrees into categories
     * E.g., In progress, In review, Done
 * [ ] Add a notification badge on the tab when attention of the user is needed
@@ -36,7 +39,7 @@
 * [ ] If I mark a notification as done, add it to our marked done database table, they keep coming back from GitHub
 * [ ] Filter draft PR notifications
 * [ ] Show my review status on PR notifications
-* [ ] Convert to panel type UI. Have PRs, Tickets, Notifications, etc that expand a panel and then you can click each one and they show options for what to do.
+* [ ] Convert to panel type UI. Have PRs, Tickets, Notifications, etc. that expand a panel, and then you can click each one and they show options for what to do.
 * [ ] Start an auto review on PRs, show the copyable path to the review Markdown
 * [ ] Rename all skills to start with a standard prefix
     * Maybe eh for eng hub?
@@ -49,10 +52,10 @@
 * [ ] Consider consolidating into a single configuration file
 * [ ] Add a UI panel for showing tickets assigned to the user
     * If a related PR is closed, ask if the ticket should be closed
-* [ ] Search function for look at all PRs, notifications, etc
+* [ ] Search function for look at all PRs, notifications, etc.
 * [ ] Can we write UI tests?
     * Can an LLM execute some manual UI-driven tests?
-    * Want the UI to be universal. So the web UI will have to call the backend server to run desktop style functions.
+  * Want the UI to be universal. So the web UI will have to call the backend server to run desktop-style functions.
     * Might need to split eng-hub into eng-hub-ui and backend
 * [ ] Look into <https://github.com/obra/superpowers/tree/main> for their skills
 * [ ] Look into <https://github.com/garrytan/gstack> for their skills

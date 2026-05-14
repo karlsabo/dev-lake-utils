@@ -132,18 +132,12 @@ class GitWorktreeService(
     }
 
     companion object {
-        fun buildWorktreePath(repoPath: String, branch: String): String {
-            val repoName = repoPath.trimEnd('/').substringAfterLast('/')
-            val sanitized = sanitizeBranchName(branch)
-            val parentDir = repoPath.trimEnd('/').substringBeforeLast('/')
-            return "$parentDir/$repoName-$sanitized"
-        }
+        fun buildWorktreePath(repoPath: String, branch: String): String =
+            com.github.karlsabo.git.buildWorktreePath(repoPath, branch).value
 
-        fun sanitizeBranchName(branch: String): String {
-            return branch
-                .replace(Regex("[^a-zA-Z0-9._-]"), "-")
-                .trim('-')
-        }
+        @Suppress("unused")
+        fun sanitizeBranchName(branch: String): String =
+            com.github.karlsabo.git.sanitizeBranchName(branch)
 
         internal fun parseWorktreeListPorcelain(output: String): List<Worktree> {
             val worktrees = mutableListOf<Worktree>()

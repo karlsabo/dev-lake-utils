@@ -54,6 +54,7 @@ kotlin {
 
                 // kotlin
                 api(libs.kotlinx.datetime)
+                api(libs.kotlinx.coroutines.core)
 
                 // XML
                 implementation(libs.xmlutil.core)
