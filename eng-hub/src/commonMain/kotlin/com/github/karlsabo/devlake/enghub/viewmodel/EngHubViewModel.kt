@@ -8,6 +8,7 @@ import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
+import com.github.karlsabo.devlake.enghub.configuredWorktreeSetupCommands
 import com.github.karlsabo.devlake.enghub.runConfiguredWorktreeSetup
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
@@ -20,6 +21,11 @@ import com.github.karlsabo.devlake.enghub.state.toNotificationUiState
 import com.github.karlsabo.devlake.enghub.state.toPullRequestUiState
 import com.github.karlsabo.git.GitCommandException
 import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.git.WorktreePath
+import com.github.karlsabo.git.WorktreeSetupCoordinator
+import com.github.karlsabo.git.WorktreeSetupRequest
+import com.github.karlsabo.git.WorktreeSetupStatus
+import com.github.karlsabo.git.buildWorktreePath
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus.PENDING
 import com.github.karlsabo.github.GitHubApi
@@ -123,6 +129,7 @@ class EngHubViewModel(
     private val gitHubApi: GitHubApi,
     private val gitHubNotificationService: GitHubNotificationService,
     private val gitWorktreeApi: GitWorktreeApi,
+    private val worktreeSetupCoordinator: WorktreeSetupCoordinator,
     private val desktopLauncher: DesktopLauncher,
     private val directoryPicker: DirectoryPicker,
     private val configWriter: EngHubConfigWriter,
@@ -134,8 +141,8 @@ class EngHubViewModel(
     private val actionError = MutableStateFlow<String?>(null)
     val actionErrorStateFlow: StateFlow<String?> = actionError.asStateFlow()
 
-    private val checkoutInProgress = MutableStateFlow(false)
-    val checkoutInProgressStateFlow: StateFlow<Boolean> = checkoutInProgress.asStateFlow()
+    val setupStatusesStateFlow: StateFlow<Map<WorktreePath, WorktreeSetupStatus>> =
+        worktreeSetupCoordinator.statuses
 
     private val localRepositories = MutableStateFlow(config.localRepositories.toLocalRepositoryUiStates())
     val localRepositoriesStateFlow: StateFlow<List<LocalRepositoryUiState>> = localRepositories.asStateFlow()
@@ -317,26 +324,32 @@ class EngHubViewModel(
 
     fun checkoutAndOpen(repoFullName: String, branch: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            checkoutInProgress.value = true
             try {
                 val activeConfig = currentConfig
-                val repoName = repoFullName.substringAfterLast('/')
-                val repoPath = "${activeConfig.repositoriesBaseDir.trimEnd('/')}/$repoName"
-                val cloneUrl = "https://github.com/$repoFullName.git"
-                logger.info { "Setup: ensuring repository at $repoPath" }
-                gitWorktreeApi.ensureRepository(repoPath, cloneUrl)
-                logger.info { "Setup: ensuring worktree for branch $branch" }
-                val worktreePath = gitWorktreeApi.ensureWorktree(repoPath, branch)
-                runConfiguredSetupForWorktree(repoPath, worktreePath, activeConfig)
+                val repoPath = checkoutRepoPath(repoFullName, activeConfig)
+                val worktreePath = buildWorktreePath(repoPath, branch)
+                logger.info { "Setup: requesting checkout setup for $repoFullName branch=$branch at $worktreePath" }
+                val setup = worktreeSetupCoordinator.setup(
+                    WorktreeSetupRequest(
+                        repoPath = repoPath,
+                        worktreePath = worktreePath,
+                        cloneUrl = "https://github.com/$repoFullName.git",
+                        branch = branch,
+                        setupShell = activeConfig.setupShell,
+                        setupCommands = configuredWorktreeSetupCommands(repoPath, activeConfig),
+                    ),
+                )
+                setup.await()
                 logger.info { "Setup: done" }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to set up $repoFullName branch=$branch" }
                 actionError.value = e.message ?: "Failed to set up worktree"
-            } finally {
-                checkoutInProgress.value = false
             }
         }
     }
+
+    fun checkoutWorktreePath(repoFullName: String, branch: String): WorktreePath =
+        buildWorktreePath(checkoutRepoPath(repoFullName, currentConfig), branch)
 
     fun openLocalWorktree(repoRootPath: String, worktreePath: String) {
         val normalizedWorktreePath = worktreePath.normalizedRepoPath()
@@ -592,6 +605,11 @@ class EngHubViewModel(
 }
 
 private fun String.normalizedRepoPath(): String = trim().trimEnd('/', '\\')
+
+private fun checkoutRepoPath(repoFullName: String, config: EngHubConfig): String {
+    val repoName = repoFullName.substringAfterLast('/')
+    return "${config.repositoriesBaseDir.trimEnd('/')}/$repoName"
+}
 
 private val dirtyWorktreeGitOutputMarkers = listOf(
     "contains modified",

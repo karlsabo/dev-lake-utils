@@ -47,7 +47,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
     val pullRequestsResult by viewModel.pullRequests.collectAsState()
     val notificationsResult by viewModel.notifications.collectAsState()
     val actionError by viewModel.actionErrorStateFlow.collectAsState()
-    val checkoutInProgress by viewModel.checkoutInProgressStateFlow.collectAsState()
+    val setupStatuses by viewModel.setupStatusesStateFlow.collectAsState()
     val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
     val openingLocalWorktreePaths by viewModel.openingLocalWorktreePathsStateFlow.collectAsState()
@@ -80,7 +80,9 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                         pullRequestsResult = pullRequestsResult,
                         onOpenInBrowser = { viewModel.openInBrowser(it) },
                         onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
-                        checkoutInProgress = checkoutInProgress,
+                        setupStatusFor = { repoFullName, branch ->
+                            setupStatuses[viewModel.checkoutWorktreePath(repoFullName, branch)]
+                        },
                         modifier = Modifier.weight(1f),
                     )
 
@@ -88,7 +90,9 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                         notificationsResult = notificationsResult,
                         onOpenInBrowser = { viewModel.openInBrowser(it) },
                         onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
-                        checkoutInProgress = checkoutInProgress,
+                        setupStatusFor = { repoFullName, branch ->
+                            setupStatuses[viewModel.checkoutWorktreePath(repoFullName, branch)]
+                        },
                         actingOnThreadIds = actingOnThreadIds,
                         onApprove = { notificationThreadId, apiUrl ->
                             viewModel.approvePullRequest(

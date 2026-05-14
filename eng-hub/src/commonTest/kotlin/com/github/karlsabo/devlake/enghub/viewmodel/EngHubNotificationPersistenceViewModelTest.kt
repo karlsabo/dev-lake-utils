@@ -6,6 +6,8 @@ import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
+import com.github.karlsabo.git.WorktreeSetupCoordinator
+import com.github.karlsabo.git.buildWorktreePath
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.GitHubApi
@@ -240,10 +242,12 @@ private fun createViewModel(
     api: NotificationPersistenceGitHubApi,
     store: RecordingNotificationSubscriptionStore,
 ): EngHubViewModel {
+    val gitWorktreeApi = NoOpGitWorktreeApi()
     return EngHubViewModel(
         gitHubApi = api,
         gitHubNotificationService = GitHubNotificationService(api),
-        gitWorktreeApi = NoOpGitWorktreeApi(),
+        gitWorktreeApi = gitWorktreeApi,
+        worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi),
         desktopLauncher = NoOpDesktopLauncher(),
         directoryPicker = NoOpDirectoryPicker(),
         configWriter = NoOpEngHubConfigWriter(),
@@ -263,7 +267,7 @@ private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> =
 private class NoOpGitWorktreeApi : GitWorktreeApi {
     override fun ensureRepository(repoPath: String, cloneUrl: String) = Unit
 
-    override fun ensureWorktree(repoPath: String, branch: String): String = "$repoPath/$branch"
+    override fun ensureWorktree(repoPath: String, branch: String): String = buildWorktreePath(repoPath, branch).value
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 

@@ -7,6 +7,13 @@ import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
+import com.github.karlsabo.git.WorktreePath
+import com.github.karlsabo.git.WorktreeSetupCommandResult
+import com.github.karlsabo.git.WorktreeSetupCommandRunner
+import com.github.karlsabo.git.WorktreeSetupCoordinator
+import com.github.karlsabo.git.WorktreeSetupRequest
+import com.github.karlsabo.git.WorktreeSetupStatus
+import com.github.karlsabo.git.buildWorktreePath
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.GitHubApi
@@ -595,7 +602,7 @@ class EngHubViewModelTest {
     fun checkoutAndOpenRunsUnifiedRepositorySetupCommands() = runBlocking {
         val repositoriesBaseDir = createTempDir("repositories")
         val repoPath = Path(repositoriesBaseDir, "example-service").toString()
-        val worktreePath = Path(repoPath, "feature", "worktree-loading")
+        val worktreePath = Path(buildWorktreePath(repoPath, "feature/worktree-loading").value)
         SystemFileSystem.createDirectories(worktreePath)
         try {
             val api = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
@@ -621,12 +628,75 @@ class EngHubViewModelTest {
             }
 
             val openedPath = readText(Path(worktreePath, "unified-checkout-path.txt")).trim()
-            assertTrue(openedPath.endsWith("/example-service/feature/worktree-loading"))
+            assertTrue(openedPath.endsWith("/example-service-feature-worktree-loading"))
             assertEquals(
                 listOf(repoPath to "https://github.com/example-org/example-service.git"),
                 api.ensureRepositoryCalls,
             )
             assertEquals(listOf(repoPath to "feature/worktree-loading"), api.ensureWorktreeCalls)
+        } finally {
+            removeTempDir(repositoriesBaseDir)
+        }
+    }
+
+    @Test
+    fun checkoutAndOpenTracksCoordinatorStatusPerWorktreePath(): Unit = runBlocking {
+        val repositoriesBaseDir = createTempDir("repositories")
+        val firstRepoPath = Path(repositoriesBaseDir, "example-service").toString()
+        val secondRepoPath = Path(repositoriesBaseDir, "example-web").toString()
+        try {
+            val api = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
+            val setupRunner = BlockingCoordinatorSetupRunner()
+            val coordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            )
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = api,
+                worktreeSetupCoordinator = coordinator,
+                configWriter = RecordingEngHubConfigWriter(),
+                repositoriesBaseDir = repositoriesBaseDir,
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(path = firstRepoPath, setupCommands = listOf("setup first")),
+                    LocalRepositoryConfig(path = secondRepoPath, setupCommands = listOf("setup second")),
+                ),
+            )
+            val firstWorktreePath = buildWorktreePath(firstRepoPath, "feature/first")
+            val secondWorktreePath = buildWorktreePath(secondRepoPath, "feature/second")
+
+            viewModel.checkoutAndOpen("example-org/example-service", "feature/first")
+            withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(firstWorktreePath) }
+
+            var statuses = viewModel.setupStatusesStateFlow.value
+            assertEquals(WorktreeSetupStatus.RUNNING_SETUP_COMMANDS, statuses[firstWorktreePath])
+            assertEquals(null, statuses[secondWorktreePath])
+
+            viewModel.checkoutAndOpen("example-org/example-web", "feature/second")
+            statuses = withTimeout(2_000.milliseconds) {
+                viewModel.setupStatusesStateFlow.first { current ->
+                    current[firstWorktreePath] == WorktreeSetupStatus.RUNNING_SETUP_COMMANDS &&
+                            current[secondWorktreePath] == WorktreeSetupStatus.RUNNING_SETUP_COMMANDS
+                }
+            }
+
+            assertEquals(setOf(firstWorktreePath, secondWorktreePath), statuses.keys)
+            assertEquals(
+                listOf(
+                    firstRepoPath to "https://github.com/example-org/example-service.git",
+                    secondRepoPath to "https://github.com/example-org/example-web.git",
+                ),
+                api.ensureRepositoryCalls,
+            )
+            assertEquals(
+                listOf(firstRepoPath to "feature/first", secondRepoPath to "feature/second"),
+                api.ensureWorktreeCalls,
+            )
+
+            setupRunner.complete(firstWorktreePath)
+            setupRunner.complete(secondWorktreePath)
+            withTimeout(2_000.milliseconds) {
+                viewModel.setupStatusesStateFlow.first { it.isEmpty() }
+            }
         } finally {
             removeTempDir(repositoriesBaseDir)
         }
@@ -1273,6 +1343,7 @@ private fun testIssue(@Suppress("SameParameterValue") issueApiUrl: String, pullA
 private fun createLocalRepositoryViewModel(
     gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()),
     gitWorktreeApi: RecordingGitWorktreeApi,
+    worktreeSetupCoordinator: WorktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi),
     configWriter: RecordingEngHubConfigWriter,
     localRepositories: List<String> = emptyList(),
     localRepositoryConfigs: List<LocalRepositoryConfig> =
@@ -1285,6 +1356,7 @@ private fun createLocalRepositoryViewModel(
         gitHubApi = gitHubApi,
         gitHubNotificationService = GitHubNotificationService(gitHubApi),
         gitWorktreeApi = gitWorktreeApi,
+        worktreeSetupCoordinator = worktreeSetupCoordinator,
         desktopLauncher = LocalRepositoryNoOpDesktopLauncher(),
         directoryPicker = LocalRepositoryNoOpDirectoryPicker(),
         configWriter = configWriter,
@@ -1297,6 +1369,34 @@ private fun createLocalRepositoryViewModel(
         ),
         notificationSubscriptionStore = NoOpNotificationSubscriptionStore(),
     )
+}
+
+private class BlockingCoordinatorSetupRunner : WorktreeSetupCommandRunner {
+    private val lock = Any()
+    private val startedSignals = mutableMapOf<WorktreePath, CompletableDeferred<Unit>>()
+    private val completeSignals = mutableMapOf<WorktreePath, CompletableDeferred<Unit>>()
+
+    override suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult {
+        startedSignal(request.worktreePath).complete(Unit)
+        completeSignal(request.worktreePath).await()
+        return WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
+    }
+
+    suspend fun awaitStarted(worktreePath: WorktreePath) {
+        startedSignal(worktreePath).await()
+    }
+
+    fun complete(worktreePath: WorktreePath) {
+        completeSignal(worktreePath).complete(Unit)
+    }
+
+    private fun startedSignal(worktreePath: WorktreePath): CompletableDeferred<Unit> = synchronized(lock) {
+        startedSignals.getOrPut(worktreePath) { CompletableDeferred() }
+    }
+
+    private fun completeSignal(worktreePath: WorktreePath): CompletableDeferred<Unit> = synchronized(lock) {
+        completeSignals.getOrPut(worktreePath) { CompletableDeferred() }
+    }
 }
 
 private class RecordingGitWorktreeApi(
@@ -1350,7 +1450,9 @@ private class RecordingGitWorktreeApi(
 
     override fun ensureWorktree(repoPath: String, branch: String): String {
         ensureWorktreeCalls += repoPath to branch
-        return "$repoPath/$branch"
+        val worktreePath = buildWorktreePath(repoPath, branch).value
+        SystemFileSystem.createDirectories(Path(worktreePath))
+        return worktreePath
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false

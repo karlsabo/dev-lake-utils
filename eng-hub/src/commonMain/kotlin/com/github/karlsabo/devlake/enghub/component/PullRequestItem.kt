@@ -16,14 +16,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.git.WorktreeSetupStatus
 
 @Composable
 fun PullRequestItem(
     pr: PullRequestUiState,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    checkoutInProgress: Boolean = false,
+    setupStatus: WorktreeSetupStatus? = null,
 ) {
+    val setupInProgress = setupStatus != null
+
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         elevation = 2.dp,
@@ -61,9 +64,9 @@ fun PullRequestItem(
                 if (pr.headRef != null) {
                     Button(
                         onClick = { onCheckoutAndOpen(pr.repositoryFullName, pr.headRef) },
-                        enabled = !checkoutInProgress,
+                        enabled = !setupInProgress,
                     ) {
-                        Text(if (checkoutInProgress) "Setting up..." else "Setup")
+                        Text(if (setupInProgress) "Setting up..." else "Setup")
                     }
                 }
             }

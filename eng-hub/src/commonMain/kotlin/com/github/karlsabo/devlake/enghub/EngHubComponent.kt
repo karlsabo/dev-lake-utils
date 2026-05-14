@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.GitWorktreeService
+import com.github.karlsabo.git.WorktreeSetupCoordinator
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubNotificationService
 import com.github.karlsabo.github.GitHubRestApi
@@ -32,6 +33,10 @@ interface EngHubBindings {
 
     @Provides
     fun provideGitWorktreeApi(): GitWorktreeApi = GitWorktreeService()
+
+    @Provides
+    fun provideWorktreeSetupCoordinator(gitWorktreeApi: GitWorktreeApi): WorktreeSetupCoordinator =
+        WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi)
 
     @Provides
     fun provideDesktopLauncher(): DesktopLauncher = DesktopLauncherService()

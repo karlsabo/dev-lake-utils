@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
+import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.github.ReviewStateValue
 
 @Composable
@@ -26,7 +27,7 @@ fun NotificationItem(
     notification: NotificationUiState,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    checkoutInProgress: Boolean = false,
+    setupStatus: WorktreeSetupStatus? = null,
     actionInProgress: Boolean = false,
     onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
     onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
@@ -34,6 +35,7 @@ fun NotificationItem(
     onUnsubscribe: (NotificationUiState) -> Unit,
 ) {
     var showReviewDialog by remember { mutableStateOf(false) }
+    val setupInProgress = setupStatus != null
 
     if (showReviewDialog && notification.apiUrl != null) {
         ReviewDialog(
@@ -75,9 +77,9 @@ fun NotificationItem(
                 if (notification.isPullRequest && notification.headRef != null) {
                     Button(
                         onClick = { onCheckoutAndOpen(notification.repositoryFullName, notification.headRef) },
-                        enabled = !checkoutInProgress && !actionInProgress,
+                        enabled = !setupInProgress && !actionInProgress,
                     ) {
-                        Text(if (checkoutInProgress) "Setting up..." else "Setup")
+                        Text(if (setupInProgress) "Setting up..." else "Setup")
                     }
                 }
 

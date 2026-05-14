@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
+import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.github.ReviewStateValue
 
 @Composable
@@ -24,7 +25,7 @@ fun NotificationPanel(
     notificationsResult: Result<List<NotificationUiState>>?,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    checkoutInProgress: Boolean = false,
+    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus? = { _, _ -> null },
     actingOnThreadIds: Set<String> = emptySet(),
     onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
     onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
@@ -53,7 +54,9 @@ fun NotificationPanel(
                                 notification = notification,
                                 onOpenInBrowser = onOpenInBrowser,
                                 onCheckoutAndOpen = onCheckoutAndOpen,
-                                checkoutInProgress = checkoutInProgress,
+                                setupStatus = notification.headRef?.let {
+                                    setupStatusFor(notification.repositoryFullName, it)
+                                },
                                 actionInProgress = notification.notificationThreadId in actingOnThreadIds,
                                 onApprove = onApprove,
                                 onSubmitReview = onSubmitReview,

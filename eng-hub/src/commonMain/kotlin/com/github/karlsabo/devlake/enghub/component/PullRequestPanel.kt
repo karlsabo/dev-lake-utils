@@ -13,13 +13,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.git.WorktreeSetupStatus
 
 @Composable
 fun PullRequestPanel(
     pullRequestsResult: Result<List<PullRequestUiState>>?,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    checkoutInProgress: Boolean = false,
+    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus? = { _, _ -> null },
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -42,7 +43,7 @@ fun PullRequestPanel(
                                 pr = pr,
                                 onOpenInBrowser = onOpenInBrowser,
                                 onCheckoutAndOpen = onCheckoutAndOpen,
-                                checkoutInProgress = checkoutInProgress,
+                                setupStatus = pr.headRef?.let { setupStatusFor(pr.repositoryFullName, it) },
                             )
                         }
                     }

@@ -2,6 +2,8 @@ package com.github.karlsabo.devlake.enghub
 
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
+import com.github.karlsabo.git.WorktreeSetupCoordinator
+import com.github.karlsabo.git.buildWorktreePath
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.GitHubApi
@@ -43,6 +45,7 @@ class EngHubDependenciesTest {
             gitHubApi = fakeGitHubApi,
             gitHubNotificationService = notificationService,
             gitWorktreeApi = fakeGitWorktreeApi,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = fakeGitWorktreeApi),
             desktopLauncher = fakeDesktopLauncher,
             directoryPicker = RecordingDirectoryPicker(),
             configWriter = RecordingEngHubConfigWriter(),
@@ -105,10 +108,12 @@ class EngHubDependenciesTest {
         val gitHubApiConfig = GitHubApiRestConfig(token = "test-token")
         val fakeGitHubApi = RecordingGitHubApi()
         val fakeNotificationSubscriptionStore = RecordingNotificationSubscriptionStore()
+        val fakeGitWorktreeApi = RecordingGitWorktreeApi()
         val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
             gitHubApi = fakeGitHubApi,
             gitHubNotificationService = GitHubNotificationService(fakeGitHubApi),
-            gitWorktreeApi = RecordingGitWorktreeApi(),
+            gitWorktreeApi = fakeGitWorktreeApi,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = fakeGitWorktreeApi),
             desktopLauncher = RecordingDesktopLauncher(),
             directoryPicker = RecordingDirectoryPicker(),
             configWriter = RecordingEngHubConfigWriter(),
@@ -156,7 +161,7 @@ private class RecordingGitWorktreeApi : GitWorktreeApi {
 
     override fun ensureWorktree(repoPath: String, branch: String): String {
         ensureWorktreeCalls.value += EnsureWorktreeCall(repoPath, branch)
-        return "$repoPath/$branch"
+        return buildWorktreePath(repoPath, branch).value
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false

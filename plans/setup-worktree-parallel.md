@@ -204,6 +204,8 @@ This should be the last useful batch. The remaining ambiguity is API shape and s
 
 ### 2. Allow different worktrees to set up in parallel while serializing repository ensure
 
+**Done:** 2026 05 14
+
 **Acceptance criteria:** Given two setup requests for different local worktree paths in the same repository and repository ensure is required, when both requests are submitted, then repository ensure runs serially while both worktree setups are tracked independently and may proceed concurrently after repository ensure completes.
 
 **Expected edits:**
@@ -231,6 +233,8 @@ This should be the last useful batch. The remaining ambiguity is API shape and s
 - Use tests with blocking fakes to prove there is never more than one concurrent repository ensure for the same repo path and that two different worktree setup operations can both reach setup-command execution before either completes.
 
 ### 3. Route PR and notification Setup actions through the coordinator
+
+**Done:** 2026 05 14
 
 **Acceptance criteria:** Given two pull-request notifications with different local worktree paths and the first setup is still running, when the user clicks Setup on the second notification, then the second setup starts immediately and only rows whose local worktree paths are in the coordinator status map show setup progress.
 

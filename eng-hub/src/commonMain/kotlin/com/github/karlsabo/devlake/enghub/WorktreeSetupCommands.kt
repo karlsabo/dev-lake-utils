@@ -12,11 +12,7 @@ internal fun runConfiguredWorktreeSetup(
     worktreePath: String,
     config: EngHubConfig,
 ): ProcessResult? {
-    val normalizedRepoPath = repoPath.normalizedRepositoryPath()
-    val commands = config.localRepositories
-        .firstOrNull { it.path.normalizedRepositoryPath() == normalizedRepoPath }
-        ?.setupCommands
-        .orEmpty()
+    val commands = configuredWorktreeSetupCommands(repoPath, config)
     if (commands.isEmpty()) return null
 
     val script = buildWorktreeSetupScript(commands)
@@ -24,3 +20,13 @@ internal fun runConfiguredWorktreeSetup(
     return executeCommand(listOf(config.setupShell, "-l", "-c", script), worktreePath)
 }
 
+internal fun configuredWorktreeSetupCommands(
+    repoPath: String,
+    config: EngHubConfig,
+): List<String> {
+    val normalizedRepoPath = repoPath.normalizedRepositoryPath()
+    return config.localRepositories
+        .firstOrNull { it.path.normalizedRepositoryPath() == normalizedRepoPath }
+        ?.setupCommands
+        .orEmpty()
+}
