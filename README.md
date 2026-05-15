@@ -14,13 +14,17 @@
 * [ ] Allow running multiple set-up commands at a time from the notification view
 * [ ] Update PR review skill to be named `eh-pr-review`
     * Also update the skill to ensure that AI prefixes all its comments with ${LLM-NAME}-${REASONING-LEVEL}: ${THE_COMMENT}. This way it's clear the comment is from an LLM.
+* [ ] Update plan review skill to be named `eh-plan`
+    * Have the plan have a grill me if needed so we reach a shared understanding and solution
 * [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
+    * In the worktree view, have a highlight hover effect so you know what row you're on
     * Clicking on the worktree to expand, it sometimes takes too long to expand
     * Should be able to expand anywhere with a double click
     * Should be able to right-click to get all the menu options
     * Should have PR information if there's a PR connected to the branch
         * Should have menu options to open the PR in the web
+    * Should have shortcut style buttons, open, and archive, use emojis to keep it small
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
@@ -52,7 +56,7 @@
 * [ ] Consider consolidating into a single configuration file
 * [ ] Add a UI panel for showing tickets assigned to the user
     * If a related PR is closed, ask if the ticket should be closed
-* [ ] Search function for look at all PRs, notifications, etc.
+* [ ] Search function to look at all PRs, notifications, etc.
 * [ ] Can we write UI tests?
     * Can an LLM execute some manual UI-driven tests?
   * Want the UI to be universal. So the web UI will have to call the backend server to run desktop-style functions.

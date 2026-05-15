@@ -273,6 +273,8 @@ This should be the last useful batch. The remaining ambiguity is API shape and s
 
 ### 4. Share setup progress across PR and notification rows for the same worktree path
 
+**Done:** 2026 05 14
+
 **Acceptance criteria:** Given the same PR appears in both the Pull Requests and Notifications panes, when setup starts from one pane, then the matching row in the other pane reflects setup progress for the same local worktree path after it observes the shared status state.
 
 **Expected edits:**

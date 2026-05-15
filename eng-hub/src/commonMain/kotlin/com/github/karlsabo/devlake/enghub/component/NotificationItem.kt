@@ -27,7 +27,7 @@ fun NotificationItem(
     notification: NotificationUiState,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    setupStatus: WorktreeSetupStatus? = null,
+    setupStatus: WorktreeSetupStatus?,
     actionInProgress: Boolean = false,
     onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
     onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,

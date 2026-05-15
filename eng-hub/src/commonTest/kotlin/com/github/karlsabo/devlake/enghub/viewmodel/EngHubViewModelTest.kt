@@ -4,6 +4,9 @@ import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
+import com.github.karlsabo.devlake.enghub.component.checkoutSetupStatus
+import com.github.karlsabo.devlake.enghub.state.NotificationUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
@@ -703,6 +706,69 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun matchingPullRequestAndNotificationRowsShareCheckoutSetupProgress(): Unit = runBlocking {
+        val repositoriesBaseDir = createTempDir("repositories")
+        val repoPath = Path(repositoriesBaseDir, "example-service").toString()
+        val repoFullName = "example-org/example-service"
+        val branch = "feature/shared-progress"
+        try {
+            val api = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
+            val setupRunner = BlockingCoordinatorSetupRunner()
+            val coordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            )
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = api,
+                worktreeSetupCoordinator = coordinator,
+                configWriter = RecordingEngHubConfigWriter(),
+                repositoriesBaseDir = repositoriesBaseDir,
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(path = repoPath, setupCommands = listOf("setup shared")),
+                ),
+            )
+            val pullRequestWorktreePath = viewModel.checkoutWorktreePath(repoFullName, branch)
+            val setupStatusFor = { currentRepoFullName: String, currentBranch: String ->
+                viewModel.setupStatusesStateFlow.value[viewModel.checkoutWorktreePath(
+                    currentRepoFullName,
+                    currentBranch
+                )]
+            }
+
+            val firstCheckout = viewModel.checkoutAndOpen(repoFullName, branch)
+            withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(pullRequestWorktreePath) }
+
+            assertEquals(
+                WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+                sharedProgressPullRequest(repoFullName, branch).checkoutSetupStatus(setupStatusFor),
+            )
+            assertEquals(
+                WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+                sharedProgressNotification(repoFullName, branch).checkoutSetupStatus(setupStatusFor),
+            )
+
+            val duplicateSetup = viewModel.requestCheckoutSetup(repoFullName, branch)
+
+            assertEquals(
+                listOf(repoPath to "https://github.com/$repoFullName.git"),
+                api.ensureRepositoryCalls,
+            )
+            assertEquals(listOf(repoPath to branch), api.ensureWorktreeCalls)
+            assertEquals(1, setupRunner.calls())
+
+            setupRunner.complete(pullRequestWorktreePath)
+            withTimeout(2_000.milliseconds) {
+                firstCheckout.join()
+                duplicateSetup.await()
+                viewModel.setupStatusesStateFlow.first { it.isEmpty() }
+            }
+            assertEquals(1, setupRunner.calls())
+        } finally {
+            removeTempDir(repositoriesBaseDir)
+        }
+    }
+
+    @Test
     fun openingExistingWorktreeTracksProgressForSelectedWorktreeOnly() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")
@@ -1340,6 +1406,47 @@ private fun testIssue(@Suppress("SameParameterValue") issueApiUrl: String, pullA
     )
 }
 
+private fun sharedProgressPullRequest(
+    @Suppress("SameParameterValue") repoFullName: String,
+    @Suppress("SameParameterValue") branch: String,
+): PullRequestUiState {
+    return PullRequestUiState(
+        number = 1,
+        title = "Shared progress",
+        htmlUrl = "https://github.com/$repoFullName/pull/1",
+        repositoryFullName = repoFullName,
+        owner = repoFullName.substringBefore('/'),
+        repo = repoFullName.substringAfter('/'),
+        isDraft = false,
+        ciStatus = CiStatus.PENDING,
+        ciSummaryText = "0/0 passed",
+        approvedCount = 0,
+        requestedCount = 0,
+        reviewSummaryText = "0/0 approved",
+        headRef = branch,
+        apiUrl = "https://api.github.com/repos/$repoFullName/pulls/1",
+    )
+}
+
+private fun sharedProgressNotification(
+    @Suppress("SameParameterValue") repoFullName: String,
+    @Suppress("SameParameterValue") branch: String,
+): NotificationUiState {
+    return NotificationUiState(
+        notificationThreadId = "thread-1",
+        title = "Shared progress",
+        reason = "review_requested",
+        repositoryFullName = repoFullName,
+        subjectType = "PullRequest",
+        htmlUrl = "https://github.com/$repoFullName/pull/1",
+        apiUrl = "https://api.github.com/repos/$repoFullName/pulls/1",
+        isPullRequest = true,
+        pullRequestNumber = 1,
+        unread = true,
+        headRef = branch,
+    )
+}
+
 private fun createLocalRepositoryViewModel(
     gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()),
     gitWorktreeApi: RecordingGitWorktreeApi,
@@ -1373,14 +1480,18 @@ private fun createLocalRepositoryViewModel(
 
 private class BlockingCoordinatorSetupRunner : WorktreeSetupCommandRunner {
     private val lock = Any()
+    private var callCount = 0
     private val startedSignals = mutableMapOf<WorktreePath, CompletableDeferred<Unit>>()
     private val completeSignals = mutableMapOf<WorktreePath, CompletableDeferred<Unit>>()
 
     override suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult {
+        synchronized(lock) { callCount += 1 }
         startedSignal(request.worktreePath).complete(Unit)
         completeSignal(request.worktreePath).await()
         return WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
     }
+
+    fun calls(): Int = synchronized(lock) { callCount }
 
     suspend fun awaitStarted(worktreePath: WorktreePath) {
         startedSignal(worktreePath).await()

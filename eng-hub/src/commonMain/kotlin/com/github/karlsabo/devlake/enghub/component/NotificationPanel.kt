@@ -20,12 +20,18 @@ import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.github.ReviewStateValue
 
+internal fun NotificationUiState.checkoutSetupStatus(
+    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
+): WorktreeSetupStatus? {
+    return headRef?.let { setupStatusFor(repositoryFullName, it) }
+}
+
 @Composable
 fun NotificationPanel(
     notificationsResult: Result<List<NotificationUiState>>?,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus? = { _, _ -> null },
+    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
     actingOnThreadIds: Set<String> = emptySet(),
     onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
     onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
@@ -54,9 +60,7 @@ fun NotificationPanel(
                                 notification = notification,
                                 onOpenInBrowser = onOpenInBrowser,
                                 onCheckoutAndOpen = onCheckoutAndOpen,
-                                setupStatus = notification.headRef?.let {
-                                    setupStatusFor(notification.repositoryFullName, it)
-                                },
+                                setupStatus = notification.checkoutSetupStatus(setupStatusFor),
                                 actionInProgress = notification.notificationThreadId in actingOnThreadIds,
                                 onApprove = onApprove,
                                 onSubmitReview = onSubmitReview,

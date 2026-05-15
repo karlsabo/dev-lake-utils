@@ -23,7 +23,7 @@ fun PullRequestItem(
     pr: PullRequestUiState,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    setupStatus: WorktreeSetupStatus? = null,
+    setupStatus: WorktreeSetupStatus?,
 ) {
     val setupInProgress = setupStatus != null
 

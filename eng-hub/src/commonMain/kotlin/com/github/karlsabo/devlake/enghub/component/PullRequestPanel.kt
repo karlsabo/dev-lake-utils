@@ -15,12 +15,18 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
 
+internal fun PullRequestUiState.checkoutSetupStatus(
+    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
+): WorktreeSetupStatus? {
+    return headRef?.let { setupStatusFor(repositoryFullName, it) }
+}
+
 @Composable
 fun PullRequestPanel(
     pullRequestsResult: Result<List<PullRequestUiState>>?,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus? = { _, _ -> null },
+    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -43,7 +49,7 @@ fun PullRequestPanel(
                                 pr = pr,
                                 onOpenInBrowser = onOpenInBrowser,
                                 onCheckoutAndOpen = onCheckoutAndOpen,
-                                setupStatus = pr.headRef?.let { setupStatusFor(pr.repositoryFullName, it) },
+                                setupStatus = pr.checkoutSetupStatus(setupStatusFor),
                             )
                         }
                     }

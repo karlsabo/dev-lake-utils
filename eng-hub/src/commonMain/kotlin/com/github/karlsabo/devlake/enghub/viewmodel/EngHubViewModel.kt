@@ -23,6 +23,7 @@ import com.github.karlsabo.git.GitCommandException
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupCoordinator
+import com.github.karlsabo.git.WorktreeSetupHandle
 import com.github.karlsabo.git.WorktreeSetupRequest
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.git.buildWorktreePath
@@ -44,6 +45,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -322,30 +324,33 @@ class EngHubViewModel(
         }
     }
 
-    fun checkoutAndOpen(repoFullName: String, branch: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+    fun checkoutAndOpen(repoFullName: String, branch: String): Job {
+        return viewModelScope.launch(Dispatchers.IO) {
             try {
-                val activeConfig = currentConfig
-                val repoPath = checkoutRepoPath(repoFullName, activeConfig)
-                val worktreePath = buildWorktreePath(repoPath, branch)
-                logger.info { "Setup: requesting checkout setup for $repoFullName branch=$branch at $worktreePath" }
-                val setup = worktreeSetupCoordinator.setup(
-                    WorktreeSetupRequest(
-                        repoPath = repoPath,
-                        worktreePath = worktreePath,
-                        cloneUrl = "https://github.com/$repoFullName.git",
-                        branch = branch,
-                        setupShell = activeConfig.setupShell,
-                        setupCommands = configuredWorktreeSetupCommands(repoPath, activeConfig),
-                    ),
-                )
-                setup.await()
+                requestCheckoutSetup(repoFullName, branch).await()
                 logger.info { "Setup: done" }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to set up $repoFullName branch=$branch" }
                 actionError.value = e.message ?: "Failed to set up worktree"
             }
         }
+    }
+
+    internal fun requestCheckoutSetup(repoFullName: String, branch: String): WorktreeSetupHandle {
+        val activeConfig = currentConfig
+        val repoPath = checkoutRepoPath(repoFullName, activeConfig)
+        val worktreePath = buildWorktreePath(repoPath, branch)
+        logger.info { "Setup: requesting checkout setup for $repoFullName branch=$branch at $worktreePath" }
+        return worktreeSetupCoordinator.setup(
+            WorktreeSetupRequest(
+                repoPath = repoPath,
+                worktreePath = worktreePath,
+                cloneUrl = "https://github.com/$repoFullName.git",
+                branch = branch,
+                setupShell = activeConfig.setupShell,
+                setupCommands = configuredWorktreeSetupCommands(repoPath, activeConfig),
+            ),
+        )
     }
 
     fun checkoutWorktreePath(repoFullName: String, branch: String): WorktreePath =
