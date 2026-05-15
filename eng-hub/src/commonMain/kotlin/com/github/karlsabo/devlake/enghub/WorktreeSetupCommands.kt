@@ -1,25 +1,5 @@
 package com.github.karlsabo.devlake.enghub
 
-import com.github.karlsabo.git.buildWorktreeSetupScript
-import com.github.karlsabo.system.ProcessResult
-import com.github.karlsabo.system.executeCommand
-import io.github.oshai.kotlinlogging.KotlinLogging
-
-private val logger = KotlinLogging.logger {}
-
-internal fun runConfiguredWorktreeSetup(
-    repoPath: String,
-    worktreePath: String,
-    config: EngHubConfig,
-): ProcessResult? {
-    val commands = configuredWorktreeSetupCommands(repoPath, config)
-    if (commands.isEmpty()) return null
-
-    val script = buildWorktreeSetupScript(commands)
-    logger.info { "Executing setup script: $script" }
-    return executeCommand(listOf(config.setupShell, "-l", "-c", script), worktreePath)
-}
-
 internal fun configuredWorktreeSetupCommands(
     repoPath: String,
     config: EngHubConfig,

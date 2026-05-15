@@ -9,7 +9,6 @@ import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.configuredWorktreeSetupCommands
-import com.github.karlsabo.devlake.enghub.runConfiguredWorktreeSetup
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
@@ -149,8 +148,6 @@ class EngHubViewModel(
     private val localRepositories = MutableStateFlow(config.localRepositories.toLocalRepositoryUiStates())
     val localRepositoriesStateFlow: StateFlow<List<LocalRepositoryUiState>> = localRepositories.asStateFlow()
     private val localRepositoryExpansionsInFlight = Collections.synchronizedSet(mutableSetOf<String>())
-    private val openingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
-    val openingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = openingLocalWorktreePaths.asStateFlow()
     private val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = archivingLocalWorktreePaths.asStateFlow()
     private val forceArchiveWorktreeRequest = MutableStateFlow<ForceArchiveWorktreeUiState?>(null)
@@ -358,19 +355,32 @@ class EngHubViewModel(
 
     fun openLocalWorktree(repoRootPath: String, worktreePath: String) {
         val normalizedWorktreePath = worktreePath.normalizedRepoPath()
-        if (normalizedWorktreePath.isEmpty() || !markLocalWorktreeOpening(normalizedWorktreePath)) return
+        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        if (normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty()) return
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                logger.info { "Setup: opening existing worktree $worktreePath for $repoRootPath" }
-                runConfiguredSetupForWorktree(repoRootPath, worktreePath, currentConfig)
+                logger.info { "Setup: requesting existing worktree setup for $normalizedWorktreePath" }
+                requestExistingWorktreeSetup(normalizedRepoRootPath, normalizedWorktreePath).await()
+                logger.info { "Setup: existing worktree setup done for $normalizedWorktreePath" }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to set up existing worktree $worktreePath" }
                 actionError.value = e.message ?: "Failed to set up worktree"
-            } finally {
-                openingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
             }
         }
+    }
+
+    internal fun requestExistingWorktreeSetup(repoRootPath: String, worktreePath: String): WorktreeSetupHandle {
+        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        val normalizedWorktreePath = worktreePath.normalizedRepoPath()
+        return worktreeSetupCoordinator.setup(
+            WorktreeSetupRequest(
+                repoPath = normalizedRepoRootPath,
+                worktreePath = WorktreePath(normalizedWorktreePath),
+                setupShell = currentConfig.setupShell,
+                setupCommands = configuredWorktreeSetupCommands(normalizedRepoRootPath, currentConfig),
+            ),
+        )
     }
 
     fun archiveLocalWorktree(repoRootPath: String, worktreePath: String) {
@@ -548,16 +558,6 @@ class EngHubViewModel(
         }
     }
 
-    private fun markLocalWorktreeOpening(normalizedWorktreePath: String): Boolean {
-        while (true) {
-            val currentPaths = openingLocalWorktreePaths.value
-            if (normalizedWorktreePath in currentPaths) return false
-            if (openingLocalWorktreePaths.compareAndSet(currentPaths, currentPaths + normalizedWorktreePath)) {
-                return true
-            }
-        }
-    }
-
     private fun markLocalWorktreeArchiving(normalizedWorktreePath: String): Boolean {
         while (true) {
             val currentPaths = archivingLocalWorktreePaths.value
@@ -565,26 +565,6 @@ class EngHubViewModel(
             if (archivingLocalWorktreePaths.compareAndSet(currentPaths, currentPaths + normalizedWorktreePath)) {
                 return true
             }
-        }
-    }
-
-    private fun runConfiguredSetupForWorktree(
-        repoPath: String,
-        worktreePath: String,
-        setupConfig: EngHubConfig,
-    ) {
-        val setupResult = runConfiguredWorktreeSetup(repoPath, worktreePath, setupConfig)
-        when {
-            setupResult == null -> logger.info { "Setup: no configured commands for $repoPath" }
-            setupResult.exitCode != 0 -> {
-                val detail = setupResult.stderr.ifEmpty { setupResult.stdout }.ifBlank { "No command output" }
-                val warningMessage =
-                    "Setup commands failed for $worktreePath (exit code ${setupResult.exitCode}): $detail"
-                logger.warn { warningMessage }
-                actionError.value = warningMessage
-            }
-
-            else -> logger.info { "Setup: commands completed for $worktreePath" }
         }
     }
 

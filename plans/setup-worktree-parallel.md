@@ -305,6 +305,8 @@ This should be the last useful batch. The remaining ambiguity is API shape and s
 
 ### 5. Route existing Worktrees pane setup through the coordinator
 
+**Done:** 2026 05 15
+
 **Acceptance criteria:** Given an existing worktree row is setting up from the Worktrees pane, when matching PR/notification rows are visible or become visible, then they use the same local worktree path status and do not start duplicate setup work for that path.
 
 **Expected edits:**

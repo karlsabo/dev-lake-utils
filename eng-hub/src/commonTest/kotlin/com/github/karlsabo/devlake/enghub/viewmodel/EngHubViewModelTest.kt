@@ -540,6 +540,7 @@ class EngHubViewModelTest {
     fun openingExistingWorktreeRunsConfiguredSetupInSelectedWorktreePath() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")
+        val worktreeKey = WorktreePath(worktreePath)
         try {
             val api = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
             val viewModel = createLocalRepositoryViewModel(
@@ -548,7 +549,10 @@ class EngHubViewModelTest {
                 localRepositoryConfigs = listOf(
                     LocalRepositoryConfig(
                         path = repoRoot,
-                        setupCommands = listOf("pwd > opened-path.txt"),
+                        setupCommands = listOf(
+                            "pwd > opened-path.txt",
+                            "while [ ! -f release-open ]; do sleep 0.01; done",
+                        ),
                     ),
                 ),
                 setupShell = "/bin/bash",
@@ -556,15 +560,31 @@ class EngHubViewModelTest {
 
             viewModel.openLocalWorktree(repoRoot, worktreePath)
 
+            val runningStatus = withTimeout(2_000.milliseconds) {
+                viewModel.setupStatusesStateFlow.first {
+                    it[worktreeKey] == WorktreeSetupStatus.RUNNING_SETUP_COMMANDS
+                }
+            }
+            assertEquals(mapOf(worktreeKey to WorktreeSetupStatus.RUNNING_SETUP_COMMANDS), runningStatus)
             withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+                while (!SystemFileSystem.exists(Path(worktreePath, "opened-path.txt"))) {
+                    delay(10.milliseconds)
+                }
             }
 
             val openedPath = readText(Path(worktreePath, "opened-path.txt")).trim()
             assertTrue(openedPath.endsWith(worktreePath.substringAfterLast('/')))
+            writeText(Path(worktreePath, "release-open"), "")
+            val completedStatus = withTimeout(2_000.milliseconds) {
+                viewModel.setupStatusesStateFlow.first { worktreeKey !in it }
+            }
+            assertEquals(emptyMap(), completedStatus)
             assertEquals(emptyList(), api.ensureWorktreeCalls)
             assertEquals(emptyList(), api.ensureRepositoryCalls)
         } finally {
+            if (SystemFileSystem.exists(Path(worktreePath))) {
+                writeText(Path(worktreePath, "release-open"), "")
+            }
             removeTempDir(repoRoot)
             removeTempDir(worktreePath)
         }
@@ -574,6 +594,7 @@ class EngHubViewModelTest {
     fun openingExistingWorktreeRunsUnifiedRepositorySetupCommands() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")
+        val worktreeKey = WorktreePath(worktreePath)
         try {
             val viewModel = createLocalRepositoryViewModel(
                 gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
@@ -581,7 +602,10 @@ class EngHubViewModelTest {
                 localRepositoryConfigs = listOf(
                     LocalRepositoryConfig(
                         path = "$repoRoot/",
-                        setupCommands = listOf("pwd > unified-opened-path.txt"),
+                        setupCommands = listOf(
+                            "pwd > unified-opened-path.txt",
+                            "while [ ! -f release-unified-open ]; do sleep 0.01; done",
+                        ),
                     ),
                 ),
                 setupShell = "/bin/bash",
@@ -589,13 +613,29 @@ class EngHubViewModelTest {
 
             viewModel.openLocalWorktree(repoRoot, worktreePath)
 
+            val runningStatus = withTimeout(2_000.milliseconds) {
+                viewModel.setupStatusesStateFlow.first {
+                    it[worktreeKey] == WorktreeSetupStatus.RUNNING_SETUP_COMMANDS
+                }
+            }
+            assertEquals(mapOf(worktreeKey to WorktreeSetupStatus.RUNNING_SETUP_COMMANDS), runningStatus)
             withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+                while (!SystemFileSystem.exists(Path(worktreePath, "unified-opened-path.txt"))) {
+                    delay(10.milliseconds)
+                }
             }
 
             val openedPath = readText(Path(worktreePath, "unified-opened-path.txt")).trim()
             assertTrue(openedPath.endsWith(worktreePath.substringAfterLast('/')))
+            writeText(Path(worktreePath, "release-unified-open"), "")
+            val completedStatus = withTimeout(2_000.milliseconds) {
+                viewModel.setupStatusesStateFlow.first { worktreeKey !in it }
+            }
+            assertEquals(emptyMap(), completedStatus)
         } finally {
+            if (SystemFileSystem.exists(Path(worktreePath))) {
+                writeText(Path(worktreePath, "release-unified-open"), "")
+            }
             removeTempDir(repoRoot)
             removeTempDir(worktreePath)
         }
@@ -769,9 +809,69 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun existingWorktreeSetupSharesProgressWithMatchingPullRequestAndNotificationRows(): Unit = runBlocking {
+        val repositoriesBaseDir = createTempDir("repositories")
+        val repoFullName = "example-org/example-service"
+        val repoPath = Path(repositoriesBaseDir, repoFullName.substringAfterLast('/')).toString()
+        val branch = "feature/existing-worktree"
+        try {
+            val api = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
+            val setupRunner = BlockingCoordinatorSetupRunner()
+            val coordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            )
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = api,
+                worktreeSetupCoordinator = coordinator,
+                configWriter = RecordingEngHubConfigWriter(),
+                repositoriesBaseDir = repositoriesBaseDir,
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(path = repoPath, setupCommands = listOf("setup existing")),
+                ),
+            )
+            val worktreePath = viewModel.checkoutWorktreePath(repoFullName, branch)
+            val setupStatusFor = { currentRepoFullName: String, currentBranch: String ->
+                viewModel.setupStatusesStateFlow.value[viewModel.checkoutWorktreePath(
+                    currentRepoFullName,
+                    currentBranch
+                )]
+            }
+
+            viewModel.openLocalWorktree(repoPath, worktreePath.value)
+            withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(worktreePath) }
+
+            assertEquals(
+                WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+                sharedProgressPullRequest(repoFullName, branch).checkoutSetupStatus(setupStatusFor),
+            )
+            assertEquals(
+                WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+                sharedProgressNotification(repoFullName, branch).checkoutSetupStatus(setupStatusFor),
+            )
+
+            val duplicateCheckoutSetup = viewModel.requestCheckoutSetup(repoFullName, branch)
+
+            assertEquals(emptyList(), api.ensureRepositoryCalls)
+            assertEquals(emptyList(), api.ensureWorktreeCalls)
+            assertEquals(1, setupRunner.calls())
+
+            setupRunner.complete(worktreePath)
+            withTimeout(2_000.milliseconds) {
+                duplicateCheckoutSetup.await()
+                viewModel.setupStatusesStateFlow.first { it.isEmpty() }
+            }
+            assertEquals(1, setupRunner.calls())
+        } finally {
+            removeTempDir(repositoriesBaseDir)
+        }
+    }
+
+    @Test
     fun openingExistingWorktreeTracksProgressForSelectedWorktreeOnly() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")
+        val worktreeKey = WorktreePath(worktreePath)
         try {
             val viewModel = createLocalRepositoryViewModel(
                 gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
@@ -788,15 +888,18 @@ class EngHubViewModelTest {
             viewModel.openLocalWorktree(repoRoot, worktreePath)
 
             val inProgress = withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath in it }
+                viewModel.setupStatusesStateFlow.first { worktreeKey in it }
             }
-            assertEquals(setOf(worktreePath), inProgress)
+            assertEquals(
+                mapOf(worktreeKey to WorktreeSetupStatus.RUNNING_SETUP_COMMANDS),
+                inProgress,
+            )
 
             writeText(Path(worktreePath, "release-open"), "")
             val completed = withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+                viewModel.setupStatusesStateFlow.first { worktreeKey !in it }
             }
-            assertEquals(emptySet(), completed)
+            assertEquals(emptyMap(), completed)
         } finally {
             removeTempDir(repoRoot)
             removeTempDir(worktreePath)
@@ -808,6 +911,8 @@ class EngHubViewModelTest {
         val repoRoot = createTempDir("repo")
         val firstWorktreePath = createTempDir("worktree-first")
         val secondWorktreePath = createTempDir("worktree-second")
+        val firstWorktreeKey = WorktreePath(firstWorktreePath)
+        val secondWorktreeKey = WorktreePath(secondWorktreePath)
         try {
             val viewModel = createLocalRepositoryViewModel(
                 gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
@@ -825,20 +930,26 @@ class EngHubViewModelTest {
             viewModel.openLocalWorktree(repoRoot, secondWorktreePath)
 
             val inProgress = withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { paths ->
-                    firstWorktreePath in paths && secondWorktreePath in paths
+                viewModel.setupStatusesStateFlow.first { statuses ->
+                    firstWorktreeKey in statuses && secondWorktreeKey in statuses
                 }
             }
-            assertEquals(setOf(firstWorktreePath, secondWorktreePath), inProgress)
+            assertEquals(
+                mapOf(
+                    firstWorktreeKey to WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+                    secondWorktreeKey to WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+                ),
+                inProgress,
+            )
 
             writeText(Path(firstWorktreePath, "release-open"), "")
             writeText(Path(secondWorktreePath, "release-open"), "")
             val completed = withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { paths ->
-                    firstWorktreePath !in paths && secondWorktreePath !in paths
+                viewModel.setupStatusesStateFlow.first { statuses ->
+                    firstWorktreeKey !in statuses && secondWorktreeKey !in statuses
                 }
             }
-            assertEquals(emptySet(), completed)
+            assertEquals(emptyMap(), completed)
         } finally {
             removeTempDir(repoRoot)
             removeTempDir(firstWorktreePath)
@@ -850,6 +961,7 @@ class EngHubViewModelTest {
     fun concurrentDuplicateOpenAttemptsStartOneSetupJob() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")
+        val worktreeKey = WorktreePath(worktreePath)
         val setupCountPath = Path(repoRoot, "setup-count.txt")
         try {
             val viewModel = createLocalRepositoryViewModel(
@@ -877,13 +989,16 @@ class EngHubViewModelTest {
             releaseOpenAttempts.complete(Unit)
             openAttempts.awaitAll()
             val inProgress = withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath in it }
+                viewModel.setupStatusesStateFlow.first { worktreeKey in it }
             }
-            assertEquals(setOf(worktreePath), inProgress)
+            assertEquals(
+                mapOf(worktreeKey to WorktreeSetupStatus.RUNNING_SETUP_COMMANDS),
+                inProgress,
+            )
 
             writeText(Path(worktreePath, "release-open"), "")
             withTimeout(2_000.milliseconds) {
-                viewModel.openingLocalWorktreePathsStateFlow.first { worktreePath !in it }
+                viewModel.setupStatusesStateFlow.first { worktreeKey !in it }
             }
 
             assertEquals("x", readText(setupCountPath))
@@ -919,7 +1034,7 @@ class EngHubViewModelTest {
             assertTrue(actionError!!.contains("Setup commands failed for $worktreePath"))
             assertTrue(actionError.contains("exit code 23"))
             assertTrue(actionError.contains("setup failed"))
-            assertEquals(emptySet(), viewModel.openingLocalWorktreePathsStateFlow.value)
+            assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
         } finally {
             removeTempDir(repoRoot)
             removeTempDir(worktreePath)

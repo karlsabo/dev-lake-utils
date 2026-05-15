@@ -37,6 +37,8 @@ import androidx.compose.ui.window.DialogWindow
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
+import com.github.karlsabo.git.WorktreePath
+import com.github.karlsabo.git.WorktreeSetupStatus
 import dev_lake_utils.shared_resources.generated.resources.Res
 import dev_lake_utils.shared_resources.generated.resources.icon
 import org.jetbrains.compose.resources.painterResource
@@ -63,7 +65,7 @@ fun WorktreePanel(
     forceArchiveRequest: ForceArchiveWorktreeUiState?,
     onConfirmForceArchiveWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     onDismissForceArchiveWorktree: () -> Unit,
-    openingWorktreePaths: Set<String>,
+    setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     archivingWorktreePaths: Set<String>,
     modifier: Modifier = Modifier,
 ) {
@@ -117,7 +119,7 @@ fun WorktreePanel(
                             onArchiveWorktree = { worktreePath ->
                                 pendingArchive = PendingArchive(repository.path, worktreePath)
                             },
-                            openingWorktreePaths = openingWorktreePaths,
+                            setupStatuses = setupStatuses,
                             archivingWorktreePaths = archivingWorktreePaths,
                         )
                     }
@@ -133,7 +135,7 @@ private fun LocalRepositoryRow(
     onToggleRepository: () -> Unit,
     onOpenWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     onArchiveWorktree: (worktreePath: String) -> Unit,
-    openingWorktreePaths: Set<String>,
+    setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     archivingWorktreePaths: Set<String>,
 ) {
     Card(
@@ -173,10 +175,11 @@ private fun LocalRepositoryRow(
                 Spacer(modifier = Modifier.size(8.dp))
                 repository.worktrees.forEach { worktree ->
                     val normalizedWorktreePath = worktree.path.normalizedWorktreePath()
+                    val worktreeSetupStatus = setupStatuses[WorktreePath(normalizedWorktreePath)]
                     key(normalizedWorktreePath) {
                         LocalWorktreeRow(
                             worktree = worktree,
-                            isOpening = normalizedWorktreePath in openingWorktreePaths,
+                            setupStatus = worktreeSetupStatus,
                             isArchiving = normalizedWorktreePath in archivingWorktreePaths,
                             onOpen = { onOpenWorktree(repository.path, worktree.path) },
                             onArchive = { onArchiveWorktree(worktree.path) },
@@ -191,12 +194,13 @@ private fun LocalRepositoryRow(
 @Composable
 private fun LocalWorktreeRow(
     worktree: LocalWorktreeUiState,
-    isOpening: Boolean,
+    setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
     onOpen: () -> Unit,
     onArchive: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val isOpening = setupStatus != null
     val isBusy = isOpening || isArchiving
 
     Row(
