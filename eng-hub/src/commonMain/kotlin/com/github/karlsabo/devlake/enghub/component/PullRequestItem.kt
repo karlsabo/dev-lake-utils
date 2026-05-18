@@ -66,7 +66,7 @@ fun PullRequestItem(
                         onClick = { onCheckoutAndOpen(pr.repositoryFullName, pr.headRef) },
                         enabled = !setupInProgress,
                     ) {
-                        Text(if (setupInProgress) "Setting up..." else "Setup")
+                        Text(setupActionLabel(defaultLabel = "Setup", setupStatus = setupStatus))
                     }
                 }
             }

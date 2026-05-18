@@ -79,7 +79,7 @@ fun NotificationItem(
                         onClick = { onCheckoutAndOpen(notification.repositoryFullName, notification.headRef) },
                         enabled = !setupInProgress && !actionInProgress,
                     ) {
-                        Text(if (setupInProgress) "Setting up..." else "Setup")
+                        Text(setupActionLabel(defaultLabel = "Setup", setupStatus = setupStatus))
                     }
                 }
 

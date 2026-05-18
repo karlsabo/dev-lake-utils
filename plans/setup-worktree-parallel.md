@@ -337,6 +337,8 @@ This should be the last useful batch. The remaining ambiguity is API shape and s
 
 ### 6. Display staged setup status in visible rows
 
+**Done:** 2026 05 15
+
 **Acceptance criteria:** Given a setup operation moves through repository, worktree, and setup-command stages, when a visible row represents that local worktree path, then the row displays the current setup stage instead of relying on one global `Setting up...` Boolean.
 
 **Expected edits:**

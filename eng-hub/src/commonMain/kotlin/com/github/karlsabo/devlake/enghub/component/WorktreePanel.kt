@@ -55,6 +55,9 @@ internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<Wo
     }
 }
 
+internal fun isWorktreeArchiveEnabled(setupStatus: WorktreeSetupStatus?, isArchiving: Boolean): Boolean =
+    setupStatus == null && !isArchiving
+
 @Composable
 fun WorktreePanel(
     localRepositories: List<LocalRepositoryUiState>,
@@ -200,8 +203,9 @@ private fun LocalWorktreeRow(
     onArchive: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val isOpening = setupStatus != null
-    val isBusy = isOpening || isArchiving
+    val setupInProgress = setupStatus != null
+    val openEnabled = !setupInProgress && !isArchiving
+    val archiveEnabled = isWorktreeArchiveEnabled(setupStatus, isArchiving)
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -221,8 +225,8 @@ private fun LocalWorktreeRow(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.body2,
         )
-        if (isOpening) {
-            Text(text = "Setting up...", style = MaterialTheme.typography.caption)
+        setupStatus?.let {
+            Text(text = it.setupStatusLabel(), style = MaterialTheme.typography.caption)
             Spacer(modifier = Modifier.width(8.dp))
         }
         if (isArchiving) {
@@ -232,7 +236,7 @@ private fun LocalWorktreeRow(
         Box {
             IconButton(
                 onClick = { menuExpanded = true },
-                enabled = !isBusy,
+                enabled = !isArchiving,
                 modifier = Modifier
                     .size(32.dp)
                     .semantics { contentDescription = "Worktree actions for ${worktree.branch}" },
@@ -250,9 +254,9 @@ private fun LocalWorktreeRow(
                                 menuExpanded = false
                                 onOpen()
                             },
-                            enabled = !isBusy,
+                            enabled = openEnabled,
                         ) {
-                            Text(if (isOpening) "Setting up..." else "Open")
+                            Text(setupActionLabel(defaultLabel = "Open", setupStatus = setupStatus))
                         }
 
                         WorktreeMenuAction.Archive -> DropdownMenuItem(
@@ -260,7 +264,7 @@ private fun LocalWorktreeRow(
                                 menuExpanded = false
                                 onArchive()
                             },
-                            enabled = !isBusy,
+                            enabled = archiveEnabled,
                         ) {
                             Text("Archive")
                         }
