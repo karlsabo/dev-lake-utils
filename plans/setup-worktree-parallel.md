@@ -366,6 +366,8 @@ This should be the last useful batch. The remaining ambiguity is API shape and s
 
 ### 7. Queue setup errors so concurrent failures are all visible
 
+**Done:** 2026 05 18
+
 **Acceptance criteria:** Given two setup operations fail concurrently, when both failures are reported, then the user can see both failure messages.
 
 **Expected edits:**

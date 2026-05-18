@@ -37,6 +37,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Clock
@@ -282,7 +283,7 @@ class EngHubViewModelTest {
         }
 
         assertEquals(listOf(DEV_LAKE_SELECTED_WORKTREE), api.resolvedPaths)
-        assertEquals("Repository already configured: $DEV_LAKE_ROOT", actionError)
+        assertEquals("Repository already configured: $DEV_LAKE_ROOT", actionError?.message)
         assertEquals(emptyList(), configWriter.savedConfigs.value)
         assertEquals(initialRepositories, viewModel.localRepositoriesStateFlow.value)
     }
@@ -489,7 +490,7 @@ class EngHubViewModelTest {
         }
 
         assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
-        assertEquals("git worktree list failed", actionError)
+        assertEquals("git worktree list failed", actionError?.message)
         assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
         assertEquals(emptyList(), viewModel.localRepositoriesStateFlow.value.single().worktrees)
     }
@@ -1031,13 +1032,121 @@ class EngHubViewModelTest {
                 viewModel.actionErrorStateFlow.first { it != null }
             }
 
-            assertTrue(actionError!!.contains("Setup commands failed for $worktreePath"))
-            assertTrue(actionError.contains("exit code 23"))
-            assertTrue(actionError.contains("setup failed"))
+            assertTrue(actionError!!.message.contains("Setup commands failed for $worktreePath"))
+            assertTrue(actionError.message.contains("exit code 23"))
+            assertTrue(actionError.message.contains("setup failed"))
             assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
         } finally {
             removeTempDir(repoRoot)
             removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
+    fun concurrentSetupFailuresQueueDuplicateActionErrors() = runBlocking {
+        val repoRoot = createTempDir("repo")
+        val firstWorktreePath = createTempDir("worktree-first")
+        val secondWorktreePath = createTempDir("worktree-second")
+        val firstWorktreeKey = WorktreePath(firstWorktreePath)
+        val secondWorktreeKey = WorktreePath(secondWorktreePath)
+        val failureMessage = "setup failed"
+        val setupRunner = FailingBlockingSetupRunner { failureMessage }
+        val gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
+        try {
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = gitWorktreeApi,
+                worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                    gitWorktreeApi = gitWorktreeApi,
+                    setupCommandRunner = setupRunner,
+                ),
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = repoRoot,
+                        setupCommands = listOf("fail in test runner"),
+                    ),
+                ),
+            )
+
+            viewModel.openLocalWorktree(repoRoot, firstWorktreePath)
+            viewModel.openLocalWorktree(repoRoot, secondWorktreePath)
+            withTimeout(2_000.milliseconds) {
+                setupRunner.awaitStarted(firstWorktreeKey)
+                setupRunner.awaitStarted(secondWorktreeKey)
+            }
+
+            setupRunner.fail(firstWorktreeKey)
+            setupRunner.fail(secondWorktreeKey)
+            val firstError = withTimeout(2_000.milliseconds) {
+                viewModel.actionErrorStateFlow.first { it != null }!!
+            }
+            viewModel.clearActionError()
+            val secondError = withTimeout(2_000.milliseconds) {
+                viewModel.actionErrorStateFlow.first { it != null }!!
+            }
+
+            assertEquals(failureMessage, firstError.message)
+            assertEquals(failureMessage, secondError.message)
+            assertTrue(secondError.id > firstError.id)
+            viewModel.clearActionError()
+            assertEquals(null, viewModel.actionErrorStateFlow.value)
+            withTimeout(2_000.milliseconds) {
+                viewModel.setupStatusesStateFlow.first { it.isEmpty() }
+            }
+            assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
+        } finally {
+            removeTempDir(repoRoot)
+            removeTempDir(firstWorktreePath)
+            removeTempDir(secondWorktreePath)
+        }
+    }
+
+    @Test
+    fun duplicateSetupFailureReportsOneActionErrorForSharedHandle() = runBlocking {
+        val repositoriesBaseDir = createTempDir("repos")
+        val repoFullName = "test-org/dev-lake-utils"
+        val branch = "feature/duplicate-setup"
+        val repoPath = "$repositoriesBaseDir/dev-lake-utils"
+        val worktreePath = buildWorktreePath(repoPath, branch)
+        val setupRunner = FailingBlockingSetupRunner()
+        val gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap())
+        try {
+            val viewModel = createLocalRepositoryViewModel(
+                gitWorktreeApi = gitWorktreeApi,
+                worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                    gitWorktreeApi = gitWorktreeApi,
+                    setupCommandRunner = setupRunner,
+                ),
+                configWriter = RecordingEngHubConfigWriter(),
+                localRepositoryConfigs = listOf(
+                    LocalRepositoryConfig(
+                        path = repoPath,
+                        setupCommands = listOf("fail in test runner"),
+                    ),
+                ),
+                repositoriesBaseDir = repositoriesBaseDir,
+            )
+
+            val firstJob = viewModel.checkoutAndOpen(repoFullName, branch)
+            withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(worktreePath) }
+            val secondJob = viewModel.checkoutAndOpen(repoFullName, branch)
+
+            assertEquals(1, setupRunner.calls())
+            setupRunner.fail(worktreePath)
+            withTimeout(2_000.milliseconds) {
+                firstJob.join()
+                secondJob.join()
+            }
+
+            val actionError = withTimeout(2_000.milliseconds) {
+                viewModel.actionErrorStateFlow.first { it != null }
+            }
+            assertEquals("setup failed for ${worktreePath.value}", actionError?.message)
+            viewModel.clearActionError()
+            assertEquals(null, viewModel.actionErrorStateFlow.value)
+            assertEquals(1, setupRunner.calls())
+        } finally {
+            removeTempDir(repositoriesBaseDir)
         }
     }
 
@@ -1185,7 +1294,7 @@ class EngHubViewModelTest {
             viewModel.actionErrorStateFlow.first { it != null }
         }
 
-        assertEquals(failureMessage, actionError)
+        assertEquals(failureMessage, actionError?.message)
         assertEquals(null, viewModel.forceArchiveWorktreeRequestStateFlow.value)
         assertEquals(listOf(DEV_LAKE_ROOT to dirtyPath), api.archiveWorktreeCalls)
         assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
@@ -1303,7 +1412,7 @@ class EngHubViewModelTest {
         val actionError = withTimeout(2_000.milliseconds) {
             viewModel.actionErrorStateFlow.first { it != null }
         }
-        assertEquals("force archive failed", actionError)
+        assertEquals("force archive failed", actionError?.message)
         assertEquals(listOf(false, true), api.archiveWorktreeForceValues)
         assertEquals(
             listOf("main", "feature/worktree-panel"),
@@ -1347,7 +1456,7 @@ class EngHubViewModelTest {
             viewModel.actionErrorStateFlow.first { it != null }
         }
 
-        assertEquals("archive failed", actionError)
+        assertEquals("archive failed", actionError?.message)
         assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
         assertEquals(
             listOf("main", "feature/worktree-panel"),
@@ -1397,7 +1506,7 @@ class EngHubViewModelTest {
             viewModel.actionErrorStateFlow.first { it != null }
         }
 
-        assertEquals("cleanup failed", actionError)
+        assertEquals("cleanup failed", actionError?.message)
         assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
         assertEquals(listOf("main"), repository.worktrees.map { it.branch })
         assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
@@ -1594,34 +1703,82 @@ private fun createLocalRepositoryViewModel(
 }
 
 private class BlockingCoordinatorSetupRunner : WorktreeSetupCommandRunner {
-    private val lock = Any()
-    private var callCount = 0
-    private val startedSignals = mutableMapOf<WorktreePath, CompletableDeferred<Unit>>()
-    private val completeSignals = mutableMapOf<WorktreePath, CompletableDeferred<Unit>>()
+    private val signals = WorktreeSetupRunnerSignals()
 
     override suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult {
-        synchronized(lock) { callCount += 1 }
-        startedSignal(request.worktreePath).complete(Unit)
-        completeSignal(request.worktreePath).await()
+        signals.recordStarted(request.worktreePath)
+        signals.awaitUnblocked(request.worktreePath)
         return WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
     }
 
-    fun calls(): Int = synchronized(lock) { callCount }
+    fun calls(): Int = signals.calls()
 
     suspend fun awaitStarted(worktreePath: WorktreePath) {
-        startedSignal(worktreePath).await()
+        signals.awaitStarted(worktreePath)
     }
 
     fun complete(worktreePath: WorktreePath) {
-        completeSignal(worktreePath).complete(Unit)
+        signals.unblock(worktreePath)
+    }
+}
+
+private class FailingBlockingSetupRunner(
+    private val failureMessage: (WorktreePath) -> String = { worktreePath -> "setup failed for ${worktreePath.value}" },
+) : WorktreeSetupCommandRunner {
+    private val signals = WorktreeSetupRunnerSignals()
+
+    override suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult {
+        signals.recordStarted(request.worktreePath)
+        signals.awaitUnblocked(request.worktreePath)
+        throw IllegalStateException(failureMessage(request.worktreePath))
     }
 
-    private fun startedSignal(worktreePath: WorktreePath): CompletableDeferred<Unit> = synchronized(lock) {
-        startedSignals.getOrPut(worktreePath) { CompletableDeferred() }
+    fun calls(): Int = signals.calls()
+
+    suspend fun awaitStarted(worktreePath: WorktreePath) {
+        signals.awaitStarted(worktreePath)
     }
 
-    private fun completeSignal(worktreePath: WorktreePath): CompletableDeferred<Unit> = synchronized(lock) {
-        completeSignals.getOrPut(worktreePath) { CompletableDeferred() }
+    fun fail(worktreePath: WorktreePath) {
+        signals.unblock(worktreePath)
+    }
+}
+
+private class WorktreeSetupRunnerSignals {
+    private val callCount = MutableStateFlow(0)
+    private val startedSignals = MutableStateFlow<Map<WorktreePath, CompletableDeferred<Unit>>>(emptyMap())
+    private val unblockSignals = MutableStateFlow<Map<WorktreePath, CompletableDeferred<Unit>>>(emptyMap())
+
+    fun recordStarted(worktreePath: WorktreePath) {
+        callCount.update { it + 1 }
+        signalFor(startedSignals, worktreePath).complete(Unit)
+    }
+
+    fun calls(): Int = callCount.value
+
+    suspend fun awaitStarted(worktreePath: WorktreePath) {
+        signalFor(startedSignals, worktreePath).await()
+    }
+
+    suspend fun awaitUnblocked(worktreePath: WorktreePath) {
+        signalFor(unblockSignals, worktreePath).await()
+    }
+
+    fun unblock(worktreePath: WorktreePath) {
+        signalFor(unblockSignals, worktreePath).complete(Unit)
+    }
+
+    private fun signalFor(
+        signals: MutableStateFlow<Map<WorktreePath, CompletableDeferred<Unit>>>,
+        worktreePath: WorktreePath,
+    ): CompletableDeferred<Unit> {
+        while (true) {
+            val currentSignals = signals.value
+            currentSignals[worktreePath]?.let { return it }
+
+            val signal = CompletableDeferred<Unit>()
+            if (signals.compareAndSet(currentSignals, currentSignals + (worktreePath to signal))) return signal
+        }
     }
 }
 

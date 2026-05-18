@@ -55,7 +55,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
     var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
 
     actionError?.let { error ->
-        ErrorDialog(message = error, onDismiss = { viewModel.clearActionError() })
+        ErrorDialog(message = error.message, onDismiss = { viewModel.clearActionError() })
     }
 
     MaterialTheme {

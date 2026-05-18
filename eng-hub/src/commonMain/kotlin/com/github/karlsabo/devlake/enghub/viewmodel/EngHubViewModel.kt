@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalCoroutinesApi::class, ExperimentalForInheritanceCoroutinesApi::class)
 
 package com.github.karlsabo.devlake.enghub.viewmodel
 
@@ -44,6 +44,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -51,8 +52,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import me.tatarka.inject.annotations.Inject
-import java.io.IOException
-import java.util.Collections
 import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = KotlinLogging.logger {}
@@ -125,6 +124,50 @@ internal suspend fun GitHubApi.buildPullRequestUiStates(issues: List<Issue>): Li
     }
 }
 
+data class ActionErrorUiState(
+    val id: Long,
+    val message: String,
+)
+
+private data class ActionErrorQueueState(
+    val current: ActionErrorUiState? = null,
+    val queuedMessages: List<String> = emptyList(),
+    val nextErrorId: Long = 1L,
+) {
+    fun enqueue(message: String): ActionErrorQueueState =
+        if (current == null) withCurrent(message) else copy(queuedMessages = queuedMessages + message)
+
+    fun clearCurrent(): ActionErrorQueueState =
+        queuedMessages.firstOrNull()?.let { nextMessage ->
+            copy(queuedMessages = queuedMessages.drop(1)).withCurrent(nextMessage)
+        } ?: copy(current = null)
+
+    private fun withCurrent(message: String): ActionErrorQueueState =
+        copy(
+            current = ActionErrorUiState(id = nextErrorId, message = message),
+            nextErrorId = nextErrorId + 1,
+        )
+}
+
+private fun StateFlow<ActionErrorQueueState>.currentActionErrorStateFlow(): StateFlow<ActionErrorUiState?> =
+    MappedStateFlow(this) { it.current }
+
+private class MappedStateFlow<T, R>(
+    private val source: StateFlow<T>,
+    private val transform: (T) -> R,
+) : StateFlow<R> {
+    override val replayCache: List<R>
+        get() = listOf(value)
+
+    override val value: R
+        get() = transform(source.value)
+
+    override suspend fun collect(collector: FlowCollector<R>): Nothing {
+        source.map(transform).distinctUntilChanged().collect(collector)
+        error("StateFlow collection completed unexpectedly")
+    }
+}
+
 @Inject
 class EngHubViewModel(
     private val gitHubApi: GitHubApi,
@@ -139,15 +182,18 @@ class EngHubViewModel(
 ) : ViewModel() {
     private var currentConfig = config
 
-    private val actionError = MutableStateFlow<String?>(null)
-    val actionErrorStateFlow: StateFlow<String?> = actionError.asStateFlow()
+    private val actionErrors = MutableStateFlow(ActionErrorQueueState())
+    val actionErrorStateFlow: StateFlow<ActionErrorUiState?> = actionErrors.currentActionErrorStateFlow()
+
+    private val reportedSetupFailureHandlesByPath =
+        MutableStateFlow<Map<WorktreePath, List<WorktreeSetupHandle>>>(emptyMap())
 
     val setupStatusesStateFlow: StateFlow<Map<WorktreePath, WorktreeSetupStatus>> =
         worktreeSetupCoordinator.statuses
 
     private val localRepositories = MutableStateFlow(config.localRepositories.toLocalRepositoryUiStates())
     val localRepositoriesStateFlow: StateFlow<List<LocalRepositoryUiState>> = localRepositories.asStateFlow()
-    private val localRepositoryExpansionsInFlight = Collections.synchronizedSet(mutableSetOf<String>())
+    private val localRepositoryExpansionsInFlight = MutableStateFlow<Set<String>>(emptySet())
     private val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = archivingLocalWorktreePaths.asStateFlow()
     private val forceArchiveWorktreeRequest = MutableStateFlow<ForceArchiveWorktreeUiState?>(null)
@@ -164,7 +210,35 @@ class EngHubViewModel(
     }
 
     fun clearActionError() {
-        actionError.value = null
+        actionErrors.update { it.clearCurrent() }
+    }
+
+    private fun enqueueActionError(message: String) {
+        actionErrors.update { it.enqueue(message) }
+    }
+
+    private fun enqueueSetupActionErrorOnce(
+        worktreePath: WorktreePath,
+        setupHandle: WorktreeSetupHandle,
+        message: String,
+    ): Boolean {
+        val shouldReport = markSetupFailureReported(worktreePath, setupHandle)
+        if (shouldReport) enqueueActionError(message)
+        return shouldReport
+    }
+
+    private fun markSetupFailureReported(
+        worktreePath: WorktreePath,
+        setupHandle: WorktreeSetupHandle,
+    ): Boolean {
+        while (true) {
+            val currentReports = reportedSetupFailureHandlesByPath.value
+            val currentHandles = currentReports[worktreePath].orEmpty()
+            if (currentHandles.any { it === setupHandle }) return false
+
+            val updatedReports = currentReports + (worktreePath to (currentHandles + setupHandle))
+            if (reportedSetupFailureHandlesByPath.compareAndSet(currentReports, updatedReports)) return true
+        }
     }
 
     val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = flow {
@@ -177,7 +251,7 @@ class EngHubViewModel(
     }
         .flowOn(Dispatchers.IO)
         .retry(5) { cause ->
-            if (cause is IOException) {
+            if (cause.isRetriablePollingFailure()) {
                 delay(5_000.milliseconds)
                 true
             } else {
@@ -219,7 +293,7 @@ class EngHubViewModel(
         }
             .flowOn(Dispatchers.IO)
             .retry(5) { cause ->
-                if (cause is IOException) {
+                if (cause.isRetriablePollingFailure()) {
                     delay(5_000.milliseconds)
                     true
                 } else {
@@ -259,7 +333,7 @@ class EngHubViewModel(
                 val repositoryWorktrees = gitWorktreeApi.resolveRepositoryRoot(selectedPath)
                 val rootPath = repositoryWorktrees.rootPath
                 if (currentConfig.localRepositories.any { it.path.normalizedRepoPath() == rootPath.normalizedRepoPath() }) {
-                    actionError.value = "Repository already configured: $rootPath"
+                    enqueueActionError("Repository already configured: $rootPath")
                     return@launch
                 }
 
@@ -280,7 +354,7 @@ class EngHubViewModel(
                 }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to add local repository from $selectedPath" }
-                actionError.value = e.message ?: "Failed to add local repository"
+                enqueueActionError(e.message ?: "Failed to add local repository")
             }
         }
     }
@@ -292,7 +366,7 @@ class EngHubViewModel(
         } ?: return
 
         if (repository.isExpanded) {
-            localRepositoryExpansionsInFlight -= normalizedRepoRootPath
+            clearLocalRepositoryExpansionInFlight(normalizedRepoRootPath)
             localRepositories.update { repositories ->
                 repositories.map { currentRepository ->
                     if (currentRepository.path.normalizedRepoPath() == normalizedRepoRootPath) {
@@ -305,30 +379,41 @@ class EngHubViewModel(
             return
         }
 
-        if (!localRepositoryExpansionsInFlight.add(normalizedRepoRootPath)) return
+        if (!markLocalRepositoryExpansionInFlight(normalizedRepoRootPath)) return
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val worktrees = listLocalWorktreeUiStates(repoRootPath)
-                if (normalizedRepoRootPath !in localRepositoryExpansionsInFlight) return@launch
+                if (!isLocalRepositoryExpansionInFlight(normalizedRepoRootPath)) return@launch
                 updateLocalRepositoryWorktrees(repoRootPath, worktrees, isExpanded = true)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to list worktrees for $repoRootPath" }
-                actionError.value = e.message ?: "Failed to list worktrees"
+                enqueueActionError(e.message ?: "Failed to list worktrees")
             } finally {
-                localRepositoryExpansionsInFlight -= normalizedRepoRootPath
+                clearLocalRepositoryExpansionInFlight(normalizedRepoRootPath)
             }
         }
     }
 
     fun checkoutAndOpen(repoFullName: String, branch: String): Job {
+        val setupRequestResult = runCatching {
+            val worktreePath = checkoutWorktreePath(repoFullName, branch)
+            worktreePath to requestCheckoutSetup(repoFullName, branch)
+        }
         return viewModelScope.launch(Dispatchers.IO) {
             try {
-                requestCheckoutSetup(repoFullName, branch).await()
+                val (_, setupHandle) = setupRequestResult.getOrThrow()
+                setupHandle.await()
                 logger.info { "Setup: done" }
             } catch (e: Exception) {
-                logger.error(e) { "Failed to set up $repoFullName branch=$branch" }
-                actionError.value = e.message ?: "Failed to set up worktree"
+                val message = e.message ?: "Failed to set up worktree"
+                val shouldReport = setupRequestResult.getOrNull()?.let { (worktreePath, handle) ->
+                    enqueueSetupActionErrorOnce(worktreePath, handle, message)
+                } ?: run {
+                    enqueueActionError(message)
+                    true
+                }
+                if (shouldReport) logger.error(e) { "Failed to set up $repoFullName branch=$branch" }
             }
         }
     }
@@ -358,14 +443,23 @@ class EngHubViewModel(
         val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
         if (normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty()) return
 
+        val worktreeKey = WorktreePath(normalizedWorktreePath)
         viewModelScope.launch(Dispatchers.IO) {
+            var setupHandle: WorktreeSetupHandle? = null
             try {
                 logger.info { "Setup: requesting existing worktree setup for $normalizedWorktreePath" }
-                requestExistingWorktreeSetup(normalizedRepoRootPath, normalizedWorktreePath).await()
+                setupHandle = requestExistingWorktreeSetup(normalizedRepoRootPath, normalizedWorktreePath)
+                setupHandle.await()
                 logger.info { "Setup: existing worktree setup done for $normalizedWorktreePath" }
             } catch (e: Exception) {
-                logger.error(e) { "Failed to set up existing worktree $worktreePath" }
-                actionError.value = e.message ?: "Failed to set up worktree"
+                val message = e.message ?: "Failed to set up worktree"
+                val shouldReport = setupHandle?.let { handle ->
+                    enqueueSetupActionErrorOnce(worktreeKey, handle, message)
+                } ?: run {
+                    enqueueActionError(message)
+                    true
+                }
+                if (shouldReport) logger.error(e) { "Failed to set up existing worktree $worktreePath" }
             }
         }
     }
@@ -402,7 +496,7 @@ class EngHubViewModel(
         val normalizedWorktreePath = worktreePath.normalizedRepoPath()
         if (normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty()) return
         if (normalizedRepoRootPath == normalizedWorktreePath) {
-            actionError.value = "Cannot archive root worktree: $worktreePath"
+            enqueueActionError("Cannot archive root worktree: $worktreePath")
             return
         }
         if (!markLocalWorktreeArchiving(normalizedWorktreePath)) return
@@ -418,7 +512,7 @@ class EngHubViewModel(
                     archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
                     forceArchiveWorktreeRequest.value = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
                 } else {
-                    actionError.value = e.message ?: "Failed to archive worktree"
+                    enqueueActionError(e.message ?: "Failed to archive worktree")
                 }
                 refreshLocalRepositoryAfterArchiveFailure(repoRootPath)
             } finally {
@@ -436,7 +530,7 @@ class EngHubViewModel(
                 hiddenThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to approve PR $apiUrl" }
-                actionError.value = e.message ?: "Failed to approve pull request"
+                enqueueActionError(e.message ?: "Failed to approve pull request")
             } finally {
                 actingOnThreadIds.value -= notificationThreadId
             }
@@ -452,7 +546,7 @@ class EngHubViewModel(
                 hiddenThreadIds.value += notificationThreadId
             } catch (e: Exception) {
                 logger.error(e) { "Failed to submit review for $apiUrl" }
-                actionError.value = e.message ?: "Failed to submit review"
+                enqueueActionError(e.message ?: "Failed to submit review")
             } finally {
                 actingOnThreadIds.value -= notificationThreadId
             }
@@ -468,7 +562,7 @@ class EngHubViewModel(
             } catch (e: Exception) {
                 logger.error(e) { "Failed to mark notification done $notificationThreadId" }
                 hiddenThreadIds.value -= notificationThreadId
-                actionError.value = e.message ?: "Failed to mark notification as done"
+                enqueueActionError(e.message ?: "Failed to mark notification as done")
             } finally {
                 actingOnThreadIds.value -= notificationThreadId
             }
@@ -485,7 +579,7 @@ class EngHubViewModel(
             } catch (e: Exception) {
                 logger.error(e) { "Failed to unsubscribe from notification $notificationThreadId" }
                 hiddenThreadIds.value -= notificationThreadId
-                actionError.value = e.message ?: "Failed to unsubscribe from notification"
+                enqueueActionError(e.message ?: "Failed to unsubscribe from notification")
                 actingOnThreadIds.value -= notificationThreadId
                 return@launch
             }
@@ -495,7 +589,7 @@ class EngHubViewModel(
             } catch (e: Exception) {
                 logger.error(e) { "Failed to persist unsubscribed notification $notificationThreadId" }
                 hiddenThreadIds.value -= notificationThreadId
-                actionError.value = e.message ?: "Failed to persist unsubscribed notification locally"
+                enqueueActionError(e.message ?: "Failed to persist unsubscribed notification locally")
                 actingOnThreadIds.value -= notificationThreadId
                 return@launch
             }
@@ -504,7 +598,7 @@ class EngHubViewModel(
                 gitHubApi.markNotificationAsDone(notificationThreadId)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to mark unsubscribed notification done $notificationThreadId" }
-                actionError.value = e.message ?: "Failed to mark notification as done"
+                enqueueActionError(e.message ?: "Failed to mark notification as done")
             } finally {
                 actingOnThreadIds.value -= notificationThreadId
             }
@@ -557,6 +651,23 @@ class EngHubViewModel(
             logger.error(refreshFailure) { "Failed to refresh worktrees after archive failure for $repoRootPath" }
         }
     }
+
+    private fun markLocalRepositoryExpansionInFlight(normalizedRepoRootPath: String): Boolean {
+        while (true) {
+            val currentPaths = localRepositoryExpansionsInFlight.value
+            if (normalizedRepoRootPath in currentPaths) return false
+            if (localRepositoryExpansionsInFlight.compareAndSet(currentPaths, currentPaths + normalizedRepoRootPath)) {
+                return true
+            }
+        }
+    }
+
+    private fun clearLocalRepositoryExpansionInFlight(normalizedRepoRootPath: String) {
+        localRepositoryExpansionsInFlight.update { it - normalizedRepoRootPath }
+    }
+
+    private fun isLocalRepositoryExpansionInFlight(normalizedRepoRootPath: String): Boolean =
+        normalizedRepoRootPath in localRepositoryExpansionsInFlight.value
 
     private fun markLocalWorktreeArchiving(normalizedWorktreePath: String): Boolean {
         while (true) {

@@ -196,7 +196,9 @@ class EngHubNotificationPersistenceViewModelTest {
 
         viewModel.unsubscribeFromNotification(testNotificationUiState("thread-1"))
 
-        assertEquals("boom", withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first() })
+        assertEquals(
+            "boom",
+            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message })
         assertTrue(store.savedThreads.value.isEmpty(), "Failed unsubscribe should not persist the thread locally")
         assertTrue(api.markedDoneThreadIds.value.isEmpty(), "Failed unsubscribe should not mark the thread done")
     }
@@ -225,7 +227,7 @@ class EngHubNotificationPersistenceViewModelTest {
 
         assertEquals(
             "persist failed",
-            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first() })
+            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message })
         withTimeout(2_000.milliseconds) {
             viewModel.notifications
                 .filterNotNull()
