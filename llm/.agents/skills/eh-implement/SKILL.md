@@ -1,6 +1,6 @@
 ---
-name: eh-implement
-description: Implement a planned story or feature slice. Follow llm/notes.md while making small, testable, low-coupling code changes with disciplined comments.
+name: karl-implement
+description: Implement a planned story, feature slice, or description. Follow llm/notes.md while making small, testable, low-coupling code changes with disciplined comments.
 user-invocable: true
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *)
 ---
@@ -24,49 +24,11 @@ If the input still contains multiple acceptance tests or unrelated behavior, sto
 
 ## Workflow
 
-You are the orchestrator of several LLM calls. When you create subagents, use the same model you are; do not use a mini model.
+### Step 1: Lock the slice
 
-### Step 1: Create a subagent to flesh out the new contract
-
-Prompt the subagent with all the context it needs to create classes/interfaces/functions with contracts.
-
-### Step 2: Create a subagent to write unit tests against the new contracts
-
-Prompt the subagent with all the context it needs to create black box unit tests for the new contracts.
-
-### Step 3: Create a subagent to review the unit tests
-
-Prompt the subagent with all the context it needs to review the black box unit tests for the new contracts.
-
-### Step 4: Create a subagent to fix the unit test review findings
-
-Prompt the subagent with all the context it needs to review the black box unit test reviews and apply fixes.
-
-### Step 5: Create a subagent to write code to satisfy unit tests
-
-Prompt the subagent with all the context it needs to write code to satisfy the black box unit tests
-
-### Step 6: Create a subagent to verify the unit tests pass
-
-Prompt the subagent with all the context it needs to verify the unit tests are passing.
-
-### Step 7: Create a subagent to fix any failing unit tests
-
-Prompt the subagent with all the context it needs to fix the unit tests that are failing.
-
-### Step 8: Create a subagent to write white box unit tests against the new contracts
-
-Prompt the subagent with all the context it needs to create white box unit tests for the new code.
-
-### Step 9: Create a subagent to review the white box unit tests
-
-Prompt the subagent with all the context it needs to review the white box unit tests for the new contracts.
-
-### Step 10: Create a subagent to fix the white box unit test review findings
-
-Prompt the subagent with all the context it needs to review the white box unit test review findings and apply fixes.
-
-### Step 11:
+- Identify the single acceptance test being implemented.
+- Restate the observable behavior, what is in scope, and what is explicitly out of scope.
+- Prefer the smallest tracer-bullet path that proves the behavior end to end.
 
 ### Step 2: Find the seam
 
