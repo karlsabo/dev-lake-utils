@@ -1,5 +1,5 @@
 ---
-name: karl-plan
+name: eh-plan
 description: "Break down features or stories into single-acceptance-test tickets and PRs. Conversational planning skill."
 user-invocable: true
 allowed-tools: "Bash(gh *), Read, Glob, Grep, Write, Edit, WebFetch, Agent(subagent_type=Explore *)"
