@@ -1,11 +1,11 @@
 ---
-name: pr-review
+name: eh-pr-review
 description: Reviews a GitHub PR. Use when asked to review a PR, code review, or given a PR number/URL.
 user-invocable: true
 allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *)
 ---
 
-# PR Review Skill
+# eh-pr-review Skill
 
 You are conducting a thorough, structured code review of a GitHub pull request. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
 
@@ -53,8 +53,7 @@ From these, derive:
 
 ### Step 3: Read changed files in full
 
-For every file in the changed file list that exists locally, read the **entire file** using the `Read` tool (not just
-the diff hunks). This provides the surrounding context that catches:
+For every file in the changed file list that exists locally, read the **entire file** using the `Read` tool (not just the diff hunks). This provides the surrounding context that catches:
 
 - Duplicate logic elsewhere in the same file
 - Methods accidentally inserted inside other methods
@@ -75,8 +74,7 @@ Load `references/review-lenses.md` and systematically analyze the PR through eac
 4. **Architecture & Design**, coupling, cohesion, abstraction
 5. **Redundancy**, dead code, duplicates, stale comments
 
-**Calibration:** Not every PR needs comments in every category. A clean PR may only warrant an approval with a brief
-note. Match comment volume to the risk and complexity of the change.
+**Calibration:** Not every PR needs comments in every category. A clean PR may only warrant an approval with a brief note. Match comment volume to the risk and complexity of the change.
 
 ### Step 5: Create a planned comments document
 
@@ -163,8 +161,7 @@ Refer to `references/github-review-api.md` for the exact API calls.
 **Error handling:**
 
 - If a comment gets a 422 (invalid position), warn the user and skip that comment. Suggest they add it manually.
-- If the entire review creation fails, fall back to creating an empty pending review first, then adding comments
-  individually. See `references/github-review-api.md` for the fallback approach.
+- If the entire review creation fails, fall back to creating an empty pending review first, then adding comments individually. See `references/github-review-api.md` for the fallback approach.
 
 ### Step 10: Optional submit
 

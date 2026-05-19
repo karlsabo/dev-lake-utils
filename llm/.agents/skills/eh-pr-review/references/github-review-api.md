@@ -1,7 +1,6 @@
 # GitHub Review API Reference
 
-All commands use `gh api` to interact with the GitHub REST API. Replace `{owner}/{repo}` and `{number}` with actual
-values.
+All commands use `gh api` to interact with the GitHub REST API. Replace `{owner}/{repo}` and `{number}` with actual values.
 
 ---
 
@@ -55,8 +54,7 @@ gh api repos/{owner}/{repo}/pulls/{number}/reviews
 
 ### Primary method: single atomic call
 
-Create the review with all inline comments in one API call. This is the preferred method because it's atomic — either
-all comments are posted or none are.
+Create the review with all inline comments in one API call. This is the preferred method because it's atomic — either all comments are posted or none are.
 
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/reviews \

@@ -86,8 +86,9 @@ Each story gets one PR. Every story must name the acceptance criteria, any notes
 
 ### Step 5: Iterate
 
-This is conversational. The user may:
+This is conversational.
 
+- Grill the user with any questions you have. Ensure you reach a mutual understanding
 - Challenge the decomposition
 - Add/remove/merge stories
 - Refine acceptance tests

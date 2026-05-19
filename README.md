@@ -11,9 +11,7 @@
 
 # TODO
 
-* [ ] Allow running multiple set-up commands at a time from the notification view
 * [ ] Update PR review skill to be named `eh-pr-review`
-    * Also update the skill to ensure that AI prefixes all its comments with ${LLM-NAME}-${REASONING-LEVEL}: ${THE_COMMENT}. This way it's clear the comment is from an LLM.
 * [ ] Update plan review skill to be named `eh-plan`
     * Have the plan have a grill me if needed so we reach a shared understanding and solution
 * [ ] Should be able to create a new worktree and have it run the setup commands.
