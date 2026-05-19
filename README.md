@@ -11,9 +11,7 @@
 
 # TODO
 
-* [ ] Update PR review skill to be named `eh-pr-review`
-* [ ] Update plan review skill to be named `eh-plan`
-    * Have the plan have a grill me if needed so we reach a shared understanding and solution
+* [ ] Due to the way the GH api works, we still get notifications that were marked 'done'. Can we add these notifications to the database like we did with unsubscribe? GH only has a read filter which is not the same as done or unsubscribe. So I believe we need to track it ourselves.
 * [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on
@@ -23,6 +21,7 @@
     * Should have PR information if there's a PR connected to the branch
         * Should have menu options to open the PR in the web
     * Should have shortcut style buttons, open, and archive, use emojis to keep it small
+* [ ] Have the GH API for getting notifications return each page as it loads one, so maybe use a kotlinx coroutine channel. that way the UI is more responsive and doesn't have to wait for all notifications to load before it can start displaying some.
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
@@ -63,6 +62,7 @@
 * [ ] Look into <https://github.com/garrytan/gstack> for their skills
 * [ ] Look into <https://github.com/mattpocock/skills/tree/main> for their skills
 * [ ] Look into <https://worktrunk.dev/>
+* [ ] Add a database pruning background task that runs at startup and then every hour to prune old DB entries.
 
 ## Implementation loop
 * Implement
