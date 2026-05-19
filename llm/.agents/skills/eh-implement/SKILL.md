@@ -1,5 +1,5 @@
 ---
-name: karl-implement
+name: eh-implement
 description: Implement a planned story, feature slice, or description. Follow llm/notes.md while making small, testable, low-coupling code changes with disciplined comments.
 user-invocable: true
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *)

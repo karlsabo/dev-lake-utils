@@ -1,5 +1,5 @@
 ---
-name: eh-implement
+name: wip-eh-implement
 description: Implement a planned story or feature slice. Follow llm/notes.md while making small, testable, low-coupling code changes with disciplined comments.
 user-invocable: true
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *)
