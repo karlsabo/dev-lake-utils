@@ -1,5 +1,5 @@
 ---
-name: create-draft-pr
+name: eh-create-draft-pr
 description: Create a draft GitHub pull request with `gh`, including a description, test plan, PR template content, and a Linear link near the top.
 user-invocable: true
 allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit
