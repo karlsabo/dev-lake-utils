@@ -12,6 +12,14 @@
 # TODO
 
 * [ ] Due to the way the GH api works, we still get notifications that were marked 'done'. Can we add these notifications to the database like we did with unsubscribe? GH only has a read filter which is not the same as done or unsubscribe. So I believe we need to track it ourselves.
+* [ ] Need a PR monitoring skill:
+    1. Log the failure with llm/.agents/skills/eh-track-cicd-failure/SKILL.md
+    2. Fix code, commit, push if and only if we are 100% for sure caused by changes we made for this PR
+    3. Fetch, pull, merge, or rebase off our root branch if we're behind
+    4. Restart the build
+* [ ] Update PR review skill to make it clear these are AI
+    * Make the comments more question-oriented; 'did you consider...', 'what is the reason...'
+    * Prefix comments to make it clear they are from an LLM. `LLM: ${THE_COMMENT}`
 * [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on
