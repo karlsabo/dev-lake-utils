@@ -42,13 +42,13 @@
 * [ ] Show my review status on PR notifications
 * [ ] Convert to panel type UI. Have PRs, Tickets, Notifications, etc. that expand a panel, and then you can click each one and they show options for what to do.
 * [ ] Start an auto review on PRs, show the copyable path to the review Markdown
-* [ ] Rename all skills to start with a standard prefix
-    * Maybe eh for eng hub?
 * [ ] Add a queued status for PRs so we know if it's waying in a merge queue, maybe give the position in the queue too.
-* [ ] Fix skill paths to not be hard coded, e.g., remove `$HOME/karl-backup`, take it from a config variable
 * [ ] Clicking "Setup" greys out all Setup buttons, it should only do it for the current task
-* [ ] Add a UI button to sync skills, or always sync skills every X minutes
+* [ ] Add a UI menu option to sync skills
     * Maybe a searchable menu that pops up, like JB Fleet had with cmd+k
+    * Add a settings option that allows it to run automatically 
+* [ ] Add a UI menu option to upgrade agent harnesses (claude code, codex, pi, goose, etc)
+    * Add a settings option that allows it to run automatically 
 * [ ] Create native executables
 * [ ] Consider consolidating into a single configuration file
 * [ ] Add a UI panel for showing tickets assigned to the user
