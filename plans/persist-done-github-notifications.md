@@ -130,7 +130,9 @@ Given Eng Hub automatically marks notification `thread-7` done in GitHub but the
 
 - Keep GitHub API wrapper focused on GitHub calls; local ignore persistence belongs above it in Eng Hub notification orchestration.
 
-### 3. Restore explicit Done notification and show an error when local ignore persistence fails
+### 3. Restore explicit Done notification and show an error when local ignore persistence fails - Done
+
+**Done:** 2026 05 20
 
 **Acceptance criteria:** Given GitHub accepts marking notification `thread-6` done but the local ignore-store write fails, when I click Done for `thread-6`, then Eng Hub shows an action error and restores `thread-6` in the notification list because durable local hiding was not recorded.
 
