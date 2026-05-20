@@ -107,7 +107,9 @@ Given Eng Hub automatically marks notification `thread-7` done in GitHub but the
 - This is the data-model foundation story. It should reuse the existing unsubscribe persistence path as much as practical while changing the vocabulary from subscription-specific persistence to generic local ignore persistence.
 - The old table can be kept as a compatibility artifact if SQLDelight migration constraints make dropping awkward, but new code should use `ignored_notification_threads`.
 
-### 2. Persist explicit Done as an ignored notification and hide it on startup
+### 2. Persist explicit Done as an ignored notification and hide it on startup - Done
+
+**Done:** 2026 05 20
 
 **Acceptance criteria:** Given GitHub returns notification thread `thread-1` for `test-org/test-repo`, when I click Done for `thread-1`, then Eng Hub hides it immediately, records it locally as ignored with reason `DONE`, and after restarting Eng Hub while GitHub still returns `thread-1`, the notification list does not show `thread-1`.
 
