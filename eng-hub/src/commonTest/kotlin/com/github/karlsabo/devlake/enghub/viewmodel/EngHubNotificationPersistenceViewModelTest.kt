@@ -338,23 +338,44 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
-    fun submitReviewPersistsDoneThreadAndMarksNotificationDone() = runBlocking {
-        val api = NotificationPersistenceGitHubApi()
+    fun submitReviewPersistsDoneThreadAndFiltersAfterRestart() = runBlocking {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/23"
+        val notification = testNotification(
+            id = "thread-3",
+            subjectType = "PullRequest",
+            subjectUrl = pullRequestUrl,
+        )
+        val api = NotificationPersistenceGitHubApi(
+            notifications = listOf(notification),
+            pullRequestsByUrl = mapOf(
+                pullRequestUrl to PullRequest(
+                    number = 23,
+                    url = pullRequestUrl,
+                    head = PullRequestHead(ref = "feature/review"),
+                ),
+            ),
+        )
         val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
-        val notification = testNotificationUiState("thread-review")
+        val notificationUiState = withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-3" } }
+                .single { it.notificationThreadId == "thread-3" }
+        }
 
-        viewModel.submitReview(notification, ReviewStateValue.COMMENTED, "Looks good")
+        viewModel.submitReview(notificationUiState, ReviewStateValue.COMMENTED, "Looks good")
 
         assertEquals(
-            listOf(SubmittedReview(notification.apiUrl!!, ReviewStateValue.COMMENTED, "Looks good")),
+            listOf(SubmittedReview(pullRequestUrl, ReviewStateValue.COMMENTED, "Looks good")),
             api.submittedReviews.awaitValue(),
         )
-        assertEquals(listOf("thread-review"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(listOf("thread-3"), api.markedDoneThreadIds.awaitValue())
         assertEquals(
             listOf(
                 SavedThread(
-                    threadId = "thread-review",
+                    threadId = "thread-3",
                     repositoryFullName = "test-org/test-repo",
                     subjectType = "PullRequest",
                     reason = NotificationIgnoreReason.DONE,
@@ -362,6 +383,12 @@ class EngHubNotificationPersistenceViewModelTest {
             ),
             store.savedThreads.awaitValue().map { it.withoutTimestamp() },
         )
+
+        val restartedViewModel = createViewModel(api, store)
+        val restartedNotifications = withTimeout(2_000.milliseconds) {
+            restartedViewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+        assertTrue(restartedNotifications.isEmpty())
     }
 
     @Test

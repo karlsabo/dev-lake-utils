@@ -175,7 +175,9 @@ Given Eng Hub automatically marks notification `thread-7` done in GitHub but the
 - Existing approve callback passes `notificationThreadId` and `apiUrl`; it likely needs `NotificationUiState` so the store can save repository and subject metadata.
 - Ordering should be: approve PR succeeds, GitHub mark-done succeeds, local ignore save succeeds, then durable hiding is guaranteed.
 
-### 5. Persist Submit Review action as ignored
+### 5. Persist Submit Review action as ignored - Done
+
+**Done:** 2026 05 20
 
 **Acceptance criteria:** Given GitHub returns pull request notification thread `thread-3` for PR `#23`, when I submit a review from Eng Hub and the review submission and notification mark-done calls succeed, then Eng Hub records `thread-3` locally as ignored with reason `DONE` and after restarting Eng Hub while GitHub still returns `thread-3`, the notification list does not show `thread-3`.
 
