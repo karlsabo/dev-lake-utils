@@ -151,7 +151,9 @@ Given Eng Hub automatically marks notification `thread-7` done in GitHub but the
 - This story assumes Story 2 added the explicit Done ignore persistence path.
 - Preserve existing behavior for GitHub mark-done failure: restore visibility and show the mark-done error.
 
-### 4. Persist Approve action as ignored
+### 4. Persist Approve action as ignored - Done
+
+**Done:** 2026 05 20
 
 **Acceptance criteria:** Given GitHub returns pull request notification thread `thread-2` for PR `#22`, when I click Approve in Eng Hub and the PR approval and notification mark-done calls succeed, then Eng Hub records `thread-2` locally as ignored with reason `DONE` and after restarting Eng Hub while GitHub still returns `thread-2`, the notification list does not show `thread-2`.
 
