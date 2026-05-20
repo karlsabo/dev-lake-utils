@@ -93,14 +93,9 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                             setupStatuses[viewModel.checkoutWorktreePath(repoFullName, branch)]
                         },
                         actingOnThreadIds = actingOnThreadIds,
-                        onApprove = { notificationThreadId, apiUrl ->
-                            viewModel.approvePullRequest(
-                                notificationThreadId,
-                                apiUrl
-                            )
-                        },
-                        onSubmitReview = { notificationThreadId, apiUrl, event, reviewComment ->
-                            viewModel.submitReview(notificationThreadId, apiUrl, event, reviewComment)
+                        onApprove = { viewModel.approvePullRequest(it) },
+                        onSubmitReview = { notification, event, reviewComment ->
+                            viewModel.submitReview(notification, event, reviewComment)
                         },
                         onMarkDone = { viewModel.markNotificationDone(it) },
                         onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },

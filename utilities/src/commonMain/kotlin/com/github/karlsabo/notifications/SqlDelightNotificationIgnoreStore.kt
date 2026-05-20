@@ -7,28 +7,30 @@ import kotlinx.io.files.Path
 val engHubNotificationsDatabasePath: Path =
     Path(getApplicationDirectory(DEV_METRICS_APP_NAME), "eng-hub-notifications.db")
 
-class SqlDelightNotificationSubscriptionStore(
+class SqlDelightNotificationIgnoreStore(
     driverFactory: NotificationDatabaseDriverFactory = NotificationDatabaseDriverFactory(),
     databasePath: String = engHubNotificationsDatabasePath.toString(),
-) : NotificationSubscriptionStore {
+) : NotificationIgnoreStore {
     private val queries =
-        NotificationDatabase(driverFactory.createDriver(databasePath)).unsubscribedNotificationThreadsQueries
+        NotificationDatabase(driverFactory.createDriver(databasePath)).ignoredNotificationThreadsQueries
 
-    override fun listUnsubscribedThreadIds(): Set<String> {
+    override fun listIgnoredThreadIds(): Set<String> {
         return queries.selectAllThreadIds().executeAsList().toSet()
     }
 
-    override fun saveUnsubscribedThread(
+    override fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,
         subjectType: String,
-        unsubscribedAtEpochMs: Long,
+        reason: NotificationIgnoreReason,
+        ignoredAtEpochMs: Long,
     ) {
         queries.upsertThread(
             thread_id = threadId,
             repository_full_name = repositoryFullName,
             subject_type = subjectType,
-            unsubscribed_at_epoch_ms = unsubscribedAtEpochMs,
+            ignore_reason = reason.name,
+            ignored_at_epoch_ms = ignoredAtEpochMs,
         )
     }
 }

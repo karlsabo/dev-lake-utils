@@ -8,8 +8,8 @@ import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubNotificationService
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.GitHubApiRestConfig
-import com.github.karlsabo.notifications.NotificationSubscriptionStore
-import com.github.karlsabo.notifications.SqlDelightNotificationSubscriptionStore
+import com.github.karlsabo.notifications.NotificationIgnoreStore
+import com.github.karlsabo.notifications.SqlDelightNotificationIgnoreStore
 import com.github.karlsabo.system.DesktopLauncher
 import com.github.karlsabo.system.DesktopLauncherService
 import me.tatarka.inject.annotations.Provides
@@ -48,8 +48,8 @@ interface EngHubBindings {
     fun provideEngHubConfigWriter(): EngHubConfigWriter = EngHubConfigWriter(::saveEngHubConfig)
 
     @Provides
-    fun provideNotificationSubscriptionStore(): NotificationSubscriptionStore {
-        return SqlDelightNotificationSubscriptionStore()
+    fun provideNotificationIgnoreStore(): NotificationIgnoreStore {
+        return SqlDelightNotificationIgnoreStore()
     }
 }
 

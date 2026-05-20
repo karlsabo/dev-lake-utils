@@ -79,7 +79,9 @@ Given Eng Hub automatically marks notification `thread-7` done in GitHub but the
 
 ## Stories
 
-### 1. Introduce generic ignored-notification persistence and preserve unsubscribe behavior
+### 1. Introduce generic ignored-notification persistence and preserve unsubscribe behavior - Done
+
+**Done:** 2026 05 20
 
 **Acceptance criteria:** Given GitHub returns notification thread `thread-unsubscribed` for `test-org/test-repo`, when I unsubscribe from `thread-unsubscribed`, then Eng Hub records it locally as ignored with reason `UNSUBSCRIBED`, and after restarting Eng Hub while GitHub still returns `thread-unsubscribed`, the notification list does not show `thread-unsubscribed`.
 

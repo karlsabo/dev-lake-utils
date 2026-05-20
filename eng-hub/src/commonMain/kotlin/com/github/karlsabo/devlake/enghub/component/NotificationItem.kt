@@ -29,9 +29,9 @@ fun NotificationItem(
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
     setupStatus: WorktreeSetupStatus?,
     actionInProgress: Boolean = false,
-    onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
-    onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
-    onMarkDone: (String) -> Unit,
+    onApprove: (NotificationUiState) -> Unit,
+    onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -> Unit,
+    onMarkDone: (NotificationUiState) -> Unit,
     onUnsubscribe: (NotificationUiState) -> Unit,
 ) {
     var showReviewDialog by remember { mutableStateOf(false) }
@@ -40,7 +40,7 @@ fun NotificationItem(
     if (showReviewDialog && notification.apiUrl != null) {
         ReviewDialog(
             onSubmit = { event, body ->
-                onSubmitReview(notification.notificationThreadId, notification.apiUrl, event, body)
+                onSubmitReview(notification, event, body)
                 showReviewDialog = false
             },
             onDismiss = { showReviewDialog = false },
@@ -85,7 +85,7 @@ fun NotificationItem(
 
                 if (notification.isPullRequest && notification.apiUrl != null) {
                     Button(
-                        onClick = { onApprove(notification.notificationThreadId, notification.apiUrl) },
+                        onClick = { onApprove(notification) },
                         enabled = !actionInProgress,
                     ) {
                         Text("Approve")
@@ -99,7 +99,7 @@ fun NotificationItem(
                 }
 
                 Button(
-                    onClick = { onMarkDone(notification.notificationThreadId) },
+                    onClick = { onMarkDone(notification) },
                     enabled = !actionInProgress,
                     colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.secondary),
                 ) {

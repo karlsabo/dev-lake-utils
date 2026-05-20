@@ -33,9 +33,9 @@ fun NotificationPanel(
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
     setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
     actingOnThreadIds: Set<String> = emptySet(),
-    onApprove: (notificationThreadId: String, apiUrl: String) -> Unit,
-    onSubmitReview: (notificationThreadId: String, apiUrl: String, event: ReviewStateValue, reviewComment: String?) -> Unit,
-    onMarkDone: (String) -> Unit,
+    onApprove: (NotificationUiState) -> Unit,
+    onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -> Unit,
+    onMarkDone: (NotificationUiState) -> Unit,
     onUnsubscribe: (NotificationUiState) -> Unit,
     modifier: Modifier = Modifier,
 ) {

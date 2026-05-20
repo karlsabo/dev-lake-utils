@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub
 
+import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.WorktreeSetupCoordinator
@@ -14,7 +15,8 @@ import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.config.GitHubApiRestConfig
-import com.github.karlsabo.notifications.NotificationSubscriptionStore
+import com.github.karlsabo.notifications.NotificationIgnoreReason
+import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -40,7 +42,7 @@ class EngHubDependenciesTest {
         val notificationService = GitHubNotificationService(fakeGitHubApi)
         val fakeGitWorktreeApi = RecordingGitWorktreeApi()
         val fakeDesktopLauncher = RecordingDesktopLauncher()
-        val fakeNotificationSubscriptionStore = RecordingNotificationSubscriptionStore()
+        val fakeNotificationIgnoreStore = RecordingNotificationIgnoreStore()
         val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
             gitHubApi = fakeGitHubApi,
             gitHubNotificationService = notificationService,
@@ -50,7 +52,7 @@ class EngHubDependenciesTest {
             directoryPicker = RecordingDirectoryPicker(),
             configWriter = RecordingEngHubConfigWriter(),
             config = config,
-            notificationSubscriptionStore = fakeNotificationSubscriptionStore,
+            notificationIgnoreStore = fakeNotificationIgnoreStore,
         )
 
         val viewModel = loadEngHubViewModel(
@@ -85,7 +87,7 @@ class EngHubDependenciesTest {
             fakeGitWorktreeApi.ensureWorktreeCalls.awaitValue(),
         )
 
-        viewModel.markNotificationDone("thread-1")
+        viewModel.markNotificationDone(testNotificationUiState("thread-1"))
         assertEquals(listOf("thread-1"), fakeGitHubApi.markedDoneThreadIds.awaitValue())
     }
 
@@ -107,7 +109,7 @@ class EngHubDependenciesTest {
         )
         val gitHubApiConfig = GitHubApiRestConfig(token = "test-token")
         val fakeGitHubApi = RecordingGitHubApi()
-        val fakeNotificationSubscriptionStore = RecordingNotificationSubscriptionStore()
+        val fakeNotificationIgnoreStore = RecordingNotificationIgnoreStore()
         val fakeGitWorktreeApi = RecordingGitWorktreeApi()
         val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
             gitHubApi = fakeGitHubApi,
@@ -118,7 +120,7 @@ class EngHubDependenciesTest {
             directoryPicker = RecordingDirectoryPicker(),
             configWriter = RecordingEngHubConfigWriter(),
             config = config,
-            notificationSubscriptionStore = fakeNotificationSubscriptionStore,
+            notificationIgnoreStore = fakeNotificationIgnoreStore,
         )
 
         val loadedDependencies = loadEngHubDependencies(
@@ -136,6 +138,22 @@ class EngHubDependenciesTest {
         assertSame(config, loadedDependencies.config)
         assertSame(providedViewModel, loadedDependencies.viewModel)
     }
+}
+
+private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: String): NotificationUiState {
+    return NotificationUiState(
+        notificationThreadId = threadId,
+        title = "Notification $threadId",
+        reason = "review_requested",
+        repositoryFullName = "test-org/test-repo",
+        subjectType = "PullRequest",
+        htmlUrl = "https://github.com/test-org/test-repo/pull/1",
+        apiUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
+        isPullRequest = true,
+        pullRequestNumber = 1,
+        unread = true,
+        headRef = "feature/test",
+    )
 }
 
 private data class EnsureRepositoryCall(
@@ -256,13 +274,14 @@ private class RecordingGitHubApi : GitHubApi {
     override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) = Unit
 }
 
-private class RecordingNotificationSubscriptionStore : NotificationSubscriptionStore {
-    override fun listUnsubscribedThreadIds(): Set<String> = emptySet()
+private class RecordingNotificationIgnoreStore : NotificationIgnoreStore {
+    override fun listIgnoredThreadIds(): Set<String> = emptySet()
 
-    override fun saveUnsubscribedThread(
+    override fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,
         subjectType: String,
-        unsubscribedAtEpochMs: Long,
+        reason: NotificationIgnoreReason,
+        ignoredAtEpochMs: Long,
     ) = Unit
 }

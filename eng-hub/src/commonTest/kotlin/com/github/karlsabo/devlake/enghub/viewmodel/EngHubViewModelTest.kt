@@ -28,7 +28,8 @@ import com.github.karlsabo.github.PullRequestHead
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.User
-import com.github.karlsabo.notifications.NotificationSubscriptionStore
+import com.github.karlsabo.notifications.NotificationIgnoreReason
+import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -1698,7 +1699,7 @@ private fun createLocalRepositoryViewModel(
             localRepositories = localRepositoryConfigs,
             setupShell = setupShell,
         ),
-        notificationSubscriptionStore = NoOpNotificationSubscriptionStore(),
+        notificationIgnoreStore = NoOpNotificationIgnoreStore(),
     )
 }
 
@@ -1908,13 +1909,14 @@ private class LocalRepositoryNoOpDesktopLauncher : DesktopLauncher {
     override fun openInIdea(projectPath: String) = Unit
 }
 
-private class NoOpNotificationSubscriptionStore : NotificationSubscriptionStore {
-    override fun listUnsubscribedThreadIds(): Set<String> = emptySet()
+private class NoOpNotificationIgnoreStore : NotificationIgnoreStore {
+    override fun listIgnoredThreadIds(): Set<String> = emptySet()
 
-    override fun saveUnsubscribedThread(
+    override fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,
         subjectType: String,
-        unsubscribedAtEpochMs: Long,
+        reason: NotificationIgnoreReason,
+        ignoredAtEpochMs: Long,
     ) = Unit
 }

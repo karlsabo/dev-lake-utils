@@ -20,7 +20,8 @@ import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.PullRequestHead
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
-import com.github.karlsabo.notifications.NotificationSubscriptionStore
+import com.github.karlsabo.notifications.NotificationIgnoreReason
+import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -55,7 +56,7 @@ class EngHubNotificationPersistenceViewModelTest {
                 ),
             ),
         )
-        val viewModel = createViewModel(api, RecordingNotificationSubscriptionStore())
+        val viewModel = createViewModel(api, RecordingNotificationIgnoreStore())
 
         val notifications = withTimeout(2_000.milliseconds) {
             viewModel.notifications.filterNotNull().first().getOrThrow()
@@ -79,7 +80,7 @@ class EngHubNotificationPersistenceViewModelTest {
             notifications = listOf(notification),
             pullRequestFailureUrls = setOf(pullRequestUrl),
         )
-        val viewModel = createViewModel(api, RecordingNotificationSubscriptionStore())
+        val viewModel = createViewModel(api, RecordingNotificationIgnoreStore())
 
         val notifications = withTimeout(2_000.milliseconds) {
             viewModel.notifications.filterNotNull().first().getOrThrow()
@@ -121,7 +122,7 @@ class EngHubNotificationPersistenceViewModelTest {
             ),
             pullRequestFailureUrls = setOf(failedPullRequestUrl),
         )
-        val viewModel = createViewModel(api, RecordingNotificationSubscriptionStore())
+        val viewModel = createViewModel(api, RecordingNotificationIgnoreStore())
 
         val notifications = withTimeout(2_000.milliseconds) {
             viewModel.notifications.filterNotNull().first().getOrThrow()
@@ -147,7 +148,7 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
-    fun loadsPersistedUnsubscribedThreadIdsBeforeNotificationEnrichment() = runBlocking {
+    fun loadsPersistedIgnoredThreadIdsBeforeNotificationEnrichment() = runBlocking {
         val hiddenNotification = testNotification(
             id = "thread-hidden",
             subjectType = "PullRequest",
@@ -161,7 +162,7 @@ class EngHubNotificationPersistenceViewModelTest {
         val api = NotificationPersistenceGitHubApi(
             notifications = listOf(hiddenNotification, visibleNotification),
         )
-        val store = RecordingNotificationSubscriptionStore(initialThreadIds = setOf("thread-hidden"))
+        val store = RecordingNotificationIgnoreStore(initialThreadIds = setOf("thread-hidden"))
         val viewModel = createViewModel(api, store)
 
         val notifications = withTimeout(2_000.milliseconds) {
@@ -173,9 +174,296 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
+    fun automaticallyMarkedDoneNotificationsArePersistedAndFilteredAfterRestart() = runBlocking {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1"
+        val notification = testNotification(
+            id = "thread-auto-done",
+            subjectType = "PullRequest",
+            subjectUrl = pullRequestUrl,
+        )
+        val api = NotificationPersistenceGitHubApi(
+            notifications = listOf(notification),
+            pullRequestsByUrl = mapOf(
+                pullRequestUrl to PullRequest(
+                    number = 1,
+                    url = pullRequestUrl,
+                    state = "closed",
+                ),
+            ),
+        )
+        val store = RecordingNotificationIgnoreStore()
+        val viewModel = createViewModel(api, store)
+
+        val notifications = withTimeout(2_000.milliseconds) {
+            viewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+
+        assertTrue(notifications.isEmpty())
+        assertEquals(listOf("thread-auto-done"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(
+            listOf(
+                SavedThread(
+                    threadId = "thread-auto-done",
+                    repositoryFullName = "test-org/test-repo",
+                    subjectType = "PullRequest",
+                    reason = NotificationIgnoreReason.DONE,
+                ),
+            ),
+            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+        )
+
+        val restartedViewModel = createViewModel(api, store)
+        val restartedNotifications = withTimeout(2_000.milliseconds) {
+            restartedViewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+        assertTrue(restartedNotifications.isEmpty())
+        assertEquals(listOf("thread-auto-done"), api.markedDoneThreadIds.value)
+    }
+
+    @Test
+    fun automaticDonePersistenceFailureIsLogOnly() = runBlocking {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1"
+        val notification = testNotification(
+            id = "thread-auto-done",
+            subjectType = "PullRequest",
+            subjectUrl = pullRequestUrl,
+        )
+        val api = NotificationPersistenceGitHubApi(
+            notifications = listOf(notification),
+            pullRequestsByUrl = mapOf(
+                pullRequestUrl to PullRequest(
+                    number = 1,
+                    url = pullRequestUrl,
+                    state = "closed",
+                ),
+            ),
+        )
+        val store = RecordingNotificationIgnoreStore(
+            saveFailure = IllegalStateException("persist failed"),
+        )
+        val viewModel = createViewModel(api, store)
+
+        val notifications = withTimeout(2_000.milliseconds) {
+            viewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+
+        assertTrue(notifications.isEmpty())
+        assertEquals(listOf("thread-auto-done"), api.markedDoneThreadIds.awaitValue())
+        assertTrue(store.savedThreads.value.isEmpty(), "Failed automatic persistence should not save the thread")
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun donePersistsThreadAndFiltersAfterRestart() = runBlocking {
+        val notification = testNotification(
+            id = "thread-1",
+            subjectType = "PullRequest",
+            subjectUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
+        )
+        val api = NotificationPersistenceGitHubApi(notifications = listOf(notification))
+        val store = RecordingNotificationIgnoreStore()
+        val viewModel = createViewModel(api, store)
+
+        viewModel.markNotificationDone(testNotificationUiState("thread-1"))
+
+        assertEquals(listOf("thread-1"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(
+            listOf(
+                SavedThread(
+                    threadId = "thread-1",
+                    repositoryFullName = "test-org/test-repo",
+                    subjectType = "PullRequest",
+                    reason = NotificationIgnoreReason.DONE,
+                ),
+            ),
+            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+        )
+
+        val restartedViewModel = createViewModel(api, store)
+        val restartedNotifications = withTimeout(2_000.milliseconds) {
+            restartedViewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+        assertTrue(restartedNotifications.isEmpty())
+    }
+
+    @Test
+    fun approvePersistsDoneThreadAndMarksNotificationDone() = runBlocking {
+        val api = NotificationPersistenceGitHubApi()
+        val store = RecordingNotificationIgnoreStore()
+        val viewModel = createViewModel(api, store)
+        val notification = testNotificationUiState("thread-approve")
+
+        viewModel.approvePullRequest(notification)
+
+        assertEquals(listOf(notification.apiUrl!!), api.approvedPullRequestUrls.awaitValue())
+        assertEquals(listOf("thread-approve"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(
+            listOf(
+                SavedThread(
+                    threadId = "thread-approve",
+                    repositoryFullName = "test-org/test-repo",
+                    subjectType = "PullRequest",
+                    reason = NotificationIgnoreReason.DONE,
+                ),
+            ),
+            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+        )
+    }
+
+    @Test
+    fun submitReviewPersistsDoneThreadAndMarksNotificationDone() = runBlocking {
+        val api = NotificationPersistenceGitHubApi()
+        val store = RecordingNotificationIgnoreStore()
+        val viewModel = createViewModel(api, store)
+        val notification = testNotificationUiState("thread-review")
+
+        viewModel.submitReview(notification, ReviewStateValue.COMMENTED, "Looks good")
+
+        assertEquals(
+            listOf(SubmittedReview(notification.apiUrl!!, ReviewStateValue.COMMENTED, "Looks good")),
+            api.submittedReviews.awaitValue(),
+        )
+        assertEquals(listOf("thread-review"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(
+            listOf(
+                SavedThread(
+                    threadId = "thread-review",
+                    repositoryFullName = "test-org/test-repo",
+                    subjectType = "PullRequest",
+                    reason = NotificationIgnoreReason.DONE,
+                ),
+            ),
+            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+        )
+    }
+
+    @Test
+    fun submitReviewMarkDoneFailureReportsFailureRestoresVisibilityAndDoesNotPersist() = runBlocking {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1"
+        val api = NotificationPersistenceGitHubApi(
+            notifications = listOf(
+                testNotification(
+                    id = "thread-review",
+                    subjectType = "PullRequest",
+                    subjectUrl = pullRequestUrl,
+                ),
+            ),
+            markDoneFailure = IllegalStateException("mark done failed"),
+        )
+        val store = RecordingNotificationIgnoreStore()
+        val viewModel = createViewModel(api, store)
+        val notification = withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-review" } }
+                .single { it.notificationThreadId == "thread-review" }
+        }
+
+        viewModel.submitReview(notification, ReviewStateValue.COMMENTED, "Looks good")
+
+        assertEquals(
+            listOf(SubmittedReview(pullRequestUrl, ReviewStateValue.COMMENTED, "Looks good")),
+            api.submittedReviews.awaitValue(),
+        )
+        assertEquals(listOf("thread-review"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(
+            "mark done failed",
+            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message },
+        )
+        withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-review" } }
+        }
+        assertTrue(store.savedThreads.value.isEmpty(), "Failed mark-done should not persist the thread locally")
+    }
+
+    @Test
+    fun submitReviewPersistenceFailureReportsLocalFailureAndRestoresNotificationVisibility() = runBlocking {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1"
+        val api = NotificationPersistenceGitHubApi(
+            notifications = listOf(
+                testNotification(
+                    id = "thread-review",
+                    subjectType = "PullRequest",
+                    subjectUrl = pullRequestUrl,
+                ),
+            ),
+        )
+        val store = RecordingNotificationIgnoreStore(
+            saveFailure = IllegalStateException("persist failed"),
+        )
+        val viewModel = createViewModel(api, store)
+        val notification = withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-review" } }
+                .single { it.notificationThreadId == "thread-review" }
+        }
+
+        viewModel.submitReview(notification, ReviewStateValue.COMMENTED, "Looks good")
+
+        assertEquals(
+            listOf(SubmittedReview(pullRequestUrl, ReviewStateValue.COMMENTED, "Looks good")),
+            api.submittedReviews.awaitValue(),
+        )
+        assertEquals(listOf("thread-review"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(
+            "persist failed",
+            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message },
+        )
+        withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-review" } }
+        }
+        assertTrue(store.savedThreads.value.isEmpty(), "Failed persistence should not leave a saved local thread")
+    }
+
+    @Test
+    fun donePersistenceFailureReportsLocalFailureAndRestoresNotificationVisibility() = runBlocking {
+        val notification = testNotification(
+            id = "thread-1",
+            subjectType = "PullRequest",
+            subjectUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
+        )
+        val api = NotificationPersistenceGitHubApi(notifications = listOf(notification))
+        val store = RecordingNotificationIgnoreStore(
+            saveFailure = IllegalStateException("persist failed"),
+        )
+        val viewModel = createViewModel(api, store)
+
+        withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-1" } }
+        }
+
+        viewModel.markNotificationDone(testNotificationUiState("thread-1"))
+
+        assertEquals(listOf("thread-1"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(
+            "persist failed",
+            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message },
+        )
+        withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-1" } }
+        }
+        assertTrue(store.savedThreads.value.isEmpty(), "Failed persistence should not leave a saved local thread")
+    }
+
+    @Test
     fun unsubscribePersistsThreadAndMarksNotificationDone() = runBlocking {
         val api = NotificationPersistenceGitHubApi()
-        val store = RecordingNotificationSubscriptionStore()
+        val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
         val notification = testNotificationUiState("thread-1")
 
@@ -183,7 +471,17 @@ class EngHubNotificationPersistenceViewModelTest {
 
         assertEquals(listOf("thread-1"), api.unsubscribedThreadIds.awaitValue())
         assertEquals(listOf("thread-1"), api.markedDoneThreadIds.awaitValue())
-        assertEquals(listOf("thread-1"), store.savedThreads.awaitValue().map { it.threadId })
+        assertEquals(
+            listOf(
+                SavedThread(
+                    threadId = "thread-1",
+                    repositoryFullName = "test-org/test-repo",
+                    subjectType = "PullRequest",
+                    reason = NotificationIgnoreReason.UNSUBSCRIBED,
+                ),
+            ),
+            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+        )
     }
 
     @Test
@@ -191,7 +489,7 @@ class EngHubNotificationPersistenceViewModelTest {
         val api = NotificationPersistenceGitHubApi(
             unsubscribeFailure = IllegalStateException("boom"),
         )
-        val store = RecordingNotificationSubscriptionStore()
+        val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
 
         viewModel.unsubscribeFromNotification(testNotificationUiState("thread-1"))
@@ -211,7 +509,7 @@ class EngHubNotificationPersistenceViewModelTest {
             subjectUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
         )
         val api = NotificationPersistenceGitHubApi(notifications = listOf(notification))
-        val store = RecordingNotificationSubscriptionStore(
+        val store = RecordingNotificationIgnoreStore(
             saveFailure = IllegalStateException("persist failed"),
         )
         val viewModel = createViewModel(api, store)
@@ -242,7 +540,7 @@ class EngHubNotificationPersistenceViewModelTest {
 
 private fun createViewModel(
     api: NotificationPersistenceGitHubApi,
-    store: RecordingNotificationSubscriptionStore,
+    store: RecordingNotificationIgnoreStore,
 ): EngHubViewModel {
     val gitWorktreeApi = NoOpGitWorktreeApi()
     return EngHubViewModel(
@@ -259,7 +557,7 @@ private fun createViewModel(
             gitHubAuthor = "test-user",
             pollIntervalMs = 60_000,
         ),
-        notificationSubscriptionStore = store,
+        notificationIgnoreStore = store,
     )
 }
 
@@ -302,23 +600,27 @@ private data class SavedThread(
     val threadId: String,
     val repositoryFullName: String,
     val subjectType: String,
-    val unsubscribedAtEpochMs: Long,
-)
+    val reason: NotificationIgnoreReason,
+    val ignoredAtEpochMs: Long? = null,
+) {
+    fun withoutTimestamp(): SavedThread = copy(ignoredAtEpochMs = null)
+}
 
-private class RecordingNotificationSubscriptionStore(
+private class RecordingNotificationIgnoreStore(
     initialThreadIds: Set<String> = emptySet(),
     private val saveFailure: Exception? = null,
-) : NotificationSubscriptionStore {
+) : NotificationIgnoreStore {
     private var storedThreadIds = initialThreadIds.toMutableSet()
     val savedThreads = MutableStateFlow<List<SavedThread>>(emptyList())
 
-    override fun listUnsubscribedThreadIds(): Set<String> = storedThreadIds.toSet()
+    override fun listIgnoredThreadIds(): Set<String> = storedThreadIds.toSet()
 
-    override fun saveUnsubscribedThread(
+    override fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,
         subjectType: String,
-        unsubscribedAtEpochMs: Long,
+        reason: NotificationIgnoreReason,
+        ignoredAtEpochMs: Long,
     ) {
         saveFailure?.let { throw it }
         storedThreadIds += threadId
@@ -326,18 +628,28 @@ private class RecordingNotificationSubscriptionStore(
             threadId = threadId,
             repositoryFullName = repositoryFullName,
             subjectType = subjectType,
-            unsubscribedAtEpochMs = unsubscribedAtEpochMs,
+            reason = reason,
+            ignoredAtEpochMs = ignoredAtEpochMs,
         )
     }
 }
+
+private data class SubmittedReview(
+    val prApiUrl: String,
+    val event: ReviewStateValue,
+    val reviewComment: String?,
+)
 
 private class NotificationPersistenceGitHubApi(
     private val notifications: List<Notification> = emptyList(),
     private val pullRequestsByUrl: Map<String, PullRequest> = emptyMap(),
     private val pullRequestFailureUrls: Set<String> = emptySet(),
     private val unsubscribeFailure: Exception? = null,
+    private val markDoneFailure: Exception? = null,
 ) : GitHubApi {
     val pullRequestByUrlCalls = mutableListOf<String>()
+    val approvedPullRequestUrls = MutableStateFlow<List<String>>(emptyList())
+    val submittedReviews = MutableStateFlow<List<SubmittedReview>>(emptyList())
     val unsubscribedThreadIds = MutableStateFlow<List<String>>(emptyList())
     val markedDoneThreadIds = MutableStateFlow<List<String>>(emptyList())
 
@@ -386,11 +698,12 @@ private class NotificationPersistenceGitHubApi(
     }
 
     override suspend fun approvePullRequestByUrl(url: String, body: String?) {
-        error("Unexpected call")
+        approvedPullRequestUrls.value += url
     }
 
     override suspend fun markNotificationAsDone(threadId: String) {
         markedDoneThreadIds.value += threadId
+        markDoneFailure?.let { throw it }
     }
 
     override suspend fun unsubscribeFromNotification(threadId: String) {
@@ -416,7 +729,7 @@ private class NotificationPersistenceGitHubApi(
     }
 
     override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) {
-        error("Unexpected call")
+        submittedReviews.value += SubmittedReview(prApiUrl, event, reviewComment)
     }
 }
 

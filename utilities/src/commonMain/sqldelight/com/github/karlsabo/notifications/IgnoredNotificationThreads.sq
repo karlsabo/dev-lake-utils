@@ -1,0 +1,26 @@
+CREATE TABLE ignored_notification_threads (
+  thread_id TEXT NOT NULL PRIMARY KEY,
+  repository_full_name TEXT NOT NULL,
+  subject_type TEXT NOT NULL,
+  ignore_reason TEXT NOT NULL,
+  ignored_at_epoch_ms INTEGER NOT NULL
+);
+
+selectAllThreadIds:
+SELECT thread_id
+FROM ignored_notification_threads;
+
+selectIgnoreReason:
+SELECT ignore_reason
+FROM ignored_notification_threads
+WHERE thread_id = ?;
+
+upsertThread:
+INSERT OR REPLACE INTO ignored_notification_threads(
+  thread_id,
+  repository_full_name,
+  subject_type,
+  ignore_reason,
+  ignored_at_epoch_ms
+)
+VALUES (?, ?, ?, ?, ?);

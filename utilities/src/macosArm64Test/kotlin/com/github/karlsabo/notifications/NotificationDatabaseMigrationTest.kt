@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
 class NotificationDatabaseMigrationTest {
 
     @Test
-    fun upgradesVersion1DatabaseAndPreservesUnsubscribedThreadIds() {
+    fun upgradesVersion1DatabaseAndPreservesUnsubscribedRowsAsIgnoredRows() {
         val testDir = createNotificationStoreTestDir()
         val databasePath = Path(testDir, "eng-hub-notifications.db")
 
@@ -22,19 +22,53 @@ class NotificationDatabaseMigrationTest {
             createSchemaVersion1Fixture(databasePath)
             assertEquals(1L, readUserVersion(databasePath))
 
-            val store = SqlDelightNotificationSubscriptionStore(databasePath = databasePath.toString())
+            val store = SqlDelightNotificationIgnoreStore(databasePath = databasePath.toString())
 
-            assertEquals(setOf("123456789"), store.listUnsubscribedThreadIds())
-            assertEquals(NotificationDatabase.Schema.version.toLong(), readUserVersion(databasePath))
+            assertEquals(setOf("123456789"), store.listIgnoredThreadIds())
+            assertEquals(NotificationDatabase.Schema.version, readUserVersion(databasePath))
             assertEquals(
                 listOf(
                     "thread_id",
                     "repository_full_name",
                     "subject_type",
-                    "unsubscribed_at_epoch_ms",
+                    "ignore_reason",
                     "ignored_at_epoch_ms",
                 ),
-                readColumnNames(databasePath),
+                readIgnoredColumnNames(databasePath),
+            )
+            assertEquals(
+                listOf(IgnoredThreadRow("123456789", "example-org/example-repo", "PullRequest", "UNSUBSCRIBED", 1L)),
+                readIgnoredRows(databasePath),
+            )
+        } finally {
+            deleteRecursively(testDir)
+        }
+    }
+
+    @Test
+    fun upgradesVersion2DatabaseAndPreservesIgnoredTimestampWhenPresent() {
+        val testDir = createNotificationStoreTestDir()
+        val databasePath = Path(testDir, "eng-hub-notifications.db")
+
+        try {
+            createSchemaVersion2Fixture(databasePath)
+            assertEquals(2L, readUserVersion(databasePath))
+
+            val store = SqlDelightNotificationIgnoreStore(databasePath = databasePath.toString())
+
+            assertEquals(setOf("thread-with-ignore-timestamp"), store.listIgnoredThreadIds())
+            assertEquals(NotificationDatabase.Schema.version, readUserVersion(databasePath))
+            assertEquals(
+                listOf(
+                    IgnoredThreadRow(
+                        "thread-with-ignore-timestamp",
+                        "example-org/example-repo",
+                        "PullRequest",
+                        "UNSUBSCRIBED",
+                        2L,
+                    ),
+                ),
+                readIgnoredRows(databasePath),
             )
         } finally {
             deleteRecursively(testDir)
@@ -68,15 +102,44 @@ class NotificationDatabaseMigrationTest {
         }
     }
 
+    private fun createSchemaVersion2Fixture(databasePath: Path) {
+        withDatabaseConnection(databasePath) { connection ->
+            connection.rawExecSql(
+                """
+                CREATE TABLE unsubscribed_notification_threads (
+                  thread_id TEXT NOT NULL PRIMARY KEY,
+                  repository_full_name TEXT NOT NULL,
+                  subject_type TEXT NOT NULL,
+                  unsubscribed_at_epoch_ms INTEGER NOT NULL,
+                  ignored_at_epoch_ms INTEGER
+                )
+                """.trimIndent(),
+            )
+            connection.rawExecSql(
+                """
+                INSERT INTO unsubscribed_notification_threads(
+                  thread_id,
+                  repository_full_name,
+                  subject_type,
+                  unsubscribed_at_epoch_ms,
+                  ignored_at_epoch_ms
+                )
+                VALUES ('thread-with-ignore-timestamp', 'example-org/example-repo', 'PullRequest', 1, 2)
+                """.trimIndent(),
+            )
+            connection.setVersion(2)
+        }
+    }
+
     private fun readUserVersion(databasePath: Path): Long {
         return withDatabaseConnection(databasePath) { connection ->
             connection.getVersion().toLong()
         }
     }
 
-    private fun readColumnNames(databasePath: Path): List<String> {
+    private fun readIgnoredColumnNames(databasePath: Path): List<String> {
         return withDatabaseConnection(databasePath) { connection ->
-            connection.withStatement("PRAGMA table_info(unsubscribed_notification_threads)") {
+            connection.withStatement("PRAGMA table_info(ignored_notification_threads)") {
                 val cursor = query()
                 val columnNames = mutableListOf<String>()
                 try {
@@ -84,6 +147,35 @@ class NotificationDatabaseMigrationTest {
                         columnNames += cursor.getString(1)
                     }
                     columnNames
+                } finally {
+                    resetStatement()
+                }
+            }
+        }
+    }
+
+    private fun readIgnoredRows(databasePath: Path): List<IgnoredThreadRow> {
+        return withDatabaseConnection(databasePath) { connection ->
+            connection.withStatement(
+                """
+                SELECT thread_id, repository_full_name, subject_type, ignore_reason, ignored_at_epoch_ms
+                FROM ignored_notification_threads
+                ORDER BY thread_id
+                """.trimIndent(),
+            ) {
+                val cursor = query()
+                val rows = mutableListOf<IgnoredThreadRow>()
+                try {
+                    while (cursor.next()) {
+                        rows += IgnoredThreadRow(
+                            threadId = cursor.getString(0),
+                            repositoryFullName = cursor.getString(1),
+                            subjectType = cursor.getString(2),
+                            ignoreReason = cursor.getString(3),
+                            ignoredAtEpochMs = cursor.getLong(4),
+                        )
+                    }
+                    rows
                 } finally {
                     resetStatement()
                 }
@@ -108,3 +200,11 @@ private fun <T> withDatabaseConnection(databasePath: Path, block: (co.touchlab.s
 
     return databaseManager.withConnection(block)
 }
+
+private data class IgnoredThreadRow(
+    val threadId: String,
+    val repositoryFullName: String,
+    val subjectType: String,
+    val ignoreReason: String,
+    val ignoredAtEpochMs: Long,
+)
