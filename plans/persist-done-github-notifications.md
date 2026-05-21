@@ -220,7 +220,9 @@ Given Eng Hub automatically marks notification `thread-7` done in GitHub but the
 - The ViewModel already sees both the original `Notification` and the `NotificationProcessingResult`; it should be able to persist without injecting storage into `GitHubNotificationService`.
 - If local ignore persistence fails during polling, log and retry on a later poll; do not show an action error.
 
-### 7. Persist automatic appfile approval as ignored
+### 7. Persist automatic appfile approval as ignored - Done
+
+**Done:** 2026 05 21
 
 **Acceptance criteria:** Given GitHub returns pull request notification thread `thread-5` for an open PR titled `Updating appfile demo service`, when Eng Hub auto-approves the PR and marks `thread-5` done automatically, then Eng Hub records `thread-5` locally as ignored with reason `DONE` and after restarting Eng Hub while GitHub still returns `thread-5`, the notification list does not show `thread-5`.
 
