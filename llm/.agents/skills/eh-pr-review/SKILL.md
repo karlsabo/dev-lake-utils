@@ -7,9 +7,9 @@ allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Exp
 
 # eh-pr-review Skill
 
-You are conducting a thorough, structured code review of a GitHub pull request. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
+You are conducting a review of a git merge request. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
 
-Keep comments, terse, and concise. Replace ‘you’ with ‘we’ What about renaming this variable to something more descriptive, like seconds_remaining? Respect the scope of the review Did you consider...
+Keep comments, terse, and concise. Replace ‘you’ with ‘we’ What about renaming this variable to something more descriptive, like seconds_remaining? Did you consider...? Respect the scope of the review
 
 ## Workflow
 
@@ -25,7 +25,7 @@ Store the PR number as `{number}` for all later steps.
 
 ### Step 2: Gather metadata
 
-Run these commands **in parallel** to collect PR context:
+Run these commands to collect PR context:
 
 ```bash
 # Owner/repo
@@ -60,7 +60,7 @@ For every file in the changed file list that exists locally, read the **entire f
 - Naming inconsistencies with neighboring code
 - Import or dependency issues are not visible in the diff
 
-If a file is too large (>1000 lines), read the changed regions plus 100 lines of context above and below each hunk.
+If a file is too large (>1000 lines), read the changed regions plus 100 lines of context above and below each chunk.
 
 For files that don't exist locally (deleted files, or repo not checked out), rely on the diff.
 
@@ -78,7 +78,7 @@ Load `references/review-lenses.md` and systematically analyze the PR through eac
 
 ### Step 5: Create a planned comments document
 
-Write the planned GitHub comments to:
+Write the planned comments to:
 
 ```
 ${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md
@@ -86,29 +86,18 @@ ${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md
 
 Follow the format in `references/output-templates.md`. The planned comments document must include both of these sections:
 
-- `## Overall PR Comment`, the terse review body that will appear at the top of the GitHub review
-- `## Inline Comments`, the ordered list of inline comments with File, Line, and comment body
+Keep the section headings exactly as defined in the template so later steps can review the same artifact shape every time. If there are no inline comments, still include `## Inline Comments` and leave it empty.
 
-Keep the section headings exactly as defined in the template so later steps can review the same artifact shape every time. If there are no inline comments, still include `## Inline Comments` and leave it empty rather than changing the document contract.
+Each inline comment should be self-contained and actionable.
 
-Each inline comment should be self-contained and actionable. Use the priority from the analysis to order them.
+### Step 6: Run a subagent pass and wait for it to finish
 
-### Step 6: Run a skeptic subagent pass and wait for it to finish
+Spawn an agent pass using whatever the current harness actually supports. If a native subagent or Task tool exists, use it. If there is no native subagent tool, launch tmux session, start a new process, send it commands, treat that subprocess as the subagent.
 
-Compute the planned comments document path once and store it as `{planned_comments_path}`:
-
-```text
-${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md
-```
-
-Use that exact absolute path for the rest of this step. Do not continue if the file is missing; go back and fix Step 5 first.
-
-Spawn a second-agent skeptic pass using whatever the current harness actually supports. If a native subagent or Task tool exists, use it. If there is no native subagent tool, launch tmux session, start a new process, send it commands, treat that subprocess as the subagent.
-
-Set the subagent model to the same model you are; do not use a mini model. Then give it this prompt, substituting `{planned_comments_path}` with the absolute path you computed:
+Set the subagent model to the same model you are and give it this prompt:
 
 ```text
-Review the Pull Request comments document at {planned_comments_path} with an eye of skepticism and cynicism.
+Review the Pull Request comments document at ${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md with an eye of skepticism and cynicism.
 
 1. Remove or rewrite comments that are weak, speculative, redundant, not actionable, or not well-supported by the PR.
 2. Keep the tone constructive, but be skeptical about whether each comment should really be posted.
@@ -118,11 +107,11 @@ Review the Pull Request comments document at {planned_comments_path} with an eye
 In your final response, state whether you changed the file and briefly summarize the changes.
 ```
 
-Wait for the subagent or pi subprocess to finish before moving on. Do not continue to Step 7 until it has reported completion, even if it made no changes.
+Wait for the subagent or subprocess to finish before moving on. Do not continue to Step 7 until it has reported completion, even if it made no changes.
 
 ### Step 7: Read the revised document, inform user, and wait
 
-After the Step 6 subagent reports completion, read `{planned_comments_path}` from disk again before you say anything to the user. Use the post-subagent contents of that file as the source of truth for the rest of the workflow; do not rely on the pre-subagent version from memory.
+After the Step 6 subagent reports completion, read `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md` from disk again before you say anything to the user. Use the subagent contents of that file as the source of truth for the rest of the workflow; do not rely on the pre-subagent version from memory.
 
 Present a summary to the user:
 
@@ -150,10 +139,12 @@ Repeat until the user is satisfied.
 
 When the user says they're ready (e.g., "looks good," "post it," "create the review"), create the review using `gh api`.
 
-Refer to `references/github-review-api.md` for the exact API calls.
+1. Read `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md` from disk again before you proceed
+2. Refer to `references/github-review-api.md` for the exact API calls.
 
 **Critical rules:**
 
+- **ALWAYS** read `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md` from disk again before you post a comment
 - **ALWAYS** use `"event": "PENDING"`, this creates a draft review the user can inspect on GitHub before submitting
 - **NEVER** submit the review (no `APPROVE`, `REQUEST_CHANGES`, or `COMMENT` event) unless explicitly told to
 - Tell the user the review is pending, and they need to submit it from the GitHub UI

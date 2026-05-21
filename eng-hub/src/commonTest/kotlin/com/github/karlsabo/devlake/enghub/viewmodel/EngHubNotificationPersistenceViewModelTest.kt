@@ -174,22 +174,40 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
-    fun automaticallyMarkedDoneNotificationsArePersistedAndFilteredAfterRestart() = runBlocking {
-        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1"
+    fun automaticClosedPullRequestCleanupPersistsDoneThreadAndFiltersAfterRestart() = runBlocking {
+        assertAutomaticPullRequestCleanupPersistsDoneThreadAndFiltersAfterRestart(
+            PullRequest(
+                number = 24,
+                url = "https://api.github.com/repos/test-org/test-repo/pulls/24",
+                state = "closed",
+            ),
+        )
+    }
+
+    @Test
+    fun automaticMergedPullRequestCleanupPersistsDoneThreadAndFiltersAfterRestart() = runBlocking {
+        assertAutomaticPullRequestCleanupPersistsDoneThreadAndFiltersAfterRestart(
+            PullRequest(
+                number = 24,
+                url = "https://api.github.com/repos/test-org/test-repo/pulls/24",
+                state = "closed",
+                mergedAt = Instant.parse("2026-05-20T00:00:00Z"),
+            ),
+        )
+    }
+
+    private suspend fun assertAutomaticPullRequestCleanupPersistsDoneThreadAndFiltersAfterRestart(
+        pullRequest: PullRequest,
+    ) {
+        val pullRequestUrl = requireNotNull(pullRequest.url)
         val notification = testNotification(
-            id = "thread-auto-done",
+            id = "thread-4",
             subjectType = "PullRequest",
             subjectUrl = pullRequestUrl,
         )
         val api = NotificationPersistenceGitHubApi(
             notifications = listOf(notification),
-            pullRequestsByUrl = mapOf(
-                pullRequestUrl to PullRequest(
-                    number = 1,
-                    url = pullRequestUrl,
-                    state = "closed",
-                ),
-            ),
+            pullRequestsByUrl = mapOf(pullRequestUrl to pullRequest),
         )
         val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
@@ -199,11 +217,11 @@ class EngHubNotificationPersistenceViewModelTest {
         }
 
         assertTrue(notifications.isEmpty())
-        assertEquals(listOf("thread-auto-done"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(listOf("thread-4"), api.markedDoneThreadIds.awaitValue())
         assertEquals(
             listOf(
                 SavedThread(
-                    threadId = "thread-auto-done",
+                    threadId = "thread-4",
                     repositoryFullName = "test-org/test-repo",
                     subjectType = "PullRequest",
                     reason = NotificationIgnoreReason.DONE,
@@ -217,7 +235,7 @@ class EngHubNotificationPersistenceViewModelTest {
             restartedViewModel.notifications.filterNotNull().first().getOrThrow()
         }
         assertTrue(restartedNotifications.isEmpty())
-        assertEquals(listOf("thread-auto-done"), api.markedDoneThreadIds.value)
+        assertEquals(listOf("thread-4"), api.markedDoneThreadIds.value)
     }
 
     @Test

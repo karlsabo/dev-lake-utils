@@ -34,6 +34,7 @@ import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.NotificationAction
 import com.github.karlsabo.github.NotificationProcessingResult
+import com.github.karlsabo.github.PullRequestStatus
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.extractOwnerAndRepo
@@ -281,10 +282,10 @@ class EngHubViewModel(
                                 val processed = withContext(Dispatchers.IO) {
                                     gitHubNotificationService.processNotification(notif)
                                 } as? NotificationProcessingResult.Processed
-                                val markedDone =
-                                    processed?.actions?.any { it is NotificationAction.MarkedAsDone } ?: false
-                                if (markedDone) {
-                                    persistAutomaticallyDoneThreadOrLog(notif)
+                                if (processed?.wasMarkedAsDone() == true) {
+                                    if (processed.wasMarkedDoneForClosedOrMergedPullRequest()) {
+                                        persistAutomaticallyDoneThreadOrLog(notif)
+                                    }
                                 } else {
                                     emit(notif)
                                 }
@@ -796,6 +797,15 @@ class EngHubViewModel(
 }
 
 private fun String.normalizedRepoPath(): String = trim().trimEnd('/', '\\')
+
+private fun NotificationProcessingResult.Processed.wasMarkedDoneForClosedOrMergedPullRequest(): Boolean =
+    wasMarkedAsDone() && pullRequestStatus.isClosedOrMerged()
+
+private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean =
+    actions.any { it is NotificationAction.MarkedAsDone }
+
+private fun PullRequestStatus?.isClosedOrMerged(): Boolean =
+    this == PullRequestStatus.CLOSED || this == PullRequestStatus.MERGED
 
 private fun checkoutRepoPath(repoFullName: String, config: EngHubConfig): String {
     val repoName = repoFullName.substringAfterLast('/')

@@ -1,12 +1,10 @@
 # Review Lenses
 
-Each lens represents a dimension of analysis. Apply them in priority order. Not every lens will produce findings for every PR — that's expected and correct.
+Each lens represents a dimension of analysis. Not every lens will produce findings for every PR — that's expected and correct.
 
 ---
 
 ## Bugs & Correctness
-
-The highest priority. A bug in production outweighs any number of style nits.
 
 **What to look for:**
 
@@ -21,7 +19,7 @@ The highest priority. A bug in production outweighs any number of style nits.
 
 **Pragmatic Programmer:** "Dead Programs Tell No Lies" — fail loudly and early rather than propagating corrupt state.
 
-**Signal phrases for comments:** "Bug:", "This will fail when...", "This silently..."
+**Signal phrases for comments:** "Did you consider this will fail when...", "When this executes, it might silently..."
 
 ---
 

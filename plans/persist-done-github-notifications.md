@@ -198,7 +198,9 @@ Given Eng Hub automatically marks notification `thread-7` done in GitHub but the
 
 - This should reuse the same internal helper introduced for explicit Done / Approve rather than duplicating persistence ordering.
 
-### 6. Persist automatic merged/closed PR cleanup as ignored
+### 6. Persist automatic merged/closed PR cleanup as ignored - Done
+
+**Done:** 2026 05 20
 
 **Acceptance criteria:** Given GitHub returns pull request notification thread `thread-4` for PR `#24` that is already merged or closed, when Eng Hub polls notifications and marks `thread-4` done automatically, then Eng Hub records `thread-4` locally as ignored with reason `DONE` and after restarting Eng Hub while GitHub still returns `thread-4`, the notification list does not show `thread-4`.
 
