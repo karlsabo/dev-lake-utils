@@ -283,7 +283,7 @@ class EngHubViewModel(
                                     gitHubNotificationService.processNotification(notif)
                                 } as? NotificationProcessingResult.Processed
                                 if (processed?.wasMarkedAsDone() == true) {
-                                    if (processed.wasMarkedDoneForClosedOrMergedPullRequest()) {
+                                    if (processed.shouldPersistAutomaticallyDoneThread()) {
                                         persistAutomaticallyDoneThreadOrLog(notif)
                                     }
                                 } else {
@@ -798,8 +798,16 @@ class EngHubViewModel(
 
 private fun String.normalizedRepoPath(): String = trim().trimEnd('/', '\\')
 
+private fun NotificationProcessingResult.Processed.shouldPersistAutomaticallyDoneThread(): Boolean =
+    wasMarkedDoneForClosedOrMergedPullRequest() || wasMarkedDoneByAutoApprovalWorkflow()
+
 private fun NotificationProcessingResult.Processed.wasMarkedDoneForClosedOrMergedPullRequest(): Boolean =
     wasMarkedAsDone() && pullRequestStatus.isClosedOrMerged()
+
+private fun NotificationProcessingResult.Processed.wasMarkedDoneByAutoApprovalWorkflow(): Boolean =
+    wasMarkedAsDone() && actions.any {
+        it is NotificationAction.ApprovedPullRequest || it is NotificationAction.SkippedApproval
+    }
 
 private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean =
     actions.any { it is NotificationAction.MarkedAsDone }

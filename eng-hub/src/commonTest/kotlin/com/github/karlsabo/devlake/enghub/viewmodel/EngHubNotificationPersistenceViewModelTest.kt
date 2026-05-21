@@ -239,6 +239,79 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
+    fun automaticAppfileApprovalPersistsDoneThreadAndFiltersAfterRestart() = runBlocking {
+        assertAutomaticAppfileCleanupPersistsDoneThreadAndFiltersAfterRestart(
+            threadId = "thread-5",
+            pullRequestNumber = 25,
+            alreadyApproved = false,
+        )
+    }
+
+    @Test
+    fun alreadyApprovedAutomaticAppfilePersistsDoneThreadAndFiltersAfterRestart() = runBlocking {
+        assertAutomaticAppfileCleanupPersistsDoneThreadAndFiltersAfterRestart(
+            threadId = "thread-6",
+            pullRequestNumber = 26,
+            alreadyApproved = true,
+        )
+    }
+
+    private suspend fun assertAutomaticAppfileCleanupPersistsDoneThreadAndFiltersAfterRestart(
+        threadId: String,
+        pullRequestNumber: Int,
+        alreadyApproved: Boolean,
+    ) {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/$pullRequestNumber"
+        val notification = testNotification(
+            id = threadId,
+            title = "Updating appfile demo service",
+            subjectType = "PullRequest",
+            subjectUrl = pullRequestUrl,
+        )
+        val expectedApprovedPullRequestUrls = if (alreadyApproved) emptyList() else listOf(pullRequestUrl)
+        val api = NotificationPersistenceGitHubApi(
+            notifications = listOf(notification),
+            pullRequestsByUrl = mapOf(
+                pullRequestUrl to PullRequest(
+                    number = pullRequestNumber,
+                    url = pullRequestUrl,
+                    state = "open",
+                ),
+            ),
+            approvedReviewUrls = if (alreadyApproved) setOf(pullRequestUrl) else emptySet(),
+        )
+        val store = RecordingNotificationIgnoreStore()
+        val viewModel = createViewModel(api, store)
+
+        val notifications = withTimeout(2_000.milliseconds) {
+            viewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+
+        assertTrue(notifications.isEmpty())
+        assertEquals(listOf(threadId), api.markedDoneThreadIds.awaitValue())
+        assertEquals(expectedApprovedPullRequestUrls, api.approvedPullRequestUrls.value)
+        assertEquals(
+            listOf(
+                SavedThread(
+                    threadId = threadId,
+                    repositoryFullName = "test-org/test-repo",
+                    subjectType = "PullRequest",
+                    reason = NotificationIgnoreReason.DONE,
+                ),
+            ),
+            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+        )
+
+        val restartedViewModel = createViewModel(api, store)
+        val restartedNotifications = withTimeout(2_000.milliseconds) {
+            restartedViewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+        assertTrue(restartedNotifications.isEmpty())
+        assertEquals(expectedApprovedPullRequestUrls, api.approvedPullRequestUrls.value)
+        assertEquals(listOf(threadId), api.markedDoneThreadIds.value)
+    }
+
+    @Test
     fun automaticDonePersistenceFailureIsLogOnly() = runBlocking {
         val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1"
         val notification = testNotification(
@@ -716,6 +789,7 @@ private class NotificationPersistenceGitHubApi(
     private val notifications: List<Notification> = emptyList(),
     private val pullRequestsByUrl: Map<String, PullRequest> = emptyMap(),
     private val pullRequestFailureUrls: Set<String> = emptySet(),
+    private val approvedReviewUrls: Set<String> = emptySet(),
     private val unsubscribeFailure: Exception? = null,
     private val markDoneFailure: Exception? = null,
 ) : GitHubApi {
@@ -783,9 +857,7 @@ private class NotificationPersistenceGitHubApi(
         unsubscribeFailure?.let { throw it }
     }
 
-    override suspend fun hasAnyApprovedReview(url: String): Boolean {
-        error("Unexpected call")
-    }
+    override suspend fun hasAnyApprovedReview(url: String): Boolean = url in approvedReviewUrls
 
     override suspend fun getOpenPullRequestsByAuthor(
         organizationIds: List<String>,
@@ -809,6 +881,7 @@ private fun testNotification(
     id: String,
     subjectType: String,
     subjectUrl: String?,
+    title: String = "Notification $id",
 ): Notification {
     val now = Clock.System.now()
     return Notification(
@@ -818,7 +891,7 @@ private fun testNotification(
         updatedAt = now,
         lastReadAt = null,
         subject = NotificationSubject(
-            title = "Notification $id",
+            title = title,
             url = subjectUrl,
             latestCommentUrl = null,
             type = subjectType,
