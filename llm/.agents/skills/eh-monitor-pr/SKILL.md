@@ -5,8 +5,6 @@ user-invocable: true
 allowed-tools: all
 ---
 
-# eh-monitor-pr
-
 Default: one active pass. If asked for `status`/read-only, run **Gather + report** and stop. If asked to `watch`, loop every 5 minutes for up to 120 minutes unless overridden.
 
 ## Rules
@@ -37,7 +35,6 @@ PR: <url> — <title> (<state>, draft=<bool>, review=<decision>)
 Branches: <head> -> <base>; default=<default>; behind=<yes/no/unknown> (<evidence>)
 Checks: failing=<names>; pending=<names>; passing=<count>
 Review work: unresolved_threads=<n>; actionable=<urls or none>; ignored=<urls/reasons or none>
-Mutation: none yet
 ```
 
 ## Action order
@@ -69,18 +66,14 @@ If strategy evidence conflicts, merge/rebase conflicts, or validation fails: do 
 
 ### 2. Handle failed Buildkite CI
 
-If `statusCheckRollup` has a failed Buildkite check (`buildkite.com` URL or Buildkite name), read and follow `eh-track-cicd-failure skill`. Let it update `${PLANNING_MARKDOWN_DIR}/cicd-failed.md`; then read that PR entry before deciding.
+If `statusCheckRollup` has a failed Buildkite check (`buildkite.com` URL or Buildkite name), read/follow `eh-track-cicd-failure skill`. Let it update `${PLANNING_MARKDOWN_DIR}/cicd-failed.md`; read the PR entry before deciding.
 
-- Blocked classification: stop without edits/commit/push and report:
-  ```text
-  CI blocked: <classification>
-  Evidence: <job/error text>; PR files: <paths>; reason: <why not PR-caused>
-  Mutation: none
-  ```
-- Deterministic generated metadata drift: run the known generator only if logs/config identify the command and expected outputs. Validate narrowly. Continue only if `git diff --name-only` and `git status --short` are limited to expected generated/related files. Commit `Regenerate metadata`, push, and report command, files, validation, SHA.
-- `PR-caused`: read `eh-implement skill`; fix one failure only. Before editing, state evidence, PR files, and intended fix. Make the smallest change, validate, confirm `git diff --name-only` and `git status --short`, commit `Fix CI failure in <area>`, push, and report evidence, files, validation, SHA.
+Only mutate for:
 
-If generator command is unclear, output is unexpected/non-deterministic, validation fails, or evidence is not decisive, stop.
+- Deterministic generated metadata drift: logs/config identify the generator and expected outputs. Run it, validate narrowly, verify `git diff --name-only` and `git status --short` are limited to expected files, commit `Regenerate metadata`, push, and report command, files, validation, SHA.
+- `PR-caused`: entry records decisive PR-diff evidence. Read `eh-implement skill`; state evidence, PR files, and intended fix; fix one failure only; validate; verify diff/status; commit `Fix CI failure in <area>`; push; report evidence, files, validation, SHA.
+
+For blocked, flaky, infra, unrelated, uncertain, unclear/unsafe generator output, validation failure, or non-decisive evidence: stop without edits/commit/push and report classification, job/error text, PR files, and reason.
 
 ### 3. Handle review comments
 
@@ -109,4 +102,4 @@ For one coherent actionable request only:
 
 ## Watch mode
 
-Repeat Gather + actions in order. Per iteration print: head SHA, behind status, check status, comments handled/ignored, action, next sleep/exit reason. Sleep/refetch after pushes or pending checks. Exit clean only when branch is current, checks are not failed/pending, and no actionable comments remain. Exit blocked on any safety gate/blocker or timeout.
+Repeat Gather + actions in order. After pushes or pending checks, refetch/sleep. Per iteration print head SHA, behind/check status, comments handled/ignored, action, and next sleep/exit reason. Exit clean only when branch is current, checks are not failed/pending, and no actionable comments remain; stop on blocker or timeout.
