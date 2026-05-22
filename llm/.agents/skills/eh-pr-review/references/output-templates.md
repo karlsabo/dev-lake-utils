@@ -23,8 +23,9 @@ This is the lean deliverable — exactly what will be posted to GitHub. No analy
 
 ## Overall PR Comment
 
-> The review body text. This appears at the top of the GitHub review.
-> Keep it concise and terse.
+The review body text. This appears at the top of the GitHub review. Keep it concise, terse, and neutral. When there are inline comments, prefer a simple opener like:
+
+Couple of things to look at:
 
 ---
 
@@ -35,18 +36,17 @@ This is the lean deliverable — exactly what will be posted to GitHub. No analy
 **File:** `{full_file_path}`
 **Line:** {line_number} {optional: brief description of what's on that line}
 
-> {The exact comment body that will be posted to GitHub.
-> Supports GitHub-flavored markdown.
->
-> Use `>` blockquote formatting for the entire comment body
-> so it's visually distinct from the metadata.
->
-> Include code suggestions in fenced blocks:
-> ```python
-> suggested_code()
-> ```
+{The exact comment body that will be posted to GitHub. Supports GitHub-flavored markdown.
 
-> }
+The body should be copy/paste-ready for GitHub. Do not prefix lines with `>`.
+
+Include code suggestions only when the exact fix is obvious:
+
+```python
+suggested_code()
+```
+
+}
 
 ---
 
@@ -56,16 +56,16 @@ This is the lean deliverable — exactly what will be posted to GitHub. No analy
 
 ### Guidelines
 
-- The overall PR comment sets the tone, be constructive and concise
+- The overall PR comment should be neutral and short; avoid summarizing or judging the PR
 - Each inline comment must be **self-contained**. A reader on GitHub should understand it without seeing the review analysis document
-- Use the `>` blockquote for the comment body to visually separate it from the File/Line metadata
+- Comment bodies should be plain GitHub-flavored markdown with no leading `>` prefixes
 - The `{short label}` in the heading should indicate the category: "Bug:", "Nit:", "Question:", "Testing gap:", etc.
-- Keep comment bodies focused, if a comment needs more than ~10 lines, consider splitting it or linking to further context
+- Keep comment bodies focused; one short paragraph is usually enough
 
 ### Tone Guide
 
-- **(Bugs):** Direct but not alarming. "Potiential Bug: this will fail when..." not "CRITICAL BUG!!!"
-- **(Quality):** Suggestive. "Consider using..." or "This duplicates..."
-- **(Testing/Architecture):** Questioning. "Is there a reason..." or "Testing gap:..." or "Did you consider..."
+- **(Bugs):** Question-led and concrete. "Did you consider that when X happens, Y follows..." not "This must be fixed."
+- **(Quality):** Suggestive and light. "What about renaming..." or "This duplicates..."
+- **(Testing/Architecture):** Questioning. "Is there a reason..." or "Did you consider..."
 - **(Minor):** Explicitly low-priority. "Minor:" or "Nit:" prefix
-- **General:** Use "we" or impersonal voice ("this could be..." not "you should..."). Assume positive intent. Acknowledge when something is pre-existing rather than introduced by the PR.
+- **General:** Avoid "you should", "please fix", and hard requirements. Use "we" for shared ownership when natural. Use "I believe" for conclusions that are likely but depend on repo wiring or runtime behavior.

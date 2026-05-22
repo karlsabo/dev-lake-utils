@@ -9,7 +9,7 @@ allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Exp
 
 You are conducting a review of a git merge request. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
 
-Keep comments, terse, and concise. Replace ‘you’ with ‘we’ What about renaming this variable to something more descriptive, like seconds_remaining? Did you consider...? Respect the scope of the review
+Keep comments terse, concise, and scoped. Prefer a conversational review voice: "Did you consider that...", "I believe...", "What about...". Avoid commands and heavy phrasing ("must", "should", "please fix", "before exposing"). Use "we" for shared ownership when needed, but do not force it into natural question openers.
 
 ## Workflow
 
@@ -88,7 +88,7 @@ Follow the format in `references/output-templates.md`. The planned comments docu
 
 Keep the section headings exactly as defined in the template so later steps can review the same artifact shape every time. If there are no inline comments, still include `## Inline Comments` and leave it empty.
 
-Each inline comment should be self-contained and actionable.
+Each inline comment should be self-contained and useful. Prefer explaining the observed behavior and impact over prescribing the exact fix unless the fix is trivial.
 
 ### Step 6: Run a subagent pass and wait for it to finish
 
@@ -101,8 +101,9 @@ Review the Pull Request comments document at ${PLANNING_MARKDOWN_DIR}/pr-{number
 
 1. Remove or rewrite comments that are weak, speculative, redundant, not actionable, or not well-supported by the PR.
 2. Keep the tone constructive, but be skeptical about whether each comment should really be posted.
-3. Ensure the `Overall PR Comment` is terse, concise, and does not repeat what is already covered by inline comments.
-4. Preserve the existing document structure and section headings.
+3. Ensure the `Overall PR Comment` is terse, neutral, and does not repeat what is already covered by inline comments. Prefer a short opener like "Couple of things to look at:" when there are comments.
+4. Rewrite inline comments into the user's preferred style: question-led, non-commanding, no "please fix", no overstatement.
+5. Preserve the existing document structure and section headings.
 
 In your final response, state whether you changed the file and briefly summarize the changes.
 ```
@@ -168,6 +169,8 @@ When the user says they're ready (e.g., "looks good," "post it," "create the rev
 - Always read full files, not just diffs, context matters
 - Be constructive, not nitpicky, every comment should help the author
 - Prioritize bugs over style, a bug matters more than a naming nit
-- Include code suggestions where helpful, show, don't just tell
-- Reference principles by name (DRY, Orthogonality, etc.) but don't be preachy
+- Start inline comments with the concern, not the prescription
+- Prefer "Did you consider that..." for risks and "I believe..." when the conclusion depends on surrounding routing/config
+- Avoid asking for an exact implementation unless the fix is obvious and low-risk
+- Reference principles by name (DRY, Orthogonality, etc.) only when it materially clarifies the comment
 - If the PR is clean and well-written, say so, don't manufacture comments
