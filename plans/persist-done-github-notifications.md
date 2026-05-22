@@ -242,7 +242,9 @@ Given Eng Hub automatically marks notification `thread-7` done in GitHub but the
 - `GitHubNotificationService` currently reports actions including `ApprovedPullRequest` and `MarkedAsDone`; the ViewModel can use those actions to identify this path if the result remains sufficiently explicit.
 - If local ignore persistence fails during polling, log and retry on a later poll; do not show an action error.
 
-### 8. Log automatic local ignore-persistence failures without user-facing action errors
+### 8. Log automatic local ignore-persistence failures without user-facing action errors - Done
+
+**Done:** 2026 05 22
 
 **Acceptance criteria:** Given Eng Hub automatically marks notification `thread-7` done in GitHub but the local ignore-store write fails, when the poll completes, then Eng Hub logs the persistence failure and does not show a user-facing action error, so a later poll can retry processing if GitHub still returns `thread-7`.
 

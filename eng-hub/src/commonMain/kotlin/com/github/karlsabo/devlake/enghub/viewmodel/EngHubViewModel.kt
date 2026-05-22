@@ -679,7 +679,9 @@ class EngHubViewModel(
             persistIgnoredThread(notification, NotificationIgnoreReason.DONE)
             hiddenThreadIds.update { it + notification.id }
         } catch (e: Exception) {
-            logger.error(e) { "Failed to persist automatically done notification ${notification.id}" }
+            logger.error(e) {
+                "Failed to persist automatically done notification ${notification.id}; will retry if GitHub returns it again"
+            }
         }
     }
 

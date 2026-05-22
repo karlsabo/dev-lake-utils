@@ -312,10 +312,10 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
-    fun automaticDonePersistenceFailureIsLogOnly() = runBlocking {
-        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1"
+    fun automaticDonePersistenceFailureIsLogOnlyAndRetriesOnLaterPoll() = runBlocking {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/7"
         val notification = testNotification(
-            id = "thread-auto-done",
+            id = "thread-7",
             subjectType = "PullRequest",
             subjectUrl = pullRequestUrl,
         )
@@ -323,24 +323,34 @@ class EngHubNotificationPersistenceViewModelTest {
             notifications = listOf(notification),
             pullRequestsByUrl = mapOf(
                 pullRequestUrl to PullRequest(
-                    number = 1,
+                    number = 7,
                     url = pullRequestUrl,
                     state = "closed",
                 ),
             ),
         )
         val store = RecordingNotificationIgnoreStore(
-            saveFailure = IllegalStateException("persist failed"),
+            saveFailuresBeforeSuccess = listOf(IllegalStateException("persist failed")),
         )
-        val viewModel = createViewModel(api, store)
+        val viewModel = createViewModel(api, store, pollIntervalMs = 50)
 
         val notifications = withTimeout(2_000.milliseconds) {
             viewModel.notifications.filterNotNull().first().getOrThrow()
         }
 
         assertTrue(notifications.isEmpty())
-        assertEquals(listOf("thread-auto-done"), api.markedDoneThreadIds.awaitValue())
-        assertTrue(store.savedThreads.value.isEmpty(), "Failed automatic persistence should not save the thread")
+        assertEquals(listOf("thread-7", "thread-7"), api.markedDoneThreadIds.awaitSize(2))
+        assertEquals(
+            listOf(
+                SavedThread(
+                    threadId = "thread-7",
+                    repositoryFullName = "test-org/test-repo",
+                    subjectType = "PullRequest",
+                    reason = NotificationIgnoreReason.DONE,
+                ),
+            ),
+            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+        )
         assertEquals(null, viewModel.actionErrorStateFlow.value)
     }
 
@@ -686,6 +696,7 @@ class EngHubNotificationPersistenceViewModelTest {
 private fun createViewModel(
     api: NotificationPersistenceGitHubApi,
     store: RecordingNotificationIgnoreStore,
+    pollIntervalMs: Long = 60_000,
 ): EngHubViewModel {
     val gitWorktreeApi = NoOpGitWorktreeApi()
     return EngHubViewModel(
@@ -700,7 +711,7 @@ private fun createViewModel(
             organizationIds = listOf("test-org"),
             repositoriesBaseDir = "/tmp/repos",
             gitHubAuthor = "test-user",
-            pollIntervalMs = 60_000,
+            pollIntervalMs = pollIntervalMs,
         ),
         notificationIgnoreStore = store,
     )
@@ -708,6 +719,9 @@ private fun createViewModel(
 
 private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> =
     withTimeout(2_000.milliseconds) { first { it.isNotEmpty() } }
+
+private suspend fun <T> MutableStateFlow<List<T>>.awaitSize(size: Int): List<T> =
+    withTimeout(2_000.milliseconds) { first { it.size >= size } }
 
 private class NoOpGitWorktreeApi : GitWorktreeApi {
     override fun ensureRepository(repoPath: String, cloneUrl: String) = Unit
@@ -754,8 +768,10 @@ private data class SavedThread(
 private class RecordingNotificationIgnoreStore(
     initialThreadIds: Set<String> = emptySet(),
     private val saveFailure: Exception? = null,
+    saveFailuresBeforeSuccess: List<Exception> = emptyList(),
 ) : NotificationIgnoreStore {
     private var storedThreadIds = initialThreadIds.toMutableSet()
+    private val queuedSaveFailures = saveFailuresBeforeSuccess.toMutableList()
     val savedThreads = MutableStateFlow<List<SavedThread>>(emptyList())
 
     override fun listIgnoredThreadIds(): Set<String> = storedThreadIds.toSet()
@@ -768,6 +784,7 @@ private class RecordingNotificationIgnoreStore(
         ignoredAtEpochMs: Long,
     ) {
         saveFailure?.let { throw it }
+        if (queuedSaveFailures.isNotEmpty()) throw queuedSaveFailures.removeAt(0)
         storedThreadIds += threadId
         savedThreads.value += SavedThread(
             threadId = threadId,
