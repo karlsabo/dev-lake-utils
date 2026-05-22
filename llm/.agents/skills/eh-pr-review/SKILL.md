@@ -7,7 +7,7 @@ allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Exp
 
 # eh-pr-review Skill
 
-You are conducting a review of a git merge request. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
+You are conducting a review of a git merge request. Never give ad hoc review findings: always write the planned comments document, run the subagent pass, re-read the document, then summarize. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
 
 Keep comments terse, concise, and scoped. Prefer a conversational review voice: "Did you consider that...", "I believe...", "What about...". Avoid commands and heavy phrasing ("must", "should", "please fix", "before exposing"). Use "we" for shared ownership when needed, but do not force it into natural question openers.
 
@@ -19,6 +19,7 @@ Parse the argument to determine the PR number:
 
 - If a number is given (e.g., `12345`), use it directly
 - If a URL is given (e.g., `https://github.com/org/repo/pull/12345`), extract the number
+- If reviewing uncommitted/local changes, use `uncommitted` and gather context with `git diff`, `git diff --name-only`, and full changed-file reads
 - If no argument is given, auto-detect via `gh pr view --json number -q .number` on the current branch
 
 Store the PR number as `{number}` for all later steps.
