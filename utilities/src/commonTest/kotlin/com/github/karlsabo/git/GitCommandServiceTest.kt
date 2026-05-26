@@ -151,6 +151,12 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun isValidBranchRefFormat_usesGitCheckRefFormatBranchSemantics() {
+        assertTrue(service.isValidBranchRefFormat("feature/stacked-pr"))
+        assertFalse(service.isValidBranchRefFormat("feature//stacked-pr"))
+    }
+
+    @Test
     fun execute_escapeHatch_returnsOutput() {
         val repoDir = createTempDir("repo")
         try {

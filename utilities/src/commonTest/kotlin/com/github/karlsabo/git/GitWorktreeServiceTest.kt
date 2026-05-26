@@ -141,6 +141,48 @@ class GitWorktreeServiceTest {
     }
 
     @Test
+    fun ensureWorktree_invalidBranchWithWhitespaceFailsBeforeWorktreeCommands() {
+        val fake = FakeGitCommandApi()
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.ensureWorktree("/tmp/repo", "feature/new dashboard")
+        }
+
+        assertTrue(ex.message!!.contains("Invalid worktree branch name"))
+        assertEquals(
+            emptyList(),
+            fake.calls.filter { it.method == "worktreeList" || it.method == "fetch" || it.method == "worktreeAdd" },
+        )
+    }
+
+    @Test
+    fun ensureWorktree_invalidGitRefFormatFailsBeforeWorktreeCommands() {
+        val fake = FakeGitCommandApi()
+        fake.executeAction = { _, args ->
+            if (args.toList() == listOf("check-ref-format", "--branch", "feature//stacked-pr")) {
+                throw GitCommandException(
+                    command = listOf("git", "check-ref-format", "--branch", "feature//stacked-pr"),
+                    exitCode = 1,
+                    gitOutput = "fatal: 'feature//stacked-pr' is not a valid branch name",
+                )
+            }
+            ""
+        }
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.ensureWorktree("/tmp/repo", "feature//stacked-pr")
+        }
+
+        assertTrue(ex.message!!.contains("Invalid worktree branch name"))
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature//stacked-pr"))),
+            fake.calls,
+        )
+    }
+
+    @Test
     fun ensureWorktree_fetchFailure_isNonFatal() {
         val fake = FakeGitCommandApi()
         val repoPath = "/tmp/repo"

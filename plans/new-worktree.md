@@ -33,7 +33,9 @@ Relevant current code:
 - Worktree path sanitization: `utilities/src/commonMain/kotlin/com/github/karlsabo/git/WorktreePath.kt`
 - UI state: `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/state/LocalRepositoryUiState.kt`
 
-### 1. Validate branch names for worktree creation
+### 1. Validate branch names for worktree creation - Done
+
+**Done** 2026 05 26
 
 **Acceptance criteria:** Given a branch name with whitespace or control characters, when Eng Hub validates it for worktree creation, then validation fails before any git worktree command runs.
 

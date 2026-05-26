@@ -11,6 +11,9 @@ class GitWorktreeException(message: String, cause: Throwable? = null) : RuntimeE
 class GitWorktreeService(
     private val gitCommandApi: GitCommandApi = GitCommandService(),
     private val deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
+    private val branchNameValidator: WorktreeBranchNameValidator = WorktreeBranchNameValidator { branch ->
+        gitCommandApi.isValidBranchRefFormat(branch)
+    },
 ) : GitWorktreeApi {
 
     override fun ensureRepository(repoPath: String, cloneUrl: String) {
@@ -31,6 +34,7 @@ class GitWorktreeService(
     }
 
     override fun ensureWorktree(repoPath: String, branch: String): String {
+        validateWorktreeBranchName(branch)
         val worktreePath = buildWorktreePath(repoPath, branch)
 
         val existing = listWorktrees(repoPath)
@@ -164,6 +168,13 @@ class GitWorktreeService(
             }
 
             return worktrees
+        }
+    }
+
+    private fun validateWorktreeBranchName(branch: String) {
+        val validation = branchNameValidator.validate(branch)
+        if (!validation.isValid) {
+            throw GitWorktreeException("Invalid worktree branch name: ${validation.message}")
         }
     }
 
