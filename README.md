@@ -11,13 +11,6 @@
 
 # TODO
 
-* [ ] Need a PR monitoring skill:
-    1. Log the failure with llm/.agents/skills/eh-track-cicd-failure/SKILL.md
-    2. Fix code, commit, push if and only if we are 100% for sure caused by changes we made for this PR
-    3. Fetch, pull, merge, or rebase off our root branch if we're behind
-* [ ] Update PR review skill to make it clear these are AI
-    * Make the comments more question-oriented; 'did you consider...', 'what is the reason...'
-    * Prefix comments to make it clear they are from an LLM. `LLM: ${THE_COMMENT}`
 * [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on
@@ -41,6 +34,7 @@
     * If there's a notification to review
     * If a PR build has failed, or there's a new comment, etc.
     * If a worktree agent has finished or needs attention
+  * For workspace creation, if a background fetch fails and Eng Hub falls back to local refs
 * [ ] Fix all test names, either camelCase or back tick names `hello moto`
 * [ ] Optimize GitHub API requests: When refreshing notifications, only pull extra information if needed. Same with PRs.
 * [ ] If I mark a notification as done, add it to our marked done database table, they keep coming back from GitHub
