@@ -25,6 +25,7 @@ private class FakeGitCommandApi : GitCommandApi {
     var isGitRepositoryResult: Boolean = true
     var fetchAction: (String, String, Array<out String>) -> Unit = { _, _, _ -> }
     var worktreeAddAction: (String, String, String) -> Unit = { _, _, _ -> }
+    var worktreeAddNewBranchAction: (String, String, String, String) -> Unit = { _, _, _, _ -> }
     var worktreeListResult: String = ""
     var worktreeListAction: (String) -> String = { worktreeListResult }
     var worktreeRemoveAction: (String, String) -> Unit = { _, _ -> }
@@ -50,6 +51,16 @@ private class FakeGitCommandApi : GitCommandApi {
     override fun worktreeAdd(repoPath: String, path: String, commitIsh: String) {
         calls.add(Call("worktreeAdd", listOf(repoPath, path, commitIsh)))
         worktreeAddAction(repoPath, path, commitIsh)
+    }
+
+    override fun worktreeAddNewBranch(
+        repoPath: String,
+        newBranch: String,
+        path: String,
+        baseBranch: String,
+    ) {
+        calls.add(Call("worktreeAddNewBranch", listOf(repoPath, newBranch, path, baseBranch)))
+        worktreeAddNewBranchAction(repoPath, newBranch, path, baseBranch)
     }
 
     override fun worktreeList(repoPath: String): String {
@@ -226,6 +237,81 @@ class GitWorktreeServiceTest {
             service.ensureWorktree(repoPath, branch)
         }
         assertTrue(ex.message!!.contains("Failed to create worktree"))
+        assertTrue(ex.cause is GitCommandException)
+    }
+
+    @Test
+    fun createBranchWorktree_fromBranchBase_createsDerivedPathFromExplicitBase() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        val baseWorktreePath = "/repos/dev-lake-utils-feature-base-pr"
+        val baseBranch = "feature/base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val expectedWorktreePath = GitWorktreeService.buildWorktreePath(repoPath, targetBranch)
+        val service = GitWorktreeService(fake)
+
+        val result = service.createBranchWorktree(
+            repoPath,
+            baseWorktreePath,
+            baseBranch,
+            targetBranch,
+        )
+
+        assertEquals(expectedWorktreePath, result)
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call(
+                    "worktreeAddNewBranch",
+                    listOf(baseWorktreePath, targetBranch, expectedWorktreePath, baseBranch),
+                ),
+            ),
+            fake.calls.filter { it.method == "worktreeAddNewBranch" },
+        )
+        assertTrue(fake.calls.none { it.method == "fetch" })
+        assertTrue(fake.calls.none { it.method == "worktreeAdd" })
+    }
+
+    @Test
+    fun createBranchWorktree_invalidTargetBranchFailsBeforeWorktreeCommand() {
+        val fake = FakeGitCommandApi()
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.createBranchWorktree(
+                "/tmp/repo",
+                "/tmp/repo-feature-base-pr",
+                "feature/base-pr",
+                "feature/new dashboard",
+            )
+        }
+
+        assertTrue(ex.message!!.contains("Invalid worktree branch name"))
+        assertTrue(fake.calls.none { it.method == "worktreeAddNewBranch" })
+    }
+
+    @Test
+    fun createBranchWorktree_worktreeAddFailure_throwsWorktreeException() {
+        val fake = FakeGitCommandApi()
+        fake.worktreeAddNewBranchAction = { _, _, _, _ ->
+            throw GitCommandException(
+                command = listOf("git", "worktree", "add", "-b"),
+                exitCode = 128,
+                gitOutput = "fatal: cannot add",
+            )
+        }
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.createBranchWorktree(
+                "/tmp/repo",
+                "/tmp/repo-feature-base-pr",
+                "feature/base-pr",
+                "feature/stacked-pr",
+            )
+        }
+
+        assertTrue(ex.message!!.contains("Failed to create worktree"))
+        assertTrue(ex.message!!.contains("from feature/base-pr"))
         assertTrue(ex.cause is GitCommandException)
     }
 

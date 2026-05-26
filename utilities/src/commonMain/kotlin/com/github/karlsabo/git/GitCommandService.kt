@@ -29,6 +29,15 @@ class GitCommandService : GitCommandApi {
         executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", path, commitIsh))
     }
 
+    override fun worktreeAddNewBranch(
+        repoPath: String,
+        newBranch: String,
+        path: String,
+        baseBranch: String,
+    ) {
+        executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", "-b", newBranch, path, baseBranch))
+    }
+
     override fun worktreeList(repoPath: String): String {
         return executeGitCommand(buildRepoCommand(repoPath, "worktree", "list", "--porcelain"))
     }

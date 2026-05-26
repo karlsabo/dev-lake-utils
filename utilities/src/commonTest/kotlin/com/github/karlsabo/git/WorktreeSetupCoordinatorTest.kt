@@ -41,6 +41,15 @@ private class FakeGitWorktreeApi : GitWorktreeApi {
         return requireNotNull(ensuredWorktreePath).value
     }
 
+    override fun createBranchWorktree(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ): String {
+        error("createBranchWorktree is not used by WorktreeSetupCoordinator")
+    }
+
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 
     override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees =
@@ -102,6 +111,15 @@ private class SerializingFakeGitWorktreeApi : GitWorktreeApi {
     override fun ensureWorktree(repoPath: String, branch: String): String = runBlocking {
         stateMutex.withLock { worktreeEnsureCallCount += 1 }
         buildWorktreePath(repoPath, branch).value
+    }
+
+    override fun createBranchWorktree(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ): String {
+        error("createBranchWorktree is not used by WorktreeSetupCoordinator")
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false

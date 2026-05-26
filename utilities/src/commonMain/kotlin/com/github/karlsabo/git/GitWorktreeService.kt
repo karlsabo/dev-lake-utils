@@ -62,6 +62,30 @@ class GitWorktreeService(
         return worktreePath
     }
 
+    override fun createBranchWorktree(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ): String {
+        require(baseWorktreePath.isNotBlank()) { "baseWorktreePath must not be blank" }
+        validateWorktreeBranchName(baseBranch)
+        validateWorktreeBranchName(targetBranch)
+        val worktreePath = buildWorktreePath(repoPath, targetBranch)
+
+        try {
+            gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseBranch)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to create worktree at $worktreePath for branch $targetBranch from $baseBranch: ${e.gitOutput}",
+                e,
+            )
+        }
+
+        logger.info { "Created worktree at $worktreePath for branch $targetBranch from $baseBranch" }
+        return worktreePath
+    }
+
     override fun worktreeExists(repoPath: String, branch: String): Boolean {
         val worktreePath = buildWorktreePath(repoPath, branch)
         return listWorktrees(repoPath).any { it.path == worktreePath }

@@ -117,7 +117,6 @@ class GitCommandServiceTest {
         removeTempDir(worktreeDir)
         try {
             initRepoWithCommit(repoDir)
-            // Create a branch for the worktree
             executeCommand(listOf("git", "-C", repoDir, "branch", "feature-branch"), workingDirectory = null)
 
             service.worktreeAdd(repoDir, worktreeDir, "feature-branch")
@@ -129,6 +128,49 @@ class GitCommandServiceTest {
 
             val listingAfter = service.worktreeList(repoDir)
             assertFalse(listingAfter.contains(worktreeDir), "worktreeList should no longer contain the removed path")
+        } finally {
+            removeTempDir(repoDir)
+            removeTempDir(worktreeDir)
+        }
+    }
+
+    @Test
+    fun worktreeAddNewBranch_createsBranchFromExplicitBase() {
+        val repoDir = createTempDir("repo")
+        val worktreeDir = createTempDir("wt")
+        removeTempDir(worktreeDir)
+        try {
+            val baseCommit = initRepoWithCommit(repoDir)
+            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr", baseCommit), workingDirectory = null)
+            executeCommand(listOf("sh", "-c", "echo mainline > $repoDir/mainline.txt"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "mainline"), workingDirectory = null)
+            val currentCommit = executeCommand(
+                listOf("git", "-C", repoDir, "rev-parse", "HEAD"),
+                workingDirectory = null,
+            ).stdout.trim()
+            assertFalse(baseCommit == currentCommit, "Test setup requires HEAD to differ from the base branch")
+
+            service.worktreeAddNewBranch(
+                repoDir,
+                "feature/stacked-pr",
+                worktreeDir,
+                "feature/base-pr",
+            )
+
+            val branch = executeCommand(
+                listOf("git", "-C", worktreeDir, "branch", "--show-current"),
+                workingDirectory = null,
+            ).stdout.trim()
+            assertEquals("feature/stacked-pr", branch)
+            val branchStart = executeCommand(
+                listOf("git", "-C", worktreeDir, "rev-parse", "HEAD"),
+                workingDirectory = null,
+            ).stdout.trim()
+            assertEquals(baseCommit, branchStart)
+
+            val listing = service.worktreeList(repoDir)
+            assertTrue(listing.contains(worktreeDir), "worktreeList should contain the new worktree path")
         } finally {
             removeTempDir(repoDir)
             removeTempDir(worktreeDir)

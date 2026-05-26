@@ -3,6 +3,12 @@ package com.github.karlsabo.git
 interface GitWorktreeApi {
     fun ensureRepository(repoPath: String, cloneUrl: String)
     fun ensureWorktree(repoPath: String, branch: String): String
+    fun createBranchWorktree(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ): String
     fun worktreeExists(repoPath: String, branch: String): Boolean
     fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees
     fun listWorktrees(repoPath: String): List<Worktree>

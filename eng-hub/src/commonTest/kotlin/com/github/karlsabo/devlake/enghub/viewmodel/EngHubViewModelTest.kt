@@ -1839,6 +1839,15 @@ private class RecordingGitWorktreeApi(
         return worktreePath
     }
 
+    override fun createBranchWorktree(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ): String {
+        error("Unexpected call")
+    }
+
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 
     override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {

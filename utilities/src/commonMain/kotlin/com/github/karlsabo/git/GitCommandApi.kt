@@ -19,6 +19,14 @@ interface GitCommandApi {
     /** `git -C <repoPath> worktree add <path> <commitIsh>`. */
     fun worktreeAdd(repoPath: String, path: String, commitIsh: String)
 
+    /** `git -C <repoPath> worktree add -b <newBranch> <path> <baseBranch>`. */
+    fun worktreeAddNewBranch(
+        repoPath: String,
+        newBranch: String,
+        path: String,
+        baseBranch: String,
+    )
+
     /** `git -C <repoPath> worktree list --porcelain` — returns raw porcelain output. */
     fun worktreeList(repoPath: String): String
 
