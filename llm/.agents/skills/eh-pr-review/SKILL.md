@@ -93,9 +93,9 @@ Each inline comment should be self-contained and useful. Prefer explaining the o
 
 ### Step 6: Run a subagent pass and wait for it to finish
 
-Spawn an agent pass using whatever the current harness actually supports. If a native subagent or Task tool exists, use it. If there is no native subagent tool, launch tmux session, start a new process, send it commands, treat that subprocess as the subagent.
+Spawn an agent pass using whatever the current harness actually supports. If a native subagent or Task tool exists, use it; prefer `Task(subagent_type=Explore *)` when available. If there is no native subagent tool, launch tmux session, start a new process, or run a non-interactive agent process such as `pi -p --tools read,edit,write "<prompt>"`; treat that subprocess as the subagent.
 
-Set the subagent model to the same model you are and give it this prompt:
+Set the subagent model to the same model you are when the harness allows it, and give it this prompt:
 
 ```text
 Review the Pull Request comments document at ${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md with an eye of skepticism and cynicism.
@@ -147,9 +147,9 @@ When the user says they're ready (e.g., "looks good," "post it," "create the rev
 **Critical rules:**
 
 - **ALWAYS** read `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md` from disk again before you post a comment
-- **ALWAYS** use `"event": "PENDING"`, this creates a draft review the user can inspect on GitHub before submitting
-- **NEVER** submit the review (no `APPROVE`, `REQUEST_CHANGES`, or `COMMENT` event) unless explicitly told to
-- Tell the user the review is pending, and they need to submit it from the GitHub UI
+- **ALWAYS** create a pending/draft review first. For the REST create-review endpoint, omit `event` entirely; do **not** send `"event": "PENDING"` because GitHub rejects it with `422`.
+- **NEVER** submit the review (`APPROVE`, `REQUEST_CHANGES`, or `COMMENT` event) unless explicitly told to. If the user explicitly asks to submit/approve/comment in the same turn as posting, create the pending review first, then submit it via Step 10.
+- Tell the user the review is pending and they need to submit it from the GitHub UI, unless they explicitly asked you to submit it.
 
 **Error handling:**
 
@@ -158,9 +158,10 @@ When the user says they're ready (e.g., "looks good," "post it," "create the rev
 
 ### Step 10: Optional submit
 
-**Only** if the user explicitly says "submit" or "submit the review":
+**Only** if the user explicitly says "submit" or "submit the review", or explicitly asks to mark the review as `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`:
 
-- Ask what event type they want: `COMMENT` (safest), `APPROVE`, or `REQUEST_CHANGES`
+- If the user already specified an event type (for example, "mark as APPROVE"), use that event without asking again
+- Otherwise ask what event type they want: `COMMENT` (safest), `APPROVE`, or `REQUEST_CHANGES`
 - Default to `COMMENT` if they don't specify
 - Use `gh api` to submit the pending review with the chosen event
 - Confirm submission and provide the PR URL
