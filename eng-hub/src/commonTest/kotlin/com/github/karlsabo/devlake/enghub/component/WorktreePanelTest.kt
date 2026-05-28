@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class WorktreePanelTest {
 
     @Test
-    fun rootWorktreeMenuDoesNotExposeArchive() {
+    fun rootWorktreeMenuExposesCreateWorktreeButNotArchive() {
         val worktree = LocalWorktreeUiState(
             branch = "main",
             path = "/repos/dev-lake-utils",
@@ -18,13 +18,13 @@ class WorktreePanelTest {
         )
 
         assertEquals(
-            listOf(WorktreeMenuAction.Open),
+            listOf(WorktreeMenuAction.Open, WorktreeMenuAction.CreateWorktree),
             visibleWorktreeMenuActions(worktree),
         )
     }
 
     @Test
-    fun nonRootWorktreeMenuExposesArchive() {
+    fun nonRootWorktreeMenuExposesCreateWorktreeAndArchive() {
         val worktree = LocalWorktreeUiState(
             branch = "feature/worktree-panel",
             path = "/repos/dev-lake-utils-feature-worktree-panel",
@@ -32,8 +32,98 @@ class WorktreePanelTest {
         )
 
         assertEquals(
-            listOf(WorktreeMenuAction.Open, WorktreeMenuAction.Archive),
+            listOf(
+                WorktreeMenuAction.Open,
+                WorktreeMenuAction.CreateWorktree,
+                WorktreeMenuAction.Archive,
+            ),
             visibleWorktreeMenuActions(worktree),
+        )
+    }
+
+    @Test
+    fun createWorktreeDialogUsesSelectedBaseAndEmptyTargetBranch() {
+        val worktree = LocalWorktreeUiState(
+            branch = "feature/base-pr",
+            path = "/repos/dev-lake-utils-feature-base-pr",
+            isRoot = false,
+        )
+
+        assertEquals(
+            PendingCreateWorktree(
+                repoRootPath = "/repos/dev-lake-utils",
+                baseWorktreePath = "/repos/dev-lake-utils-feature-base-pr",
+                baseBranch = "feature/base-pr",
+                targetBranch = "",
+            ),
+            createWorktreeDialogState(
+                repoRootPath = "/repos/dev-lake-utils",
+                worktree = worktree,
+            ),
+        )
+    }
+
+    @Test
+    fun createWorktreeActionIsDisabledWhileSetupIsInProgress() {
+        val worktree = LocalWorktreeUiState(
+            branch = "feature/base-pr",
+            path = "/repos/dev-lake-utils-feature-base-pr",
+        )
+
+        assertFalse(
+            isWorktreeCreateEnabled(
+                worktree = worktree,
+                setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
+                isArchiving = false,
+            ),
+        )
+    }
+
+    @Test
+    fun createWorktreeActionIsDisabledWhileArchiveIsInProgress() {
+        val worktree = LocalWorktreeUiState(
+            branch = "feature/base-pr",
+            path = "/repos/dev-lake-utils-feature-base-pr",
+        )
+
+        assertFalse(
+            isWorktreeCreateEnabled(
+                worktree = worktree,
+                setupStatus = null,
+                isArchiving = true,
+            ),
+        )
+    }
+
+    @Test
+    fun createWorktreeActionIsDisabledForDetachedWorktree() {
+        val worktree = LocalWorktreeUiState(
+            branch = "(detached)",
+            path = "/repos/dev-lake-utils-detached",
+        )
+
+        assertFalse(
+            isWorktreeCreateEnabled(
+                worktree = worktree,
+                setupStatus = null,
+                isArchiving = false,
+            ),
+        )
+    }
+
+    @Test
+    fun createWorktreeActionIsEnabledForIdleBranchWorktree() {
+        val worktree = LocalWorktreeUiState(
+            branch = "feature/base-pr",
+            path = "/repos/dev-lake-utils-feature-base-pr",
+        )
+
+        assertTrue(
+            isWorktreeCreateEnabled(
+                worktree = worktree,
+                setupStatus = null,
+                isArchiving = false,
+            ),
         )
     }
 

@@ -19,6 +19,7 @@ import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
@@ -45,15 +46,39 @@ import org.jetbrains.compose.resources.painterResource
 
 internal enum class WorktreeMenuAction {
     Open,
+    CreateWorktree,
     Archive,
 }
+
+internal data class PendingCreateWorktree(
+    val repoRootPath: String,
+    val baseWorktreePath: String,
+    val baseBranch: String,
+    val targetBranch: String = "",
+)
 
 internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<WorktreeMenuAction> {
     return buildList {
         add(WorktreeMenuAction.Open)
+        add(WorktreeMenuAction.CreateWorktree)
         if (!worktree.isRoot) add(WorktreeMenuAction.Archive)
     }
 }
+
+internal fun createWorktreeDialogState(
+    repoRootPath: String,
+    worktree: LocalWorktreeUiState,
+): PendingCreateWorktree = PendingCreateWorktree(
+    repoRootPath = repoRootPath,
+    baseWorktreePath = worktree.path,
+    baseBranch = worktree.branch,
+)
+
+internal fun isWorktreeCreateEnabled(
+    worktree: LocalWorktreeUiState,
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+): Boolean = setupStatus == null && !isArchiving && !worktree.isDetachedDisplayBranch()
 
 internal fun isWorktreeArchiveEnabled(setupStatus: WorktreeSetupStatus?, isArchiving: Boolean): Boolean =
     setupStatus == null && !isArchiving
@@ -73,6 +98,7 @@ fun WorktreePanel(
     modifier: Modifier = Modifier,
 ) {
     var pendingArchive by remember { mutableStateOf<PendingArchive?>(null) }
+    var pendingCreateWorktree by remember { mutableStateOf<PendingCreateWorktree?>(null) }
 
     pendingArchive?.let { archive ->
         ArchiveWorktreeDialog(
@@ -92,6 +118,16 @@ fun WorktreePanel(
                 onConfirmForceArchiveWorktree(archive.repoRootPath, archive.worktreePath)
             },
             onDismiss = onDismissForceArchiveWorktree,
+        )
+    }
+
+    pendingCreateWorktree?.let { createWorktree ->
+        CreateWorktreeDialog(
+            state = createWorktree,
+            onTargetBranchChange = { targetBranch ->
+                pendingCreateWorktree = pendingCreateWorktree?.copy(targetBranch = targetBranch)
+            },
+            onDismiss = { pendingCreateWorktree = null },
         )
     }
 
@@ -122,6 +158,9 @@ fun WorktreePanel(
                             onArchiveWorktree = { worktreePath ->
                                 pendingArchive = PendingArchive(repository.path, worktreePath)
                             },
+                            onOpenCreateWorktreeDialog = { worktree ->
+                                pendingCreateWorktree = createWorktreeDialogState(repository.path, worktree)
+                            },
                             setupStatuses = setupStatuses,
                             archivingWorktreePaths = archivingWorktreePaths,
                         )
@@ -138,6 +177,7 @@ private fun LocalRepositoryRow(
     onToggleRepository: () -> Unit,
     onOpenWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     onArchiveWorktree: (worktreePath: String) -> Unit,
+    onOpenCreateWorktreeDialog: (LocalWorktreeUiState) -> Unit,
     setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     archivingWorktreePaths: Set<String>,
 ) {
@@ -186,6 +226,7 @@ private fun LocalRepositoryRow(
                             isArchiving = normalizedWorktreePath in archivingWorktreePaths,
                             onOpen = { onOpenWorktree(repository.path, worktree.path) },
                             onArchive = { onArchiveWorktree(worktree.path) },
+                            onOpenCreateWorktreeDialog = { onOpenCreateWorktreeDialog(worktree) },
                         )
                     }
                 }
@@ -201,10 +242,12 @@ private fun LocalWorktreeRow(
     isArchiving: Boolean,
     onOpen: () -> Unit,
     onArchive: () -> Unit,
+    onOpenCreateWorktreeDialog: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val setupInProgress = setupStatus != null
     val openEnabled = !setupInProgress && !isArchiving
+    val createEnabled = isWorktreeCreateEnabled(worktree, setupStatus, isArchiving)
     val archiveEnabled = isWorktreeArchiveEnabled(setupStatus, isArchiving)
 
     Row(
@@ -259,6 +302,16 @@ private fun LocalWorktreeRow(
                             Text(setupActionLabel(defaultLabel = "Open", setupStatus = setupStatus))
                         }
 
+                        WorktreeMenuAction.CreateWorktree -> DropdownMenuItem(
+                            onClick = {
+                                menuExpanded = false
+                                onOpenCreateWorktreeDialog()
+                            },
+                            enabled = createEnabled,
+                        ) {
+                            Text("Create worktree")
+                        }
+
                         WorktreeMenuAction.Archive -> DropdownMenuItem(
                             onClick = {
                                 menuExpanded = false
@@ -267,6 +320,52 @@ private fun LocalWorktreeRow(
                             enabled = archiveEnabled,
                         ) {
                             Text("Archive")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateWorktreeDialog(
+    state: PendingCreateWorktree,
+    onTargetBranchChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DialogWindow(
+        onCloseRequest = onDismiss,
+        title = "Create Worktree",
+        icon = painterResource(Res.drawable.icon),
+        visible = true,
+    ) {
+        MaterialTheme {
+            Surface {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                ) {
+                    Text(text = "Create Worktree", style = MaterialTheme.typography.h6)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "Base: ${state.baseBranch}")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = state.targetBranch,
+                        onValueChange = onTargetBranchChange,
+                        label = { Text("Target branch") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row {
+                        Button(onClick = {}, enabled = false) {
+                            Text("Create")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel")
                         }
                     }
                 }
@@ -361,5 +460,7 @@ private data class PendingArchive(
     val repoRootPath: String,
     val worktreePath: String,
 )
+
+private fun LocalWorktreeUiState.isDetachedDisplayBranch(): Boolean = branch == "(detached)"
 
 private fun String.normalizedWorktreePath(): String = trim().trimEnd('/', '\\')

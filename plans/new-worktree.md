@@ -65,7 +65,9 @@ Relevant current code:
 
 **Notes:** Keep base-branch behavior explicit; do not hide it inside the existing `ensureWorktree(repoPath, branch)` behavior.
 
-### 3. Run setup after creating a branch worktree
+### 3. Run setup after creating a branch worktree - Done
+
+**Done** 2026 05 28
 
 **Acceptance criteria:** Given setup command `touch setup-ran.txt`, when a setup request creates `feature/stacked-pr` from `feature/base-pr`, then setup commands run in the new worktree after git creation succeeds.
 
@@ -76,7 +78,9 @@ Relevant current code:
 
 **Scope:** Add a create-from-base-then-setup flow and setup status keyed by the new worktree path. Keep the existing checkout/setup request path behavior unchanged. Do not add UI, hierarchy, ancestry override, or detached-base support.
 
-### 4. Open a create-worktree dialog from a worktree row
+### 4. Open a create-worktree dialog from a worktree row - Done
+
+**Done** 2026 05 28
 
 **Acceptance criteria:** Given worktree `feature/base-pr`, when the user chooses `Create worktree`, then a dialog opens showing `feature/base-pr` as the base and an empty target branch input.
 
