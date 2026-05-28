@@ -20,6 +20,9 @@ data class WorktreeSetupRequest(
     val worktreePath: WorktreePath,
     val cloneUrl: String? = null,
     val branch: String? = null,
+    val baseWorktreePath: String? = null,
+    val baseBranch: String? = null,
+    val targetBranch: String? = null,
     val setupShell: String = "",
     val setupCommands: List<String> = emptyList(),
 ) {
@@ -28,14 +31,25 @@ data class WorktreeSetupRequest(
         require((cloneUrl == null) == (branch == null)) {
             "cloneUrl and branch must both be provided for repository/worktree setup, or both omitted for an existing worktree"
         }
+        val branchCreationFieldCount = listOf(baseWorktreePath, baseBranch, targetBranch).count { it != null }
+        require(branchCreationFieldCount == 0 || branchCreationFieldCount == 3) {
+            "baseWorktreePath, baseBranch, and targetBranch must all be provided for branch worktree creation, or all omitted"
+        }
+        require(cloneUrl == null || branchCreationFieldCount == 0) {
+            "repository/worktree setup and branch worktree creation are mutually exclusive"
+        }
         cloneUrl?.let { require(it.isNotBlank()) { "cloneUrl must not be blank" } }
         branch?.let { require(it.isNotBlank()) { "branch must not be blank" } }
+        baseWorktreePath?.let { require(it.isNotBlank()) { "baseWorktreePath must not be blank" } }
+        baseBranch?.let { require(it.isNotBlank()) { "baseBranch must not be blank" } }
+        targetBranch?.let { require(it.isNotBlank()) { "targetBranch must not be blank" } }
         if (setupCommands.isNotEmpty()) {
             require(setupShell.isNotBlank()) { "setupShell must not be blank when setupCommands are provided" }
         }
     }
 
     internal val shouldEnsureRepositoryAndWorktree: Boolean = cloneUrl != null
+    internal val shouldCreateBranchWorktree: Boolean = baseWorktreePath != null
 }
 
 data class WorktreeSetupResult(
@@ -191,6 +205,21 @@ class WorktreeSetupCoordinator private constructor(
                     "ensureWorktree returned $ensuredPath, but request expected ${request.worktreePath}",
                 )
             }
+        } else if (request.shouldCreateBranchWorktree) {
+            setStatus(request.worktreePath, WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE)
+            val createdPath = WorktreePath(
+                gitWorktreeApi.createBranchWorktree(
+                    repoPath = request.repoPath,
+                    baseWorktreePath = requireNotNull(request.baseWorktreePath),
+                    baseBranch = requireNotNull(request.baseBranch),
+                    targetBranch = requireNotNull(request.targetBranch),
+                ),
+            )
+            if (createdPath != request.worktreePath) {
+                throw WorktreeSetupException(
+                    "createBranchWorktree returned $createdPath, but request expected ${request.worktreePath}",
+                )
+            }
         }
 
         val setupCommandResult = if (request.setupCommands.isEmpty()) {
@@ -212,6 +241,7 @@ class WorktreeSetupCoordinator private constructor(
 
     private fun WorktreeSetupRequest.initialStatus(): WorktreeSetupStatus? = when {
         shouldEnsureRepositoryAndWorktree -> WorktreeSetupStatus.WAITING_FOR_REPOSITORY
+        shouldCreateBranchWorktree -> WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE
         setupCommands.isNotEmpty() -> WorktreeSetupStatus.RUNNING_SETUP_COMMANDS
         else -> null
     }

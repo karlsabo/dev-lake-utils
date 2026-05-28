@@ -23,10 +23,16 @@ import kotlin.time.Duration.Companion.milliseconds
 private class FakeGitWorktreeApi : GitWorktreeApi {
     var ensureRepositoryCalls = 0
     var ensureWorktreeCalls = 0
+    var createBranchWorktreeCalls = 0
     lateinit var expectedRepoPath: String
     lateinit var expectedCloneUrl: String
     lateinit var expectedBranch: String
+    lateinit var expectedBaseWorktreePath: String
+    lateinit var expectedBaseBranch: String
+    lateinit var expectedTargetBranch: String
     var ensuredWorktreePath: WorktreePath? = null
+    var createdBranchWorktreePath: WorktreePath? = null
+    var onCreateBranchWorktree: () -> Unit = {}
 
     override fun ensureRepository(repoPath: String, cloneUrl: String) {
         assertEquals(expectedRepoPath, repoPath)
@@ -47,7 +53,13 @@ private class FakeGitWorktreeApi : GitWorktreeApi {
         baseBranch: String,
         targetBranch: String,
     ): String {
-        error("createBranchWorktree is not used by WorktreeSetupCoordinator")
+        assertEquals(expectedRepoPath, repoPath)
+        assertEquals(expectedBaseWorktreePath, baseWorktreePath)
+        assertEquals(expectedBaseBranch, baseBranch)
+        assertEquals(expectedTargetBranch, targetBranch)
+        createBranchWorktreeCalls += 1
+        onCreateBranchWorktree()
+        return requireNotNull(createdBranchWorktreePath).value
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
@@ -226,6 +238,71 @@ class WorktreeSetupCoordinatorTest {
         assertEquals(1, git.ensureRepositoryCalls)
         assertEquals(1, git.ensureWorktreeCalls)
         assertEquals(1, setupRunner.calls)
+        assertTrue(coordinator.statuses.value.isEmpty())
+    }
+
+    @Test
+    fun createBranchWorktreeRequestCreatesThenRunsSetupInNewWorktree() = runBlocking {
+        val repoPath = "/repos/dev-lake-utils"
+        val baseBranch = "feature/base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val baseWorktreePath = buildWorktreePath(repoPath, baseBranch)
+        val targetWorktreePath = buildWorktreePath(repoPath, targetBranch)
+        val events = mutableListOf<String>()
+        val git = FakeGitWorktreeApi().apply {
+            expectedRepoPath = repoPath
+            expectedBaseWorktreePath = baseWorktreePath.value
+            expectedBaseBranch = baseBranch
+            expectedTargetBranch = targetBranch
+            createdBranchWorktreePath = targetWorktreePath
+            onCreateBranchWorktree = { events += "create" }
+        }
+        val setupStarted = CompletableDeferred<WorktreeSetupRequest>()
+        val setupComplete = CompletableDeferred<Unit>()
+        val setupRunner = WorktreeSetupCommandRunner { request ->
+            assertEquals(listOf("create"), events)
+            events += "setup:${request.worktreePath.value}"
+            setupStarted.complete(request)
+            setupComplete.await()
+            WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
+        }
+        val coordinator = WorktreeSetupCoordinator(
+            gitWorktreeApi = git,
+            setupCommandRunner = setupRunner,
+            scope = this,
+        )
+        val request = WorktreeSetupRequest(
+            repoPath = repoPath,
+            worktreePath = targetWorktreePath,
+            baseWorktreePath = baseWorktreePath.value,
+            baseBranch = baseBranch,
+            targetBranch = targetBranch,
+            setupShell = "/bin/sh",
+            setupCommands = listOf("touch setup-ran.txt"),
+        )
+
+        val handle = coordinator.setup(request)
+
+        assertEquals(
+            WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
+            coordinator.statuses.value[targetWorktreePath],
+        )
+        val setupRequest = withTimeout(1_000.milliseconds) { setupStarted.await() }
+        assertEquals(targetWorktreePath, setupRequest.worktreePath)
+        assertEquals(
+            WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+            coordinator.statuses.value[targetWorktreePath],
+        )
+
+        setupComplete.complete(Unit)
+        val result = withTimeout(1_000.milliseconds) { handle.await() }
+
+        assertEquals(targetWorktreePath, result.worktreePath)
+        assertEquals("setup complete", result.setupCommandResult?.stdout)
+        assertEquals(listOf("create", "setup:${targetWorktreePath.value}"), events)
+        assertEquals(0, git.ensureRepositoryCalls)
+        assertEquals(0, git.ensureWorktreeCalls)
+        assertEquals(1, git.createBranchWorktreeCalls)
         assertTrue(coordinator.statuses.value.isEmpty())
     }
 

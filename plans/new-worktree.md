@@ -48,7 +48,9 @@ Relevant current code:
 
 **Notes:** Validation should include `git check-ref-format --branch <branch>` semantics plus whitespace/control-character rejection.
 
-### 2. Create a branch worktree from a selected branch base
+### 2. Create a branch worktree from a selected branch base - Done
+
+**Done** 2026 05 26
 
 **Acceptance criteria:** Given an existing worktree on branch `feature/base-pr`, when worktree creation is requested for `feature/stacked-pr`, then git creates the derived worktree path using `git worktree add -b feature/stacked-pr <derived-path> feature/base-pr`.
 
