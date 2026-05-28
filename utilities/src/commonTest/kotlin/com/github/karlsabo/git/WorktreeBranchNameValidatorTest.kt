@@ -16,6 +16,15 @@ class WorktreeBranchNameValidatorTest {
     }
 
     @Test
+    fun validateWithoutGitRefFormatCheck_acceptsPlausibleBranchWithoutCallingGitChecker() {
+        val validator = WorktreeBranchNameValidator { error("git ref format checker should not run") }
+
+        val result = validator.validateWithoutGitRefFormatCheck("feature/stacked-pr")
+
+        assertTrue(result.isValid)
+    }
+
+    @Test
     fun validate_rejectsWhitespaceBeforeGitRefFormatCheck() {
         var checkedBranch: String? = null
         val validator = WorktreeBranchNameValidator { branch ->

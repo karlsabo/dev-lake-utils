@@ -24,7 +24,7 @@ class WorktreeBranchNameValidator(
         GitCommandService().isValidBranchRefFormat(branch)
     },
 ) {
-    fun validate(branch: String): WorktreeBranchNameValidationResult = when {
+    fun validateWithoutGitRefFormatCheck(branch: String): WorktreeBranchNameValidationResult = when {
         branch.isEmpty() -> WorktreeBranchNameValidationResult.Invalid(WorktreeBranchNameValidationFailure.EMPTY)
         branch.any { it.isWhitespace() } -> {
             WorktreeBranchNameValidationResult.Invalid(WorktreeBranchNameValidationFailure.WHITESPACE)
@@ -34,11 +34,18 @@ class WorktreeBranchNameValidator(
             WorktreeBranchNameValidationResult.Invalid(WorktreeBranchNameValidationFailure.CONTROL_CHARACTER)
         }
 
-        !isValidGitBranchRefFormat(branch) -> {
+        else -> WorktreeBranchNameValidationResult.Valid
+    }
+
+    fun validate(branch: String): WorktreeBranchNameValidationResult {
+        val localValidation = validateWithoutGitRefFormatCheck(branch)
+        if (!localValidation.isValid) return localValidation
+
+        return if (isValidGitBranchRefFormat(branch)) {
+            WorktreeBranchNameValidationResult.Valid
+        } else {
             WorktreeBranchNameValidationResult.Invalid(WorktreeBranchNameValidationFailure.INVALID_GIT_REF_FORMAT)
         }
-
-        else -> WorktreeBranchNameValidationResult.Valid
     }
 }
 

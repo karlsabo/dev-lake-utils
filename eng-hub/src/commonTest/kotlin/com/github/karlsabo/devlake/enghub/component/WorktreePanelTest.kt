@@ -1,6 +1,7 @@
 package com.github.karlsabo.devlake.enghub.component
 
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
+import com.github.karlsabo.git.WorktreeBranchNameValidator
 import com.github.karlsabo.git.WorktreeSetupStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -125,6 +126,95 @@ class WorktreePanelTest {
                 isArchiving = false,
             ),
         )
+    }
+
+    @Test
+    fun createWorktreeDialogShowsInlineValidationAndDisablesCreateForWhitespaceTargetBranch() {
+        val validation = startCreateWorktreeTargetBranchValidation(
+            targetBranch = "feature/new dashboard",
+            branchNameValidator = WorktreeBranchNameValidator { true },
+        )
+
+        assertEquals(
+            "Branch name must not contain whitespace",
+            createWorktreeTargetBranchValidationMessage(
+                targetBranch = "feature/new dashboard",
+                validation = validation,
+            ),
+        )
+        assertFalse(validation.isCheckingGitRefFormat)
+        assertFalse(isCreateWorktreeConfirmEnabled(validation))
+    }
+
+    @Test
+    fun createWorktreeDialogDisablesCreateWithoutShowingInlineValidationForEmptyTargetBranch() {
+        val validation = startCreateWorktreeTargetBranchValidation(
+            targetBranch = "",
+            branchNameValidator = WorktreeBranchNameValidator { true },
+        )
+
+        assertEquals(
+            null,
+            createWorktreeTargetBranchValidationMessage(targetBranch = "", validation = validation),
+        )
+        assertFalse(validation.isCheckingGitRefFormat)
+        assertFalse(isCreateWorktreeConfirmEnabled(validation))
+    }
+
+    @Test
+    fun createWorktreeDialogKeepsCreateDisabledWhileGitRefFormatCheckIsPending() {
+        val validation = startCreateWorktreeTargetBranchValidation(
+            targetBranch = "feature/new-dashboard",
+            branchNameValidator = WorktreeBranchNameValidator {
+                error("git check should run from the async validation boundary")
+            },
+        )
+
+        assertEquals(
+            null,
+            createWorktreeTargetBranchValidationMessage(
+                targetBranch = "feature/new-dashboard",
+                validation = validation,
+            ),
+        )
+        assertTrue(validation.isCheckingGitRefFormat)
+        assertFalse(isCreateWorktreeConfirmEnabled(validation))
+    }
+
+    @Test
+    fun createWorktreeDialogEnablesCreateAfterValidGitRefFormatCheckCompletes() {
+        val validation = finishCreateWorktreeTargetBranchValidation(
+            targetBranch = "feature/new-dashboard",
+            branchNameValidator = WorktreeBranchNameValidator { true },
+        )
+
+        assertEquals(
+            null,
+            createWorktreeTargetBranchValidationMessage(
+                targetBranch = "feature/new-dashboard",
+                validation = validation,
+            ),
+        )
+        assertFalse(validation.isCheckingGitRefFormat)
+        assertTrue(isCreateWorktreeConfirmEnabled(validation))
+    }
+
+    @Test
+    fun createWorktreeDialogDisablesCreateAfterInvalidGitRefFormatCheckCompletes() {
+        val validation = finishCreateWorktreeTargetBranchValidation(
+            targetBranch = "feature//new-dashboard",
+            branchNameValidator = WorktreeBranchNameValidator { false },
+        )
+
+        assertEquals(
+            "Branch name is not a valid git branch name",
+            createWorktreeTargetBranchValidationMessage(
+                targetBranch = "feature//new-dashboard",
+                validation = validation,
+            ),
+        )
+        assertFalse(validation.isCheckingGitRefFormat)
+        assertFalse(isCreateWorktreeConfirmEnabled(validation))
     }
 
     @Test

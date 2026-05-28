@@ -92,7 +92,9 @@ Relevant current code:
 
 **Scope:** Add the row action and dialog open/dismiss state. Disable the action while the base worktree is running setup or being archived. If detached rows are visible before detached-base support lands, keep their create action disabled or show a controlled unsupported message; do not submit `(detached)` as a ref. Do not submit, validate, or create a worktree.
 
-### 5. Validate create-worktree dialog input inline
+### 5. Validate create-worktree dialog input inline - Done
+
+**Done** 2026 05 28
 
 **Acceptance criteria:** Given the create-worktree dialog is open, when the user enters `feature/new dashboard`, then the create button is disabled and inline validation text is shown.
 

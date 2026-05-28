@@ -24,6 +24,7 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -38,10 +39,14 @@ import androidx.compose.ui.window.DialogWindow
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
+import com.github.karlsabo.git.WorktreeBranchNameValidationResult
+import com.github.karlsabo.git.WorktreeBranchNameValidator
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 import dev_lake_utils.shared_resources.generated.resources.Res
 import dev_lake_utils.shared_resources.generated.resources.icon
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
 internal enum class WorktreeMenuAction {
@@ -82,6 +87,42 @@ internal fun isWorktreeCreateEnabled(
 
 internal fun isWorktreeArchiveEnabled(setupStatus: WorktreeSetupStatus?, isArchiving: Boolean): Boolean =
     setupStatus == null && !isArchiving
+
+internal data class CreateWorktreeTargetBranchValidation(
+    val result: WorktreeBranchNameValidationResult,
+    val isCheckingGitRefFormat: Boolean,
+)
+
+internal fun startCreateWorktreeTargetBranchValidation(
+    targetBranch: String,
+    branchNameValidator: WorktreeBranchNameValidator,
+): CreateWorktreeTargetBranchValidation {
+    val localValidation = branchNameValidator.validateWithoutGitRefFormatCheck(targetBranch)
+    return CreateWorktreeTargetBranchValidation(
+        result = localValidation,
+        isCheckingGitRefFormat = localValidation.isValid,
+    )
+}
+
+internal fun finishCreateWorktreeTargetBranchValidation(
+    targetBranch: String,
+    branchNameValidator: WorktreeBranchNameValidator,
+): CreateWorktreeTargetBranchValidation = CreateWorktreeTargetBranchValidation(
+    result = branchNameValidator.validate(targetBranch),
+    isCheckingGitRefFormat = false,
+)
+
+internal fun createWorktreeTargetBranchValidationMessage(
+    targetBranch: String,
+    validation: CreateWorktreeTargetBranchValidation,
+): String? = when {
+    targetBranch.isEmpty() -> null
+    validation.isCheckingGitRefFormat -> null
+    else -> validation.result.message
+}
+
+internal fun isCreateWorktreeConfirmEnabled(validation: CreateWorktreeTargetBranchValidation): Boolean =
+    !validation.isCheckingGitRefFormat && validation.result.isValid
 
 @Composable
 fun WorktreePanel(
@@ -334,6 +375,22 @@ private fun CreateWorktreeDialog(
     onTargetBranchChange: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val branchNameValidator = remember { WorktreeBranchNameValidator() }
+    var targetBranchValidation by remember(state.targetBranch) {
+        mutableStateOf(startCreateWorktreeTargetBranchValidation(state.targetBranch, branchNameValidator))
+    }
+    LaunchedEffect(state.targetBranch) {
+        if (!targetBranchValidation.isCheckingGitRefFormat) return@LaunchedEffect
+
+        val targetBranch = state.targetBranch
+        targetBranchValidation = withContext(Dispatchers.IO) {
+            finishCreateWorktreeTargetBranchValidation(targetBranch, branchNameValidator)
+        }
+    }
+    val validationMessage = createWorktreeTargetBranchValidationMessage(
+        targetBranch = state.targetBranch,
+        validation = targetBranchValidation,
+    )
     DialogWindow(
         onCloseRequest = onDismiss,
         title = "Create Worktree",
@@ -356,11 +413,20 @@ private fun CreateWorktreeDialog(
                         value = state.targetBranch,
                         onValueChange = onTargetBranchChange,
                         label = { Text("Target branch") },
+                        isError = validationMessage != null,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    validationMessage?.let { message ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = message,
+                            color = MaterialTheme.colors.error,
+                            style = MaterialTheme.typography.caption,
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Row {
-                        Button(onClick = {}, enabled = false) {
+                        Button(onClick = {}, enabled = isCreateWorktreeConfirmEnabled(targetBranchValidation)) {
                             Text("Create")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
