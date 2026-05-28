@@ -49,6 +49,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
+internal typealias CreateWorktreeCallback = (
+    repoRootPath: String,
+    baseWorktreePath: String,
+    baseBranch: String,
+    targetBranch: String,
+) -> Unit
+
 internal enum class WorktreeMenuAction {
     Open,
     CreateWorktree,
@@ -141,6 +148,13 @@ internal fun createWorktreeTargetBranchValidationMessage(
 internal fun isCreateWorktreeConfirmEnabled(validation: CreateWorktreeTargetBranchValidation): Boolean =
     !validation.isCheckingGitRefFormat && validation.result.isValid && !validation.targetBranchMatchesBase
 
+internal fun submitCreateWorktreeDialog(
+    state: PendingCreateWorktree,
+    onCreateWorktree: CreateWorktreeCallback,
+) {
+    onCreateWorktree(state.repoRootPath, state.baseWorktreePath, state.baseBranch, state.targetBranch)
+}
+
 private fun targetBranchMatchesBase(baseBranch: String, targetBranch: String): Boolean =
     targetBranch.isNotEmpty() && targetBranch == baseBranch
 
@@ -151,6 +165,7 @@ fun WorktreePanel(
     onToggleRepository: (String) -> Unit,
     onOpenWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     onArchiveWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
+    onCreateWorktree: CreateWorktreeCallback,
     forceArchiveRequest: ForceArchiveWorktreeUiState?,
     onConfirmForceArchiveWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     onDismissForceArchiveWorktree: () -> Unit,
@@ -187,6 +202,10 @@ fun WorktreePanel(
             state = createWorktree,
             onTargetBranchChange = { targetBranch ->
                 pendingCreateWorktree = pendingCreateWorktree?.copy(targetBranch = targetBranch)
+            },
+            onConfirm = { request ->
+                pendingCreateWorktree = null
+                submitCreateWorktreeDialog(request, onCreateWorktree)
             },
             onDismiss = { pendingCreateWorktree = null },
         )
@@ -393,6 +412,7 @@ private fun LocalWorktreeRow(
 private fun CreateWorktreeDialog(
     state: PendingCreateWorktree,
     onTargetBranchChange: (String) -> Unit,
+    onConfirm: (PendingCreateWorktree) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val branchNameValidator = remember { WorktreeBranchNameValidator() }
@@ -457,7 +477,10 @@ private fun CreateWorktreeDialog(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Row {
-                        Button(onClick = {}, enabled = isCreateWorktreeConfirmEnabled(targetBranchValidation)) {
+                        Button(
+                            onClick = { onConfirm(state) },
+                            enabled = isCreateWorktreeConfirmEnabled(targetBranchValidation),
+                        ) {
                             Text("Create")
                         }
                         Spacer(modifier = Modifier.width(8.dp))

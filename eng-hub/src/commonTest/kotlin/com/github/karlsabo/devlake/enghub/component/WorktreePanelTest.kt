@@ -65,6 +65,28 @@ class WorktreePanelTest {
     }
 
     @Test
+    fun submittingCreateWorktreeDialogCallsBoundaryWithSelectedBaseAndTargetBranch() {
+        val submissions = mutableListOf<PendingCreateWorktree>()
+        val state = PendingCreateWorktree(
+            repoRootPath = "/repos/dev-lake-utils",
+            baseWorktreePath = "/repos/dev-lake-utils-feature-base-pr",
+            baseBranch = "feature/base-pr",
+            targetBranch = "feature/stacked-pr",
+        )
+
+        submitCreateWorktreeDialog(state) { repoRootPath, baseWorktreePath, baseBranch, targetBranch ->
+            submissions += PendingCreateWorktree(
+                repoRootPath = repoRootPath,
+                baseWorktreePath = baseWorktreePath,
+                baseBranch = baseBranch,
+                targetBranch = targetBranch,
+            )
+        }
+
+        assertEquals(listOf(state), submissions)
+    }
+
+    @Test
     fun createWorktreeActionIsDisabledWhileSetupIsInProgress() {
         val worktree = LocalWorktreeUiState(
             branch = "feature/base-pr",

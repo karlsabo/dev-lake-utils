@@ -539,6 +539,32 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun createLocalWorktreeFromBaseRecordsSubmittedDialogRequestAtViewModelBoundary() {
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = RecordingGitWorktreeApi(worktreesByRepoPath = emptyMap()),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr",
+            baseBranch = "feature/base-pr",
+            targetBranch = "feature/stacked-pr",
+        )
+
+        assertEquals(
+            CreateLocalWorktreeFromBaseRequest(
+                repoRootPath = DEV_LAKE_ROOT,
+                baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr",
+                baseBranch = "feature/base-pr",
+                targetBranch = "feature/stacked-pr",
+            ),
+            viewModel.lastCreateLocalWorktreeFromBaseRequestStateFlow.value,
+        )
+    }
+
+    @Test
     fun openingExistingWorktreeRunsConfiguredSetupInSelectedWorktreePath() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")

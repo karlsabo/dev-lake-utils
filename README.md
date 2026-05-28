@@ -13,7 +13,8 @@
 
 * [ ] When we mark a notification as 'Done', do all paths make a call to github to mark them done? I'm seeing lots of notifications still show up in GitHub
     * Maybe we have an issue where it's the same notification ID and there's a github update like a new commit or comment and we've blanket ignored it.
-* [ ] Clicking open on a notification takes you to the PR, not to what GitHub wants to take you do such as a new commit or comment.
+* [ ] Clicking open on a notification takes you to the PR, not to what GitHub wants to take you to such as a new commit or comment.
+* [ ] Find large code files, plan out splitting them up.
 * [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on

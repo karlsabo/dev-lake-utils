@@ -131,6 +131,13 @@ data class ActionErrorUiState(
     val message: String,
 )
 
+internal data class CreateLocalWorktreeFromBaseRequest(
+    val repoRootPath: String,
+    val baseWorktreePath: String,
+    val baseBranch: String,
+    val targetBranch: String,
+)
+
 private data class ActionErrorQueueState(
     val current: ActionErrorUiState? = null,
     val queuedMessages: List<String> = emptyList(),
@@ -195,6 +202,10 @@ class EngHubViewModel(
 
     private val localRepositories = MutableStateFlow(config.localRepositories.toLocalRepositoryUiStates())
     val localRepositoriesStateFlow: StateFlow<List<LocalRepositoryUiState>> = localRepositories.asStateFlow()
+    private val lastCreateLocalWorktreeFromBaseRequest =
+        MutableStateFlow<CreateLocalWorktreeFromBaseRequest?>(null)
+    internal val lastCreateLocalWorktreeFromBaseRequestStateFlow: StateFlow<CreateLocalWorktreeFromBaseRequest?> =
+        lastCreateLocalWorktreeFromBaseRequest.asStateFlow()
     private val localRepositoryExpansionsInFlight = MutableStateFlow<Set<String>>(emptySet())
     private val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> = archivingLocalWorktreePaths.asStateFlow()
@@ -443,6 +454,24 @@ class EngHubViewModel(
 
     fun checkoutWorktreePath(repoFullName: String, branch: String): WorktreePath =
         buildWorktreePath(checkoutRepoPath(repoFullName, currentConfig), branch)
+
+    fun createLocalWorktreeFromBase(
+        repoRootPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ) {
+        val request = CreateLocalWorktreeFromBaseRequest(
+            repoRootPath = repoRootPath,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = baseBranch,
+            targetBranch = targetBranch,
+        )
+        logger.info {
+            "Create local worktree requested for $repoRootPath base=$baseBranch target=$targetBranch"
+        }
+        lastCreateLocalWorktreeFromBaseRequest.value = request
+    }
 
     fun openLocalWorktree(repoRootPath: String, worktreePath: String) {
         val normalizedWorktreePath = worktreePath.normalizedRepoPath()

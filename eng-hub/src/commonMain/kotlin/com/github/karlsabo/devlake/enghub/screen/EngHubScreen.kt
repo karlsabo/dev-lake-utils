@@ -112,6 +112,14 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                         onArchiveWorktree = { repoRootPath, worktreePath ->
                             viewModel.archiveLocalWorktree(repoRootPath, worktreePath)
                         },
+                        onCreateWorktree = { repoRootPath, baseWorktreePath, baseBranch, targetBranch ->
+                            viewModel.createLocalWorktreeFromBase(
+                                repoRootPath = repoRootPath,
+                                baseWorktreePath = baseWorktreePath,
+                                baseBranch = baseBranch,
+                                targetBranch = targetBranch,
+                            )
+                        },
                         forceArchiveRequest = forceArchiveWorktreeRequest,
                         onConfirmForceArchiveWorktree = { repoRootPath, worktreePath ->
                             viewModel.confirmForceArchiveLocalWorktree(repoRootPath, worktreePath)

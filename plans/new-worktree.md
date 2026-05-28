@@ -118,7 +118,9 @@ Relevant current code:
 
 **Scope:** Add this specific validation case in UI and business validation. Do not handle remote branch conflicts or branches checked out elsewhere.
 
-### 7. Submit a valid branch from the dialog to the ViewModel
+### 7. Submit a valid branch from the dialog to the ViewModel - Done
+
+**Done** 2026 05 28
 
 **Acceptance criteria:** Given base worktree `feature/base-pr` and target branch `feature/stacked-pr`, when the user confirms the dialog, then the Worktrees pane calls the ViewModel-facing callback with repo root path, base worktree path, base branch, and target branch.
 
