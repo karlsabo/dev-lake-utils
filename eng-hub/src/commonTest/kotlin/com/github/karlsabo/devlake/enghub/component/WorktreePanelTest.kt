@@ -131,6 +131,7 @@ class WorktreePanelTest {
     @Test
     fun createWorktreeDialogShowsInlineValidationAndDisablesCreateForWhitespaceTargetBranch() {
         val validation = startCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
             targetBranch = "feature/new dashboard",
             branchNameValidator = WorktreeBranchNameValidator { true },
         )
@@ -147,8 +148,51 @@ class WorktreePanelTest {
     }
 
     @Test
+    fun createWorktreeDialogDisablesCreateAndShowsInlineValidationForTargetBranchMatchingBase() {
+        val validation = startCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
+            targetBranch = "feature/base-pr",
+            branchNameValidator = WorktreeBranchNameValidator {
+                error("git check should not run when target branch matches the base")
+            },
+        )
+
+        assertEquals(
+            "Target branch must differ from the base branch",
+            createWorktreeTargetBranchValidationMessage(
+                targetBranch = "feature/base-pr",
+                validation = validation,
+            ),
+        )
+        assertFalse(validation.isCheckingGitRefFormat)
+        assertFalse(isCreateWorktreeConfirmEnabled(validation))
+    }
+
+    @Test
+    fun createWorktreeDialogStillRejectsMatchingBaseWhenAsyncValidationCompletes() {
+        val validation = finishCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
+            targetBranch = "feature/base-pr",
+            branchNameValidator = WorktreeBranchNameValidator {
+                error("git check should not run when target branch matches the base")
+            },
+        )
+
+        assertEquals(
+            "Target branch must differ from the base branch",
+            createWorktreeTargetBranchValidationMessage(
+                targetBranch = "feature/base-pr",
+                validation = validation,
+            ),
+        )
+        assertFalse(validation.isCheckingGitRefFormat)
+        assertFalse(isCreateWorktreeConfirmEnabled(validation))
+    }
+
+    @Test
     fun createWorktreeDialogDisablesCreateWithoutShowingInlineValidationForEmptyTargetBranch() {
         val validation = startCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
             targetBranch = "",
             branchNameValidator = WorktreeBranchNameValidator { true },
         )
@@ -164,6 +208,7 @@ class WorktreePanelTest {
     @Test
     fun createWorktreeDialogKeepsCreateDisabledWhileGitRefFormatCheckIsPending() {
         val validation = startCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
             targetBranch = "feature/new-dashboard",
             branchNameValidator = WorktreeBranchNameValidator {
                 error("git check should run from the async validation boundary")
@@ -184,6 +229,7 @@ class WorktreePanelTest {
     @Test
     fun createWorktreeDialogEnablesCreateAfterValidGitRefFormatCheckCompletes() {
         val validation = finishCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
             targetBranch = "feature/new-dashboard",
             branchNameValidator = WorktreeBranchNameValidator { true },
         )
@@ -202,6 +248,7 @@ class WorktreePanelTest {
     @Test
     fun createWorktreeDialogDisablesCreateAfterInvalidGitRefFormatCheckCompletes() {
         val validation = finishCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
             targetBranch = "feature//new-dashboard",
             branchNameValidator = WorktreeBranchNameValidator { false },
         )

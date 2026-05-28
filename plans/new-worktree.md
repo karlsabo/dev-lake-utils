@@ -105,7 +105,9 @@ Relevant current code:
 
 **Scope:** Use the shared validator from story 1 for visible dialog validation. Do not submit or run git.
 
-### 6. Reject target branch equal to selected base branch
+### 6. Reject target branch equal to selected base branch - Done
+
+**Done** 2026 05 28
 
 **Acceptance criteria:** Given selected base branch `feature/base-pr`, when the user enters `feature/base-pr` as the target branch, then the create button is disabled and inline validation says the target branch must differ from the base branch.
 

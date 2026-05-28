@@ -91,26 +91,42 @@ internal fun isWorktreeArchiveEnabled(setupStatus: WorktreeSetupStatus?, isArchi
 internal data class CreateWorktreeTargetBranchValidation(
     val result: WorktreeBranchNameValidationResult,
     val isCheckingGitRefFormat: Boolean,
+    val targetBranchMatchesBase: Boolean = false,
 )
 
+private const val TARGET_BRANCH_MATCHES_BASE_MESSAGE = "Target branch must differ from the base branch"
+
 internal fun startCreateWorktreeTargetBranchValidation(
+    baseBranch: String,
     targetBranch: String,
     branchNameValidator: WorktreeBranchNameValidator,
 ): CreateWorktreeTargetBranchValidation {
     val localValidation = branchNameValidator.validateWithoutGitRefFormatCheck(targetBranch)
+    val targetBranchMatchesBase = targetBranchMatchesBase(baseBranch, targetBranch)
     return CreateWorktreeTargetBranchValidation(
         result = localValidation,
-        isCheckingGitRefFormat = localValidation.isValid,
+        isCheckingGitRefFormat = localValidation.isValid && !targetBranchMatchesBase,
+        targetBranchMatchesBase = targetBranchMatchesBase,
     )
 }
 
 internal fun finishCreateWorktreeTargetBranchValidation(
+    baseBranch: String,
     targetBranch: String,
     branchNameValidator: WorktreeBranchNameValidator,
-): CreateWorktreeTargetBranchValidation = CreateWorktreeTargetBranchValidation(
-    result = branchNameValidator.validate(targetBranch),
-    isCheckingGitRefFormat = false,
-)
+): CreateWorktreeTargetBranchValidation {
+    val localValidation = branchNameValidator.validateWithoutGitRefFormatCheck(targetBranch)
+    val targetBranchMatchesBase = targetBranchMatchesBase(baseBranch, targetBranch)
+    return CreateWorktreeTargetBranchValidation(
+        result = if (localValidation.isValid && !targetBranchMatchesBase) {
+            branchNameValidator.validate(targetBranch)
+        } else {
+            localValidation
+        },
+        isCheckingGitRefFormat = false,
+        targetBranchMatchesBase = targetBranchMatchesBase,
+    )
+}
 
 internal fun createWorktreeTargetBranchValidationMessage(
     targetBranch: String,
@@ -118,11 +134,15 @@ internal fun createWorktreeTargetBranchValidationMessage(
 ): String? = when {
     targetBranch.isEmpty() -> null
     validation.isCheckingGitRefFormat -> null
+    validation.targetBranchMatchesBase -> TARGET_BRANCH_MATCHES_BASE_MESSAGE
     else -> validation.result.message
 }
 
 internal fun isCreateWorktreeConfirmEnabled(validation: CreateWorktreeTargetBranchValidation): Boolean =
-    !validation.isCheckingGitRefFormat && validation.result.isValid
+    !validation.isCheckingGitRefFormat && validation.result.isValid && !validation.targetBranchMatchesBase
+
+private fun targetBranchMatchesBase(baseBranch: String, targetBranch: String): Boolean =
+    targetBranch.isNotEmpty() && targetBranch == baseBranch
 
 @Composable
 fun WorktreePanel(
@@ -376,15 +396,26 @@ private fun CreateWorktreeDialog(
     onDismiss: () -> Unit,
 ) {
     val branchNameValidator = remember { WorktreeBranchNameValidator() }
-    var targetBranchValidation by remember(state.targetBranch) {
-        mutableStateOf(startCreateWorktreeTargetBranchValidation(state.targetBranch, branchNameValidator))
+    var targetBranchValidation by remember(state.baseBranch, state.targetBranch) {
+        mutableStateOf(
+            startCreateWorktreeTargetBranchValidation(
+                baseBranch = state.baseBranch,
+                targetBranch = state.targetBranch,
+                branchNameValidator = branchNameValidator,
+            ),
+        )
     }
-    LaunchedEffect(state.targetBranch) {
+    LaunchedEffect(state.baseBranch, state.targetBranch) {
         if (!targetBranchValidation.isCheckingGitRefFormat) return@LaunchedEffect
 
         val targetBranch = state.targetBranch
+        val baseBranch = state.baseBranch
         targetBranchValidation = withContext(Dispatchers.IO) {
-            finishCreateWorktreeTargetBranchValidation(targetBranch, branchNameValidator)
+            finishCreateWorktreeTargetBranchValidation(
+                baseBranch = baseBranch,
+                targetBranch = targetBranch,
+                branchNameValidator = branchNameValidator,
+            )
         }
     }
     val validationMessage = createWorktreeTargetBranchValidationMessage(
