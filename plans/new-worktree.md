@@ -160,7 +160,9 @@ Relevant current code:
 
 **Scope:** Change refresh timing only. The post-create refresh is best-effort: log/report refresh failures without converting a successful create/setup operation into a failed setup. Do not change dialog behavior or create command semantics.
 
-### 10. Report setup failure after creating a worktree without hiding the worktree
+### 10. Report setup failure after creating a worktree without hiding the worktree - Done
+
+**Done** 2026 05 29
 
 **Acceptance criteria:** Given setup command `exit 23`, when stacked worktree creation succeeds but setup fails, then Eng Hub shows the existing setup failure error and the Worktrees pane can refresh to show the created worktree.
 

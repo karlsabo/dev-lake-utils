@@ -400,6 +400,43 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
+    fun doneMarkDoneFailureRestoresVisibilityAndDoesNotPersist() = runBlocking {
+        val notification = testNotification(
+            id = "thread-1",
+            subjectType = "PullRequest",
+            subjectUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
+        )
+        val api = NotificationPersistenceGitHubApi(
+            notifications = listOf(notification),
+            markDoneFailure = IllegalStateException("mark done failed"),
+        )
+        val store = RecordingNotificationIgnoreStore()
+        val viewModel = createViewModel(api, store)
+        val notificationUiState = withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-1" } }
+                .single { it.notificationThreadId == "thread-1" }
+        }
+
+        viewModel.markNotificationDone(notificationUiState)
+
+        assertEquals(listOf("thread-1"), api.markedDoneThreadIds.awaitValue())
+        assertEquals(
+            "mark done failed",
+            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message },
+        )
+        withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-1" } }
+        }
+        assertTrue(store.savedThreads.value.isEmpty(), "Failed mark-done should not persist the thread locally")
+    }
+
+    @Test
     fun approvePersistsDoneThreadAndFiltersAfterRestart() = runBlocking {
         val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/22"
         val notification = testNotification(
@@ -431,6 +468,7 @@ class EngHubNotificationPersistenceViewModelTest {
 
         assertEquals(listOf(pullRequestUrl), api.approvedPullRequestUrls.awaitValue())
         assertEquals(listOf("thread-2"), api.markedDoneThreadIds.awaitValue())
+        val savedThreads = store.savedThreads.awaitValue()
         assertEquals(
             listOf(
                 SavedThread(
@@ -440,8 +478,9 @@ class EngHubNotificationPersistenceViewModelTest {
                     reason = NotificationIgnoreReason.DONE,
                 ),
             ),
-            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+            savedThreads.map { it.withoutTimestamp() },
         )
+        assertEquals(notification.updatedAt.toEpochMilliseconds(), savedThreads.single().notificationUpdatedAtEpochMs)
 
         val restartedViewModel = createViewModel(api, store)
         val restartedNotifications = withTimeout(2_000.milliseconds) {
@@ -485,6 +524,7 @@ class EngHubNotificationPersistenceViewModelTest {
             api.submittedReviews.awaitValue(),
         )
         assertEquals(listOf("thread-3"), api.markedDoneThreadIds.awaitValue())
+        val savedThreads = store.savedThreads.awaitValue()
         assertEquals(
             listOf(
                 SavedThread(
@@ -494,8 +534,9 @@ class EngHubNotificationPersistenceViewModelTest {
                     reason = NotificationIgnoreReason.DONE,
                 ),
             ),
-            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+            savedThreads.map { it.withoutTimestamp() },
         )
+        assertEquals(notification.updatedAt.toEpochMilliseconds(), savedThreads.single().notificationUpdatedAtEpochMs)
 
         val restartedViewModel = createViewModel(api, store)
         val restartedNotifications = withTimeout(2_000.milliseconds) {

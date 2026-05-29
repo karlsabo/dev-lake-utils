@@ -874,6 +874,80 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun createLocalWorktreeFromBaseRefreshesAgainWhenSetupFailsAfterPostCreateRefreshFailure() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val baseWorktree = Worktree(path = baseWorktreePath, branch = "feature/base-pr", commitHash = "def456")
+        val targetWorktree = Worktree(path = targetWorktreePath.value, branch = targetBranch, commitHash = "789abc")
+        var currentWorktrees = listOf(rootWorktree, baseWorktree)
+        val listCalls = MutableStateFlow(0)
+        val setupRunner = FailingBlockingSetupRunner {
+            "Setup commands failed for ${it.value} with exit code 23"
+        }
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = {
+                val nextCallCount = listCalls.value + 1
+                listCalls.value = nextCallCount
+                if (nextCallCount == 2) throw IllegalStateException("transient worktree list failure")
+                currentWorktrees
+            },
+            onCreateBranchWorktree = { _, _, _, target ->
+                currentWorktrees = currentWorktrees + targetWorktree
+                buildWorktreePath(DEV_LAKE_ROOT, target).value
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("exit 23"),
+                ),
+            ),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT, baseWorktreePath)
+            }
+        }
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(targetWorktreePath) }
+        withTimeout(2_000.milliseconds) { listCalls.first { it >= 2 } }
+
+        setupRunner.fail(targetWorktreePath)
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.any { it.path == targetWorktreePath.value }
+            }.single()
+        }
+
+        assertTrue(actionError?.message?.contains("exit code 23") == true)
+        assertEquals(
+            listOf("main", "feature/base-pr", targetBranch),
+            repository.worktrees.map { it.branch },
+        )
+    }
+
+    @Test
     fun createLocalWorktreeFromBaseSetupFailureSetsActionError() = runBlocking {
         val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
         val targetBranch = "feature/stacked-pr"

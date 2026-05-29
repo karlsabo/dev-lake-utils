@@ -480,6 +480,7 @@ class EngHubViewModel(
             var setupRequest: WorktreeSetupRequest? = null
             var setupHandle: WorktreeSetupHandle? = null
             var postCreateRefresh: PostCreateLocalWorktreeRefresh? = null
+            var refreshedAfterFailure = false
             try {
                 setupRequest = buildCreateLocalWorktreeFromBaseSetupRequest(request)
                 setupHandle = worktreeSetupCoordinator.setup(setupRequest)
@@ -499,10 +500,14 @@ class EngHubViewModel(
                 if (shouldReport) logger.error(e) {
                     "Failed to create local worktree for $repoRootPath base=$baseBranch target=$targetBranch"
                 }
+                setupRequest?.let { failedSetupRequest ->
+                    refreshedAfterFailure = true
+                    refreshLocalRepositoryWorktreesAfterSetupFailure(failedSetupRequest)
+                }
             } finally {
                 val refreshStarted = postCreateRefresh?.cancelWaitingOrAwaitStartedRefresh() ?: false
                 val submittedSetupRequest = setupRequest
-                if (!refreshStarted && submittedSetupRequest != null) {
+                if (!refreshStarted && submittedSetupRequest != null && !refreshedAfterFailure) {
                     refreshLocalRepositoryWorktreesAfterCreate(submittedSetupRequest)
                 }
             }
@@ -541,6 +546,13 @@ class EngHubViewModel(
         refreshLocalRepositoryWorktreesBestEffort(
             repoRootPath = setupRequest.repoPath,
             logContext = "after creating worktree ${setupRequest.worktreePath.value}",
+        )
+    }
+
+    private fun refreshLocalRepositoryWorktreesAfterSetupFailure(setupRequest: WorktreeSetupRequest) {
+        refreshLocalRepositoryWorktreesBestEffort(
+            repoRootPath = setupRequest.repoPath,
+            logContext = "after setup failed for worktree ${setupRequest.worktreePath.value}",
         )
     }
 

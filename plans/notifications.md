@@ -25,7 +25,7 @@ Make Eng Hub notification “Done” handling reliably clear the corresponding G
 
 ## Stories
 
-### 1. Persist the GitHub notification update watermark with ignored threads
+### 1. Persist the GitHub notification update watermark with ignored threads - Done
 
 **Status:** Done.
 
@@ -44,7 +44,9 @@ Make Eng Hub notification “Done” handling reliably clear the corresponding G
 
 **Notes:** Existing rows will not have a real GitHub `updated_at`. Treat legacy `DONE` rows as stale so GitHub-returned notifications can be re-evaluated rather than silently hidden forever. `UNSUBSCRIBED` rows remain thread-wide hides regardless of watermark.
 
-### 2. Save the current notification snapshot when a user marks a notification Done
+### 2. Save the current notification snapshot when a user marks a notification Done - Done
+
+**Status:** Done.
 
 **Acceptance criteria:** Given a visible notification `thread-1` with `updatedAt=2026-05-29T10:00:00Z`, when the user clicks Done, then `gitHubApi.markNotificationAsDone("thread-1")` is called once and the local DONE record stores `notification_updated_at=2026-05-29T10:00:00Z` only after the GitHub call succeeds.
 
