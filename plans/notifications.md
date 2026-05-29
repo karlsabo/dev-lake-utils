@@ -91,7 +91,9 @@ Make Eng Hub notification “Done” handling reliably clear the corresponding G
 
 **Notes:** This keeps closed/merged PR noise out of the UI while still making the GitHub-side Done call for fresh activity.
 
-### 5. Keep unsubscribed threads hidden across future GitHub activity
+### 5. Keep unsubscribed threads hidden across future GitHub activity - Done
+
+**Status:** Done.
 
 **Acceptance criteria:** Given the local store has `thread-3` marked `UNSUBSCRIBED`, when GitHub later returns `thread-3` with a newer `updatedAt`, then Eng Hub continues to hide the notification and does not show it in the UI.
 

@@ -215,6 +215,39 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
+    fun keepsUnsubscribedThreadHiddenAcrossNewGitHubActivity() = runBlocking {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/3"
+        val notification = testNotification(
+            id = "thread-3",
+            title = "New activity after unsubscribe",
+            subjectType = "PullRequest",
+            subjectUrl = pullRequestUrl,
+            updatedAt = Instant.parse("2026-05-29T10:05:00Z"),
+        )
+        val api = NotificationPersistenceGitHubApi(notifications = listOf(notification))
+        val store = RecordingNotificationIgnoreStore(
+            initialIgnoredThreads = listOf(
+                ignoredThread(
+                    threadId = "thread-3",
+                    reason = NotificationIgnoreReason.UNSUBSCRIBED,
+                    notificationUpdatedAtEpochMs = Instant.parse("2026-05-29T10:00:00Z").toEpochMilliseconds(),
+                ),
+            ),
+        )
+        val viewModel = createViewModel(api, store)
+
+        val notifications = withTimeout(2_000.milliseconds) {
+            viewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+
+        assertTrue(notifications.isEmpty())
+        assertTrue(
+            api.pullRequestByUrlCalls.isEmpty(),
+            "Unsubscribed notifications should stay hidden before enrichment"
+        )
+    }
+
+    @Test
     fun reMarksAutomaticallyHandledRevivedDoneThreadAndUpdatesWatermark() = runBlocking {
         val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/2"
         val notification = testNotification(

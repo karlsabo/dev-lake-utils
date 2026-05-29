@@ -278,6 +278,43 @@ class GitWorktreeServiceTest {
     }
 
     @Test
+    fun createBranchWorktree_exactExistingTargetWorktreeReturnsPathWithoutCreating() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        val baseWorktreePath = "/repos/dev-lake-utils-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = GitWorktreeService.buildWorktreePath(repoPath, targetBranch)
+        fake.worktreeListResult = """
+            worktree /repos/dev-lake-utils
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree $targetWorktreePath
+            HEAD def456
+            branch refs/heads/feature/stacked-pr
+        """.trimIndent()
+        fake.remoteBranchExistsAction = { _, _, _ -> true }
+        val service = GitWorktreeService(fake)
+
+        val result = service.createBranchWorktree(
+            repoPath,
+            baseWorktreePath,
+            "feature/base-pr",
+            targetBranch,
+        )
+
+        assertEquals(targetWorktreePath, result)
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature/base-pr")),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", targetBranch)),
+                FakeGitCommandApi.Call("worktreeList", listOf(repoPath)),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
     fun createBranchWorktree_targetBranchCheckedOutElsewhereFailsBeforeWorktreeCommand() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"

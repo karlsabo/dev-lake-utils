@@ -627,6 +627,73 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun createLocalWorktreeFromBaseRunsSetupAndRefreshesWhenExactTargetWorktreeAlreadyExists() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val targetWorktree = Worktree(path = targetWorktreePath.value, branch = targetBranch, commitHash = "789abc")
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesByRepoPath = mapOf(
+                DEV_LAKE_ROOT to listOf(
+                    Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                    Worktree(path = baseWorktreePath, branch = "feature/base-pr", commitHash = "def456"),
+                    targetWorktree,
+                ),
+            ),
+            onCreateBranchWorktree = { _, _, _, _ -> targetWorktreePath.value },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("setup existing stacked worktree"),
+                ),
+            ),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(targetWorktreePath) }
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.any { it.path == targetWorktreePath.value }
+            }.single()
+        }
+
+        assertEquals(
+            listOf("main", "feature/base-pr", targetBranch),
+            repository.worktrees.map { it.branch },
+        )
+        assertEquals(
+            listOf("setup existing stacked worktree"),
+            setupRunner.requestFor(targetWorktreePath)?.setupCommands,
+        )
+        assertEquals(
+            WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+            viewModel.setupStatusesStateFlow.value[targetWorktreePath],
+        )
+
+        setupRunner.complete(targetWorktreePath)
+        withTimeout(2_000.milliseconds) {
+            viewModel.setupStatusesStateFlow.first { targetWorktreePath !in it }
+        }
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
     fun createLocalWorktreeFromBaseRefreshesRepositoryWhileSetupIsRunning() = runBlocking {
         val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
         val targetBranch = "feature/stacked-pr"

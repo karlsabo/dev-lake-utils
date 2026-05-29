@@ -203,7 +203,9 @@ Relevant current code:
 
 **Scope:** Detect remote same-name branch and block. Do not silently check out or track the remote branch.
 
-### 13. Reuse an exact existing target worktree
+### 13. Reuse an exact existing target worktree - Done
+
+**Done** 2026 05 29
 
 **Acceptance criteria:** Given the exact derived worktree path for `feature/stacked-pr` already exists, when the user creates `feature/stacked-pr` from `feature/base-pr`, then Eng Hub skips ancestry validation, runs setup commands in that existing worktree, and refreshes the repository row.
 

@@ -72,7 +72,8 @@ class GitWorktreeService(
         validateWorktreeBranchName(baseBranch)
         validateWorktreeBranchName(targetBranch)
         val worktreePath = buildWorktreePath(repoPath, targetBranch)
-        val checkedOutElsewhere = listWorktreeEntries(repoPath).firstOrNull { worktree ->
+        val existingWorktrees = listWorktreeEntries(repoPath)
+        val checkedOutElsewhere = existingWorktrees.firstOrNull { worktree ->
             worktree.branch == targetBranch && worktree.path != worktreePath
         }
         if (checkedOutElsewhere != null) {
@@ -81,6 +82,14 @@ class GitWorktreeService(
                         "Choose a different branch name.",
             )
         }
+        val exactTargetWorktree = existingWorktrees.firstOrNull { worktree ->
+            worktree.path == worktreePath && worktree.branch == targetBranch
+        }
+        if (exactTargetWorktree != null) {
+            logger.info { "Worktree already exists at $worktreePath for branch $targetBranch" }
+            return worktreePath
+        }
+
         if (remoteBranchExists(repoPath, targetBranch)) {
             throw GitWorktreeException(
                 "Remote branch origin/$targetBranch already exists. Choose a different branch name.",
