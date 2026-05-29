@@ -173,7 +173,9 @@ Relevant current code:
 
 **Scope:** Preserve/report post-create setup failure through the existing setup error dialog/action-error path. Refresh/list failures after the setup failure should not hide or delete the created worktree. Do not delete/archive the failed worktree or add retry setup.
 
-### 11. Show branch checked out elsewhere error
+### 11. Show branch checked out elsewhere error - Done
+
+**Done** 2026 05 29
 
 **Acceptance criteria:** Given `feature/stacked-pr` is already checked out in another worktree at a different path, when the user tries to create `feature/stacked-pr` from `feature/base-pr`, then Eng Hub shows an error explaining that the branch is already checked out elsewhere.
 

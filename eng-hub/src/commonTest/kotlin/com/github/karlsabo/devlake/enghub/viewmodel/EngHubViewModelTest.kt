@@ -8,6 +8,7 @@ import com.github.karlsabo.devlake.enghub.component.checkoutSetupStatus
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.git.GitWorktreeException
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.WorktreePath
@@ -1001,6 +1002,53 @@ class EngHubViewModelTest {
             viewModel.setupStatusesStateFlow.first { targetWorktreePath !in it }
         }
         assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseShowsBranchCheckedOutElsewhereError() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            onCreateBranchWorktree = { _, _, _, _ ->
+                throw GitWorktreeException(
+                    "Branch feature/stacked-pr is already checked out elsewhere at " +
+                            "/repos/dev-lake-utils-feature-stacked-pr-existing. Choose a different branch name.",
+                )
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("should not run"),
+                ),
+            ),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals(
+            "Branch feature/stacked-pr is already checked out elsewhere at " +
+                    "/repos/dev-lake-utils-feature-stacked-pr-existing. Choose a different branch name.",
+            actionError?.message,
+        )
+        assertEquals(0, setupRunner.calls())
     }
 
     @Test

@@ -272,6 +272,43 @@ class GitWorktreeServiceTest {
     }
 
     @Test
+    fun createBranchWorktree_targetBranchCheckedOutElsewhereFailsBeforeWorktreeCommand() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        val targetBranch = "feature/stacked-pr"
+        fake.worktreeListResult = """
+            worktree /repos/dev-lake-utils
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree /repos/dev-lake-utils-stacked-pr-existing
+            HEAD def456
+            branch refs/heads/feature/stacked-pr
+        """.trimIndent()
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.createBranchWorktree(
+                repoPath,
+                "/repos/dev-lake-utils-feature-base-pr",
+                "feature/base-pr",
+                targetBranch,
+            )
+        }
+
+        assertTrue(ex.message!!.contains("Branch feature/stacked-pr is already checked out elsewhere"))
+        assertTrue(ex.message!!.contains("/repos/dev-lake-utils-stacked-pr-existing"))
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature/base-pr")),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", targetBranch)),
+                FakeGitCommandApi.Call("worktreeList", listOf(repoPath)),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
     fun createBranchWorktree_invalidTargetBranchFailsBeforeWorktreeCommand() {
         val fake = FakeGitCommandApi()
         val service = GitWorktreeService(fake)

@@ -175,6 +175,46 @@ class EngHubNotificationPersistenceViewModelTest {
     }
 
     @Test
+    fun showsNewGitHubActivityOnPreviouslyDoneThread() = runBlocking {
+        val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1"
+        val notification = testNotification(
+            id = "thread-1",
+            title = "Please review feature",
+            subjectType = "PullRequest",
+            subjectUrl = pullRequestUrl,
+            updatedAt = Instant.parse("2026-05-29T10:05:00Z"),
+        )
+        val api = NotificationPersistenceGitHubApi(
+            notifications = listOf(notification),
+            pullRequestsByUrl = mapOf(
+                pullRequestUrl to PullRequest(
+                    number = 1,
+                    url = pullRequestUrl,
+                    state = "open",
+                    head = PullRequestHead(ref = "feature/revived"),
+                ),
+            ),
+        )
+        val store = RecordingNotificationIgnoreStore(
+            initialIgnoredThreads = listOf(
+                ignoredThread(
+                    threadId = "thread-1",
+                    reason = NotificationIgnoreReason.DONE,
+                    notificationUpdatedAtEpochMs = Instant.parse("2026-05-29T10:00:00Z").toEpochMilliseconds(),
+                ),
+            ),
+        )
+        val viewModel = createViewModel(api, store)
+
+        val notifications = withTimeout(2_000.milliseconds) {
+            viewModel.notifications.filterNotNull().first().getOrThrow()
+        }
+
+        assertEquals(listOf("thread-1"), notifications.map { it.notificationThreadId })
+        assertTrue(api.markedDoneThreadIds.value.isEmpty(), "Open non-auto-approvable notifications should be shown")
+    }
+
+    @Test
     fun automaticClosedPullRequestCleanupPersistsDoneThreadAndFiltersAfterRestart() = runBlocking {
         assertAutomaticPullRequestCleanupPersistsDoneThreadAndFiltersAfterRestart(
             PullRequest(
@@ -828,18 +868,36 @@ private data class SavedThread(
     fun withoutTimestamp(): SavedThread = copy(ignoredAtEpochMs = null, notificationUpdatedAtEpochMs = null)
 }
 
+private fun ignoredThread(
+    threadId: String,
+    reason: NotificationIgnoreReason,
+    notificationUpdatedAtEpochMs: Long? = null,
+): IgnoredNotificationThread = IgnoredNotificationThread(
+    threadId = threadId,
+    repositoryFullName = "test-org/test-repo",
+    subjectType = "PullRequest",
+    reason = reason,
+    ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
+    notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+)
+
 private class RecordingNotificationIgnoreStore(
     initialThreadIds: Set<String> = emptySet(),
+    initialIgnoredThreads: List<IgnoredNotificationThread> = emptyList(),
     private val saveFailure: Exception? = null,
     saveFailuresBeforeSuccess: List<Exception> = emptyList(),
 ) : NotificationIgnoreStore {
-    private var storedThreadIds = initialThreadIds.toMutableSet()
+    private var storedIgnoredThreads = (
+            initialIgnoredThreads + initialThreadIds.map { threadId ->
+                ignoredThread(threadId = threadId, reason = NotificationIgnoreReason.UNSUBSCRIBED)
+            }
+            ).associateBy { it.threadId }.toMutableMap()
     private val queuedSaveFailures = saveFailuresBeforeSuccess.toMutableList()
     val savedThreads = MutableStateFlow<List<SavedThread>>(emptyList())
 
-    override fun listIgnoredThreadIds(): Set<String> = storedThreadIds.toSet()
+    override fun listIgnoredThreadIds(): Set<String> = storedIgnoredThreads.keys
 
-    override fun listIgnoredThreads(): List<IgnoredNotificationThread> = emptyList()
+    override fun listIgnoredThreads(): List<IgnoredNotificationThread> = storedIgnoredThreads.values.toList()
 
     override fun saveIgnoredThread(
         threadId: String,
@@ -851,7 +909,14 @@ private class RecordingNotificationIgnoreStore(
     ) {
         saveFailure?.let { throw it }
         if (queuedSaveFailures.isNotEmpty()) throw queuedSaveFailures.removeAt(0)
-        storedThreadIds += threadId
+        storedIgnoredThreads[threadId] = IgnoredNotificationThread(
+            threadId = threadId,
+            repositoryFullName = repositoryFullName,
+            subjectType = subjectType,
+            reason = reason,
+            ignoredAtEpochMs = ignoredAtEpochMs,
+            notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+        )
         savedThreads.value += SavedThread(
             threadId = threadId,
             repositoryFullName = repositoryFullName,
@@ -966,13 +1031,13 @@ private fun testNotification(
     subjectType: String,
     subjectUrl: String?,
     title: String = "Notification $id",
+    updatedAt: Instant = Clock.System.now(),
 ): Notification {
-    val now = Clock.System.now()
     return Notification(
         id = id,
         unread = true,
         reason = "review_requested",
-        updatedAt = now,
+        updatedAt = updatedAt,
         lastReadAt = null,
         subject = NotificationSubject(
             title = title,

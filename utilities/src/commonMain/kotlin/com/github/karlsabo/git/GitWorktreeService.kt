@@ -72,6 +72,15 @@ class GitWorktreeService(
         validateWorktreeBranchName(baseBranch)
         validateWorktreeBranchName(targetBranch)
         val worktreePath = buildWorktreePath(repoPath, targetBranch)
+        val checkedOutElsewhere = listWorktreeEntries(repoPath).firstOrNull { worktree ->
+            worktree.branch == targetBranch && worktree.path != worktreePath
+        }
+        if (checkedOutElsewhere != null) {
+            throw GitWorktreeException(
+                "Branch $targetBranch is already checked out elsewhere at ${checkedOutElsewhere.path}. " +
+                        "Choose a different branch name.",
+            )
+        }
 
         try {
             gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseBranch)
@@ -122,13 +131,7 @@ class GitWorktreeService(
     }
 
     override fun listWorktrees(repoPath: String): List<Worktree> {
-        val output = try {
-            gitCommandApi.worktreeList(repoPath)
-        } catch (e: GitCommandException) {
-            throw GitWorktreeException("Failed to list worktrees for $repoPath: ${e.gitOutput}", e)
-        }
-
-        return parseWorktreeListPorcelain(output).map { worktree ->
+        return listWorktreeEntries(repoPath).map { worktree ->
             worktree.copy(isDirty = isWorktreeDirty(worktree.path))
         }
     }
@@ -200,6 +203,16 @@ class GitWorktreeService(
         if (!validation.isValid) {
             throw GitWorktreeException("Invalid worktree branch name: ${validation.message}")
         }
+    }
+
+    private fun listWorktreeEntries(repoPath: String): List<Worktree> {
+        val output = try {
+            gitCommandApi.worktreeList(repoPath)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to list worktrees for $repoPath: ${e.gitOutput}", e)
+        }
+
+        return parseWorktreeListPorcelain(output)
     }
 
     private fun isWorktreeDirty(worktreePath: String): Boolean {

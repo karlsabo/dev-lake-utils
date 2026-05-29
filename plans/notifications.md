@@ -60,7 +60,9 @@ Make Eng Hub notification “Done” handling reliably clear the corresponding G
 
 **Notes:** Keep the existing failure behavior: if GitHub mark-done fails, restore visibility and do not persist local DONE.
 
-### 3. Show new GitHub activity on a previously done thread
+### 3. Show new GitHub activity on a previously done thread - Done
+
+**Status:** Done.
 
 **Acceptance criteria:** Given the local store has `thread-1` marked DONE with `notification_updated_at=2026-05-29T10:00:00Z`, when GitHub later returns `thread-1` with `updatedAt=2026-05-29T10:05:00Z` for an open pull request that is not auto-approvable, then Eng Hub shows the notification instead of filtering it from the UI.
 
