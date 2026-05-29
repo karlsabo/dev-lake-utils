@@ -133,7 +133,9 @@ Relevant current code:
 
 **Scope:** Wire UI to ViewModel method boundary. The ViewModel method may be a no-op/test-recorded seam if creation is not part of this PR.
 
-### 8. Create and set up a stacked worktree from the submitted dialog
+### 8. Create and set up a stacked worktree from the submitted dialog - Done
+
+**Done** 2026 05 28
 
 **Acceptance criteria:** Given the ViewModel receives base branch `feature/base-pr` and target branch `feature/stacked-pr`, when creation succeeds, then Eng Hub creates the derived worktree and starts setup for that worktree path.
 

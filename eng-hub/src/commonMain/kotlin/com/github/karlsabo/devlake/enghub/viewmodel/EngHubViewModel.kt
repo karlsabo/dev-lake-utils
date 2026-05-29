@@ -20,6 +20,7 @@ import com.github.karlsabo.devlake.enghub.state.toNotificationUiState
 import com.github.karlsabo.devlake.enghub.state.toPullRequestUiState
 import com.github.karlsabo.git.GitCommandException
 import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.git.WorktreeBranchNameValidator
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupCoordinator
 import com.github.karlsabo.git.WorktreeSetupHandle
@@ -471,6 +472,71 @@ class EngHubViewModel(
             "Create local worktree requested for $repoRootPath base=$baseBranch target=$targetBranch"
         }
         lastCreateLocalWorktreeFromBaseRequest.value = request
+
+        viewModelScope.launch(Dispatchers.IO) {
+            var setupRequest: WorktreeSetupRequest? = null
+            var setupHandle: WorktreeSetupHandle? = null
+            try {
+                setupRequest = buildCreateLocalWorktreeFromBaseSetupRequest(request)
+                setupHandle = worktreeSetupCoordinator.setup(setupRequest)
+                setupHandle.await()
+                logger.info { "Setup: created local worktree setup done for ${setupRequest.worktreePath.value}" }
+            } catch (e: Exception) {
+                val message = e.message ?: "Failed to create worktree"
+                val shouldReport = setupRequest?.let { requestWithPath ->
+                    setupHandle?.let { handle ->
+                        enqueueSetupActionErrorOnce(requestWithPath.worktreePath, handle, message)
+                    }
+                } ?: run {
+                    enqueueActionError(message)
+                    true
+                }
+                if (shouldReport) logger.error(e) {
+                    "Failed to create local worktree for $repoRootPath base=$baseBranch target=$targetBranch"
+                }
+            }
+        }
+    }
+
+    private fun buildCreateLocalWorktreeFromBaseSetupRequest(
+        request: CreateLocalWorktreeFromBaseRequest,
+    ): WorktreeSetupRequest {
+        val normalizedRepoRootPath = request.repoRootPath.normalizedRepoPath()
+        val normalizedBaseWorktreePath = request.baseWorktreePath.normalizedRepoPath()
+        validateCreateLocalWorktreeFromBaseRequest(
+            repoRootPath = normalizedRepoRootPath,
+            baseWorktreePath = normalizedBaseWorktreePath,
+            baseBranch = request.baseBranch,
+            targetBranch = request.targetBranch,
+        )
+
+        val worktreePath = buildWorktreePath(normalizedRepoRootPath, request.targetBranch)
+        return WorktreeSetupRequest(
+            repoPath = normalizedRepoRootPath,
+            worktreePath = worktreePath,
+            baseWorktreePath = normalizedBaseWorktreePath,
+            baseBranch = request.baseBranch,
+            targetBranch = request.targetBranch,
+            setupShell = currentConfig.setupShell,
+            setupCommands = configuredWorktreeSetupCommands(normalizedRepoRootPath, currentConfig),
+        )
+    }
+
+    private fun validateCreateLocalWorktreeFromBaseRequest(
+        repoRootPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ) {
+        require(repoRootPath.isNotEmpty()) { "Repository root path is required" }
+        require(baseWorktreePath.isNotEmpty()) { "Base worktree path is required" }
+        require(baseBranch != targetBranch) { "Target branch must differ from the base branch" }
+
+        val branchNameValidator = WorktreeBranchNameValidator()
+        val baseBranchValidation = branchNameValidator.validate(baseBranch)
+        require(baseBranchValidation.isValid) { "Invalid base branch: ${baseBranchValidation.message}" }
+        val targetBranchValidation = branchNameValidator.validate(targetBranch)
+        require(targetBranchValidation.isValid) { "Invalid target branch: ${targetBranchValidation.message}" }
     }
 
     fun openLocalWorktree(repoRootPath: String, worktreePath: String) {

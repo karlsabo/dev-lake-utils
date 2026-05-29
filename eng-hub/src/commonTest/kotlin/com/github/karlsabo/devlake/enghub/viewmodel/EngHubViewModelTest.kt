@@ -565,6 +565,222 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun createLocalWorktreeFromBaseCreatesDerivedWorktreeAndStartsConfiguredSetup() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            onCreateBranchWorktree = { _, _, _, target -> buildWorktreePath(DEV_LAKE_ROOT, target).value },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("setup stacked worktree"),
+                ),
+            ),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(targetWorktreePath) }
+
+        assertEquals(
+            listOf(
+                CreateBranchWorktreeCall(
+                    repoPath = DEV_LAKE_ROOT,
+                    baseWorktreePath = baseWorktreePath,
+                    baseBranch = "feature/base-pr",
+                    targetBranch = targetBranch,
+                ),
+            ),
+            api.createBranchWorktreeCalls,
+        )
+        assertEquals(
+            WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+            viewModel.setupStatusesStateFlow.value[targetWorktreePath],
+        )
+        assertEquals(
+            listOf("setup stacked worktree"),
+            setupRunner.requestFor(targetWorktreePath)?.setupCommands,
+        )
+
+        setupRunner.complete(targetWorktreePath)
+        withTimeout(2_000.milliseconds) {
+            viewModel.setupStatusesStateFlow.first { targetWorktreePath !in it }
+        }
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseSetupFailureSetsActionError() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val setupRunner = FailingBlockingSetupRunner { "setup failed after create" }
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            onCreateBranchWorktree = { _, _, _, target -> buildWorktreePath(DEV_LAKE_ROOT, target).value },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("fail setup"),
+                ),
+            ),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(targetWorktreePath) }
+
+        setupRunner.fail(targetWorktreePath)
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals("setup failed after create", actionError?.message)
+        assertEquals(
+            listOf(
+                CreateBranchWorktreeCall(
+                    repoPath = DEV_LAKE_ROOT,
+                    baseWorktreePath = baseWorktreePath,
+                    baseBranch = "feature/base-pr",
+                    targetBranch = targetBranch,
+                ),
+            ),
+            api.createBranchWorktreeCalls,
+        )
+        withTimeout(2_000.milliseconds) {
+            viewModel.setupStatusesStateFlow.first { targetWorktreePath !in it }
+        }
+        assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseCreationFailureSetsActionErrorWithoutRunningSetup() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            onCreateBranchWorktree = { _, _, _, _ -> throw IllegalStateException("git worktree add failed") },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("should not run"),
+                ),
+            ),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals("git worktree add failed", actionError?.message)
+        assertEquals(
+            listOf(
+                CreateBranchWorktreeCall(
+                    repoPath = DEV_LAKE_ROOT,
+                    baseWorktreePath = baseWorktreePath,
+                    baseBranch = "feature/base-pr",
+                    targetBranch = targetBranch,
+                ),
+            ),
+            api.createBranchWorktreeCalls,
+        )
+        assertEquals(0, setupRunner.calls())
+        assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
+        assertEquals(null, setupRunner.requestFor(targetWorktreePath))
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseRejectsInvalidTargetBranchWithoutCreatingWorktree() = runBlocking {
+        val api = RecordingGitWorktreeApi(repositoryWorktreesBySelectedPath = emptyMap())
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr",
+            baseBranch = "feature/base-pr",
+            targetBranch = "feature/stacked pr",
+        )
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals("Invalid target branch: Branch name must not contain whitespace", actionError?.message)
+        assertEquals(emptyList(), api.createBranchWorktreeCalls)
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseRejectsTargetBranchMatchingBaseWithoutCreatingWorktree() = runBlocking {
+        val api = RecordingGitWorktreeApi(repositoryWorktreesBySelectedPath = emptyMap())
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositories = listOf(DEV_LAKE_ROOT),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr",
+            baseBranch = "feature/base-pr",
+            targetBranch = "feature/base-pr",
+        )
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals("Target branch must differ from the base branch", actionError?.message)
+        assertEquals(emptyList(), api.createBranchWorktreeCalls)
+    }
+
+    @Test
     fun openingExistingWorktreeRunsConfiguredSetupInSelectedWorktreePath() = runBlocking {
         val repoRoot = createTempDir("repo")
         val worktreePath = createTempDir("worktree")
@@ -1731,14 +1947,18 @@ private fun createLocalRepositoryViewModel(
 
 private class BlockingCoordinatorSetupRunner : WorktreeSetupCommandRunner {
     private val signals = WorktreeSetupRunnerSignals()
+    private val requests = MutableStateFlow<Map<WorktreePath, WorktreeSetupRequest>>(emptyMap())
 
     override suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult {
+        requests.update { it + (request.worktreePath to request) }
         signals.recordStarted(request.worktreePath)
         signals.awaitUnblocked(request.worktreePath)
         return WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
     }
 
     fun calls(): Int = signals.calls()
+
+    fun requestFor(worktreePath: WorktreePath): WorktreeSetupRequest? = requests.value[worktreePath]
 
     suspend fun awaitStarted(worktreePath: WorktreePath) {
         signals.awaitStarted(worktreePath)
@@ -1809,6 +2029,13 @@ private class WorktreeSetupRunnerSignals {
     }
 }
 
+private data class CreateBranchWorktreeCall(
+    val repoPath: String,
+    val baseWorktreePath: String,
+    val baseBranch: String,
+    val targetBranch: String,
+)
+
 private class RecordingGitWorktreeApi(
     private val repositoryWorktreesBySelectedPath: Map<String, RepositoryWorktrees>,
     worktreesByRepoPath: Map<String, List<Worktree>>? = null,
@@ -1817,6 +2044,9 @@ private class RecordingGitWorktreeApi(
     private val onListWorktrees: (String) -> Unit = {},
     private val archiveWorktreeFailure: RuntimeException? = null,
     private val onArchiveWorktree: (String, String, Boolean) -> Unit = { _, _, _ -> },
+    private val onCreateBranchWorktree: (String, String, String, String) -> String = { _, _, _, _ ->
+        error("Unexpected call")
+    },
 ) : GitWorktreeApi {
     constructor(
         worktreesForRepoPath: (String) -> List<Worktree>,
@@ -1849,6 +2079,7 @@ private class RecordingGitWorktreeApi(
     val listWorktreeRepoPaths = mutableListOf<String>()
     val ensureRepositoryCalls = mutableListOf<Pair<String, String>>()
     val ensureWorktreeCalls = mutableListOf<Pair<String, String>>()
+    val createBranchWorktreeCalls = mutableListOf<CreateBranchWorktreeCall>()
     val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
     val archiveWorktreeForceValues = mutableListOf<Boolean>()
     private val worktreesByRepoPath = worktreesByRepoPath
@@ -1871,7 +2102,13 @@ private class RecordingGitWorktreeApi(
         baseBranch: String,
         targetBranch: String,
     ): String {
-        error("Unexpected call")
+        createBranchWorktreeCalls += CreateBranchWorktreeCall(
+            repoPath = repoPath,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = baseBranch,
+            targetBranch = targetBranch,
+        )
+        return onCreateBranchWorktree(repoPath, baseWorktreePath, baseBranch, targetBranch)
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
