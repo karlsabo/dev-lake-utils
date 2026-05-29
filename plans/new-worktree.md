@@ -146,7 +146,9 @@ Relevant current code:
 
 **Scope:** Add business validation and create+setup invocation using existing configured setup commands. Creation/setup failures must be caught and reported through the existing action-error path so the app remains usable. Do not add immediate refresh timing, hierarchy display, ancestry override, detached-base stacking, or polished conflict handling.
 
-### 9. Refresh the repository row after git creation before setup completes
+### 9. Refresh the repository row after git creation before setup completes - Done
+
+**Done** 2026 05 29
 
 **Acceptance criteria:** Given git worktree creation succeeds and setup is still running, when the repository row is visible, then the new worktree appears while setup status remains visible until setup completes.
 

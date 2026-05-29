@@ -14,8 +14,6 @@
 * [ ] When we mark a notification as 'Done', do all paths make a call to github to mark them done? I'm seeing lots of notifications still show up in GitHub
     * Maybe we have an issue where it's the same notification ID and there's a github update like a new commit or comment and we've blanket ignored it.
 * [ ] Clicking open on a notification takes you to the PR, not to what GitHub wants to take you to such as a new commit or comment.
-* [ ] Find large code files, plan out splitting them up.
-* [ ] Should be able to create a new worktree and have it run the setup commands.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on
     * Clicking on the worktree to expand, it sometimes takes too long to expand
@@ -23,7 +21,8 @@
     * Should be able to right-click to get all the menu options
     * Should have PR information if there's a PR connected to the branch
         * Should have menu options to open the PR in the web
-    * Should have shortcut style buttons, open, and archive, use emojis to keep it small
+  * Should have shortcut style buttons, open, and archive, use emojis to keep it small
+* [ ] Find large code files, plan out splitting them up.
 * [ ] Have the GH API for getting notifications return each page as it loads one, so maybe use a kotlinx coroutine channel. that way the UI is more responsive and doesn't have to wait for all notifications to load before it can start displaying some.
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
