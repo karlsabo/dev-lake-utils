@@ -217,7 +217,9 @@ Relevant current code:
 
 **Scope:** Reuse only the exact target worktree path. Do not reuse branches checked out at a different path.
 
-### 14. Expose branch ancestry checks in git utilities
+### 14. Expose branch ancestry checks in git utilities - Done
+
+**Done** 2026 05 29
 
 **Acceptance criteria:** Given branches `feature/base-pr` and `feature/stacked-pr`, when ancestry is checked, then utilities report whether the base tip is an ancestor of the child tip.
 

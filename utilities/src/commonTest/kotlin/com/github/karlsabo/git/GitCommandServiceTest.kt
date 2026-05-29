@@ -129,6 +129,27 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun isAncestor_reportsMergeBaseIsAncestorSemantics() {
+        val repoDir = createTempDir("repo")
+        try {
+            initRepoWithCommit(repoDir)
+            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr"), workingDirectory = null)
+            executeCommand(
+                listOf("git", "-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr"),
+                workingDirectory = null,
+            )
+            executeCommand(listOf("sh", "-c", "echo child > $repoDir/child.txt"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "child"), workingDirectory = null)
+
+            assertTrue(service.isAncestor(repoDir, "feature/base-pr", "feature/stacked-pr"))
+            assertFalse(service.isAncestor(repoDir, "feature/stacked-pr", "feature/base-pr"))
+        } finally {
+            removeTempDir(repoDir)
+        }
+    }
+
+    @Test
     fun worktree_addListRemove_lifecycle() {
         val repoDir = createTempDir("repo")
         val worktreeDir = createTempDir("wt")

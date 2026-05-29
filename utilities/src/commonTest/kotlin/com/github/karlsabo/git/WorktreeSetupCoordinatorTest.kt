@@ -64,6 +64,9 @@ private class FakeGitWorktreeApi : GitWorktreeApi {
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 
+    override fun isBranchAncestor(repoPath: String, baseBranch: String, childBranch: String): Boolean =
+        error("isBranchAncestor is not used by WorktreeSetupCoordinator")
+
     override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees =
         error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
 
@@ -135,6 +138,9 @@ private class SerializingFakeGitWorktreeApi : GitWorktreeApi {
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
+
+    override fun isBranchAncestor(repoPath: String, baseBranch: String, childBranch: String): Boolean =
+        error("isBranchAncestor is not used by WorktreeSetupCoordinator")
 
     override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees =
         error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")

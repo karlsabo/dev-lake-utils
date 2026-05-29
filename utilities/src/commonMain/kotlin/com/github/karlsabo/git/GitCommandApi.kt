@@ -19,6 +19,9 @@ interface GitCommandApi {
     /** Return `true` when `refs/heads/<branch>` exists on [remote]. */
     fun remoteBranchExists(repoPath: String, branch: String, remote: String = "origin"): Boolean
 
+    /** Return `true` when [ancestorRef] is an ancestor of [descendantRef]. */
+    fun isAncestor(repoPath: String, ancestorRef: String, descendantRef: String): Boolean
+
     /** `git -C <repoPath> worktree add <path> <commitIsh>`. */
     fun worktreeAdd(repoPath: String, path: String, commitIsh: String)
 

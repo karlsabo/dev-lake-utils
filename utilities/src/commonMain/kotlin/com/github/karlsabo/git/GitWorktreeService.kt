@@ -114,6 +114,19 @@ class GitWorktreeService(
         return listWorktrees(repoPath).any { it.path == worktreePath }
     }
 
+    override fun isBranchAncestor(repoPath: String, baseBranch: String, childBranch: String): Boolean {
+        validateWorktreeBranchName(baseBranch)
+        validateWorktreeBranchName(childBranch)
+        return try {
+            gitCommandApi.isAncestor(repoPath, "refs/heads/$baseBranch", "refs/heads/$childBranch")
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to check whether $baseBranch is an ancestor of $childBranch: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+
     override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
         if (!gitCommandApi.isGitRepository(selectedPath)) {
             throw GitWorktreeException("Directory $selectedPath is not a git repository")

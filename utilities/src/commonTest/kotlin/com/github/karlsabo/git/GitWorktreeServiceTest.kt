@@ -25,6 +25,7 @@ private class FakeGitCommandApi : GitCommandApi {
     var isGitRepositoryResult: Boolean = true
     var fetchAction: (String, String, Array<out String>) -> Unit = { _, _, _ -> }
     var remoteBranchExistsAction: (String, String, String) -> Boolean = { _, _, _ -> false }
+    var isAncestorAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var worktreeAddAction: (String, String, String) -> Unit = { _, _, _ -> }
     var worktreeAddNewBranchAction: (String, String, String, String) -> Unit = { _, _, _, _ -> }
     var worktreeListResult: String = ""
@@ -52,6 +53,11 @@ private class FakeGitCommandApi : GitCommandApi {
     override fun remoteBranchExists(repoPath: String, branch: String, remote: String): Boolean {
         calls.add(Call("remoteBranchExists", listOf(repoPath, branch, remote)))
         return remoteBranchExistsAction(repoPath, branch, remote)
+    }
+
+    override fun isAncestor(repoPath: String, ancestorRef: String, descendantRef: String): Boolean {
+        calls.add(Call("isAncestor", listOf(repoPath, ancestorRef, descendantRef)))
+        return isAncestorAction(repoPath, ancestorRef, descendantRef)
     }
 
     override fun worktreeAdd(repoPath: String, path: String, commitIsh: String) {
@@ -458,6 +464,76 @@ class GitWorktreeServiceTest {
 
         assertTrue(ex.message!!.contains("Failed to create worktree"))
         assertTrue(ex.message!!.contains("from feature/base-pr"))
+        assertTrue(ex.cause is GitCommandException)
+    }
+
+    @Test
+    fun isBranchAncestor_returnsTrueWhenBaseTipIsAncestorOfChildTip() {
+        val fake = FakeGitCommandApi()
+        val service = GitWorktreeService(fake)
+
+        fake.isAncestorAction = { _, _, _ -> true }
+
+        assertTrue(
+            service.isBranchAncestor(
+                "/repos/dev-lake-utils",
+                "feature/base-pr",
+                "feature/stacked-pr",
+            ),
+        )
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature/base-pr")),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature/stacked-pr")),
+                FakeGitCommandApi.Call(
+                    "isAncestor",
+                    listOf(
+                        "/repos/dev-lake-utils",
+                        "refs/heads/feature/base-pr",
+                        "refs/heads/feature/stacked-pr",
+                    ),
+                ),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun isBranchAncestor_returnsFalseWhenBaseTipIsNotAncestorOfChildTip() {
+        val fake = FakeGitCommandApi()
+        fake.isAncestorAction = { _, _, _ -> false }
+        val service = GitWorktreeService(fake)
+
+        assertFalse(
+            service.isBranchAncestor(
+                "/repos/dev-lake-utils",
+                "feature/base-pr",
+                "feature/stacked-pr",
+            ),
+        )
+    }
+
+    @Test
+    fun isBranchAncestor_gitFailureThrowsWorktreeException() {
+        val fake = FakeGitCommandApi()
+        fake.isAncestorAction = { _, _, _ ->
+            throw GitCommandException(
+                command = listOf("git", "merge-base", "--is-ancestor"),
+                exitCode = 128,
+                gitOutput = "fatal: bad revision 'refs/heads/feature/missing'",
+            )
+        }
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.isBranchAncestor(
+                "/repos/dev-lake-utils",
+                "feature/base-pr",
+                "feature/stacked-pr",
+            )
+        }
+
+        assertTrue(ex.message!!.contains("Failed to check whether feature/base-pr is an ancestor of feature/stacked-pr"))
         assertTrue(ex.cause is GitCommandException)
     }
 

@@ -41,6 +41,21 @@ class GitCommandService : GitCommandApi {
         }
     }
 
+    override fun isAncestor(repoPath: String, ancestorRef: String, descendantRef: String): Boolean {
+        val command = buildRepoCommand(repoPath, "merge-base", "--is-ancestor", ancestorRef, descendantRef)
+        logger.debug { "Executing: ${command.joinToString(" ")}" }
+        val result = executeCommand(command, workingDirectory = null)
+        return when (result.exitCode) {
+            0 -> true
+            1 -> false
+            else -> throw GitCommandException(
+                command = command,
+                exitCode = result.exitCode,
+                gitOutput = result.stderr.ifEmpty { result.stdout },
+            )
+        }
+    }
+
     override fun worktreeAdd(repoPath: String, path: String, commitIsh: String) {
         executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", path, commitIsh))
     }
