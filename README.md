@@ -11,9 +11,8 @@
 
 # TODO
 
-* [ ] When we mark a notification as 'Done', do all paths make a call to github to mark them done? I'm seeing lots of notifications still show up in GitHub
-    * Maybe we have an issue where it's the same notification ID and there's a github update like a new commit or comment and we've blanket ignored it.
 * [ ] Clicking open on a notification takes you to the PR, not to what GitHub wants to take you to such as a new commit or comment.
+* [ ] Copy .idea folder from the base/root repo. Or come up with a copy script to call as part of the setup procedure.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on
     * Clicking on the worktree to expand, it sometimes takes too long to expand
