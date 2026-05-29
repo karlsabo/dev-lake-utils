@@ -28,6 +28,7 @@ import com.github.karlsabo.github.PullRequestHead
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.User
+import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreReason
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.system.DesktopLauncher
@@ -622,6 +623,254 @@ class EngHubViewModelTest {
             viewModel.setupStatusesStateFlow.first { targetWorktreePath !in it }
         }
         assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseRefreshesRepositoryWhileSetupIsRunning() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val baseWorktree = Worktree(path = baseWorktreePath, branch = "feature/base-pr", commitHash = "def456")
+        val targetWorktree = Worktree(path = targetWorktreePath.value, branch = targetBranch, commitHash = "789abc")
+        var currentWorktrees = listOf(rootWorktree, baseWorktree)
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = { currentWorktrees },
+            onCreateBranchWorktree = { _, _, _, target ->
+                currentWorktrees = currentWorktrees + targetWorktree
+                buildWorktreePath(DEV_LAKE_ROOT, target).value
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("setup stacked worktree"),
+                ),
+            ),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT, baseWorktreePath)
+            }
+        }
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(targetWorktreePath) }
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.any { it.path == targetWorktreePath.value }
+            }.single()
+        }
+
+        assertEquals(
+            listOf("main", "feature/base-pr", targetBranch),
+            repository.worktrees.map { it.branch },
+        )
+        assertEquals(
+            WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+            viewModel.setupStatusesStateFlow.value[targetWorktreePath],
+        )
+
+        setupRunner.complete(targetWorktreePath)
+        withTimeout(2_000.milliseconds) {
+            viewModel.setupStatusesStateFlow.first { targetWorktreePath !in it }
+        }
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseRefreshesRepositoryWhenSetupFinishesQuickly() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val baseWorktree = Worktree(path = baseWorktreePath, branch = "feature/base-pr", commitHash = "def456")
+        val targetWorktree = Worktree(path = targetWorktreePath.value, branch = targetBranch, commitHash = "789abc")
+        var currentWorktrees = listOf(rootWorktree, baseWorktree)
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = { currentWorktrees },
+            onCreateBranchWorktree = { _, _, _, target ->
+                currentWorktrees = currentWorktrees + targetWorktree
+                buildWorktreePath(DEV_LAKE_ROOT, target).value
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = {
+                    WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
+                },
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("setup stacked worktree"),
+                ),
+            ),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT, baseWorktreePath)
+            }
+        }
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.any { it.path == targetWorktreePath.value }
+            }.single()
+        }
+
+        assertEquals(
+            listOf("main", "feature/base-pr", targetBranch),
+            repository.worktrees.map { it.branch },
+        )
+        assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseRefreshesRepositoryWhenNoSetupCommandsAreConfigured() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val baseWorktree = Worktree(path = baseWorktreePath, branch = "feature/base-pr", commitHash = "def456")
+        val targetWorktree = Worktree(path = targetWorktreePath.value, branch = targetBranch, commitHash = "789abc")
+        var currentWorktrees = listOf(rootWorktree, baseWorktree)
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = { currentWorktrees },
+            onCreateBranchWorktree = { _, _, _, target ->
+                currentWorktrees = currentWorktrees + targetWorktree
+                buildWorktreePath(DEV_LAKE_ROOT, target).value
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = api),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(LocalRepositoryConfig(path = DEV_LAKE_ROOT, setupCommands = emptyList())),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT, baseWorktreePath)
+            }
+        }
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.any { it.path == targetWorktreePath.value }
+            }.single()
+        }
+
+        assertEquals(
+            listOf("main", "feature/base-pr", targetBranch),
+            repository.worktrees.map { it.branch },
+        )
+        assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun createLocalWorktreeFromBaseRefreshesRepositoryWhenSetupFailsAfterCreate() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val baseWorktree = Worktree(path = baseWorktreePath, branch = "feature/base-pr", commitHash = "def456")
+        val targetWorktree = Worktree(path = targetWorktreePath.value, branch = targetBranch, commitHash = "789abc")
+        var currentWorktrees = listOf(rootWorktree, baseWorktree)
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            worktreesForRepoPath = { currentWorktrees },
+            onCreateBranchWorktree = { _, _, _, target ->
+                currentWorktrees = currentWorktrees + targetWorktree
+                buildWorktreePath(DEV_LAKE_ROOT, target).value
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = {
+                    throw IllegalStateException("setup failed after create")
+                },
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("fail setup"),
+                ),
+            ),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.map { it.path } == listOf(DEV_LAKE_ROOT, baseWorktreePath)
+            }
+        }
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.any { it.path == targetWorktreePath.value }
+            }.single()
+        }
+
+        assertEquals("setup failed after create", actionError?.message)
+        assertEquals(
+            listOf("main", "feature/base-pr", targetBranch),
+            repository.worktrees.map { it.branch },
+        )
     }
 
     @Test
@@ -1903,6 +2152,7 @@ private fun sharedProgressNotification(
         notificationThreadId = "thread-1",
         title = "Shared progress",
         reason = "review_requested",
+        updatedAtEpochMs = 2_026_052_910_000,
         repositoryFullName = repoFullName,
         subjectType = "PullRequest",
         htmlUrl = "https://github.com/$repoFullName/pull/1",
@@ -2184,11 +2434,14 @@ private class LocalRepositoryNoOpDesktopLauncher : DesktopLauncher {
 private class NoOpNotificationIgnoreStore : NotificationIgnoreStore {
     override fun listIgnoredThreadIds(): Set<String> = emptySet()
 
+    override fun listIgnoredThreads(): List<IgnoredNotificationThread> = emptyList()
+
     override fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,
         subjectType: String,
         reason: NotificationIgnoreReason,
         ignoredAtEpochMs: Long,
+        notificationUpdatedAtEpochMs: Long?,
     ) = Unit
 }

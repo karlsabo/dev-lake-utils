@@ -20,6 +20,7 @@ import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.PullRequestHead
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
+import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreReason
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.system.DesktopLauncher
@@ -340,6 +341,7 @@ class EngHubNotificationPersistenceViewModelTest {
 
         assertTrue(notifications.isEmpty())
         assertEquals(listOf("thread-7", "thread-7"), api.markedDoneThreadIds.awaitSize(2))
+        val savedThreads = store.savedThreads.awaitValue()
         assertEquals(
             listOf(
                 SavedThread(
@@ -349,8 +351,9 @@ class EngHubNotificationPersistenceViewModelTest {
                     reason = NotificationIgnoreReason.DONE,
                 ),
             ),
-            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+            savedThreads.map { it.withoutTimestamp() },
         )
+        assertEquals(notification.updatedAt.toEpochMilliseconds(), savedThreads.single().notificationUpdatedAtEpochMs)
         assertEquals(null, viewModel.actionErrorStateFlow.value)
     }
 
@@ -364,10 +367,18 @@ class EngHubNotificationPersistenceViewModelTest {
         val api = NotificationPersistenceGitHubApi(notifications = listOf(notification))
         val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
+        val notificationUiState = withTimeout(2_000.milliseconds) {
+            viewModel.notifications
+                .filterNotNull()
+                .map { it.getOrThrow() }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-1" } }
+                .single { it.notificationThreadId == "thread-1" }
+        }
 
-        viewModel.markNotificationDone(testNotificationUiState("thread-1"))
+        viewModel.markNotificationDone(notificationUiState)
 
         assertEquals(listOf("thread-1"), api.markedDoneThreadIds.awaitValue())
+        val savedThreads = store.savedThreads.awaitValue()
         assertEquals(
             listOf(
                 SavedThread(
@@ -377,8 +388,9 @@ class EngHubNotificationPersistenceViewModelTest {
                     reason = NotificationIgnoreReason.DONE,
                 ),
             ),
-            store.savedThreads.awaitValue().map { it.withoutTimestamp() },
+            savedThreads.map { it.withoutTimestamp() },
         )
+        assertEquals(notification.updatedAt.toEpochMilliseconds(), savedThreads.single().notificationUpdatedAtEpochMs)
 
         val restartedViewModel = createViewModel(api, store)
         val restartedNotifications = withTimeout(2_000.milliseconds) {
@@ -770,8 +782,9 @@ private data class SavedThread(
     val subjectType: String,
     val reason: NotificationIgnoreReason,
     val ignoredAtEpochMs: Long? = null,
+    val notificationUpdatedAtEpochMs: Long? = null,
 ) {
-    fun withoutTimestamp(): SavedThread = copy(ignoredAtEpochMs = null)
+    fun withoutTimestamp(): SavedThread = copy(ignoredAtEpochMs = null, notificationUpdatedAtEpochMs = null)
 }
 
 private class RecordingNotificationIgnoreStore(
@@ -785,12 +798,15 @@ private class RecordingNotificationIgnoreStore(
 
     override fun listIgnoredThreadIds(): Set<String> = storedThreadIds.toSet()
 
+    override fun listIgnoredThreads(): List<IgnoredNotificationThread> = emptyList()
+
     override fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,
         subjectType: String,
         reason: NotificationIgnoreReason,
         ignoredAtEpochMs: Long,
+        notificationUpdatedAtEpochMs: Long?,
     ) {
         saveFailure?.let { throw it }
         if (queuedSaveFailures.isNotEmpty()) throw queuedSaveFailures.removeAt(0)
@@ -801,6 +817,7 @@ private class RecordingNotificationIgnoreStore(
             subjectType = subjectType,
             reason = reason,
             ignoredAtEpochMs = ignoredAtEpochMs,
+            notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
         )
     }
 }
@@ -936,6 +953,7 @@ private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: St
         notificationThreadId = threadId,
         title = "Notification $threadId",
         reason = "review_requested",
+        updatedAtEpochMs = 2_026_052_910_000,
         repositoryFullName = "test-org/test-repo",
         subjectType = "PullRequest",
         htmlUrl = "https://github.com/test-org/test-repo/pull/1",

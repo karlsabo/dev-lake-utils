@@ -30,11 +30,21 @@ class NotificationDatabaseMigrationTest {
                     "subject_type",
                     "ignore_reason",
                     "ignored_at_epoch_ms",
+                    "notification_updated_at_epoch_ms",
                 ),
                 readIgnoredColumnNames(databasePath.toString()),
             )
             assertEquals(
-                listOf(IgnoredThreadRow("123456789", "example-org/example-repo", "PullRequest", "UNSUBSCRIBED", 1L)),
+                listOf(
+                    IgnoredThreadRow(
+                        "123456789",
+                        "example-org/example-repo",
+                        "PullRequest",
+                        "UNSUBSCRIBED",
+                        1L,
+                        null
+                    )
+                ),
                 readIgnoredRows(databasePath.toString()),
             )
         } finally {
@@ -63,10 +73,41 @@ class NotificationDatabaseMigrationTest {
                         "PullRequest",
                         "UNSUBSCRIBED",
                         2L,
+                        null,
                     ),
                 ),
                 readIgnoredRows(databasePath.toString()),
             )
+        } finally {
+            deleteRecursively(testDir)
+        }
+    }
+
+    @Test
+    fun upgradesVersion3DatabaseAndAddsNullableNotificationUpdatedAtWatermark() {
+        val testDir = Files.createTempDirectory("notification-db-migration-test")
+        val databasePath = testDir.resolve("eng-hub-notifications.db")
+
+        try {
+            createVersion3Fixture(databasePath.toString())
+            assertEquals(3L, readUserVersion(databasePath.toString()))
+
+            val store = SqlDelightNotificationIgnoreStore(databasePath = databasePath.toString())
+
+            assertEquals(
+                listOf(
+                    IgnoredNotificationThread(
+                        threadId = "thread-done-without-watermark",
+                        repositoryFullName = "example-org/example-repo",
+                        subjectType = "PullRequest",
+                        reason = NotificationIgnoreReason.DONE,
+                        ignoredAtEpochMs = 3L,
+                        notificationUpdatedAtEpochMs = null,
+                    ),
+                ),
+                store.listIgnoredThreads(),
+            )
+            assertEquals(NotificationDatabase.Schema.version, readUserVersion(databasePath.toString()))
         } finally {
             deleteRecursively(testDir)
         }
@@ -132,6 +173,37 @@ class NotificationDatabaseMigrationTest {
         }
     }
 
+    private fun createVersion3Fixture(databasePath: String) {
+        DriverManager.getConnection("jdbc:sqlite:$databasePath").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate(
+                    """
+                    CREATE TABLE ignored_notification_threads (
+                      thread_id TEXT NOT NULL PRIMARY KEY,
+                      repository_full_name TEXT NOT NULL,
+                      subject_type TEXT NOT NULL,
+                      ignore_reason TEXT NOT NULL,
+                      ignored_at_epoch_ms INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                statement.executeUpdate(
+                    """
+                    INSERT INTO ignored_notification_threads(
+                      thread_id,
+                      repository_full_name,
+                      subject_type,
+                      ignore_reason,
+                      ignored_at_epoch_ms
+                    )
+                    VALUES ('thread-done-without-watermark', 'example-org/example-repo', 'PullRequest', 'DONE', 3)
+                    """.trimIndent()
+                )
+                statement.executeUpdate("PRAGMA user_version = 3")
+            }
+        }
+    }
+
     private fun readUserVersion(databasePath: String): Long {
         DriverManager.getConnection("jdbc:sqlite:$databasePath").use { connection ->
             connection.createStatement().use { statement ->
@@ -162,7 +234,13 @@ class NotificationDatabaseMigrationTest {
             connection.createStatement().use { statement ->
                 statement.executeQuery(
                     """
-                    SELECT thread_id, repository_full_name, subject_type, ignore_reason, ignored_at_epoch_ms
+                    SELECT
+                      thread_id,
+                      repository_full_name,
+                      subject_type,
+                      ignore_reason,
+                      ignored_at_epoch_ms,
+                      notification_updated_at_epoch_ms
                     FROM ignored_notification_threads
                     ORDER BY thread_id
                     """.trimIndent(),
@@ -175,6 +253,7 @@ class NotificationDatabaseMigrationTest {
                             subjectType = resultSet.getString("subject_type"),
                             ignoreReason = resultSet.getString("ignore_reason"),
                             ignoredAtEpochMs = resultSet.getLong("ignored_at_epoch_ms"),
+                            notificationUpdatedAtEpochMs = resultSet.getNullableLong("notification_updated_at_epoch_ms"),
                         )
                     }
                     return rows
@@ -207,4 +286,10 @@ private data class IgnoredThreadRow(
     val subjectType: String,
     val ignoreReason: String,
     val ignoredAtEpochMs: Long,
+    val notificationUpdatedAtEpochMs: Long?,
 )
+
+private fun java.sql.ResultSet.getNullableLong(columnLabel: String): Long? {
+    val value = getLong(columnLabel)
+    return if (wasNull()) null else value
+}

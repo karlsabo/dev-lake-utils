@@ -10,6 +10,7 @@ class NotificationUiStateTest {
             notificationThreadId = "thread-1234",
             title = "Ship the slice",
             reason = "review_requested",
+            updatedAtEpochMs = 2_026_052_910_000,
             repositoryFullName = "test-org/test-repo",
             subjectType = "PullRequest",
             htmlUrl = "https://github.com/test-org/test-repo/pull/1234",

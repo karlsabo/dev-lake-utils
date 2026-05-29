@@ -27,6 +27,8 @@ Make Eng Hub notification “Done” handling reliably clear the corresponding G
 
 ### 1. Persist the GitHub notification update watermark with ignored threads
 
+**Status:** Done.
+
 **Acceptance criteria:** Given a notification thread is saved as ignored, when the app restarts and reads the ignore store, then the store returns the thread ID with the GitHub notification `updated_at` timestamp that was current when it was ignored.
 
 **Expected edits:**

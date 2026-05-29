@@ -49,9 +49,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import me.tatarka.inject.annotations.Inject
@@ -476,9 +479,11 @@ class EngHubViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             var setupRequest: WorktreeSetupRequest? = null
             var setupHandle: WorktreeSetupHandle? = null
+            var postCreateRefresh: PostCreateLocalWorktreeRefresh? = null
             try {
                 setupRequest = buildCreateLocalWorktreeFromBaseSetupRequest(request)
                 setupHandle = worktreeSetupCoordinator.setup(setupRequest)
+                postCreateRefresh = launchPostCreateLocalWorktreeRefresh(setupRequest)
                 setupHandle.await()
                 logger.info { "Setup: created local worktree setup done for ${setupRequest.worktreePath.value}" }
             } catch (e: Exception) {
@@ -494,8 +499,89 @@ class EngHubViewModel(
                 if (shouldReport) logger.error(e) {
                     "Failed to create local worktree for $repoRootPath base=$baseBranch target=$targetBranch"
                 }
+            } finally {
+                val refreshStarted = postCreateRefresh?.cancelWaitingOrAwaitStartedRefresh() ?: false
+                val submittedSetupRequest = setupRequest
+                if (!refreshStarted && submittedSetupRequest != null) {
+                    refreshLocalRepositoryWorktreesAfterCreate(submittedSetupRequest)
+                }
             }
         }
+    }
+
+    private suspend fun PostCreateLocalWorktreeRefresh.cancelWaitingOrAwaitStartedRefresh(): Boolean {
+        val refreshStarted = state.cancelWaitingOrReportStarted()
+        if (!refreshStarted) job.cancelAndJoin()
+        return refreshStarted
+    }
+
+    private fun launchPostCreateLocalWorktreeRefresh(setupRequest: WorktreeSetupRequest): PostCreateLocalWorktreeRefresh? {
+        if (setupRequest.setupCommands.isEmpty()) return null
+
+        val state = PostCreateLocalWorktreeRefreshState()
+        val job = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                setupStatusesStateFlow.first { statuses ->
+                    statuses[setupRequest.worktreePath] == WorktreeSetupStatus.RUNNING_SETUP_COMMANDS
+                }
+                if (!state.markRefreshStarted()) return@launch
+                refreshLocalRepositoryWorktreesAfterCreate(setupRequest)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.error(e) {
+                    "Failed to refresh worktrees after creating ${setupRequest.worktreePath.value}"
+                }
+            }
+        }
+        return PostCreateLocalWorktreeRefresh(job, state)
+    }
+
+    private fun refreshLocalRepositoryWorktreesAfterCreate(setupRequest: WorktreeSetupRequest) {
+        refreshLocalRepositoryWorktreesBestEffort(
+            repoRootPath = setupRequest.repoPath,
+            logContext = "after creating worktree ${setupRequest.worktreePath.value}",
+        )
+    }
+
+    private data class PostCreateLocalWorktreeRefresh(
+        val job: Job,
+        val state: PostCreateLocalWorktreeRefreshState,
+    )
+
+    private class PostCreateLocalWorktreeRefreshState {
+        private val guard = Mutex()
+        private var status = PostCreateLocalWorktreeRefreshStatus.WAITING
+
+        suspend fun markRefreshStarted(): Boolean = guard.withLock {
+            when (status) {
+                PostCreateLocalWorktreeRefreshStatus.WAITING -> {
+                    status = PostCreateLocalWorktreeRefreshStatus.STARTED
+                    true
+                }
+
+                PostCreateLocalWorktreeRefreshStatus.STARTED -> true
+                PostCreateLocalWorktreeRefreshStatus.CANCELLED_BEFORE_START -> false
+            }
+        }
+
+        suspend fun cancelWaitingOrReportStarted(): Boolean = guard.withLock {
+            when (status) {
+                PostCreateLocalWorktreeRefreshStatus.WAITING -> {
+                    status = PostCreateLocalWorktreeRefreshStatus.CANCELLED_BEFORE_START
+                    false
+                }
+
+                PostCreateLocalWorktreeRefreshStatus.STARTED -> true
+                PostCreateLocalWorktreeRefreshStatus.CANCELLED_BEFORE_START -> false
+            }
+        }
+    }
+
+    private enum class PostCreateLocalWorktreeRefreshStatus {
+        WAITING,
+        STARTED,
+        CANCELLED_BEFORE_START,
     }
 
     private fun buildCreateLocalWorktreeFromBaseSetupRequest(
@@ -766,6 +852,7 @@ class EngHubViewModel(
             repositoryFullName = notification.repositoryFullName,
             subjectType = notification.subjectType,
             reason = reason,
+            notificationUpdatedAtEpochMs = notification.updatedAtEpochMs,
         )
     }
 
@@ -789,6 +876,7 @@ class EngHubViewModel(
             repositoryFullName = notification.repository.fullName,
             subjectType = notification.subject.type,
             reason = reason,
+            notificationUpdatedAtEpochMs = notification.updatedAt.toEpochMilliseconds(),
         )
     }
 
@@ -797,6 +885,7 @@ class EngHubViewModel(
         repositoryFullName: String,
         subjectType: String,
         reason: NotificationIgnoreReason,
+        notificationUpdatedAtEpochMs: Long?,
     ) {
         notificationIgnoreStore.saveIgnoredThread(
             threadId = threadId,
@@ -804,6 +893,7 @@ class EngHubViewModel(
             subjectType = subjectType,
             reason = reason,
             ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
+            notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
         )
     }
 
@@ -836,12 +926,22 @@ class EngHubViewModel(
     }
 
     private fun refreshLocalRepositoryAfterArchiveFailure(repoRootPath: String) {
+        refreshLocalRepositoryWorktreesBestEffort(
+            repoRootPath = repoRootPath,
+            logContext = "after archive failure",
+        )
+    }
+
+    private fun refreshLocalRepositoryWorktreesBestEffort(
+        repoRootPath: String,
+        logContext: String,
+    ) {
         try {
             updateLocalRepositoryWorktrees(repoRootPath, listLocalWorktreeUiStates(repoRootPath))
         } catch (e: CancellationException) {
             throw e
         } catch (refreshFailure: Exception) {
-            logger.error(refreshFailure) { "Failed to refresh worktrees after archive failure for $repoRootPath" }
+            logger.error(refreshFailure) { "Failed to refresh worktrees $logContext for $repoRootPath" }
         }
     }
 

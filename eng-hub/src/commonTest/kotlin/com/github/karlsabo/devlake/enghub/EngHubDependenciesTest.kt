@@ -15,6 +15,7 @@ import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.config.GitHubApiRestConfig
+import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreReason
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.system.DesktopLauncher
@@ -145,6 +146,7 @@ private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: St
         notificationThreadId = threadId,
         title = "Notification $threadId",
         reason = "review_requested",
+        updatedAtEpochMs = 2_026_052_910_000,
         repositoryFullName = "test-org/test-repo",
         subjectType = "PullRequest",
         htmlUrl = "https://github.com/test-org/test-repo/pull/1",
@@ -286,11 +288,14 @@ private class RecordingGitHubApi : GitHubApi {
 private class RecordingNotificationIgnoreStore : NotificationIgnoreStore {
     override fun listIgnoredThreadIds(): Set<String> = emptySet()
 
+    override fun listIgnoredThreads(): List<IgnoredNotificationThread> = emptyList()
+
     override fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,
         subjectType: String,
         reason: NotificationIgnoreReason,
         ignoredAtEpochMs: Long,
+        notificationUpdatedAtEpochMs: Long?,
     ) = Unit
 }

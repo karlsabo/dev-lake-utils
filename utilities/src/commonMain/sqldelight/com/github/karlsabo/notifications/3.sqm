@@ -1,0 +1,2 @@
+ALTER TABLE ignored_notification_threads
+ADD COLUMN notification_updated_at_epoch_ms INTEGER;
