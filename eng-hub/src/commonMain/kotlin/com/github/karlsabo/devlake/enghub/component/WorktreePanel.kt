@@ -34,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
@@ -154,6 +156,11 @@ internal fun submitCreateWorktreeDialog(
 ) {
     onCreateWorktree(state.repoRootPath, state.baseWorktreePath, state.baseBranch, state.targetBranch)
 }
+
+internal fun createTargetBranchInputValue(targetBranch: String): TextFieldValue = TextFieldValue(
+    text = targetBranch,
+    selection = TextRange(targetBranch.length),
+)
 
 private fun targetBranchMatchesBase(baseBranch: String, targetBranch: String): Boolean =
     targetBranch.isNotEmpty() && targetBranch == baseBranch
@@ -416,6 +423,9 @@ private fun CreateWorktreeDialog(
     onDismiss: () -> Unit,
 ) {
     val branchNameValidator = remember { WorktreeBranchNameValidator() }
+    var targetBranchInput by remember(state.repoRootPath, state.baseWorktreePath, state.baseBranch) {
+        mutableStateOf(createTargetBranchInputValue(state.targetBranch))
+    }
     var targetBranchValidation by remember(state.baseBranch, state.targetBranch) {
         mutableStateOf(
             startCreateWorktreeTargetBranchValidation(
@@ -461,8 +471,11 @@ private fun CreateWorktreeDialog(
                     Text(text = "Base: ${state.baseBranch}")
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = state.targetBranch,
-                        onValueChange = onTargetBranchChange,
+                        value = targetBranchInput,
+                        onValueChange = { input ->
+                            targetBranchInput = input
+                            onTargetBranchChange(input.text)
+                        },
                         label = { Text("Target branch") },
                         isError = validationMessage != null,
                         modifier = Modifier.fillMaxWidth(),

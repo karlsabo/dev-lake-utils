@@ -187,7 +187,9 @@ Relevant current code:
 
 **Scope:** Add the explicit error. Do not offer to open or run setup on the other worktree.
 
-### 12. Show remote branch name conflict before creating a local branch
+### 12. Show remote branch name conflict before creating a local branch - Done
+
+**Done** 2026 05 29
 
 **Acceptance criteria:** Given `origin/feature/stacked-pr` exists and no local `feature/stacked-pr` branch/worktree exists, when the user creates `feature/stacked-pr` from `feature/base-pr`, then Eng Hub errors and asks the user to choose another branch name.
 

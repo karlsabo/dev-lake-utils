@@ -16,6 +16,9 @@ interface GitCommandApi {
     /** `git -C <repoPath> fetch [remote] [refSpecs]`. */
     fun fetch(repoPath: String, remote: String = "origin", vararg refSpecs: String)
 
+    /** Return `true` when `refs/heads/<branch>` exists on [remote]. */
+    fun remoteBranchExists(repoPath: String, branch: String, remote: String = "origin"): Boolean
+
     /** `git -C <repoPath> worktree add <path> <commitIsh>`. */
     fun worktreeAdd(repoPath: String, path: String, commitIsh: String)
 

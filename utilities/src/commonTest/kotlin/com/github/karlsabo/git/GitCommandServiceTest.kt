@@ -111,6 +111,24 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun remoteBranchExists_queriesRemoteWithoutLocalTrackingRef() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            service.clone(originDir, cloneDir)
+            executeCommand(listOf("git", "-C", originDir, "branch", "feature/stacked-pr"), workingDirectory = null)
+
+            assertTrue(service.remoteBranchExists(cloneDir, "feature/stacked-pr"))
+            assertFalse(service.remoteBranchExists(cloneDir, "feature/missing-pr"))
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
+        }
+    }
+
+    @Test
     fun worktree_addListRemove_lifecycle() {
         val repoDir = createTempDir("repo")
         val worktreeDir = createTempDir("wt")

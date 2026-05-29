@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.ui.text.TextRange
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.git.WorktreeBranchNameValidator
 import com.github.karlsabo.git.WorktreeSetupStatus
@@ -62,6 +63,15 @@ class WorktreePanelTest {
                 worktree = worktree,
             ),
         )
+    }
+
+    @Test
+    fun createWorktreeDialogInitializesTargetBranchInputCaretAtEnd() {
+        val targetBranch = "feature/stacked-pr"
+        val input = createTargetBranchInputValue(targetBranch)
+
+        assertEquals(targetBranch, input.text)
+        assertEquals(TextRange(targetBranch.length), input.selection)
     }
 
     @Test

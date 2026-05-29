@@ -25,6 +25,22 @@ class GitCommandService : GitCommandApi {
         executeGitCommand(buildRepoCommand(repoPath, *args.toTypedArray()))
     }
 
+    override fun remoteBranchExists(repoPath: String, branch: String, remote: String): Boolean {
+        val remoteBranchRef = "refs/heads/$branch"
+        val command = buildRepoCommand(repoPath, "ls-remote", "--exit-code", "--heads", remote, remoteBranchRef)
+        logger.debug { "Executing: ${command.joinToString(" ")}" }
+        val result = executeCommand(command, workingDirectory = null)
+        return when (result.exitCode) {
+            0 -> true
+            2 -> false
+            else -> throw GitCommandException(
+                command = command,
+                exitCode = result.exitCode,
+                gitOutput = result.stderr.ifEmpty { result.stdout },
+            )
+        }
+    }
+
     override fun worktreeAdd(repoPath: String, path: String, commitIsh: String) {
         executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", path, commitIsh))
     }

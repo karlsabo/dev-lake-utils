@@ -1052,6 +1052,51 @@ class EngHubViewModelTest {
     }
 
     @Test
+    fun createLocalWorktreeFromBaseShowsRemoteBranchConflictError() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            onCreateBranchWorktree = { _, _, _, _ ->
+                throw GitWorktreeException(
+                    "Remote branch origin/feature/stacked-pr already exists. Choose a different branch name.",
+                )
+            },
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = api,
+                setupCommandRunner = setupRunner,
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(
+                    path = DEV_LAKE_ROOT,
+                    setupCommands = listOf("should not run"),
+                ),
+            ),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals(
+            "Remote branch origin/feature/stacked-pr already exists. Choose a different branch name.",
+            actionError?.message,
+        )
+        assertEquals(0, setupRunner.calls())
+    }
+
+    @Test
     fun createLocalWorktreeFromBaseCreationFailureSetsActionErrorWithoutRunningSetup() = runBlocking {
         val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
         val targetBranch = "feature/stacked-pr"

@@ -24,6 +24,7 @@ private class FakeGitCommandApi : GitCommandApi {
     var cloneAction: (String, String) -> Unit = { _, _ -> }
     var isGitRepositoryResult: Boolean = true
     var fetchAction: (String, String, Array<out String>) -> Unit = { _, _, _ -> }
+    var remoteBranchExistsAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var worktreeAddAction: (String, String, String) -> Unit = { _, _, _ -> }
     var worktreeAddNewBranchAction: (String, String, String, String) -> Unit = { _, _, _, _ -> }
     var worktreeListResult: String = ""
@@ -46,6 +47,11 @@ private class FakeGitCommandApi : GitCommandApi {
     override fun fetch(repoPath: String, remote: String, vararg refSpecs: String) {
         calls.add(Call("fetch", listOf(repoPath, remote) + refSpecs.toList()))
         fetchAction(repoPath, remote, refSpecs)
+    }
+
+    override fun remoteBranchExists(repoPath: String, branch: String, remote: String): Boolean {
+        calls.add(Call("remoteBranchExists", listOf(repoPath, branch, remote)))
+        return remoteBranchExistsAction(repoPath, branch, remote)
     }
 
     override fun worktreeAdd(repoPath: String, path: String, commitIsh: String) {
@@ -306,6 +312,72 @@ class GitWorktreeServiceTest {
             ),
             fake.calls,
         )
+    }
+
+    @Test
+    fun createBranchWorktree_remoteTargetBranchExistsFailsBeforeWorktreeCommand() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        val targetBranch = "feature/stacked-pr"
+        fake.worktreeListResult = """
+            worktree /repos/dev-lake-utils
+            HEAD abc123
+            branch refs/heads/main
+        """.trimIndent()
+        fake.remoteBranchExistsAction = { path, branch, remote ->
+            path == repoPath && branch == targetBranch && remote == "origin"
+        }
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.createBranchWorktree(
+                repoPath,
+                "/repos/dev-lake-utils-feature-base-pr",
+                "feature/base-pr",
+                targetBranch,
+            )
+        }
+
+        assertEquals(
+            "Remote branch origin/feature/stacked-pr already exists. Choose a different branch name.",
+            ex.message,
+        )
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature/base-pr")),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", targetBranch)),
+                FakeGitCommandApi.Call("worktreeList", listOf(repoPath)),
+                FakeGitCommandApi.Call("remoteBranchExists", listOf(repoPath, targetBranch, "origin")),
+            ),
+            fake.calls,
+        )
+        assertTrue(fake.calls.none { it.method == "worktreeAddNewBranch" })
+    }
+
+    @Test
+    fun createBranchWorktree_remoteBranchCheckFailureFailsBeforeWorktreeCommand() {
+        val fake = FakeGitCommandApi()
+        fake.remoteBranchExistsAction = { _, branch, _ ->
+            throw GitCommandException(
+                command = listOf("git", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/$branch"),
+                exitCode = 128,
+                gitOutput = "fatal: not a git repository",
+            )
+        }
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.createBranchWorktree(
+                "/tmp/repo",
+                "/tmp/repo-feature-base-pr",
+                "feature/base-pr",
+                "feature/stacked-pr",
+            )
+        }
+
+        assertTrue(ex.message!!.contains("Failed to check remote branch origin/feature/stacked-pr"))
+        assertTrue(ex.cause is GitCommandException)
+        assertTrue(fake.calls.none { it.method == "worktreeAddNewBranch" })
     }
 
     @Test

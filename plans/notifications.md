@@ -75,7 +75,9 @@ Make Eng Hub notification “Done” handling reliably clear the corresponding G
 
 **Notes:** This is the likely root cause of “same notification ID with a new GitHub update was blanket ignored.” The fix applies to `DONE`; unsubscribe intentionally remains a permanent local hide for that thread.
 
-### 4. Re-mark automatically handled revived notifications as done in GitHub
+### 4. Re-mark automatically handled revived notifications as done in GitHub - Done
+
+**Status:** Done.
 
 **Acceptance criteria:** Given the local store has `thread-2` marked DONE with `notification_updated_at=2026-05-29T10:00:00Z`, when GitHub returns `thread-2` with `updatedAt=2026-05-29T10:05:00Z` for a merged pull request, then Eng Hub calls `gitHubApi.markNotificationAsDone("thread-2")` again, updates the stored watermark to `10:05:00Z`, and does not show the notification.
 

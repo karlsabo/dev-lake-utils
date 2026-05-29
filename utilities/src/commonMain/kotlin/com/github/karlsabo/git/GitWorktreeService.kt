@@ -81,6 +81,11 @@ class GitWorktreeService(
                         "Choose a different branch name.",
             )
         }
+        if (remoteBranchExists(repoPath, targetBranch)) {
+            throw GitWorktreeException(
+                "Remote branch origin/$targetBranch already exists. Choose a different branch name.",
+            )
+        }
 
         try {
             gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseBranch)
@@ -213,6 +218,14 @@ class GitWorktreeService(
         }
 
         return parseWorktreeListPorcelain(output)
+    }
+
+    private fun remoteBranchExists(repoPath: String, branch: String): Boolean {
+        return try {
+            gitCommandApi.remoteBranchExists(repoPath, branch, remote = "origin")
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to check remote branch origin/$branch: ${e.gitOutput}", e)
+        }
     }
 
     private fun isWorktreeDirty(worktreePath: String): Boolean {
