@@ -1,4 +1,6 @@
 - [TODO](#todo)
+- [Development](#development)
+  - [Quality checks](#quality-checks)
 - [Eng Hub](./eng-hub/README.md)
 - [Overview](#overview)
   - [Utilities](#utilities)
@@ -89,6 +91,14 @@
   * Run report through plan [skill] to break up the work
   * Implement [skill] all the tasks from the profile report
 * [skill] Code review
+
+## Development
+
+### Quality checks
+
+Spotless with ktlint owns formatting. Run `./gradlew spotlessApply` to format Kotlin and Gradle Kotlin DSL files, then run `./gradlew spotlessCheck` to verify formatting before committing.
+
+Detekt owns code-quality warnings that go beyond formatting. Run `./gradlew detekt` to run the static analysis checks directly, or run `./gradlew check` to run the full Gradle verification path, including Spotless and detekt.
 
 ## Set up MCP servers
 
