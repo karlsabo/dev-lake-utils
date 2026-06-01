@@ -44,9 +44,8 @@ fun main(args: Array<String>) {
             file != null -> processSingleFile(extractor, Path(file), saveChanges)
             directory != null -> processDirectory(extractor, Path(directory), recursive, saveChanges)
         }
-    } catch (e: Exception) {
-        println("Error: ${e.message}")
-        e.printStackTrace()
+    } catch (error: RuntimeException) {
+        println("Error: ${error.message}")
     }
 }
 

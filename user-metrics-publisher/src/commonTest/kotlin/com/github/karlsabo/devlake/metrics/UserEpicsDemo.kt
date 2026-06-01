@@ -11,6 +11,9 @@ import kotlinx.datetime.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.measureTime
 
+private const val HISTORY_YEARS = 4
+private const val DAYS_PER_YEAR = 365
+
 /**
  * Demo that pulls all the epics that a user contributed to from Jira.
  *
@@ -20,7 +23,8 @@ import kotlin.time.measureTime
  */
 fun main(args: Array<String>): Unit = runBlocking {
     val userId =
-        args.find { it.startsWith("--user=") }?.substringAfter("=") ?: throw Exception("No --user=username provided")
+        args.find { it.startsWith("--user=") }?.substringAfter("=")
+            ?: throw IllegalArgumentException("No --user=username provided")
 
     val jiraApi = JiraRestApi(loadJiraConfig(jiraConfigPath))
 
@@ -29,7 +33,7 @@ fun main(args: Array<String>): Unit = runBlocking {
     val executionTime = measureTime {
         val userIssues = jiraApi.getIssuesResolved(
             User(id = userId, name = userId, jiraId = userId),
-            Clock.System.now().minus((4 * 365).days),
+            Clock.System.now().minus((HISTORY_YEARS * DAYS_PER_YEAR).days),
             Clock.System.now(),
         )
         println("Found ${userIssues.size} issues assigned to user")

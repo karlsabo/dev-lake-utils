@@ -37,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
+@Suppress("LargeClass")
 class EngHubNotificationPersistenceViewModelTest {
 
     @Test
@@ -881,13 +882,17 @@ private fun createViewModel(
 ): EngHubViewModel {
     val gitWorktreeApi = NoOpGitWorktreeApi()
     return EngHubViewModel(
-        gitHubApi = api,
-        gitHubNotificationService = GitHubNotificationService(api),
-        gitWorktreeApi = gitWorktreeApi,
-        worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi),
-        desktopLauncher = NoOpDesktopLauncher(),
-        directoryPicker = NoOpDirectoryPicker(),
-        configWriter = NoOpEngHubConfigWriter(),
+        gitHubServices = EngHubGitHubServices(
+            api = api,
+            notificationService = GitHubNotificationService(api),
+        ),
+        worktreeServices = EngHubWorktreeServices(
+            gitWorktreeApi = gitWorktreeApi,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi),
+            directoryPicker = NoOpDirectoryPicker(),
+            configWriter = NoOpEngHubConfigWriter(),
+        ),
+        desktopServices = EngHubDesktopServices(NoOpDesktopLauncher()),
         config = EngHubConfig(
             organizationIds = listOf("test-org"),
             repositoriesBaseDir = "/tmp/repos",
@@ -898,9 +903,13 @@ private fun createViewModel(
     )
 }
 
-private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> = withTimeout(2_000.milliseconds) { first { it.isNotEmpty() } }
+private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> = withTimeout(2_000.milliseconds) {
+    first { it.isNotEmpty() }
+}
 
-private suspend fun <T> MutableStateFlow<List<T>>.awaitSize(size: Int): List<T> = withTimeout(2_000.milliseconds) { first { it.size >= size } }
+private suspend fun <T> MutableStateFlow<List<T>>.awaitSize(size: Int): List<T> = withTimeout(2_000.milliseconds) {
+    first { it.size >= size }
+}
 
 private class NoOpGitWorktreeApi : GitWorktreeApi {
     override fun ensureRepository(repoPath: String, cloneUrl: String) = Unit
@@ -1085,7 +1094,7 @@ private class NotificationPersistenceGitHubApi(
 
     override suspend fun getPullRequestByUrl(url: String): PullRequest {
         pullRequestByUrlCalls += url
-        if (url in pullRequestFailureUrls) throw IllegalStateException("failed to load pull request: $url")
+        if (url in pullRequestFailureUrls) error("failed to load pull request: $url")
         return pullRequestsByUrl[url] ?: PullRequest(url = url)
     }
 
@@ -1157,7 +1166,9 @@ private fun testNotification(
     ),
 )
 
-private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: String): NotificationUiState = NotificationUiState(
+private fun testNotificationUiState(
+    @Suppress("SameParameterValue") threadId: String,
+): NotificationUiState = NotificationUiState(
     notificationThreadId = threadId,
     title = "Notification $threadId",
     reason = "review_requested",

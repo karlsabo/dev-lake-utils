@@ -19,7 +19,9 @@ object UserMetricPublisherScope
 interface UserMetricPublisherBindings {
 
     @Provides
-    fun provideProjectManagementApi(linearApiConfig: LinearApiRestConfig): ProjectManagementApi = LinearRestApi(linearApiConfig)
+    fun provideProjectManagementApi(
+        linearApiConfig: LinearApiRestConfig,
+    ): ProjectManagementApi = LinearRestApi(linearApiConfig)
 
     @Provides
     fun provideGitHubApi(gitHubApiConfig: GitHubApiRestConfig): GitHubApi = GitHubRestApi(gitHubApiConfig)

@@ -13,28 +13,7 @@ class SqlDelightNotificationIgnoreStoreTest {
 
         try {
             val store = SqlDelightNotificationIgnoreStore(databasePath = databasePath)
-            store.saveIgnoredThread(
-                threadId = "thread-1",
-                repositoryFullName = "example-org/example-repo",
-                subjectType = "PullRequest",
-                reason = NotificationIgnoreReason.UNSUBSCRIBED,
-                ignoredAtEpochMs = 1_000,
-            )
-            store.saveIgnoredThread(
-                threadId = "thread-1",
-                repositoryFullName = "example-org/example-repo",
-                subjectType = "PullRequest",
-                reason = NotificationIgnoreReason.UNSUBSCRIBED,
-                ignoredAtEpochMs = 2_000,
-            )
-            store.saveIgnoredThread(
-                threadId = "thread-2",
-                repositoryFullName = "example-org/example-repo",
-                subjectType = "Issue",
-                reason = NotificationIgnoreReason.DONE,
-                ignoredAtEpochMs = 3_000,
-                notificationUpdatedAtEpochMs = 2_026_052_910_000,
-            )
+            store.saveIgnoredThreadFixtures()
 
             val reloadedStore = SqlDelightNotificationIgnoreStore(databasePath = databasePath)
 
@@ -43,24 +22,7 @@ class SqlDelightNotificationIgnoreStoreTest {
                 reloadedStore.listIgnoredThreadIds(),
             )
             assertEquals(
-                listOf(
-                    IgnoredNotificationThread(
-                        threadId = "thread-1",
-                        repositoryFullName = "example-org/example-repo",
-                        subjectType = "PullRequest",
-                        reason = NotificationIgnoreReason.UNSUBSCRIBED,
-                        ignoredAtEpochMs = 2_000,
-                        notificationUpdatedAtEpochMs = null,
-                    ),
-                    IgnoredNotificationThread(
-                        threadId = "thread-2",
-                        repositoryFullName = "example-org/example-repo",
-                        subjectType = "Issue",
-                        reason = NotificationIgnoreReason.DONE,
-                        ignoredAtEpochMs = 3_000,
-                        notificationUpdatedAtEpochMs = 2_026_052_910_000,
-                    ),
-                ),
+                expectedIgnoredThreads(),
                 reloadedStore.listIgnoredThreads().sortedBy { it.threadId },
             )
             assertEquals(
@@ -75,3 +37,47 @@ class SqlDelightNotificationIgnoreStoreTest {
         }
     }
 }
+
+private fun SqlDelightNotificationIgnoreStore.saveIgnoredThreadFixtures() {
+    saveIgnoredThread(
+        threadId = "thread-1",
+        repositoryFullName = "example-org/example-repo",
+        subjectType = "PullRequest",
+        reason = NotificationIgnoreReason.UNSUBSCRIBED,
+        ignoredAtEpochMs = 1_000,
+    )
+    saveIgnoredThread(
+        threadId = "thread-1",
+        repositoryFullName = "example-org/example-repo",
+        subjectType = "PullRequest",
+        reason = NotificationIgnoreReason.UNSUBSCRIBED,
+        ignoredAtEpochMs = 2_000,
+    )
+    saveIgnoredThread(
+        threadId = "thread-2",
+        repositoryFullName = "example-org/example-repo",
+        subjectType = "Issue",
+        reason = NotificationIgnoreReason.DONE,
+        ignoredAtEpochMs = 3_000,
+        notificationUpdatedAtEpochMs = 2_026_052_910_000,
+    )
+}
+
+private fun expectedIgnoredThreads(): List<IgnoredNotificationThread> = listOf(
+    IgnoredNotificationThread(
+        threadId = "thread-1",
+        repositoryFullName = "example-org/example-repo",
+        subjectType = "PullRequest",
+        reason = NotificationIgnoreReason.UNSUBSCRIBED,
+        ignoredAtEpochMs = 2_000,
+        notificationUpdatedAtEpochMs = null,
+    ),
+    IgnoredNotificationThread(
+        threadId = "thread-2",
+        repositoryFullName = "example-org/example-repo",
+        subjectType = "Issue",
+        reason = NotificationIgnoreReason.DONE,
+        ignoredAtEpochMs = 3_000,
+        notificationUpdatedAtEpochMs = 2_026_052_910_000,
+    ),
+)

@@ -29,19 +29,31 @@ import dev_lake_utils.shared_resources.generated.resources.Res
 import dev_lake_utils.shared_resources.generated.resources.icon
 import org.jetbrains.compose.resources.painterResource
 
+private val reviewEventOptions = listOf(
+    ReviewStateValue.COMMENTED to "Comment",
+    ReviewStateValue.CHANGES_REQUESTED to "Request Changes",
+    ReviewStateValue.APPROVED to "Approve",
+)
+
+private data class ReviewDialogState(
+    val selectedEvent: ReviewStateValue,
+    val reviewComment: String,
+)
+
+private data class ReviewDialogActions(
+    val onSelectedEventChange: (ReviewStateValue) -> Unit,
+    val onReviewCommentChange: (String) -> Unit,
+    val onSubmit: () -> Unit,
+    val onDismiss: () -> Unit,
+)
+
 @Composable
-fun ReviewDialog(
+fun reviewDialog(
     onSubmit: (event: ReviewStateValue, reviewComment: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedEvent by remember { mutableStateOf(ReviewStateValue.COMMENTED) }
     var reviewComment by remember { mutableStateOf("") }
-
-    val events = listOf(
-        ReviewStateValue.COMMENTED to "Comment",
-        ReviewStateValue.CHANGES_REQUESTED to "Request Changes",
-        ReviewStateValue.APPROVED to "Approve",
-    )
 
     DialogWindow(
         onCloseRequest = onDismiss,
@@ -51,52 +63,101 @@ fun ReviewDialog(
     ) {
         MaterialTheme {
             Surface {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                ) {
-                    Text(text = "Review Type", style = MaterialTheme.typography.h6)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    events.forEach { (event, label) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedEvent == event,
-                                onClick = { selectedEvent = event },
-                            )
-                            Text(text = label)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedTextField(
-                        value = reviewComment,
-                        onValueChange = { reviewComment = it },
-                        label = { Text("Review comment") },
-                        modifier = Modifier.fillMaxWidth().height(120.dp),
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row {
-                        Button(
-                            onClick = {
-                                onSubmit(selectedEvent, reviewComment.ifBlank { null })
-                            },
-                            enabled = selectedEvent == ReviewStateValue.APPROVED || reviewComment.isNotBlank(),
-                        ) {
-                            Text("Submit")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(onClick = onDismiss) {
-                            Text("Cancel")
-                        }
-                    }
-                }
+                reviewDialogContent(
+                    state = ReviewDialogState(
+                        selectedEvent = selectedEvent,
+                        reviewComment = reviewComment,
+                    ),
+                    actions = ReviewDialogActions(
+                        onSelectedEventChange = { selectedEvent = it },
+                        onReviewCommentChange = { reviewComment = it },
+                        onSubmit = { onSubmit(selectedEvent, reviewComment.ifBlank { null }) },
+                        onDismiss = onDismiss,
+                    ),
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun reviewDialogContent(
+    state: ReviewDialogState,
+    actions: ReviewDialogActions,
+) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxWidth()
+            .wrapContentHeight(),
+    ) {
+        Text(text = "Review Type", style = MaterialTheme.typography.h6)
+        Spacer(modifier = Modifier.height(8.dp))
+        reviewEventOptions(
+            selectedEvent = state.selectedEvent,
+            onSelectedEventChange = actions.onSelectedEventChange,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        reviewCommentField(
+            reviewComment = state.reviewComment,
+            onReviewCommentChange = actions.onReviewCommentChange,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        reviewDialogButtons(
+            selectedEvent = state.selectedEvent,
+            reviewComment = state.reviewComment,
+            onSubmit = actions.onSubmit,
+            onDismiss = actions.onDismiss,
+        )
+    }
+}
+
+@Composable
+private fun reviewEventOptions(
+    selectedEvent: ReviewStateValue,
+    onSelectedEventChange: (ReviewStateValue) -> Unit,
+) {
+    reviewEventOptions.forEach { (event, label) ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(
+                selected = selectedEvent == event,
+                onClick = { onSelectedEventChange(event) },
+            )
+            Text(text = label)
+        }
+    }
+}
+
+@Composable
+private fun reviewCommentField(
+    reviewComment: String,
+    onReviewCommentChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = reviewComment,
+        onValueChange = onReviewCommentChange,
+        label = { Text("Review comment") },
+        modifier = Modifier.fillMaxWidth().height(120.dp),
+    )
+}
+
+@Composable
+private fun reviewDialogButtons(
+    selectedEvent: ReviewStateValue,
+    reviewComment: String,
+    onSubmit: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Row {
+        Button(
+            onClick = onSubmit,
+            enabled = selectedEvent == ReviewStateValue.APPROVED || reviewComment.isNotBlank(),
+        ) {
+            Text("Submit")
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        TextButton(onClick = onDismiss) {
+            Text("Cancel")
         }
     }
 }

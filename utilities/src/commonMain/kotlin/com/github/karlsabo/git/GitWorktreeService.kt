@@ -11,6 +11,7 @@ class GitWorktreeException(
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
 
+@Suppress("TooManyFunctions")
 class GitWorktreeService(
     private val gitCommandApi: GitCommandApi = GitCommandService(),
     private val deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,

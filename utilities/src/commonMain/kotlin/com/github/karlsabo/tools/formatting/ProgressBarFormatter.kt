@@ -7,6 +7,10 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
+private const val PERCENT_SCALE = 100
+private const val TOTAL_BAR_COUNT = 10
+private const val PERCENT_PER_BAR = 10.0
+
 fun createSlackMarkdownProgressBar(issues: Set<ProjectIssue>, durationIssues: Set<ProjectIssue>): String {
     val progressBar = StringBuilder()
     val issueCount = issues.count { it.isIssueOrBug() }
@@ -14,22 +18,21 @@ fun createSlackMarkdownProgressBar(issues: Set<ProjectIssue>, durationIssues: Se
     val closedIssuePercentage = if (issueCount == 0) {
         0
     } else {
-        (closedIssueCount / issueCount.toDouble() * 100).roundToInt()
+        (closedIssueCount / issueCount.toDouble() * PERCENT_SCALE).roundToInt()
     }
 
     val closedIssueCountThisWeek = durationIssues.count { it.isIssueOrBug() && it.isCompleted() }
     val closedIssuePercentageThisWeek = if (durationIssues.isEmpty()) {
         0
     } else {
-        (closedIssueCountThisWeek / issueCount.toDouble() * 100).roundToInt()
+        (closedIssueCountThisWeek / issueCount.toDouble() * PERCENT_SCALE).roundToInt()
     }
-    val barCountThisWeek = ceil(closedIssuePercentageThisWeek / 10.0).roundToInt()
+    val barCountThisWeek = ceil(closedIssuePercentageThisWeek / PERCENT_PER_BAR).roundToInt()
 
-    val totalBarCount = 10
-    val closedIssueBarCount = closedIssuePercentage / totalBarCount
+    val closedIssueBarCount = closedIssuePercentage / TOTAL_BAR_COUNT
     repeat(closedIssueBarCount - barCountThisWeek) { progressBar.append("🟦") }
     repeat(barCountThisWeek) { progressBar.append("🟨") }
-    repeat(totalBarCount - closedIssueBarCount) { progressBar.append("⬜") }
+    repeat(TOTAL_BAR_COUNT - closedIssueBarCount) { progressBar.append("⬜") }
     progressBar.append(" $closedIssuePercentage%")
 
     val netIssuesResolved =

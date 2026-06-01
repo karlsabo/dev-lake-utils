@@ -1,5 +1,7 @@
 package com.github.karlsabo.common.adf
 
+private const val DOUBLE_NEWLINE = "\n\n"
+
 /**
  * Extracts plain text from a list of ADF ContentNodes.
  *
@@ -9,124 +11,74 @@ package com.github.karlsabo.common.adf
 fun extractTextFromAdf(content: List<ContentNode>?): String? {
     if (content == null) return null
 
-    val parts = mutableListOf<String>()
-    content.forEach { node ->
-        parts.add(extractTextFromNode(node))
+    val rawText = content.joinToString(separator = "") { node ->
+        AdfNodeTextExtractor.extractTextFromNode(node)
     }
 
-    val rawText = parts.joinToString(separator = "")
-
     return rawText
-        .replace(Regex("\n{3,}"), "\n\n")
+        .replace(Regex("\n{3,}"), DOUBLE_NEWLINE)
         .replace(Regex(" +\n"), "\n")
         .trim()
         .ifEmpty { null }
 }
 
-/**
- * Recursively extracts text from a single ADF ContentNode.
- */
-fun extractTextFromNode(node: ContentNode): String {
-    val sb = StringBuilder()
+private object AdfNodeTextExtractor {
+    /**
+     * Recursively extracts text from a single ADF ContentNode.
+     */
+    fun extractTextFromNode(node: ContentNode): String = when (node.type) {
+        "text" -> node.text.orEmpty()
+        "mention" -> node.attrs?.text.orEmpty()
+        "emoji" -> node.attrs?.text ?: node.attrs?.shortName.orEmpty()
+        "hardBreak" -> "\n"
+        "paragraph", "heading", "blockquote" -> node.extractChildren().withParagraphBreak(node.hasChildren())
+        "rule" -> "---".withBlockSpacing()
+        "codeBlock" -> node.extractCodeBlock().withParagraphBreak(node.hasChildren())
+        "bulletList", "orderedList" -> node.extractChildren().withListBreak()
+        "listItem" -> "- ${node.extractChildren()}".ensureTrailingNewline()
+        else -> node.extractChildren().withUnknownNodeBreak(node.hasChildren())
+    }
 
-    when (node.type) {
-        "text" -> {
-            sb.append(node.text.orEmpty())
-        }
+    private fun ContentNode.extractChildren(): String = content.orEmpty().joinToString(separator = "") { childNode ->
+        extractTextFromNode(childNode)
+    }
 
-        "mention" -> {
-            sb.append(node.attrs?.text.orEmpty())
-        }
-
-        "emoji" -> {
-            sb.append(node.attrs?.text ?: node.attrs?.shortName.orEmpty())
-        }
-
-        "hardBreak" -> {
-            sb.append('\n')
-        }
-
-        "paragraph", "heading", "blockquote" -> {
-            node.content?.forEach { childNode ->
-                sb.append(extractTextFromNode(childNode))
-            }
-            if (sb.isNotEmpty() && !sb.endsWith("\n\n")) {
-                if (sb.endsWith("\n")) sb.append('\n') else sb.append("\n\n")
-            } else if (sb.isEmpty() && node.content?.isNotEmpty() == true) {
-                sb.append("\n\n")
-            } else if (sb.isEmpty() && node.content.isNullOrEmpty()) {
-                sb.append("\n\n")
-            }
-        }
-
-        "rule" -> {
-            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) {
-                sb.append("\n\n")
-            } else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
-                sb.append('\n')
-            }
-            sb.append("---")
-            sb.append("\n\n")
-        }
-
-        "codeBlock" -> {
-            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) {
-                sb.append("\n\n")
-            } else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
-                sb.append('\n')
-            }
-
-            node.content?.forEach { lineNode ->
-                if (lineNode.type == "text") {
-                    sb.append(lineNode.text.orEmpty()).append('\n')
-                } else {
-                    sb.append(extractTextFromNode(lineNode))
-                }
-            }
-            if (sb.isNotEmpty() && !sb.endsWith("\n\n")) {
-                if (sb.endsWith("\n")) sb.append('\n') else sb.append("\n\n")
-            } else if (sb.isEmpty() && node.content?.isNotEmpty() == true) {
-                sb.append("\n\n")
-            }
-        }
-
-        "bulletList", "orderedList" -> {
-            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) {
-                sb.append("\n\n")
-            } else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
-                sb.append('\n')
-            }
-
-            node.content?.forEach { listItemNode ->
-                sb.append(extractTextFromNode(listItemNode))
-            }
-            if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
-                sb.append('\n')
-            } else if (sb.isNotEmpty() && !sb.endsWith("\n")) {
-                sb.append("\n\n")
-            }
-        }
-
-        "listItem" -> {
-            sb.append("- ")
-            node.content?.forEach { childNode ->
-                sb.append(extractTextFromNode(childNode))
-            }
-            if (sb.isNotEmpty() && !sb.endsWith("\n")) {
-                sb.append('\n')
-            }
-        }
-
-        else -> {
-            node.content?.forEach { childNode ->
-                sb.append(extractTextFromNode(childNode))
-            }
-            if (node.content?.isNotEmpty() == true && sb.isNotEmpty()) {
-                if (!sb.endsWith("\n\n")) {
-                    if (sb.endsWith("\n")) sb.append('\n') else sb.append("\n\n")
-                }
-            }
+    private fun ContentNode.extractCodeBlock(): String = content.orEmpty().joinToString(separator = "") { lineNode ->
+        if (lineNode.type == "text") {
+            lineNode.text.orEmpty() + "\n"
+        } else {
+            extractTextFromNode(lineNode)
         }
     }
-    return sb.toString()
+
+    private fun ContentNode.hasChildren(): Boolean = !content.isNullOrEmpty()
+
+    private fun String.withBlockSpacing(): String = trimTrailingSingleNewline() + DOUBLE_NEWLINE
+
+    private fun String.withParagraphBreak(hasChildren: Boolean): String = when {
+        isNotEmpty() && !endsWith(DOUBLE_NEWLINE) -> trimTrailingSingleNewline() + DOUBLE_NEWLINE
+        isEmpty() && hasChildren -> DOUBLE_NEWLINE
+        isEmpty() -> DOUBLE_NEWLINE
+        else -> this
+    }
+
+    private fun String.withListBreak(): String = when {
+        endsWith("\n") && !endsWith(DOUBLE_NEWLINE) -> this + "\n"
+        isNotEmpty() && !endsWith("\n") -> this + DOUBLE_NEWLINE
+        else -> this
+    }
+
+    private fun String.withUnknownNodeBreak(hasChildren: Boolean): String = if (hasChildren && isNotEmpty()) {
+        withParagraphBreak(hasChildren = true)
+    } else {
+        this
+    }
+
+    private fun String.ensureTrailingNewline(): String = if (endsWith("\n")) this else this + "\n"
+
+    private fun String.trimTrailingSingleNewline(): String = if (endsWith("\n") && !endsWith(DOUBLE_NEWLINE)) {
+        this + "\n"
+    } else {
+        this
+    }
 }

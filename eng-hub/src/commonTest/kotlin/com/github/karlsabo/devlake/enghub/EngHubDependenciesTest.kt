@@ -1,6 +1,9 @@
 package com.github.karlsabo.devlake.enghub
 
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
+import com.github.karlsabo.devlake.enghub.viewmodel.EngHubDesktopServices
+import com.github.karlsabo.devlake.enghub.viewmodel.EngHubGitHubServices
+import com.github.karlsabo.devlake.enghub.viewmodel.EngHubWorktreeServices
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.WorktreeSetupCoordinator
@@ -45,13 +48,17 @@ class EngHubDependenciesTest {
         val fakeDesktopLauncher = RecordingDesktopLauncher()
         val fakeNotificationIgnoreStore = RecordingNotificationIgnoreStore()
         val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
-            gitHubApi = fakeGitHubApi,
-            gitHubNotificationService = notificationService,
-            gitWorktreeApi = fakeGitWorktreeApi,
-            worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = fakeGitWorktreeApi),
-            desktopLauncher = fakeDesktopLauncher,
-            directoryPicker = RecordingDirectoryPicker(),
-            configWriter = RecordingEngHubConfigWriter(),
+            gitHubServices = EngHubGitHubServices(
+                api = fakeGitHubApi,
+                notificationService = notificationService,
+            ),
+            worktreeServices = EngHubWorktreeServices(
+                gitWorktreeApi = fakeGitWorktreeApi,
+                worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = fakeGitWorktreeApi),
+                directoryPicker = RecordingDirectoryPicker(),
+                configWriter = RecordingEngHubConfigWriter(),
+            ),
+            desktopServices = EngHubDesktopServices(fakeDesktopLauncher),
             config = config,
             notificationIgnoreStore = fakeNotificationIgnoreStore,
         )
@@ -113,13 +120,17 @@ class EngHubDependenciesTest {
         val fakeNotificationIgnoreStore = RecordingNotificationIgnoreStore()
         val fakeGitWorktreeApi = RecordingGitWorktreeApi()
         val providedViewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
-            gitHubApi = fakeGitHubApi,
-            gitHubNotificationService = GitHubNotificationService(fakeGitHubApi),
-            gitWorktreeApi = fakeGitWorktreeApi,
-            worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = fakeGitWorktreeApi),
-            desktopLauncher = RecordingDesktopLauncher(),
-            directoryPicker = RecordingDirectoryPicker(),
-            configWriter = RecordingEngHubConfigWriter(),
+            gitHubServices = EngHubGitHubServices(
+                api = fakeGitHubApi,
+                notificationService = GitHubNotificationService(fakeGitHubApi),
+            ),
+            worktreeServices = EngHubWorktreeServices(
+                gitWorktreeApi = fakeGitWorktreeApi,
+                worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = fakeGitWorktreeApi),
+                directoryPicker = RecordingDirectoryPicker(),
+                configWriter = RecordingEngHubConfigWriter(),
+            ),
+            desktopServices = EngHubDesktopServices(RecordingDesktopLauncher()),
             config = config,
             notificationIgnoreStore = fakeNotificationIgnoreStore,
         )

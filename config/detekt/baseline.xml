@@ -2,59 +2,12 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>ConstructorParameterNaming:JiraIssue.kt$JiraIssueFields$val customfield_10018: EpicLink? = null</ID>
-    <ID>ConstructorParameterNaming:JiraIssue.kt$JiraIssueFields$val customfield_10100: Double? = null</ID>
-    <ID>ConstructorParameterNaming:JiraIssue.kt$JiraIssueFields$val customfield_11202: CustomFieldValue? = null</ID>
-    <ID>ConstructorParameterNaming:JiraIssue.kt$JiraIssueFields$val customfield_11203: CustomFieldValue? = null</ID>
-    <ID>CyclomaticComplexMethod:AdfTextExtractor.kt$fun extractTextFromNode(node: ContentNode): String</ID>
-    <ID>CyclomaticComplexMethod:GitHubRestApi.kt$GitHubRestApi$override suspend fun getReviewSummary( owner: String, repo: String, prNumber: Int, ): ReviewSummary</ID>
-    <ID>CyclomaticComplexMethod:LinearRestApi.kt$LinearRestApi$override suspend fun getRecentComments(issueKey: String, maxResults: Int): List&lt;ProjectComment&gt;</ID>
-    <ID>CyclomaticComplexMethod:SlackMarkdownFormatter.kt$fun ProjectSummary.toVerboseSlackMarkdown(): String</ID>
     <ID>CyclomaticComplexMethod:UserEpicsWithIssuesDemo.kt$fun main(args: Array&lt;String&gt;): Unit</ID>
-    <ID>FunctionNaming:EngHub.kt$@Composable fun EngHub(onExitApplication: () -&gt; Unit)</ID>
-    <ID>FunctionNaming:EngHubScreen.kt$@Composable fun EngHubScreen(viewModel: EngHubViewModel)</ID>
-    <ID>FunctionNaming:EngHubScreen.kt$@Composable private fun EngHubSidebar( selectedPane: EngHubPane, onPaneSelected: (EngHubPane) -&gt; Unit, )</ID>
-    <ID>FunctionNaming:EngHubScreen.kt$@Composable private fun EngHubSidebarButton( pane: EngHubPane, selected: Boolean, onClick: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:ErrorDialog.kt$@Composable fun ErrorDialog( message: String, onDismiss: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:ErrorDialog.kt$@Composable private fun ErrorMessageBody( message: String, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:LoadingButton.kt$@Composable fun LoadingButton( text: String, isLoading: Boolean, enabled: Boolean, onClick: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:MetricsPreview.kt$@Composable fun MetricsPreview( text: String, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:NotificationItem.kt$@Composable fun NotificationItem( notification: NotificationUiState, onOpenInBrowser: (String) -&gt; Unit, onCheckoutAndOpen: (repoFullName: String, branch: String) -&gt; Unit, setupStatus: WorktreeSetupStatus?, actionInProgress: Boolean = false, onApprove: (NotificationUiState) -&gt; Unit, onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -&gt; Unit, onMarkDone: (NotificationUiState) -&gt; Unit, onUnsubscribe: (NotificationUiState) -&gt; Unit, )</ID>
-    <ID>FunctionNaming:NotificationPanel.kt$@Composable fun NotificationPanel( notificationsResult: Result&lt;List&lt;NotificationUiState&gt;&gt;?, onOpenInBrowser: (String) -&gt; Unit, onCheckoutAndOpen: (repoFullName: String, branch: String) -&gt; Unit, setupStatusFor: (repoFullName: String, branch: String) -&gt; WorktreeSetupStatus?, actingOnThreadIds: Set&lt;String&gt; = emptySet(), onApprove: (NotificationUiState) -&gt; Unit, onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -&gt; Unit, onMarkDone: (NotificationUiState) -&gt; Unit, onUnsubscribe: (NotificationUiState) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:ProjectSummaryList.kt$@Composable fun ProjectSummaryList( summaries: List&lt;ProjectSummaryHolder&gt;, onMessageChange: (Int, String) -&gt; Unit, onDelete: (Int) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:ProjectSummaryList.kt$@Composable private fun ProjectSummaryItem( message: String, onMessageChange: (String) -&gt; Unit, onDelete: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:PullRequestItem.kt$@Composable fun PullRequestItem( pr: PullRequestUiState, onOpenInBrowser: (String) -&gt; Unit, onCheckoutAndOpen: (repoFullName: String, branch: String) -&gt; Unit, setupStatus: WorktreeSetupStatus?, )</ID>
-    <ID>FunctionNaming:PullRequestPanel.kt$@Composable fun PullRequestPanel( pullRequestsResult: Result&lt;List&lt;PullRequestUiState&gt;&gt;?, onOpenInBrowser: (String) -&gt; Unit, onCheckoutAndOpen: (repoFullName: String, branch: String) -&gt; Unit, setupStatusFor: (repoFullName: String, branch: String) -&gt; WorktreeSetupStatus?, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:ReviewDialog.kt$@Composable fun ReviewDialog( onSubmit: (event: ReviewStateValue, reviewComment: String?) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:StatusBadge.kt$@Composable fun StatusBadge(status: CiStatus, modifier: Modifier = Modifier)</ID>
-    <ID>FunctionNaming:SummaryPublisherApp.kt$@Composable fun SummaryPublisherApp( configFilePath: Path, onExitApplication: () -&gt; Unit, loadDependencies: (SummaryPublisherConfig) -&gt; SummaryPublisherDependencies = ::loadSummaryPublisherDependencies, )</ID>
-    <ID>FunctionNaming:SummaryPublisherScreen.kt$@Composable fun SummaryPublisherScreen( topLevelSummary: String, onTopLevelSummaryChange: (String) -&gt; Unit, projectSummaries: List&lt;ProjectSummaryHolder&gt;, onProjectMessageChange: (Int, String) -&gt; Unit, onProjectDelete: (Int) -&gt; Unit, publishButtonText: String, publishButtonEnabled: Boolean, isLoadingSummary: Boolean, isSendingSlackMessage: Boolean, onPublishClick: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:SummaryTextField.kt$@Composable fun SummaryTextField( value: String, onValueChange: (String) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:UserMetricPublisherApp.kt$@Composable fun UserMetricPublisherApp(onExitApplication: () -&gt; Unit)</ID>
-    <ID>FunctionNaming:UserMetricPublisherScreen.kt$@Composable fun UserMetricPublisherScreen( metricsPreviewText: String, publishButtonText: String, publishButtonEnabled: Boolean, onPublishClick: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:WorktreePanel.kt$@Composable fun WorktreePanel( localRepositories: List&lt;LocalRepositoryUiState&gt;, onAddRepository: () -&gt; Unit, onToggleRepository: (String) -&gt; Unit, onOpenWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onArchiveWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onCreateWorktree: CreateWorktreeCallback, forceArchiveRequest: ForceArchiveWorktreeUiState?, onConfirmForceArchiveWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onDismissForceArchiveWorktree: () -&gt; Unit, setupStatuses: Map&lt;WorktreePath, WorktreeSetupStatus&gt;, archivingWorktreePaths: Set&lt;String&gt;, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:WorktreePanel.kt$@Composable private fun ArchiveWorktreeDialog( worktreePath: String, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:WorktreePanel.kt$@Composable private fun CreateWorktreeDialog( state: PendingCreateWorktree, onTargetBranchChange: (String) -&gt; Unit, onConfirm: (PendingCreateWorktree) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:WorktreePanel.kt$@Composable private fun ForceArchiveWorktreeDialog( worktreePath: String, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:WorktreePanel.kt$@Composable private fun LocalRepositoryRow( repository: LocalRepositoryUiState, onToggleRepository: () -&gt; Unit, onOpenWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onArchiveWorktree: (worktreePath: String) -&gt; Unit, onOpenCreateWorktreeDialog: (LocalWorktreeUiState) -&gt; Unit, setupStatuses: Map&lt;WorktreePath, WorktreeSetupStatus&gt;, archivingWorktreePaths: Set&lt;String&gt;, )</ID>
-    <ID>FunctionNaming:WorktreePanel.kt$@Composable private fun LocalWorktreeRow( worktree: LocalWorktreeUiState, setupStatus: WorktreeSetupStatus?, isArchiving: Boolean, onOpen: () -&gt; Unit, onArchive: () -&gt; Unit, onOpenCreateWorktreeDialog: () -&gt; Unit, )</ID>
-    <ID>LargeClass:EngHubNotificationPersistenceViewModelTest.kt$EngHubNotificationPersistenceViewModelTest</ID>
-    <ID>LargeClass:EngHubViewModel.kt$EngHubViewModel : ViewModel</ID>
-    <ID>LargeClass:EngHubViewModelTest.kt$EngHubViewModelTest</ID>
-    <ID>LargeClass:GitWorktreeServiceTest.kt$GitWorktreeServiceTest</ID>
-    <ID>LongMethod:AdfTextExtractor.kt$fun extractTextFromNode(node: ContentNode): String</ID>
-    <ID>LongMethod:EngHubScreen.kt$@Composable fun EngHubScreen(viewModel: EngHubViewModel)</ID>
-    <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun addingLocalRepositoryPreservesExistingRepositoryWorktrees()</ID>
+    <ID>LongMethod:EngHubScreen.kt$@Composable fun engHubScreen(viewModel: EngHubViewModel)</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRefreshesAgainWhenSetupFailsAfterPostCreateRefreshFailure()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRefreshesRepositoryWhileSetupIsRunning()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRunsSetupAndRefreshesWhenExactTargetWorktreeAlreadyExists()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun forceArchiveConfirmationStartsWhileDirtyFailureRefreshIsStillRunning()</ID>
-    <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun worktreePollRefreshesUnifiedRepositoryEntriesWithoutRefreshingGitHubData()</ID>
-    <ID>LongMethod:NotificationItem.kt$@Composable fun NotificationItem( notification: NotificationUiState, onOpenInBrowser: (String) -&gt; Unit, onCheckoutAndOpen: (repoFullName: String, branch: String) -&gt; Unit, setupStatus: WorktreeSetupStatus?, actionInProgress: Boolean = false, onApprove: (NotificationUiState) -&gt; Unit, onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -&gt; Unit, onMarkDone: (NotificationUiState) -&gt; Unit, onUnsubscribe: (NotificationUiState) -&gt; Unit, )</ID>
-    <ID>LongMethod:PagerDutyIncidentTest.kt$PagerDutyIncidentTest$@Test fun testPagerDutyIncidentDeserialization()</ID>
-    <ID>LongMethod:ReviewDialog.kt$@Composable fun ReviewDialog( onSubmit: (event: ReviewStateValue, reviewComment: String?) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
-    <ID>LongMethod:SlackMarkdownFormatter.kt$fun ProjectSummary.toVerboseSlackMarkdown(): String</ID>
-    <ID>LongMethod:SqlDelightNotificationIgnoreStoreTest.kt$SqlDelightNotificationIgnoreStoreTest$@Test fun savesAndReloadsIgnoredThreadIds()</ID>
     <ID>LongMethod:SummaryDetailTest.kt$SummaryDetailTest$@Test fun testCreateSummary()</ID>
     <ID>LongMethod:SummaryOrchestrator.kt$suspend fun createSummary( projectManagementApi: ProjectManagementApi, gitHubApi: GitHubApi, gitHubOrganizationIds: List&lt;String&gt;, pagerDutyApi: PagerDutyApi?, pagerDutyServiceIds: List&lt;String&gt;, textSummarizer: TextSummarizer, projects: List&lt;Project&gt;, duration: Duration, users: List&lt;User&gt;, miscUsers: List&lt;User&gt;, summaryName: String, isMiscellaneousProjectIncluded: Boolean, ): MultiProjectSummary</ID>
     <ID>LongMethod:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest$@Test fun loadConfigurationCreatesMissingTemplatesWhenBootstrapFails()</ID>
@@ -63,18 +16,11 @@
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun loadMetricsPreviewUsesGeneratedDependencies()</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterFailedSendAndReportsFailure()</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterThrownSendAndReportsFailure()</ID>
-    <ID>LongMethod:WorktreePanel.kt$@Composable fun WorktreePanel( localRepositories: List&lt;LocalRepositoryUiState&gt;, onAddRepository: () -&gt; Unit, onToggleRepository: (String) -&gt; Unit, onOpenWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onArchiveWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onCreateWorktree: CreateWorktreeCallback, forceArchiveRequest: ForceArchiveWorktreeUiState?, onConfirmForceArchiveWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onDismissForceArchiveWorktree: () -&gt; Unit, setupStatuses: Map&lt;WorktreePath, WorktreeSetupStatus&gt;, archivingWorktreePaths: Set&lt;String&gt;, modifier: Modifier = Modifier, )</ID>
-    <ID>LongMethod:WorktreePanel.kt$@Composable private fun CreateWorktreeDialog( state: PendingCreateWorktree, onTargetBranchChange: (String) -&gt; Unit, onConfirm: (PendingCreateWorktree) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
-    <ID>LongMethod:WorktreePanel.kt$@Composable private fun LocalWorktreeRow( worktree: LocalWorktreeUiState, setupStatus: WorktreeSetupStatus?, isArchiving: Boolean, onOpen: () -&gt; Unit, onArchive: () -&gt; Unit, onOpenCreateWorktreeDialog: () -&gt; Unit, )</ID>
+    <ID>LongMethod:WorktreePanel.kt$@Composable fun worktreePanel( localRepositories: List&lt;LocalRepositoryUiState&gt;, onAddRepository: () -&gt; Unit, onToggleRepository: (String) -&gt; Unit, onOpenWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onArchiveWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onCreateWorktree: CreateWorktreeCallback, forceArchiveRequest: ForceArchiveWorktreeUiState?, onConfirmForceArchiveWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onDismissForceArchiveWorktree: () -&gt; Unit, setupStatuses: Map&lt;WorktreePath, WorktreeSetupStatus&gt;, archivingWorktreePaths: Set&lt;String&gt;, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:WorktreePanel.kt$@Composable private fun createWorktreeDialog( state: PendingCreateWorktree, onTargetBranchChange: (String) -&gt; Unit, onConfirm: (PendingCreateWorktree) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongMethod:WorktreePanel.kt$@Composable private fun localWorktreeRow( worktree: LocalWorktreeUiState, setupStatus: WorktreeSetupStatus?, isArchiving: Boolean, onOpen: () -&gt; Unit, onArchive: () -&gt; Unit, onOpenCreateWorktreeDialog: () -&gt; Unit, )</ID>
     <ID>LongMethod:WorktreeSetupCoordinatorTest.kt$WorktreeSetupCoordinatorTest$@Test fun repositoryEnsureIsSerializedPerRepoWhileDifferentWorktreesProceedIndependently()</ID>
-    <ID>LongParameterList:EngHubViewModel.kt$EngHubViewModel$( private val gitHubApi: GitHubApi, private val gitHubNotificationService: GitHubNotificationService, private val gitWorktreeApi: GitWorktreeApi, private val worktreeSetupCoordinator: WorktreeSetupCoordinator, private val desktopLauncher: DesktopLauncher, private val directoryPicker: DirectoryPicker, private val configWriter: EngHubConfigWriter, private val config: EngHubConfig, private val notificationIgnoreStore: NotificationIgnoreStore, )</ID>
-    <ID>LongParameterList:EngHubViewModelTest.kt$( gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()), gitWorktreeApi: RecordingGitWorktreeApi, worktreeSetupCoordinator: WorktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi), configWriter: RecordingEngHubConfigWriter, localRepositories: List&lt;String&gt; = emptyList(), localRepositoryConfigs: List&lt;LocalRepositoryConfig&gt; = localRepositories.map { LocalRepositoryConfig(path = it) }, worktreePollIntervalMs: Long = 120_000, repositoriesBaseDir: String = "", setupShell: String = "/bin/zsh", )</ID>
-    <ID>LongParameterList:EngHubViewModelTest.kt$RecordingGitWorktreeApi$( private val repositoryWorktreesBySelectedPath: Map&lt;String, RepositoryWorktrees&gt;, worktreesByRepoPath: Map&lt;String, List&lt;Worktree&gt;&gt;? = null, private val worktreesForRepoPath: ((String) -&gt; List&lt;Worktree&gt;)? = null, private val listWorktreesFailure: RuntimeException? = null, private val onListWorktrees: (String) -&gt; Unit = {}, private val archiveWorktreeFailure: RuntimeException? = null, private val onArchiveWorktree: (String, String, Boolean) -&gt; Unit = { _, _, _ -&gt; }, private val onCreateBranchWorktree: (String, String, String, String) -&gt; String = { _, _, _, _ -&gt; error("Unexpected call") }, )</ID>
-    <ID>LongParameterList:NotificationIgnoreStore.kt$NotificationIgnoreStore$( threadId: String, repositoryFullName: String, subjectType: String, reason: NotificationIgnoreReason, ignoredAtEpochMs: Long, notificationUpdatedAtEpochMs: Long?, )</ID>
-    <ID>LongParameterList:NotificationItem.kt$( notification: NotificationUiState, onOpenInBrowser: (String) -&gt; Unit, onCheckoutAndOpen: (repoFullName: String, branch: String) -&gt; Unit, setupStatus: WorktreeSetupStatus?, actionInProgress: Boolean = false, onApprove: (NotificationUiState) -&gt; Unit, onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -&gt; Unit, onMarkDone: (NotificationUiState) -&gt; Unit, onUnsubscribe: (NotificationUiState) -&gt; Unit, )</ID>
-    <ID>LongParameterList:NotificationPanel.kt$( notificationsResult: Result&lt;List&lt;NotificationUiState&gt;&gt;?, onOpenInBrowser: (String) -&gt; Unit, onCheckoutAndOpen: (repoFullName: String, branch: String) -&gt; Unit, setupStatusFor: (repoFullName: String, branch: String) -&gt; WorktreeSetupStatus?, actingOnThreadIds: Set&lt;String&gt; = emptySet(), onApprove: (NotificationUiState) -&gt; Unit, onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -&gt; Unit, onMarkDone: (NotificationUiState) -&gt; Unit, onUnsubscribe: (NotificationUiState) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
     <ID>LongParameterList:ProjectSummaryBuilder.kt$( users: Set&lt;User&gt;, gitHubApi: GitHubApi, gitHubOrganizationIds: List&lt;String&gt;, projectManagementApi: ProjectManagementApi, textSummarizer: TextSummarizer, duration: Duration, pullRequests: Set&lt;com.github.karlsabo.github.Issue&gt;, parentIssuesAreChildren: Boolean = false, )</ID>
-    <ID>LongParameterList:SqlDelightNotificationIgnoreStore.kt$( threadId: String, repositoryFullName: String, subjectType: String, ignoreReason: String, ignoredAtEpochMs: Long, notificationUpdatedAtEpochMs: Long?, )</ID>
     <ID>LongParameterList:SummaryOrchestrator.kt$( miscUsers: List&lt;User&gt;, projectManagementApi: ProjectManagementApi, gitHubApi: GitHubApi, gitHubOrganizationIds: List&lt;String&gt;, duration: Duration, mutex: Mutex, miscIssueSet: MutableSet&lt;ProjectIssue&gt;, miscPrSet: MutableSet&lt;com.github.karlsabo.github.Issue&gt;, )</ID>
     <ID>LongParameterList:SummaryOrchestrator.kt$( projectManagementApi: ProjectManagementApi, gitHubApi: GitHubApi, gitHubOrganizationIds: List&lt;String&gt;, pagerDutyApi: PagerDutyApi?, pagerDutyServiceIds: List&lt;String&gt;, textSummarizer: TextSummarizer, projects: List&lt;Project&gt;, duration: Duration, users: List&lt;User&gt;, miscUsers: List&lt;User&gt;, summaryName: String, isMiscellaneousProjectIncluded: Boolean, )</ID>
     <ID>LongParameterList:SummaryPublisherDependencies.kt$( config: SummaryPublisherConfig, loadUsersConfig: () -&gt; UsersConfig? = ::loadUsersConfig, loadLinearApiConfig: () -&gt; LinearApiRestConfig = { loadLinearConfig(linearConfigPath) }, loadGitHubApiConfig: () -&gt; GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) }, loadPagerDutyApiConfig: () -&gt; PagerDutyApiRestConfig = { loadPagerDutyConfig(pagerDutyConfigPath) }, loadTextSummarizerConfig: () -&gt; TextSummarizerOpenAiConfig = { requireNotNull(loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)) { "Text summarizer config is required" }.toTextSummarizerOpenAiConfig() }, componentFactory: SummaryPublisherComponentFactory = ::createSummaryPublisherComponent, )</ID>
@@ -84,40 +30,6 @@
     <ID>LongParameterList:WorktreePanel.kt$( localRepositories: List&lt;LocalRepositoryUiState&gt;, onAddRepository: () -&gt; Unit, onToggleRepository: (String) -&gt; Unit, onOpenWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onArchiveWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onCreateWorktree: CreateWorktreeCallback, forceArchiveRequest: ForceArchiveWorktreeUiState?, onConfirmForceArchiveWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onDismissForceArchiveWorktree: () -&gt; Unit, setupStatuses: Map&lt;WorktreePath, WorktreeSetupStatus&gt;, archivingWorktreePaths: Set&lt;String&gt;, modifier: Modifier = Modifier, )</ID>
     <ID>LongParameterList:WorktreePanel.kt$( repository: LocalRepositoryUiState, onToggleRepository: () -&gt; Unit, onOpenWorktree: (repoRootPath: String, worktreePath: String) -&gt; Unit, onArchiveWorktree: (worktreePath: String) -&gt; Unit, onOpenCreateWorktreeDialog: (LocalWorktreeUiState) -&gt; Unit, setupStatuses: Map&lt;WorktreePath, WorktreeSetupStatus&gt;, archivingWorktreePaths: Set&lt;String&gt;, )</ID>
     <ID>LongParameterList:WorktreePanel.kt$( worktree: LocalWorktreeUiState, setupStatus: WorktreeSetupStatus?, isArchiving: Boolean, onOpen: () -&gt; Unit, onArchive: () -&gt; Unit, onOpenCreateWorktreeDialog: () -&gt; Unit, )</ID>
-    <ID>LongParameterList:summary-publisher.gradle.kts$( taskName: String, mainClassName: String, compilationName: String = "main", taskGroup: String = "run", supportsArgs: Boolean = false, configure: JavaExec.() -&gt; Unit = {}, )</ID>
-    <ID>LoopWithTooManyJumpStatements:CursorPagination.kt$while</ID>
-    <ID>LoopWithTooManyJumpStatements:GitHubRestApi.kt$GitHubRestApi$for</ID>
-    <ID>LoopWithTooManyJumpStatements:GitHubRestApi.kt$GitHubRestApi$while</ID>
-    <ID>LoopWithTooManyJumpStatements:JiraRestApi.kt$JiraRestApi$while</ID>
-    <ID>LoopWithTooManyJumpStatements:LinearRestApi.kt$LinearRestApi$while</ID>
-    <ID>MagicNumber:ByteFormatting.kt$1024</ID>
-    <ID>MagicNumber:CustomInstantSerializer.kt$23</ID>
-    <ID>MagicNumber:CustomInstantSerializer.kt$3</ID>
-    <ID>MagicNumber:CustomInstantSerializer.kt$5</ID>
-    <ID>MagicNumber:CustomInstantSerializer.kt$60</ID>
-    <ID>MagicNumber:CustomInstantSerializer.kt$60_000</ID>
-    <ID>MagicNumber:EngHubViewModel.kt$EngHubViewModel$5</ID>
-    <ID>MagicNumber:EngHubViewModel.kt$EngHubViewModel$5_000</ID>
-    <ID>MagicNumber:GitHubRestApi.kt$GitHubRestApi$1000</ID>
-    <ID>MagicNumber:GitHubRestApi.kt$GitHubRestApi$20</ID>
-    <ID>MagicNumber:GitHubRestApi.kt$GitHubRestApi$200</ID>
-    <ID>MagicNumber:GitHubRestApi.kt$GitHubRestApi$204</ID>
-    <ID>MagicNumber:GitHubRestApi.kt$GitHubRestApi$299</ID>
-    <ID>MagicNumber:GitHubRestApi.kt$GitHubRestApi$404</ID>
-    <ID>MagicNumber:GitHubRestApi.kt$GitHubRestApi$50</ID>
-    <ID>MagicNumber:HttpUtilities.kt$10_000</ID>
-    <ID>MagicNumber:HttpUtilities.kt$3</ID>
-    <ID>MagicNumber:HttpUtilities.kt$500</ID>
-    <ID>MagicNumber:HttpUtilities.kt$599</ID>
-    <ID>MagicNumber:HttpUtilities.kt$5_000</ID>
-    <ID>MagicNumber:IssueConversions.kt$3</ID>
-    <ID>MagicNumber:IssueConversions.kt$4</ID>
-    <ID>MagicNumber:JiraRestApi.kt$200</ID>
-    <ID>MagicNumber:JiraRestApi.kt$299</ID>
-    <ID>MagicNumber:JiraRestApi.kt$JiraRestApi$100</ID>
-    <ID>MagicNumber:LinearRestApi.kt$LinearRestApi$200</ID>
-    <ID>MagicNumber:LinearRestApi.kt$LinearRestApi$299</ID>
-    <ID>MagicNumber:MarkdownParser.kt$MarkdownParser$50</ID>
     <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$3</ID>
     <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$3L</ID>
     <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$4</ID>
@@ -125,267 +37,78 @@
     <ID>MagicNumber:PagerDutyRestApi.kt$PagerDutyRestApi$200</ID>
     <ID>MagicNumber:PagerDutyRestApi.kt$PagerDutyRestApi$25</ID>
     <ID>MagicNumber:PagerDutyRestApi.kt$PagerDutyRestApi$299</ID>
-    <ID>MagicNumber:ProcessExecutor.kt$0xFF</ID>
-    <ID>MagicNumber:ProcessExecutor.kt$4096</ID>
-    <ID>MagicNumber:ProcessExecutor.kt$8</ID>
-    <ID>MagicNumber:ProcessExecutor.kt$8096</ID>
-    <ID>MagicNumber:ProgressBarFormatter.kt$10</ID>
-    <ID>MagicNumber:ProgressBarFormatter.kt$10.0</ID>
-    <ID>MagicNumber:ProgressBarFormatter.kt$100</ID>
     <ID>MagicNumber:ProjectSummaryBuilder.kt$5</ID>
-    <ID>MagicNumber:SlackMarkdownFormatter.kt$200</ID>
-    <ID>MagicNumber:StatusBadge.kt$0xFF2DA44E</ID>
-    <ID>MagicNumber:StatusBadge.kt$0xFF6E7781</ID>
-    <ID>MagicNumber:StatusBadge.kt$0xFFBF8700</ID>
-    <ID>MagicNumber:StatusBadge.kt$0xFFCF222E</ID>
-    <ID>MagicNumber:TextSummarizerFake.kt$TextSummarizerFake$16</ID>
     <ID>MagicNumber:UserMetrics.kt$3.5</ID>
     <ID>MagicNumber:UserMetrics.kt$7</ID>
-    <ID>MagicNumber:WorktreeSetupCoordinator.kt$WorktreeSetupRequest$3</ID>
     <ID>MagicNumber:ZapierMetricService.kt$ZapierMetricService$200</ID>
     <ID>MagicNumber:ZapierMetricService.kt$ZapierMetricService$299</ID>
     <ID>MagicNumber:ZapierService.kt$ZapierService$200</ID>
     <ID>MagicNumber:ZapierService.kt$ZapierService$299</ID>
-    <ID>MagicNumber:main.kt$0x1E</ID>
-    <ID>MagicNumber:main.kt$0x23</ID>
-    <ID>MagicNumber:main.kt$0x3C</ID>
-    <ID>MagicNumber:main.kt$0x46</ID>
-    <ID>MagicNumber:main.kt$0x50</ID>
-    <ID>MagicNumber:main.kt$0x55</ID>
-    <ID>MagicNumber:main.kt$0x5F</ID>
-    <ID>MagicNumber:main.kt$0x78</ID>
-    <ID>MagicNumber:main.kt$0xA0</ID>
-    <ID>MagicNumber:main.kt$0xBE</ID>
-    <ID>MagicNumber:main.kt$0xC8</ID>
-    <ID>MagicNumber:main.kt$0xF5</ID>
-    <ID>MagicNumber:main.kt$0xF7</ID>
-    <ID>MagicNumber:main.kt$0xFA</ID>
-    <ID>MagicNumber:main.kt$0xFF</ID>
-    <ID>MagicNumber:main.kt$1.4</ID>
-    <ID>MagicNumber:main.kt$1.5</ID>
-    <ID>MagicNumber:main.kt$11</ID>
-    <ID>MagicNumber:main.kt$12</ID>
-    <ID>MagicNumber:main.kt$13</ID>
-    <ID>MagicNumber:main.kt$14</ID>
-    <ID>MagicNumber:main.kt$15</ID>
-    <ID>MagicNumber:main.kt$17</ID>
-    <ID>MagicNumber:main.kt$18</ID>
-    <ID>MagicNumber:main.kt$19</ID>
-    <ID>MagicNumber:main.kt$20</ID>
-    <ID>MagicNumber:main.kt$21</ID>
-    <ID>MagicNumber:main.kt$22</ID>
-    <ID>MagicNumber:main.kt$25</ID>
-    <ID>MagicNumber:main.kt$255</ID>
-    <ID>MagicNumber:main.kt$256</ID>
-    <ID>MagicNumber:main.kt$26</ID>
-    <ID>MagicNumber:main.kt$3</ID>
-    <ID>MagicNumber:main.kt$30</ID>
-    <ID>MagicNumber:main.kt$32.0</ID>
-    <ID>MagicNumber:main.kt$4</ID>
-    <ID>MagicNumber:main.kt$46</ID>
-    <ID>MagicNumber:main.kt$5</ID>
-    <ID>MagicNumber:main.kt$6</ID>
-    <ID>MagicNumber:main.kt$7</ID>
-    <ID>MagicNumber:main.kt$9</ID>
-    <ID>MatchingDeclarationName:CursorPagination.kt$CursorPageResult</ID>
     <ID>MatchingDeclarationName:DesktopAppBootstrap.kt$DesktopAppBootstrapResult&lt;out T&gt;</ID>
-    <ID>MatchingDeclarationName:ProcessExecutor.kt$ProcessResult</ID>
     <ID>MatchingDeclarationName:UiDemo.kt$ProjectMessage</ID>
-    <ID>MatchingDeclarationName:Utils.kt$OsFamily</ID>
     <ID>MaxLineLength:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
     <ID>MaxLineLength:EngHub.kt$private</ID>
-    <ID>MaxLineLength:EngHubComponent.kt$EngHubBindings$fun</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitValue(): List&lt;T&gt;</ID>
-    <ID>MaxLineLength:EngHubNotificationPersistenceViewModelTest.kt$private</ID>
-    <ID>MaxLineLength:EngHubNotificationPersistenceViewModelTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitSize(size: Int): List&lt;T&gt;</ID>
-    <ID>MaxLineLength:EngHubNotificationPersistenceViewModelTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitValue(): List&lt;T&gt;</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$)</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$ActionErrorQueueState$fun enqueue(message: String): ActionErrorQueueState</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$EngHubViewModel$"Failed to persist automatically done notification ${notification.id}; will retry if GitHub returns it again"</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$EngHubViewModel$fun checkoutWorktreePath(repoFullName: String, branch: String): WorktreePath</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$EngHubViewModel$if</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$EngHubViewModel$private</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$EngHubViewModel$private fun isLocalRepositoryExpansionInFlight(normalizedRepoRootPath: String): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$EngHubViewModel$private fun listLocalWorktreeUiStates(repoRootPath: String): List&lt;LocalWorktreeUiState&gt;</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$NotificationIgnoreReason.DONE -&gt; this.notificationUpdatedAtEpochMs?.let { it &gt;= notificationUpdatedAtEpochMs } == true</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$internal suspend</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun IgnoredNotificationThread.hides(notification: Notification): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun IgnoredNotificationThread.hides(notification: NotificationUiState): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun Map&lt;String, IgnoredNotificationThread&gt;.hides(notification: Notification): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun Map&lt;String, IgnoredNotificationThread&gt;.hides(notification: NotificationUiState): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun NotificationProcessingResult.Processed.shouldPersistAutomaticallyDoneThread(): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun NotificationProcessingResult.Processed.wasMarkedDoneForClosedOrMergedPullRequest(): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun PullRequestStatus?.isClosedOrMerged(): Boolean</ID>
-    <ID>MaxLineLength:EngHubViewModel.kt$private fun StateFlow&lt;ActionErrorQueueState&gt;.currentActionErrorStateFlow(): StateFlow&lt;ActionErrorUiState?&gt;</ID>
-    <ID>MaxLineLength:GitCommandService.kt$GitCommandService$override fun diff(repoPath: String, vararg args: String): String</ID>
-    <ID>MaxLineLength:GitCommandService.kt$GitCommandService$override fun log(repoPath: String, vararg args: String): String</ID>
-    <ID>MaxLineLength:GitCommandService.kt$GitCommandService$override fun revParse(repoPath: String, vararg args: String): String</ID>
-    <ID>MaxLineLength:GitCommandService.kt$GitCommandService$override fun status(repoPath: String): String</ID>
-    <ID>MaxLineLength:GitCommandService.kt$GitCommandService$override fun worktreeList(repoPath: String): String</ID>
-    <ID>MaxLineLength:GitCommandService.kt$GitCommandService$private fun buildRepoCommand(repoPath: String, vararg args: String): List&lt;String&gt;</ID>
     <ID>MaxLineLength:GitCommandServiceTest.kt$GitCommandServiceTest$executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr", baseCommit), workingDirectory = null)</ID>
-    <ID>MaxLineLength:GitHubNotificationService.kt$private</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$"author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$"reviewed-by:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr updated:$formattedStartDate..$formattedEndDate"</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$"${organizationIds.joinToString(" ") { "org:$it" }} is:merged merged:$formattedStartDate..$formattedEndDate is:pr $searchText in:title,body"</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$"Failed to get check runs for $owner/$repo ref=$ref response.status=${checkRunsResponse.status} responseText=```$checkRunsText```"</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$"Failed to get commit statuses for $owner/$repo ref=$ref response.status=${statusContextsResponse.status} responseText=```$statusContextsText```"</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$"Failed to get commit statuses: ${statusContextsResponse.status.value} for $owner/$repo ref=$ref responseText=```$statusContextsText```"</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$logger.error { "Failed to get pull request $url response.status=${response.status} responseText=```$responseText```" }</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$logger.error { "Failed to get reviews for $owner/$repo#$prNumber response.status=${reviewsResponse.status} responseText=```$reviewsText```" }</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$logger.error { "Failed to list notifications $url response.status=${response.status} responseText=```$responseText```" }</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$logger.error { "Failed to mark notification done $url response.status=${response.status} responseText=```$responseText```" }</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$parseCheckRunCounts(lenientJson.parseToJsonElement(checkRunsText).jsonObject["check_runs"]?.jsonArray.orEmpty())</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$parseCommitStatusCounts(lenientJson.parseToJsonElement(statusContextsText).jsonObject["statuses"]?.jsonArray.orEmpty())</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to approve pull request: ${response.status.value} for url=$url responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get check runs: ${checkRunsResponse.status.value} for $owner/$repo ref=$ref responseText=```$checkRunsText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get pull request review count: ${response.status.value} for $gitHubUserId responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get pull request: ${response.status.value} for url=$url responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get reviews: ${reviewsResponse.status.value} for $owner/$repo#$prNumber responseText=```$reviewsText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to list notifications: ${response.status.value} responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to list pull request reviews: ${response.status.value} for url=$url responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to search pull requests: ${response.status.value} responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to submit review: ${response.status.value} for url=$prApiUrl responseText=```$responseText```")</ID>
-    <ID>MaxLineLength:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId responseText=```$responseText```")</ID>
     <ID>MaxLineLength:GitWorktreeService.kt$GitWorktreeService.Companion$fun buildWorktreePath(repoPath: String, branch: String): String</ID>
-    <ID>MaxLineLength:GitWorktreeServiceTest.kt$GitWorktreeServiceTest$assertTrue(ex.message!!.contains("Failed to check whether feature/base-pr is an ancestor of feature/stacked-pr"))</ID>
-    <ID>MaxLineLength:JiraRestApi.kt$JiraRestApi$)</ID>
-    <ID>MaxLineLength:JiraRestApi.kt$JiraRestApi$append(" AND \"${customFieldFilter.fieldId}\" in (${customFieldFilter.values.joinToString(", ") { "\"$it\"" }})")</ID>
-    <ID>MaxLineLength:JiraRestApi.kt$JiraRestApi$override suspend fun getMilestones(projectId: String): List&lt;ProjectMilestone&gt;</ID>
-    <ID>MaxLineLength:LinearQueryBuilder.kt$LinearQueryBuilder.Companion$fun</ID>
+    <ID>MaxLineLength:IgnoredNotificationHelpers.kt$private fun IgnoredNotificationThread.hides(notification: Notification): Boolean</ID>
+    <ID>MaxLineLength:IgnoredNotificationHelpers.kt$private fun IgnoredNotificationThread.hides(notification: NotificationUiState): Boolean</ID>
     <ID>MaxLineLength:LinearRestApi.kt$LinearRestApi$override suspend fun getDirectChildIssues(parentKey: String): List&lt;ProjectIssue&gt;</ID>
-    <ID>MaxLineLength:LlmSkillSync.kt$LlmSkillSync$logger.error { "planningMarkdownDir is blank; copying markdown files without replacing $planningMarkdownDirToken" }</ID>
-    <ID>MaxLineLength:LlmSkillSync.kt$LlmSkillSync$private fun isAbsolutePath(path: String): Boolean</ID>
-    <ID>MaxLineLength:MarkdownParser.kt$MarkdownParser$fun</ID>
-    <ID>MaxLineLength:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$notificationUpdatedAtEpochMs = resultSet.getNullableLong("notification_updated_at_epoch_ms")</ID>
+    <ID>MaxLineLength:LinearRestApi.kt$private fun missingGraphQlData(responseText: String): Nothing</ID>
+    <ID>MaxLineLength:LocalRepositoryExpansionTracker.kt$LocalRepositoryExpansionTracker$fun isInFlight(normalizedRepoRootPath: String): Boolean</ID>
     <ID>MaxLineLength:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$private</ID>
-    <ID>MaxLineLength:SetupStatusLabel.kt$internal fun setupActionLabel(defaultLabel: String, setupStatus: WorktreeSetupStatus?): String</ID>
-    <ID>MaxLineLength:SlackMarkdownFormatter.kt$summary.appendLine("*$complete&lt;${milestone.issue.url}|${milestone.issue.title}&gt;: ${milestone.issue.assigneeName ?: "No assignee"}*")</ID>
-    <ID>MaxLineLength:SlackMarkdownFormatter.kt$summary.appendLine(", there hasn't been any activity for two weeks, please add a status update comment on the Epic.")</ID>
-    <ID>MaxLineLength:SlackMarkdownFormatter.kt$summary.appendLine("‼️⚠️ There hasn't been any activity for two weeks, and this Epic doesn't have an assignee")</ID>
-    <ID>MaxLineLength:SlackMarkdownFormatter.kt$summary.appendLine("🔹 PRs merged: ${durationMergedPullRequests.joinToString(", ") { "&lt;${it.htmlUrl}|${it.number}&gt;" }}")</ID>
-    <ID>MaxLineLength:SlackMarkdownFormatter.kt$summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "&lt;${it.htmlUrl}|${it.number}&gt;" }}")</ID>
-    <ID>MaxLineLength:SqlDelightNotificationIgnoreStore.kt$SqlDelightNotificationIgnoreStore$override fun listIgnoredThreads(): List&lt;IgnoredNotificationThread&gt;</ID>
-    <ID>MaxLineLength:SummaryDetailDemo.kt$if (summaryConfig.pagerDutyServiceIds.isNotEmpty()) PagerDutyRestApi(loadPagerDutyConfig(pagerDutyConfigPath)) else null</ID>
+    <ID>MaxLineLength:NotificationPolling.kt$private</ID>
+    <ID>MaxLineLength:NotificationPolling.kt$private fun NotificationProcessingResult.Processed.shouldPersistAutomaticallyDoneThread(): Boolean</ID>
+    <ID>MaxLineLength:NotificationPolling.kt$private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean</ID>
+    <ID>MaxLineLength:NotificationPolling.kt$private fun NotificationProcessingResult.Processed.wasMarkedDoneForClosedOrMergedPullRequest(): Boolean</ID>
+    <ID>MaxLineLength:NotificationPolling.kt$private fun PullRequestStatus?.isClosedOrMerged(): Boolean</ID>
+    <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Instant?.isWithinStaleWarningWindow(): Boolean</ID>
+    <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean</ID>
+    <ID>MaxLineLength:SlackMilestoneFormatting.kt$private fun String.truncateForSlack(): String</ID>
     <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.GitHubApiMock$)</ID>
     <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend</ID>
     <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend fun getChildIssues(issueKeys: List&lt;String&gt;): List&lt;ProjectIssue&gt;</ID>
     <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend fun getDirectChildIssues(parentKey: String): List&lt;ProjectIssue&gt;</ID>
     <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend fun getIssues(issueKeys: List&lt;String&gt;): List&lt;ProjectIssue&gt;</ID>
     <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend fun getMilestoneIssues(milestoneId: String): List&lt;ProjectIssue&gt;</ID>
-    <ID>MaxLineLength:SummaryPublisherApp.kt$missingMessage = "\nCreating new configuration.\n Please update the configuration file:\n$summaryPublisherConfigPath."</ID>
-    <ID>MaxLineLength:SummaryPublisherDependencies.kt$SummaryPublisherBindings$fun</ID>
     <ID>MaxLineLength:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest$message = "\nCreating new configuration.\n Please update the configuration file:\n$summaryConfigPath."</ID>
-    <ID>MaxLineLength:TextSummarizerFake.kt$TextSummarizerFake$override suspend fun summarize(text: String): String</ID>
     <ID>MaxLineLength:TextSummarizerOpenAiConfigNoSecrets.kt$fun</ID>
     <ID>MaxLineLength:TextSummarizerOpenAiConfigNoSecrets.kt$fun loadTextSummarizerOpenAiNoSecrets(configPath: Path): TextSummarizerOpenAiConfigNoSecrets?</ID>
     <ID>MaxLineLength:UserEpicsWithIssuesDemo.kt$*</ID>
     <ID>MaxLineLength:UserMetricMessagePublisherService.kt$UserMetricMessagePublisherService$open suspend fun publishMessage(message: SlackMessage): Boolean</ID>
-    <ID>MaxLineLength:UserMetricPublisherComponent.kt$UserMetricPublisherBindings$fun</ID>
     <ID>MaxLineLength:UserMetricPublisherDependenciesTest.kt$NoOpGitHubApi$override suspend fun getOpenPullRequestsByAuthor(organizationIds: List&lt;String&gt;, author: String): List&lt;Issue&gt;</ID>
     <ID>MaxLineLength:UserMetricPublisherDependenciesTest.kt$RecordingMessagePublisherService$constructor</ID>
     <ID>MaxLineLength:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$componentFactory</ID>
     <ID>MaxLineLength:UserMetrics.kt$appendLine("• *Year to Date:* `$pullRequestsYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")</ID>
     <ID>MaxLineLength:UserMetrics.kt$appendLine("• *Year to date:* `$issuesClosedYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")</ID>
-    <ID>MaxLineLength:WorktreePanel.kt$internal fun isCreateWorktreeConfirmEnabled(validation: CreateWorktreeTargetBranchValidation): Boolean</ID>
-    <ID>MaxLineLength:WorktreePanel.kt$internal fun isWorktreeArchiveEnabled(setupStatus: WorktreeSetupStatus?, isArchiving: Boolean): Boolean</ID>
-    <ID>MaxLineLength:WorktreePanel.kt$private fun targetBranchMatchesBase(baseBranch: String, targetBranch: String): Boolean</ID>
-    <ID>MaxLineLength:WorktreeSetupCoordinator.kt$WorktreeSetupRequest$"baseWorktreePath, baseBranch, and targetBranch must all be provided for branch worktree creation, or all omitted"</ID>
-    <ID>MaxLineLength:WorktreeSetupCoordinator.kt$WorktreeSetupRequest$"cloneUrl and branch must both be provided for repository/worktree setup, or both omitted for an existing worktree"</ID>
-    <ID>MaxLineLength:WorktreeSetupCoordinator.kt$appendLine($$"if [ \"$command_exit_code\" -ne 0 ] &amp;&amp; [ \"$setup_exit_code\" -eq 0 ]; then setup_exit_code=\"$command_exit_code\"; fi")</ID>
     <ID>MaxLineLength:WorktreeSetupCoordinatorTest.kt$FakeGitWorktreeApi$override fun listWorktrees(repoPath: String): List&lt;Worktree&gt;</ID>
     <ID>MaxLineLength:WorktreeSetupCoordinatorTest.kt$FakeGitWorktreeApi$override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees</ID>
     <ID>MaxLineLength:WorktreeSetupCoordinatorTest.kt$SerializingFakeGitWorktreeApi$override fun listWorktrees(repoPath: String): List&lt;Worktree&gt;</ID>
     <ID>MaxLineLength:WorktreeSetupCoordinatorTest.kt$SerializingFakeGitWorktreeApi$override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees</ID>
     <ID>MaxLineLength:ZapierSummaryPublisher.kt$ZapierSummaryPublisher$open suspend fun publishSummary(summary: ZapierProjectSummary): Boolean</ID>
-    <ID>MaxLineLength:settings.gradle.kts$/* * This file was generated by the Gradle 'init' task. * * The settings file is used to specify which projects to include in your build. * For more detailed information on multi-project builds, please refer to https://docs.gradle.org/8.7/userguide/multi_project_builds.html in the Gradle documentation. * This project uses @Incubating APIs which are subject to change. */</ID>
-    <ID>NestedBlockDepth:AdfTextExtractor.kt$fun extractTextFromNode(node: ContentNode): String</ID>
     <ID>NestedBlockDepth:ImlExcludeFolderManager.kt$internal fun parseExcludedFolderUrls(xmlContent: String): Set&lt;String&gt;</ID>
     <ID>NestedBlockDepth:LlmSkillSyncTest.kt$LlmSkillSyncTest$private fun setupSourceDir( sourceDir: Path, skills: Map&lt;String, Map&lt;String, String&gt;&gt; = emptyMap(), agentsContent: String? = null, notesContent: String? = null, )</ID>
-    <ID>NestedBlockDepth:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$private fun readIgnoredColumnNames(databasePath: String): List&lt;String&gt;</ID>
-    <ID>NestedBlockDepth:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$private fun readIgnoredRows(databasePath: String): List&lt;IgnoredThreadRow&gt;</ID>
-    <ID>NestedBlockDepth:SlackMarkdownFormatter.kt$fun ProjectSummary.toVerboseSlackMarkdown(): String</ID>
-    <ID>PrintStackTrace:GitHubApiDemo.kt$e</ID>
-    <ID>PrintStackTrace:GitHubNotificationsCleanupDemo.kt$e</ID>
-    <ID>PrintStackTrace:MarkdownImageExtractorDemo.kt$e</ID>
-    <ID>PrintStackTrace:main.kt$e</ID>
-    <ID>ReturnCount:CursorPagination.kt$fun JsonObject.extractCursorPage(vararg containerPath: String): CursorPageResult?</ID>
     <ID>ReturnCount:DirectoryUtils.kt$fun loadUsersConfig(): UsersConfig?</ID>
-    <ID>ReturnCount:EngHubViewModel.kt$EngHubViewModel$fun toggleLocalRepositoryExpansion(repoRootPath: String)</ID>
-    <ID>ReturnCount:EngHubViewModel.kt$EngHubViewModel$private fun archiveLocalWorktree( repoRootPath: String, worktreePath: String, force: Boolean, )</ID>
-    <ID>ReturnCount:GitHubRestApi.kt$GitHubRestApi$private fun isBotUser(login: String?, type: String?): Boolean</ID>
     <ID>ReturnCount:ImlExcludeFolderManager.kt$fun addExcludeFoldersToIml( imlPath: Path, directoriesToExclude: List&lt;String&gt; = DEFAULT_EXCLUDE_DIRECTORIES, ): ImlUpdateResult</ID>
-    <ID>ReturnCount:JiraRestApi.kt$JiraRestApi$override suspend fun getIssuesByFilter(filter: IssueFilter): List&lt;ProjectIssue&gt;</ID>
-    <ID>ReturnCount:LlmSkillSync.kt$LlmSkillSync$private fun syncGuidelines( sourceLlmDir: Path, homeDir: Path, target: ToolTarget, replacementDir: String?, ): Boolean</ID>
     <ID>ReturnCount:SerializationTools.kt$inline fun &lt;reified T&gt; loadConfig(configPath: Path, serializer: KSerializer&lt;T&gt;): T?</ID>
-    <ID>SpreadOperator:GitCommandService.kt$GitCommandService$(repoPath, *args.toTypedArray())</ID>
     <ID>SpreadOperator:ProjectSummaryBuilder.kt$(*initialPullRequests.toTypedArray())</ID>
-    <ID>ThrowsCount:LinearRestApi.kt$LinearRestApi$private suspend fun executeGraphQl(query: String, variables: JsonObject? = null): JsonObject</ID>
     <ID>TooGenericExceptionCaught:DesktopAppBootstrap.kt$error: Exception</ID>
     <ID>TooGenericExceptionCaught:DirectoryUtils.kt$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:EngHubViewModel.kt$EngHubViewModel$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:EngHubViewModel.kt$EngHubViewModel$refreshFailure: Exception</ID>
     <ID>TooGenericExceptionCaught:GitHubNotificationService.kt$GitHubNotificationService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:GitHubRestApi.kt$GitHubRestApi$error: Exception</ID>
     <ID>TooGenericExceptionCaught:MarkdownImageExtractor.kt$MarkdownImageExtractor$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SerializationTools.kt$error: Exception</ID>
     <ID>TooGenericExceptionCaught:UserMetricPublisherApp.kt$error: Exception</ID>
     <ID>TooGenericExceptionCaught:ZapierMetricService.kt$ZapierMetricService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ZapierService.kt$ZapierService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:main.kt$e: Exception</ID>
     <ID>TooGenericExceptionThrown:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
-    <ID>TooGenericExceptionThrown:GitHubApiDemo.kt$throw Exception("No --user=username provided")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception( "Failed to get commit statuses: ${statusContextsResponse.status.value} for $owner/$repo ref=$ref responseText=```$statusContextsText```", )</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to approve pull request: ${response.status.value} for url=$url responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get check runs: ${checkRunsResponse.status.value} for $owner/$repo ref=$ref responseText=```$checkRunsText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get pull request review count: ${response.status.value} for $gitHubUserId responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get pull request: ${response.status.value} for url=$url responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to get reviews: ${reviewsResponse.status.value} for $owner/$repo#$prNumber responseText=```$reviewsText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to list notifications: ${response.status.value} responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to list pull request reviews: ${response.status.value} for url=$url responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to search pull requests: ${response.status.value} responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to submit review: ${response.status.value} for url=$prApiUrl responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:GitHubRestApi.kt$GitHubRestApi$throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId responseText=```$responseText```")</ID>
-    <ID>TooGenericExceptionThrown:JiraRestApi.kt$JiraRestApi$throw Exception("JQL results appear truncated (no pagination fields) for jql=$jql")</ID>
-    <ID>TooGenericExceptionThrown:JiraRestApi.kt$throw Exception("Failed to $operation: HTTP ${status.value}")</ID>
-    <ID>TooGenericExceptionThrown:JiraTeamMerDemo.kt$throw Exception("--teams is required as a parameter")</ID>
-    <ID>TooGenericExceptionThrown:LinearDemo.kt$throw Exception("No --user=&lt;linear-user-id&gt; provided")</ID>
-    <ID>TooGenericExceptionThrown:LinearRestApi.kt$LinearRestApi$throw Exception("Failed Linear GraphQL request: ${response.status.value}")</ID>
-    <ID>TooGenericExceptionThrown:LinearRestApi.kt$LinearRestApi$throw Exception("Linear GraphQL errors: ${errors.joinToString("; ")}")</ID>
-    <ID>TooGenericExceptionThrown:LinearRestApi.kt$LinearRestApi$throw Exception("Linear GraphQL response missing data: $responseText")</ID>
-    <ID>TooGenericExceptionThrown:MetricsDemo.kt$throw Exception("User not found: $userId in ${users.users}")</ID>
     <ID>TooGenericExceptionThrown:PagerDutyRestApi.kt$PagerDutyRestApi$throw Exception("Failed to get PagerDuty incidents: $status")</ID>
     <ID>TooGenericExceptionThrown:TextSummarizerOpenAi.kt$TextSummarizerOpenAi$throw Exception("Failed to summarize text: ${response.status.value}")</ID>
-    <ID>TooGenericExceptionThrown:UserEpicsDemo.kt$throw Exception("No --user=username provided")</ID>
     <ID>TooGenericExceptionThrown:UserEpicsWithIssuesDemo.kt$throw Exception("No --user=username provided")</ID>
-    <ID>TooGenericExceptionThrown:UserIssuesByParentDemo.kt$throw Exception("No --parent=issueKey provided")</ID>
-    <ID>TooGenericExceptionThrown:UserIssuesByParentDemo.kt$throw Exception("No --user=username provided")</ID>
     <ID>TooGenericExceptionThrown:UserMetricPublisherApp.kt$throw Exception("User not found: $userId")</ID>
-    <ID>TooManyFunctions:EngHubViewModel.kt$EngHubViewModel : ViewModel</ID>
-    <ID>TooManyFunctions:EngHubViewModel.kt$com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel.kt</ID>
-    <ID>TooManyFunctions:GitCommandApi.kt$GitCommandApi</ID>
-    <ID>TooManyFunctions:GitCommandService.kt$GitCommandService : GitCommandApi</ID>
-    <ID>TooManyFunctions:GitHubApi.kt$GitHubApi</ID>
-    <ID>TooManyFunctions:GitHubRestApi.kt$GitHubRestApi : GitHubApi</ID>
-    <ID>TooManyFunctions:GitWorktreeService.kt$GitWorktreeService : GitWorktreeApi</ID>
-    <ID>TooManyFunctions:JiraRestApi.kt$JiraRestApi : ProjectManagementApi</ID>
-    <ID>TooManyFunctions:LinearQueryBuilder.kt$LinearQueryBuilder</ID>
-    <ID>TooManyFunctions:LinearRestApi.kt$LinearRestApi : ProjectManagementApi</ID>
-    <ID>TooManyFunctions:LlmSkillSync.kt$LlmSkillSync</ID>
+    <ID>TooManyFunctions:SlackMarkdownFormatter.kt$com.github.karlsabo.tools.formatting.SlackMarkdownFormatter.kt</ID>
     <ID>TooManyFunctions:WorktreePanel.kt$com.github.karlsabo.devlake.enghub.component.WorktreePanel.kt</ID>
-    <ID>TopLevelPropertyNaming:LlmSkillSync.kt$private const val planningMarkdownDirToken = "\${PLANNING_MARKDOWN_DIR}"</ID>
-    <ID>UseCheckOrError:EngHubNotificationPersistenceViewModelTest.kt$NotificationPersistenceGitHubApi$throw IllegalStateException("failed to load pull request: $url")</ID>
-    <ID>UseCheckOrError:EngHubViewModelTest.kt$EngHubViewModelTest$throw IllegalStateException("cleanup failed")</ID>
-    <ID>UseCheckOrError:EngHubViewModelTest.kt$EngHubViewModelTest$throw IllegalStateException("fatal: contains modified files")</ID>
-    <ID>UseCheckOrError:EngHubViewModelTest.kt$EngHubViewModelTest$throw IllegalStateException("force archive failed")</ID>
-    <ID>UseCheckOrError:EngHubViewModelTest.kt$EngHubViewModelTest$throw IllegalStateException("transient worktree list failure")</ID>
+    <ID>TopLevelPropertyNaming:PagerDutyIncidentTest.kt$private const val pagerDutyIncidentJson = """ { "incident_number": 123456, "title": "Service Response Alert", "description": "Service Response Alert", "created_at": "2025-07-21T21:00:26Z", "updated_at": "2025-07-21T21:24:50Z", "status": "resolved", "incident_key": null, "service": { "id": "ABC123", "type": "service_reference", "summary": "API Service", "self": "https://api.example.local/services/ABC123", "html_url": "https://example.pagerduty.com/service-directory/ABC123" }, "assignments": [], "assigned_via": "escalation_policy", "last_status_change_at": "2025-07-21T21:24:50Z", "resolved_at": "2025-07-21T21:24:50Z", "first_trigger_log_entry": { "id": "LOG123456", "type": "trigger_log_entry_reference", "summary": "Triggered through the API.", "self": "https://api.example.local/log_entries/LOG123456", "html_url": "https://example.pagerduty.com/incidents/INC123456/log_entries/LOG123456" }, "alert_counts": { "all": 1, "triggered": 0, "resolved": 1 }, "is_mergeable": true, "incident_type": { "name": "incident_default" }, "escalation_policy": { "id": "ESC123", "type": "escalation_policy_reference", "summary": "Standard Escalation", "self": "https://api.example.local/escalation_policies/ESC123", "html_url": "https://example.pagerduty.com/escalation_policies/ESC123" }, "teams": [ { "id": "TEAM123", "type": "team_reference", "summary": "Engineering Team", "self": "https://api.example.local/teams/TEAM123", "html_url": "https://example.pagerduty.com/teams/TEAM123" } ], "pending_actions": [], "acknowledgements": [], "basic_alert_grouping": null, "alert_grouping": null, "last_status_change_by": { "id": "USER123", "type": "user_reference", "summary": "John Smith", "self": "https://api.example.local/users/USER123", "html_url": "https://example.pagerduty.com/users/USER123" }, "priority": null, "resolve_reason": null, "incidents_responders": [], "responder_requests": [], "subscriber_requests": [], "urgency": "high", "id": "INC123456", "type": "incident", "summary": "[#123456] Service Response Alert", "self": "https://api.example.local/incidents/INC123456", "html_url": "https://example.pagerduty.com/incidents/INC123456" } """</ID>
     <ID>UseCheckOrError:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest.RecordingZapierSummaryPublisher$throw IllegalStateException("boom")</ID>
     <ID>UseCheckOrError:UserMetricPublisherDependenciesTest.kt$ThrowingMessagePublisher$throw IllegalStateException("boom")</ID>
   </CurrentIssues>

@@ -181,8 +181,9 @@ class GitHubNotificationService(
     }
 }
 
-private fun defaultAutoApprovePredicate(title: String): Boolean = title.startsWith("Updating appfile", ignoreCase = true) &&
-    (
-        title.contains("demo", ignoreCase = true) ||
-            title.contains("to dev", ignoreCase = true)
-        )
+private fun defaultAutoApprovePredicate(title: String): Boolean {
+    val isAppfileUpdate = title.startsWith("Updating appfile", ignoreCase = true)
+    val targetsKnownEnvironment = title.contains("demo", ignoreCase = true) ||
+        title.contains("to dev", ignoreCase = true)
+    return isAppfileUpdate && targetsKnownEnvironment
+}

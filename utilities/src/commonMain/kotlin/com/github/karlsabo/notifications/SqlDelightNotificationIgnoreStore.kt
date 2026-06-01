@@ -16,7 +16,23 @@ class SqlDelightNotificationIgnoreStore(
 
     override fun listIgnoredThreadIds(): Set<String> = queries.selectAllThreadIds().executeAsList().toSet()
 
-    override fun listIgnoredThreads(): List<IgnoredNotificationThread> = queries.selectAll(::toIgnoredNotificationThread).executeAsList()
+    override fun listIgnoredThreads(): List<IgnoredNotificationThread> = queries.selectAll {
+            threadId,
+            repositoryFullName,
+            subjectType,
+            ignoreReason,
+            ignoredAtEpochMs,
+            notificationUpdatedAtEpochMs,
+        ->
+        IgnoredNotificationThreadRow(
+            threadId = threadId,
+            repositoryFullName = repositoryFullName,
+            subjectType = subjectType,
+            ignoreReason = ignoreReason,
+            ignoredAtEpochMs = ignoredAtEpochMs,
+            notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+        ).toIgnoredNotificationThread()
+    }.executeAsList()
 
     override fun saveIgnoredThread(
         threadId: String,
@@ -35,6 +51,7 @@ class SqlDelightNotificationIgnoreStore(
         )
     }
 
+    @Suppress("LongParameterList")
     override fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,
@@ -54,18 +71,23 @@ class SqlDelightNotificationIgnoreStore(
     }
 }
 
-private fun toIgnoredNotificationThread(
-    threadId: String,
-    repositoryFullName: String,
-    subjectType: String,
-    ignoreReason: String,
-    ignoredAtEpochMs: Long,
-    notificationUpdatedAtEpochMs: Long?,
-): IgnoredNotificationThread = IgnoredNotificationThread(
-    threadId = threadId,
-    repositoryFullName = repositoryFullName,
-    subjectType = subjectType,
-    reason = NotificationIgnoreReason.valueOf(ignoreReason),
-    ignoredAtEpochMs = ignoredAtEpochMs,
-    notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+private data class IgnoredNotificationThreadRow(
+    val threadId: String,
+    val repositoryFullName: String,
+    val subjectType: String,
+    val ignoreReason: String,
+    val ignoredAtEpochMs: Long,
+    val notificationUpdatedAtEpochMs: Long?,
 )
+
+private fun IgnoredNotificationThreadRow.toIgnoredNotificationThread(): IgnoredNotificationThread {
+    val reason = NotificationIgnoreReason.valueOf(ignoreReason)
+    return IgnoredNotificationThread(
+        threadId = threadId,
+        repositoryFullName = repositoryFullName,
+        subjectType = subjectType,
+        reason = reason,
+        ignoredAtEpochMs = ignoredAtEpochMs,
+        notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+    )
+}

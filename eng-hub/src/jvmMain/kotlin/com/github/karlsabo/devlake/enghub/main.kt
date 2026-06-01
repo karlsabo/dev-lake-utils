@@ -12,11 +12,13 @@ import java.awt.geom.Rectangle2D
 import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
 
+private const val DOCK_ICON_SIZE = 256
+
 fun main() {
     System.setProperty("apple.awt.application.name", ENG_HUB_DISPLAY_NAME)
     setDockIcon()
     application {
-        EngHub(onExitApplication = ::exitApplication)
+        engHub(onExitApplication = ::exitApplication)
     }
 }
 
@@ -32,15 +34,17 @@ private fun setDockIcon() {
             return
         }
 
-        taskbar.iconImage = renderAppIcon(256)
+        taskbar.iconImage = renderAppIcon(DOCK_ICON_SIZE)
         System.err.println("Dock icon: set successfully")
-    } catch (e: Exception) {
-        System.err.println("Dock icon: failed - ${e.message}")
-        e.printStackTrace()
+    } catch (error: UnsupportedOperationException) {
+        System.err.println("Dock icon: failed - ${error.message}")
+    } catch (error: SecurityException) {
+        System.err.println("Dock icon: failed - ${error.message}")
     }
 }
 
-private fun renderAppIcon(size: Int): BufferedImage {
+@Suppress("MagicNumber")
+private fun renderAppIcon(@Suppress("SameParameterValue") size: Int): BufferedImage {
     val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
     val g = img.createGraphics()
     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)

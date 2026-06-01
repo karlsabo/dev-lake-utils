@@ -17,10 +17,11 @@ import kotlin.time.measureTime
  */
 fun main(args: Array<String>): Unit = runBlocking {
     val userId =
-        args.find { it.startsWith("--user=") }?.substringAfter("=") ?: throw Exception("No --user=username provided")
+        args.find { it.startsWith("--user=") }?.substringAfter("=")
+            ?: throw IllegalArgumentException("No --user=username provided")
     val parentKey =
         args.find { it.startsWith("--parent=") }?.substringAfter("=")
-            ?: throw Exception("No --parent=issueKey provided")
+            ?: throw IllegalArgumentException("No --parent=issueKey provided")
 
     val projectManagementApi = JiraRestApi(loadJiraConfig(jiraConfigPath))
 

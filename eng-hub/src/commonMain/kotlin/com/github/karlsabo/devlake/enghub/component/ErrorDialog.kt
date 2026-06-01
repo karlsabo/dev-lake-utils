@@ -29,7 +29,7 @@ import dev_lake_utils.shared_resources.generated.resources.icon
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun ErrorDialog(
+fun errorDialog(
     message: String,
     onDismiss: () -> Unit,
 ) {
@@ -50,7 +50,7 @@ fun ErrorDialog(
                 ) {
                     Text(text = "Error", style = MaterialTheme.typography.h6)
                     Spacer(modifier = Modifier.height(8.dp))
-                    ErrorMessageBody(
+                    errorMessageBody(
                         message = message,
                         modifier = Modifier.weight(1f),
                     )
@@ -65,7 +65,7 @@ fun ErrorDialog(
 }
 
 @Composable
-private fun ErrorMessageBody(
+private fun errorMessageBody(
     message: String,
     modifier: Modifier = Modifier,
 ) {

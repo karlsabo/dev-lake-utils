@@ -1,15 +1,19 @@
 package com.github.karlsabo.common.pagination
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+private const val DEFAULT_CURSOR_PAGE_SIZE = 100
+
 /**
  * Result of a single page fetch in cursor-based pagination.
  */
+@Suppress("MatchingDeclarationName")
 data class CursorPageResult(
     val nodes: JsonArray,
     val hasNextPage: Boolean,
@@ -23,19 +27,19 @@ data class CursorPageResult(
  * @return CursorPageResult with nodes and pagination info, or null if structure is invalid
  */
 fun JsonObject.extractCursorPage(vararg containerPath: String): CursorPageResult? {
-    var current: JsonObject = this
-    for (key in containerPath.dropLast(1)) {
-        current = current[key]?.jsonObject ?: return null
-    }
-    val container = current[containerPath.last()]?.jsonObject ?: return null
-    val nodes = container["nodes"]?.jsonArray ?: return null
-    val pageInfo = container["pageInfo"]?.jsonObject
+    val container = findCursorContainer(containerPath.toList())
+    val nodes = container?.get("nodes")?.jsonArray
+    val pageInfo = container?.get("pageInfo")?.jsonObject
 
-    return CursorPageResult(
-        nodes = nodes,
-        hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true,
-        endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
-    )
+    return if (nodes == null) {
+        null
+    } else {
+        CursorPageResult(
+            nodes = nodes,
+            hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true,
+            endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+        )
+    }
 }
 
 /**
@@ -49,20 +53,22 @@ fun JsonObject.extractCursorPage(vararg containerPath: String): CursorPageResult
 suspend fun <T, R> collectCursorPaginated(
     fetchPage: suspend (cursor: String?) -> R,
     extractPage: (R) -> CursorPageResult?,
-    transform: (kotlinx.serialization.json.JsonElement) -> T,
+    transform: (JsonElement) -> T,
 ): List<T> = buildList {
     var cursor: String? = null
+    var shouldContinue = true
 
-    while (true) {
+    while (shouldContinue) {
         val response = fetchPage(cursor)
-        val page = extractPage(response) ?: break
+        val page = extractPage(response)
 
-        page.nodes.forEach { node ->
-            add(transform(node))
+        if (page == null) {
+            shouldContinue = false
+        } else {
+            page.nodes.forEach { node -> add(transform(node)) }
+            shouldContinue = page.hasNextPage && page.endCursor != null && page.nodes.isNotEmpty()
+            cursor = page.endCursor
         }
-
-        if (!page.hasNextPage || page.endCursor == null || page.nodes.isEmpty()) break
-        cursor = page.endCursor
     }
 }
 
@@ -79,24 +85,32 @@ suspend fun <T, R> collectCursorPaginatedWithLimit(
     maxItems: Int,
     fetchPage: suspend (cursor: String?, pageSize: Int) -> R,
     extractPage: (R) -> CursorPageResult?,
-    transform: (kotlinx.serialization.json.JsonElement) -> T,
-    defaultPageSize: Int = 100,
+    transform: (JsonElement) -> T,
+    defaultPageSize: Int = DEFAULT_CURSOR_PAGE_SIZE,
 ): List<T> = buildList {
     var cursor: String? = null
     var remaining = maxItems
+    var shouldContinue = remaining > 0
 
-    while (remaining > 0) {
+    while (shouldContinue) {
         val pageSize = minOf(defaultPageSize, remaining)
         val response = fetchPage(cursor, pageSize)
-        val page = extractPage(response) ?: break
+        val page = extractPage(response)
 
-        page.nodes.forEach { node ->
-            add(transform(node))
+        if (page == null) {
+            shouldContinue = false
+        } else {
+            page.nodes.forEach { node -> add(transform(node)) }
+            remaining -= page.nodes.size
+            shouldContinue = remaining > 0 && page.hasNextPage && page.endCursor != null && page.nodes.isNotEmpty()
+            cursor = page.endCursor
         }
-
-        remaining -= page.nodes.size
-
-        if (!page.hasNextPage || page.endCursor == null || page.nodes.isEmpty()) break
-        cursor = page.endCursor
     }
+}
+
+private fun JsonObject.findCursorContainer(containerPath: List<String>): JsonObject? {
+    val parent = containerPath.dropLast(1).fold(this as JsonObject?) { current, key ->
+        current?.get(key)?.jsonObject
+    }
+    return parent?.get(containerPath.lastOrNull())?.jsonObject
 }

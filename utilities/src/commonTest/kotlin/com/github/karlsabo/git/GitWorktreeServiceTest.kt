@@ -134,6 +134,7 @@ private class FakeGitCommandApi : GitCommandApi {
     }
 }
 
+@Suppress("LargeClass")
 class GitWorktreeServiceTest {
     @Test
     fun ensureRepository_existingDirectory_isRepo() {
@@ -552,7 +553,8 @@ class GitWorktreeServiceTest {
             )
         }
 
-        assertTrue(ex.message!!.contains("Failed to check whether feature/base-pr is an ancestor of feature/stacked-pr"))
+        val expectedMessage = "Failed to check whether feature/base-pr is an ancestor of feature/stacked-pr"
+        assertTrue(ex.message!!.contains(expectedMessage))
         assertTrue(ex.cause is GitCommandException)
     }
 

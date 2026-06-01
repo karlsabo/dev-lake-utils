@@ -18,7 +18,7 @@ import com.github.karlsabo.devlake.tools.rememberSummaryPublisherState
 import com.github.karlsabo.devlake.tools.saveSummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
 import com.github.karlsabo.devlake.tools.summaryPublisherConfigPath
-import com.github.karlsabo.devlake.tools.ui.components.ErrorDialog
+import com.github.karlsabo.devlake.tools.ui.components.errorDialog
 import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.dto.toTerseSlackMarkup
 import com.github.karlsabo.github.config.GitHubConfig
@@ -56,7 +56,7 @@ internal data class SummaryPublisherBootstrapTemplate(
 )
 
 @Composable
-fun SummaryPublisherApp(
+fun summaryPublisherApp(
     configFilePath: Path,
     onExitApplication: () -> Unit,
     loadDependencies: (SummaryPublisherConfig) -> SummaryPublisherDependencies = ::loadSummaryPublisherDependencies,
@@ -69,7 +69,7 @@ fun SummaryPublisherApp(
     }
 
     if (state.isDisplayErrorDialog) {
-        ErrorDialog(
+        errorDialog(
             message = state.errorMessage,
             onDismiss = onExitApplication,
         )
@@ -92,7 +92,7 @@ fun SummaryPublisherApp(
             position = WindowPosition(Alignment.Center),
         ),
     ) {
-        SummaryPublisherScreen(
+        summaryPublisherScreen(
             topLevelSummary = state.topLevelSummary,
             onTopLevelSummaryChange = { state.topLevelSummary = it },
             projectSummaries = state.projectSummaries,
@@ -170,7 +170,8 @@ internal fun buildConfigurationErrorMessage(
 internal fun summaryPublisherBootstrapTemplates(): List<SummaryPublisherBootstrapTemplate> = listOf(
     SummaryPublisherBootstrapTemplate(
         path = summaryPublisherConfigPath,
-        missingMessage = "\nCreating new configuration.\n Please update the configuration file:\n$summaryPublisherConfigPath.",
+        missingMessage = "\nCreating new configuration.\n" +
+            " Please update the configuration file:\n$summaryPublisherConfigPath.",
         createIfMissing = { saveSummaryPublisherConfig(SummaryPublisherConfig()) },
     ),
     SummaryPublisherBootstrapTemplate(

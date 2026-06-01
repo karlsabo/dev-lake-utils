@@ -7,6 +7,8 @@ import io.ktor.http.encodeURLPathPart
  * All functions are side-effect free and operate only on strings.
  */
 object MarkdownParser {
+    private const val MAX_FILE_NAME_LENGTH = 50
+
     private val BASE64_REFERENCE_PATTERN = Regex(
         """\[([^]]+)]:\s*<data:image/([^;]+);base64,([^>]+)>""",
     )
@@ -30,14 +32,17 @@ object MarkdownParser {
     /**
      * Finds all base64-encoded image references in markdown content.
      */
-    fun findBase64ImageReferences(content: String): List<Base64ImageReference> = BASE64_REFERENCE_PATTERN.findAll(content).map { match ->
-        Base64ImageReference(
-            fullMatch = match.value,
-            referenceName = match.groupValues[1],
-            imageType = match.groupValues[2],
-            base64Data = match.groupValues[3],
-        )
-    }.toList()
+    fun findBase64ImageReferences(content: String): List<Base64ImageReference> {
+        val matches = BASE64_REFERENCE_PATTERN.findAll(content)
+        return matches.map { match ->
+            Base64ImageReference(
+                fullMatch = match.value,
+                referenceName = match.groupValues[1],
+                imageType = match.groupValues[2],
+                base64Data = match.groupValues[3],
+            )
+        }.toList()
+    }
 
     /**
      * Replaces a base64 image reference with a file path reference.
@@ -59,17 +64,23 @@ object MarkdownParser {
     /**
      * Sanitizes a string for use as a filename.
      */
-    fun sanitizeFileName(name: String): String = name.replace(Regex("""[^\w\s-]"""), "").trim().take(50)
+    fun sanitizeFileName(name: String): String = name
+        .replace(Regex("""[^\w\s-]"""), "")
+        .trim()
+        .take(MAX_FILE_NAME_LENGTH)
 
     /**
      * Finds all reference definitions in markdown content.
      */
-    fun findReferenceDefinitions(content: String): List<ReferenceDefinition> = REFERENCE_DEFINITION_PATTERN.findAll(content).map { match ->
-        ReferenceDefinition(
-            referenceName = match.groupValues[1],
-            path = match.groupValues[2].trim(),
-        )
-    }.toList()
+    fun findReferenceDefinitions(content: String): List<ReferenceDefinition> {
+        val matches = REFERENCE_DEFINITION_PATTERN.findAll(content)
+        return matches.map { match ->
+            ReferenceDefinition(
+                referenceName = match.groupValues[1],
+                path = match.groupValues[2].trim(),
+            )
+        }.toList()
+    }
 
     /**
      * Converts reference-style image links to direct links and removes

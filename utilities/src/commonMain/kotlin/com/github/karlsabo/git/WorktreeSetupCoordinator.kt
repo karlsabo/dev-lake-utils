@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+private const val BRANCH_WORKTREE_FIELD_COUNT = 3
+
 data class WorktreeSetupRequest(
     val repoPath: String,
     val worktreePath: WorktreePath,
@@ -29,11 +31,13 @@ data class WorktreeSetupRequest(
     init {
         require(repoPath.isNotBlank()) { "repoPath must not be blank" }
         require((cloneUrl == null) == (branch == null)) {
-            "cloneUrl and branch must both be provided for repository/worktree setup, or both omitted for an existing worktree"
+            "cloneUrl and branch must both be provided for repository/worktree setup, " +
+                "or both omitted for an existing worktree"
         }
         val branchCreationFieldCount = listOf(baseWorktreePath, baseBranch, targetBranch).count { it != null }
-        require(branchCreationFieldCount == 0 || branchCreationFieldCount == 3) {
-            "baseWorktreePath, baseBranch, and targetBranch must all be provided for branch worktree creation, or all omitted"
+        require(branchCreationFieldCount == 0 || branchCreationFieldCount == BRANCH_WORKTREE_FIELD_COUNT) {
+            "baseWorktreePath, baseBranch, and targetBranch must all be provided " +
+                "for branch worktree creation, or all omitted"
         }
         require(cloneUrl == null || branchCreationFieldCount == 0) {
             "repository/worktree setup and branch worktree creation are mutually exclusive"
@@ -259,7 +263,10 @@ fun buildWorktreeSetupScript(commands: List<String>): String = buildString {
     commands.forEach { command ->
         appendLine(command)
         appendLine("command_exit_code=$?")
-        appendLine($$"if [ \"$command_exit_code\" -ne 0 ] && [ \"$setup_exit_code\" -eq 0 ]; then setup_exit_code=\"$command_exit_code\"; fi")
+        appendLine(
+            $$"if [ \"$command_exit_code\" -ne 0 ] && [ \"$setup_exit_code\" -eq 0 ]; then " +
+                $$"setup_exit_code=\"$command_exit_code\"; fi",
+        )
     }
     append($$"exit \"$setup_exit_code\"")
 }

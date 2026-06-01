@@ -1,5 +1,8 @@
 package com.github.karlsabo.linear
 
+import com.github.karlsabo.common.pagination.collectCursorPaginated
+import com.github.karlsabo.common.pagination.collectCursorPaginatedWithLimit
+import com.github.karlsabo.common.pagination.extractCursorPage
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.http.installHttpRetry
 import com.github.karlsabo.linear.config.LinearApiRestConfig
@@ -25,13 +28,13 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -41,6 +44,13 @@ private val logger = KotlinLogging.logger {}
 
 private const val DEFAULT_PAGE_SIZE = 100
 private const val DEFAULT_BATCH_SIZE = 100
+private const val HTTP_SUCCESS_MIN = 200
+private const val HTTP_SUCCESS_MAX = 299
+
+class LinearApiException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 private val ISSUE_FIELDS = """
             id
@@ -110,6 +120,7 @@ private val MILESTONE_FIELDS = """
 /**
  * Linear GraphQL API implementation of ProjectManagementApi.
  */
+@Suppress("TooManyFunctions")
 class LinearRestApi(
     private val config: LinearApiRestConfig,
     private val clientOverride: HttpClient? = null,
@@ -149,8 +160,9 @@ class LinearRestApi(
             batch.indices.forEach { index ->
                 val alias = "issue$index"
                 val issueNode = data[alias]
-                if (issueNode == null || issueNode is JsonNull) return@forEach
-                issues += lenientJson.decodeFromJsonElement(Issue.serializer(), issueNode)
+                if (issueNode != null && issueNode !is JsonNull) {
+                    issues += lenientJson.decodeFromJsonElement(Issue.serializer(), issueNode)
+                }
             }
         }
 
@@ -160,9 +172,8 @@ class LinearRestApi(
     override suspend fun getChildIssues(issueKeys: List<String>): List<ProjectIssue> {
         if (issueKeys.isEmpty()) return emptyList()
 
-        val children = mutableListOf<Issue>()
-        for (key in issueKeys) {
-            children += if (isIssueIdentifier(key)) {
+        val children = issueKeys.flatMap { key ->
+            if (isIssueIdentifier(key)) {
                 fetchChildIssues(key)
             } else {
                 fetchProjectIssues(key)
@@ -177,35 +188,15 @@ class LinearRestApi(
     override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<ProjectComment> {
         if (maxResults <= 0) return emptyList()
 
-        val comments = mutableListOf<Comment>()
-        var remaining = maxResults
-        var cursor: String? = null
         val escapedIssueKey = escapeGraphQlString(issueKey)
-
-        while (remaining > 0) {
-            val pageSize = minOf(DEFAULT_PAGE_SIZE, remaining)
-            val query = queryBuilder.issueComments(escapedIssueKey, COMMENT_FIELDS, pageSize, cursor)
-            val data = executeGraphQl(query)
-            val issueNode = data["issue"]?.jsonObject ?: break
-            val commentsNode = issueNode["comments"]?.jsonObject ?: break
-            val nodes = commentsNode["nodes"]?.jsonArray ?: break
-
-            nodes.forEach { node ->
-                comments += lenientJson.decodeFromJsonElement(Comment.serializer(), node)
-            }
-
-            val pageInfo = commentsNode["pageInfo"]?.jsonObject
-            val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true
-            val endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content
-
-            if (!hasNextPage || endCursor.isNullOrBlank()) break
-
-            cursor = endCursor
-            remaining -= nodes.size
-            if (nodes.isEmpty()) break
-        }
-
-        return comments.map { it.toProjectComment() }
+        return collectCursorPaginatedWithLimit(
+            maxItems = maxResults,
+            fetchPage = { cursor, pageSize ->
+                executeGraphQl(queryBuilder.issueComments(escapedIssueKey, COMMENT_FIELDS, pageSize, cursor))
+            },
+            extractPage = { data -> data.extractCursorPage("issue", "comments") },
+            transform = { node -> lenientJson.decodeFromJsonElement(Comment.serializer(), node).toProjectComment() },
+        )
     }
 
     override suspend fun getIssuesResolved(
@@ -260,59 +251,23 @@ class LinearRestApi(
         return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
-    private suspend fun fetchProjectIssues(projectId: String): List<Issue> {
-        val issues = mutableListOf<Issue>()
-        var cursor: String? = null
-
-        while (true) {
-            val query = queryBuilder.projectIssues(projectId, ISSUE_FIELDS, cursor)
-            val data = executeGraphQl(query)
-            val projectNode = data["project"]?.jsonObject ?: break
-            val issuesNode = projectNode["issues"]?.jsonObject ?: break
-            val nodes = issuesNode["nodes"]?.jsonArray ?: break
-
-            nodes.forEach { node ->
-                issues += lenientJson.decodeFromJsonElement(Issue.serializer(), node)
-            }
-
-            val pageInfo = issuesNode["pageInfo"]?.jsonObject
-            val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true
-            val endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content
-
-            if (!hasNextPage || endCursor.isNullOrBlank()) break
-            cursor = endCursor
-            if (nodes.isEmpty()) break
-        }
-
-        return issues
-    }
+    private suspend fun fetchProjectIssues(projectId: String): List<Issue> = collectCursorPaginated(
+        fetchPage = { cursor -> executeGraphQl(queryBuilder.projectIssues(projectId, ISSUE_FIELDS, cursor)) },
+        extractPage = { data -> data.extractCursorPage("project", "issues") },
+        transform = ::decodeIssue,
+    )
 
     override suspend fun getMilestones(projectId: String): List<UnifiedProjectMilestone> {
-        val milestones = mutableListOf<ProjectMilestone>()
-        var cursor: String? = null
         val escapedProjectId = escapeGraphQlString(projectId)
-
-        while (true) {
-            val query = queryBuilder.projectMilestones(escapedProjectId, MILESTONE_FIELDS, cursor)
-            val data = executeGraphQl(query)
-            val projectNode = data["project"]?.jsonObject ?: break
-            val milestonesNode = projectNode["projectMilestones"]?.jsonObject ?: break
-            val nodes = milestonesNode["nodes"]?.jsonArray ?: break
-
-            nodes.forEach { node ->
-                milestones += lenientJson.decodeFromJsonElement(ProjectMilestone.serializer(), node)
-            }
-
-            val pageInfo = milestonesNode["pageInfo"]?.jsonObject
-            val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true
-            val endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content
-
-            if (!hasNextPage || endCursor.isNullOrBlank()) break
-            cursor = endCursor
-            if (nodes.isEmpty()) break
-        }
-
-        return milestones.map { it.toUnifiedProjectMilestone() }
+        return collectCursorPaginated(
+            fetchPage = { cursor ->
+                executeGraphQl(queryBuilder.projectMilestones(escapedProjectId, MILESTONE_FIELDS, cursor))
+            },
+            extractPage = { data -> data.extractCursorPage("project", "projectMilestones") },
+            transform = { node ->
+                lenientJson.decodeFromJsonElement(ProjectMilestone.serializer(), node).toUnifiedProjectMilestone()
+            },
+        )
     }
 
     override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
@@ -321,86 +276,29 @@ class LinearRestApi(
     }
 
     private suspend fun fetchChildIssues(issueKey: String): List<Issue> {
-        val children = mutableListOf<Issue>()
-        var cursor: String? = null
         val escapedIssueKey = escapeGraphQlString(issueKey)
-
-        while (true) {
-            val query = queryBuilder.childrenOf(escapedIssueKey, ISSUE_FIELDS, cursor)
-            val data = executeGraphQl(query)
-            val issueNode = data["issue"]?.jsonObject ?: break
-            val childrenNode = issueNode["children"]?.jsonObject ?: break
-            val nodes = childrenNode["nodes"]?.jsonArray ?: break
-
-            nodes.forEach { node ->
-                children += lenientJson.decodeFromJsonElement(Issue.serializer(), node)
-            }
-
-            val pageInfo = childrenNode["pageInfo"]?.jsonObject
-            val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true
-            val endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content
-
-            if (!hasNextPage || endCursor.isNullOrBlank()) break
-            cursor = endCursor
-            if (nodes.isEmpty()) break
-        }
-
-        return children
+        return collectCursorPaginated(
+            fetchPage = { cursor -> executeGraphQl(queryBuilder.childrenOf(escapedIssueKey, ISSUE_FIELDS, cursor)) },
+            extractPage = { data -> data.extractCursorPage("issue", "children") },
+            transform = ::decodeIssue,
+        )
     }
 
     private suspend fun fetchIssuesByFilter(
         filter: String,
         selection: String,
         orderBy: String? = null,
-    ): List<Issue> {
-        val issues = mutableListOf<Issue>()
-        var cursor: String? = null
+    ): List<Issue> = collectCursorPaginated(
+        fetchPage = { cursor -> executeGraphQl(queryBuilder.issuesByFilter(filter, selection, cursor, orderBy)) },
+        extractPage = { data -> data.extractCursorPage("issues") },
+        transform = ::decodeIssue,
+    )
 
-        while (true) {
-            val query = queryBuilder.issuesByFilter(filter, selection, cursor, orderBy)
-            val data = executeGraphQl(query)
-            val issuesNode = data["issues"]?.jsonObject ?: break
-            val nodes = issuesNode["nodes"]?.jsonArray ?: break
-
-            nodes.forEach { node ->
-                issues += lenientJson.decodeFromJsonElement(Issue.serializer(), node)
-            }
-
-            val pageInfo = issuesNode["pageInfo"]?.jsonObject
-            val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true
-            val endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content
-
-            if (!hasNextPage || endCursor.isNullOrBlank()) break
-            cursor = endCursor
-            if (nodes.isEmpty()) break
-        }
-
-        return issues
-    }
-
-    private suspend fun countIssuesByFilter(filter: String): UInt {
-        var cursor: String? = null
-        var count = 0
-
-        while (true) {
-            val query = queryBuilder.issuesByFilter(filter, ISSUE_ID_FIELDS, cursor, null)
-            val data = executeGraphQl(query)
-            val issuesNode = data["issues"]?.jsonObject ?: break
-            val nodes = issuesNode["nodes"]?.jsonArray ?: break
-
-            count += nodes.size
-
-            val pageInfo = issuesNode["pageInfo"]?.jsonObject
-            val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.booleanOrNull == true
-            val endCursor = pageInfo?.get("endCursor")?.jsonPrimitive?.content
-
-            if (!hasNextPage || endCursor.isNullOrBlank()) break
-            cursor = endCursor
-            if (nodes.isEmpty()) break
-        }
-
-        return count.toUInt()
-    }
+    private suspend fun countIssuesByFilter(filter: String): UInt = collectCursorPaginated(
+        fetchPage = { cursor -> executeGraphQl(queryBuilder.issuesByFilter(filter, ISSUE_ID_FIELDS, cursor, null)) },
+        extractPage = { data -> data.extractCursorPage("issues") },
+        transform = { },
+    ).size.toUInt()
 
     private suspend fun executeGraphQl(query: String, variables: JsonObject? = null): JsonObject {
         val response = client.post(config.endpoint) {
@@ -410,27 +308,12 @@ class LinearRestApi(
         }
 
         val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
-            logger.debug { "Linear GraphQL error response: ```$responseText```" }
-            throw Exception("Failed Linear GraphQL request: ${response.status.value}")
-        }
+        ensureGraphQlHttpSuccess(response.status, responseText)
 
         val root = lenientJson.parseToJsonElement(responseText).jsonObject
-        val errors = root["errors"]?.jsonArray
-            ?.mapNotNull { it.jsonObject["message"]?.jsonPrimitive?.content }
-            ?.filter { it.isNotBlank() }
-            .orEmpty()
+        ensureGraphQlResponseHasNoErrors(root, query)
 
-        if (errors.isNotEmpty()) {
-            val errorDetails = root["errors"]?.jsonArray
-                ?.map { it.jsonObject.toString() }
-                ?.joinToString("\n") ?: ""
-            logger.error { "Linear GraphQL errors for query:\n$query\nErrors:\n$errorDetails" }
-            throw Exception("Linear GraphQL errors: ${errors.joinToString("; ")}")
-        }
-
-        return root["data"]?.jsonObject
-            ?: throw Exception("Linear GraphQL response missing data: $responseText")
+        return root["data"]?.jsonObject ?: missingGraphQlData(responseText)
     }
 
     /**
@@ -448,3 +331,31 @@ class LinearRestApi(
         }
     }
 }
+
+private fun decodeIssue(
+    node: kotlinx.serialization.json.JsonElement,
+): Issue = lenientJson.decodeFromJsonElement(Issue.serializer(), node)
+
+private fun ensureGraphQlHttpSuccess(status: HttpStatusCode, responseText: String) {
+    if (status.value !in HTTP_SUCCESS_MIN..HTTP_SUCCESS_MAX) {
+        logger.debug { "Linear GraphQL error response: ```$responseText```" }
+        throw LinearApiException("Failed Linear GraphQL request: ${status.value}")
+    }
+}
+
+private fun ensureGraphQlResponseHasNoErrors(root: JsonObject, query: String) {
+    val errors = root["errors"]?.jsonArray
+        ?.mapNotNull { it.jsonObject["message"]?.jsonPrimitive?.content }
+        ?.filter { it.isNotBlank() }
+        .orEmpty()
+
+    if (errors.isNotEmpty()) {
+        val errorDetails = root["errors"]?.jsonArray
+            ?.map { it.jsonObject.toString() }
+            ?.joinToString("\n") ?: ""
+        logger.error { "Linear GraphQL errors for query:\n$query\nErrors:\n$errorDetails" }
+        throw LinearApiException("Linear GraphQL errors: ${errors.joinToString("; ")}")
+    }
+}
+
+private fun missingGraphQlData(responseText: String): Nothing = throw LinearApiException("Linear GraphQL response missing data: $responseText")

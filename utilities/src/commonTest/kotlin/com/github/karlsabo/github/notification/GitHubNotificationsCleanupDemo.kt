@@ -33,9 +33,8 @@ fun main() {
                 printResult(index, result)
             }
         }
-    } catch (e: Exception) {
-        println("Error: ${e.message}")
-        e.printStackTrace()
+    } catch (error: RuntimeException) {
+        println("Error: ${error.message}")
     }
 }
 

@@ -64,6 +64,50 @@ private const val DOCS_SELECTED_WORKTREE = "/repos/docs-feature-notes"
 private const val EXAMPLE_WEB_ROOT = "/workspace/example-web"
 private const val NEW_LOCAL_REPO_ROOT = "/workspace/new-local-repo"
 
+private fun devLakeAndDocsRepositoryWorktreesBySelectedPath(): Map<String, RepositoryWorktrees> = mapOf(
+    DEV_LAKE_SELECTED_WORKTREE to RepositoryWorktrees(
+        rootPath = DEV_LAKE_ROOT,
+        selectedWorktreePath = DEV_LAKE_SELECTED_WORKTREE,
+        worktrees = listOf(
+            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+            Worktree(path = DEV_LAKE_SELECTED_WORKTREE, branch = "feature/worktree-panel", commitHash = "def456"),
+        ),
+    ),
+    DOCS_SELECTED_WORKTREE to RepositoryWorktrees(
+        rootPath = DOCS_ROOT,
+        selectedWorktreePath = DOCS_SELECTED_WORKTREE,
+        worktrees = listOf(
+            Worktree(path = DOCS_ROOT, branch = "main", commitHash = "123abc"),
+            Worktree(path = DOCS_SELECTED_WORKTREE, branch = "feature/notes", commitHash = "456def"),
+        ),
+    ),
+)
+
+private fun pollingWorktrees(listCountsByRepo: MutableMap<String, Int>): (String) -> List<Worktree> = { repoPath ->
+    val callCount = listCountsByRepo.getOrElse(repoPath) { 0 } + 1
+    listCountsByRepo[repoPath] = callCount
+    when (repoPath) {
+        DEV_LAKE_ROOT -> devLakePollWorktrees(callCount)
+        DOCS_ROOT -> listOf(Worktree(path = DOCS_ROOT, branch = "docs-main", commitHash = "123abc"))
+        else -> error("Unexpected repo path $repoPath")
+    }
+}
+
+private fun devLakePollWorktrees(callCount: Int): List<Worktree> = if (callCount == 1) {
+    listOf(Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"))
+} else {
+    listOf(
+        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+        Worktree(
+            path = DEV_LAKE_SELECTED_WORKTREE,
+            branch = "feature/worktree-panel",
+            commitHash = "def456",
+            isDirty = true,
+        ),
+    )
+}
+
+@Suppress("LargeClass")
 class EngHubViewModelTest {
 
     @Test
@@ -151,32 +195,7 @@ class EngHubViewModelTest {
     @Test
     fun addingLocalRepositoryPreservesExistingRepositoryWorktrees() = runBlocking {
         val api = RecordingGitWorktreeApi(
-            repositoryWorktreesBySelectedPath = mapOf(
-                DEV_LAKE_SELECTED_WORKTREE to RepositoryWorktrees(
-                    rootPath = DEV_LAKE_ROOT,
-                    selectedWorktreePath = DEV_LAKE_SELECTED_WORKTREE,
-                    worktrees = listOf(
-                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
-                        Worktree(
-                            path = DEV_LAKE_SELECTED_WORKTREE,
-                            branch = "feature/worktree-panel",
-                            commitHash = "def456",
-                        ),
-                    ),
-                ),
-                DOCS_SELECTED_WORKTREE to RepositoryWorktrees(
-                    rootPath = DOCS_ROOT,
-                    selectedWorktreePath = DOCS_SELECTED_WORKTREE,
-                    worktrees = listOf(
-                        Worktree(path = DOCS_ROOT, branch = "main", commitHash = "123abc"),
-                        Worktree(
-                            path = DOCS_SELECTED_WORKTREE,
-                            branch = "feature/notes",
-                            commitHash = "456def",
-                        ),
-                    ),
-                ),
-            ),
+            repositoryWorktreesBySelectedPath = devLakeAndDocsRepositoryWorktreesBySelectedPath(),
         )
         val configWriter = RecordingEngHubConfigWriter()
         val viewModel = createLocalRepositoryViewModel(
@@ -366,29 +385,7 @@ class EngHubViewModelTest {
     fun worktreePollRefreshesUnifiedRepositoryEntriesWithoutRefreshingGitHubData() = runBlocking {
         val listCountsByRepo = mutableMapOf<String, Int>()
         val api = RecordingGitWorktreeApi(
-            worktreesForRepoPath = { repoPath ->
-                val callCount = listCountsByRepo.getOrElse(repoPath) { 0 } + 1
-                listCountsByRepo[repoPath] = callCount
-                when (repoPath) {
-                    DEV_LAKE_ROOT -> if (callCount == 1) {
-                        listOf(Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"))
-                    } else {
-                        listOf(
-                            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
-                            Worktree(
-                                path = DEV_LAKE_SELECTED_WORKTREE,
-                                branch = "feature/worktree-panel",
-                                commitHash = "def456",
-                                isDirty = true,
-                            ),
-                        )
-                    }
-
-                    DOCS_ROOT -> listOf(Worktree(path = DOCS_ROOT, branch = "docs-main", commitHash = "123abc"))
-
-                    else -> error("Unexpected repo path $repoPath")
-                }
-            },
+            worktreesForRepoPath = pollingWorktrees(listCountsByRepo),
         )
         val gitHubApi = RecordingGitHubApi(emptyMap())
         val viewModel = createLocalRepositoryViewModel(
@@ -961,7 +958,7 @@ class EngHubViewModelTest {
             worktreesForRepoPath = {
                 val nextCallCount = listCalls.value + 1
                 listCalls.value = nextCallCount
-                if (nextCallCount == 2) throw IllegalStateException("transient worktree list failure")
+                if (nextCallCount == 2) error("transient worktree list failure")
                 currentWorktrees
             },
             onCreateBranchWorktree = { _, _, _, target ->
@@ -1941,7 +1938,7 @@ class EngHubViewModelTest {
             repositoryWorktreesBySelectedPath = emptyMap(),
             worktreesForRepoPath = { currentWorktrees },
             onArchiveWorktree = { _, _, force ->
-                if (!force) throw IllegalStateException("fatal: contains modified files")
+                if (!force) error("fatal: contains modified files")
                 currentWorktrees = listOf(rootWorktree)
             },
         )
@@ -2057,7 +2054,7 @@ class EngHubViewModelTest {
             },
             onArchiveWorktree = { _, _, force ->
                 archiveAttempts += 1
-                if (!force) throw IllegalStateException("fatal: contains modified files")
+                if (!force) error("fatal: contains modified files")
                 forceArchiveStarted.complete(Unit)
                 currentWorktrees = listOf(rootWorktree)
             },
@@ -2118,8 +2115,8 @@ class EngHubViewModelTest {
             repositoryWorktreesBySelectedPath = emptyMap(),
             worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
             onArchiveWorktree = { _, _, force ->
-                if (force) throw IllegalStateException("force archive failed")
-                throw IllegalStateException("fatal: contains modified files")
+                if (force) error("force archive failed")
+                error("fatal: contains modified files")
             },
         )
         val viewModel = createLocalRepositoryViewModel(
@@ -2211,7 +2208,7 @@ class EngHubViewModelTest {
             worktreesForRepoPath = { currentWorktrees },
             onArchiveWorktree = { _, _, _ ->
                 currentWorktrees = listOf(rootWorktree)
-                throw IllegalStateException("cleanup failed")
+                error("cleanup failed")
             },
         )
         val viewModel = createLocalRepositoryViewModel(
@@ -2408,6 +2405,7 @@ private fun sharedProgressNotification(
     headRef = branch,
 )
 
+@Suppress("LongParameterList")
 private fun createLocalRepositoryViewModel(
     gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()),
     gitWorktreeApi: RecordingGitWorktreeApi,
@@ -2420,13 +2418,17 @@ private fun createLocalRepositoryViewModel(
     repositoriesBaseDir: String = "",
     setupShell: String = "/bin/zsh",
 ): EngHubViewModel = EngHubViewModel(
-    gitHubApi = gitHubApi,
-    gitHubNotificationService = GitHubNotificationService(gitHubApi),
-    gitWorktreeApi = gitWorktreeApi,
-    worktreeSetupCoordinator = worktreeSetupCoordinator,
-    desktopLauncher = LocalRepositoryNoOpDesktopLauncher(),
-    directoryPicker = LocalRepositoryNoOpDirectoryPicker(),
-    configWriter = configWriter,
+    gitHubServices = EngHubGitHubServices(
+        api = gitHubApi,
+        notificationService = GitHubNotificationService(gitHubApi),
+    ),
+    worktreeServices = EngHubWorktreeServices(
+        gitWorktreeApi = gitWorktreeApi,
+        worktreeSetupCoordinator = worktreeSetupCoordinator,
+        directoryPicker = LocalRepositoryNoOpDirectoryPicker(),
+        configWriter = configWriter,
+    ),
+    desktopServices = EngHubDesktopServices(LocalRepositoryNoOpDesktopLauncher()),
     config = EngHubConfig(
         pollIntervalMs = 60_000,
         worktreePollIntervalMs = worktreePollIntervalMs,
@@ -2528,6 +2530,7 @@ private data class CreateBranchWorktreeCall(
     val targetBranch: String,
 )
 
+@Suppress("LongParameterList")
 private class RecordingGitWorktreeApi(
     private val repositoryWorktreesBySelectedPath: Map<String, RepositoryWorktrees>,
     worktreesByRepoPath: Map<String, List<Worktree>>? = null,

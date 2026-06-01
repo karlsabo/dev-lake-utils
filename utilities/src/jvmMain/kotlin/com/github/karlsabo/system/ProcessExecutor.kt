@@ -3,9 +3,11 @@ package com.github.karlsabo.system
 import java.io.File
 import java.io.InputStream
 
+private const val STREAM_BUFFER_SIZE = 8_096
+
 private fun InputStream.readToString(): String {
     val builder = StringBuilder()
-    val buffer = CharArray(8096)
+    val buffer = CharArray(STREAM_BUFFER_SIZE)
     bufferedReader().use { reader ->
         var read: Int
         while (reader.read(buffer).also { read = it } != -1) {

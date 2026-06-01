@@ -16,7 +16,7 @@ data class Issue(
 ) {
     val htmlUrl: String
         get() {
-            val originalUrl = Url(this.self ?: "https://example.local")
+            val originalUrl = Url(this.self)
             return "${originalUrl.protocol.name}://${originalUrl.hostWithPort}/browse/$key"
         }
 }
@@ -37,17 +37,21 @@ data class JiraIssueFields(
     val updated: Instant? = null,
     val parent: IssueParent? = null,
     val priority: IssuePriority? = null,
-    val customfield_10100: Double? = null, // Story points
+    @SerialName("customfield_10100")
+    val storyPoints: Double? = null,
     val timeoriginalestimate: Long? = null,
     val timespent: Long? = null,
     val timeestimate: Long? = null,
     val creator: JiraUser? = null,
     val assignee: JiraUser? = null,
-    val customfield_11203: CustomFieldValue? = null, // Severity
+    @SerialName("customfield_11203")
+    val severity: CustomFieldValue? = null,
     val components: List<IssueComponent>? = null,
     val project: IssueProject? = null,
-    val customfield_11202: CustomFieldValue? = null, // Urgency
-    val customfield_10018: EpicLink? = null, // Epic link
+    @SerialName("customfield_11202")
+    val urgency: CustomFieldValue? = null,
+    @SerialName("customfield_10018")
+    val epicLink: EpicLink? = null,
     @Serializable(with = CustomInstantSerializer::class)
     @SerialName("duedate")
     val dueDate: Instant? = null,

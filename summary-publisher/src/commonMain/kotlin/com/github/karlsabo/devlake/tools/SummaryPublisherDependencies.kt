@@ -43,16 +43,22 @@ object SummaryPublisherScope
 interface SummaryPublisherBindings {
 
     @Provides
-    fun provideProjectManagementApi(linearApiConfig: LinearApiRestConfig): ProjectManagementApi = LinearRestApi(linearApiConfig)
+    fun provideProjectManagementApi(
+        linearApiConfig: LinearApiRestConfig,
+    ): ProjectManagementApi = LinearRestApi(linearApiConfig)
 
     @Provides
     fun provideGitHubApi(gitHubApiConfig: GitHubApiRestConfig): GitHubApi = GitHubRestApi(gitHubApiConfig)
 
     @Provides
-    fun providePagerDutyApi(pagerDutyApiConfig: PagerDutyApiRestConfig): PagerDutyApi = PagerDutyRestApi(pagerDutyApiConfig)
+    fun providePagerDutyApi(
+        pagerDutyApiConfig: PagerDutyApiRestConfig,
+    ): PagerDutyApi = PagerDutyRestApi(pagerDutyApiConfig)
 
     @Provides
-    fun provideTextSummarizer(textSummarizerConfig: TextSummarizerOpenAiConfig): TextSummarizer = TextSummarizerOpenAi(textSummarizerConfig)
+    fun provideTextSummarizer(
+        textSummarizerConfig: TextSummarizerOpenAiConfig,
+    ): TextSummarizer = TextSummarizerOpenAi(textSummarizerConfig)
 }
 
 @MergeComponent(SummaryPublisherScope::class)

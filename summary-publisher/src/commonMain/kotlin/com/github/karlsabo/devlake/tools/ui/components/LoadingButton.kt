@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun LoadingButton(
+fun loadingButton(
     text: String,
     isLoading: Boolean,
     enabled: Boolean,

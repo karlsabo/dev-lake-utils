@@ -6,6 +6,7 @@ import kotlinx.datetime.Instant
  * Builder for Linear GraphQL queries and filters.
  * Centralizes query construction logic for the Linear API.
  */
+@Suppress("TooManyFunctions")
 class LinearQueryBuilder(
     private val defaultPageSize: Int = 100,
 ) {
@@ -249,6 +250,8 @@ class LinearQueryBuilder(
         /**
          * Indents each non-blank line with the given prefix.
          */
-        fun String.indent(prefix: String): String = this.lines().joinToString("\n") { line -> if (line.isBlank()) line else prefix + line }
+        fun String.indent(prefix: String): String = this.lines().joinToString("\n") { line ->
+            if (line.isBlank()) line else prefix + line
+        }
     }
 }

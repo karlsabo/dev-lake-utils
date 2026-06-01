@@ -12,13 +12,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.karlsabo.github.CiStatus
 
+private const val PASSED_STATUS_COLOR = 0xFF2DA44E
+private const val FAILED_STATUS_COLOR = 0xFFCF222E
+private const val RUNNING_STATUS_COLOR = 0xFFBF8700
+private const val PENDING_STATUS_COLOR = 0xFF6E7781
+
 @Composable
-fun StatusBadge(status: CiStatus, modifier: Modifier = Modifier) {
+fun statusBadge(status: CiStatus, modifier: Modifier = Modifier) {
     val (backgroundColor, label) = when (status) {
-        CiStatus.PASSED -> Color(0xFF2DA44E) to "Passed"
-        CiStatus.FAILED -> Color(0xFFCF222E) to "Failed"
-        CiStatus.RUNNING -> Color(0xFFBF8700) to "Running"
-        CiStatus.PENDING -> Color(0xFF6E7781) to "Pending"
+        CiStatus.PASSED -> Color(PASSED_STATUS_COLOR) to "Passed"
+        CiStatus.FAILED -> Color(FAILED_STATUS_COLOR) to "Failed"
+        CiStatus.RUNNING -> Color(RUNNING_STATUS_COLOR) to "Running"
+        CiStatus.PENDING -> Color(PENDING_STATUS_COLOR) to "Pending"
     }
 
     Box(

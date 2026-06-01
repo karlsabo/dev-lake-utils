@@ -20,32 +20,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
-import com.github.karlsabo.github.ReviewStateValue
-
 @Composable
-fun NotificationItem(
+fun notificationItem(
     notification: NotificationUiState,
-    onOpenInBrowser: (String) -> Unit,
-    onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
+    actions: NotificationActions,
     setupStatus: WorktreeSetupStatus?,
     actionInProgress: Boolean = false,
-    onApprove: (NotificationUiState) -> Unit,
-    onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -> Unit,
-    onMarkDone: (NotificationUiState) -> Unit,
-    onUnsubscribe: (NotificationUiState) -> Unit,
 ) {
     var showReviewDialog by remember { mutableStateOf(false) }
-    val setupInProgress = setupStatus != null
 
-    if (showReviewDialog && notification.apiUrl != null) {
-        ReviewDialog(
-            onSubmit = { event, body ->
-                onSubmitReview(notification, event, body)
-                showReviewDialog = false
-            },
-            onDismiss = { showReviewDialog = false },
-        )
-    }
+    notificationReviewDialog(
+        visible = showReviewDialog && notification.apiUrl != null,
+        notification = notification,
+        actions = actions,
+        onDismiss = { showReviewDialog = false },
+    )
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -55,64 +44,157 @@ fun NotificationItem(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = notification.displayTitle, style = MaterialTheme.typography.subtitle1)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(text = notification.repositoryFullName, style = MaterialTheme.typography.caption)
-                    Text(text = notification.reason, style = MaterialTheme.typography.caption)
-                    Text(text = notification.subjectType, style = MaterialTheme.typography.caption)
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (notification.htmlUrl != null) {
-                    Button(
-                        onClick = { onOpenInBrowser(notification.htmlUrl) },
-                        enabled = !actionInProgress,
-                    ) {
-                        Text("Open")
-                    }
-                }
-
-                if (notification.isPullRequest && notification.headRef != null) {
-                    Button(
-                        onClick = { onCheckoutAndOpen(notification.repositoryFullName, notification.headRef) },
-                        enabled = !setupInProgress && !actionInProgress,
-                    ) {
-                        Text(setupActionLabel(defaultLabel = "Setup", setupStatus = setupStatus))
-                    }
-                }
-
-                if (notification.isPullRequest && notification.apiUrl != null) {
-                    Button(
-                        onClick = { onApprove(notification) },
-                        enabled = !actionInProgress,
-                    ) {
-                        Text("Approve")
-                    }
-                    Button(
-                        onClick = { showReviewDialog = true },
-                        enabled = !actionInProgress,
-                    ) {
-                        Text("Review")
-                    }
-                }
-
-                Button(
-                    onClick = { onMarkDone(notification) },
-                    enabled = !actionInProgress,
-                    colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.secondary),
-                ) {
-                    Text("Done")
-                }
-                Button(
-                    onClick = { onUnsubscribe(notification) },
-                    enabled = !actionInProgress,
-                    colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error),
-                ) {
-                    Text("Unsubscribe")
-                }
-            }
+            notificationDetails(
+                notification = notification,
+                modifier = Modifier.weight(1f),
+            )
+            notificationActionButtons(
+                notification = notification,
+                actions = actions,
+                setupStatus = setupStatus,
+                actionInProgress = actionInProgress,
+                onShowReviewDialog = { showReviewDialog = true },
+            )
         }
+    }
+}
+
+@Composable
+private fun notificationReviewDialog(
+    visible: Boolean,
+    notification: NotificationUiState,
+    actions: NotificationActions,
+    onDismiss: () -> Unit,
+) {
+    if (!visible) return
+
+    reviewDialog(
+        onSubmit = { event, body ->
+            actions.onSubmitReview(notification, event, body)
+            onDismiss()
+        },
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+private fun notificationDetails(
+    notification: NotificationUiState,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(text = notification.displayTitle, style = MaterialTheme.typography.subtitle1)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = notification.repositoryFullName, style = MaterialTheme.typography.caption)
+            Text(text = notification.reason, style = MaterialTheme.typography.caption)
+            Text(text = notification.subjectType, style = MaterialTheme.typography.caption)
+        }
+    }
+}
+
+@Composable
+private fun notificationActionButtons(
+    notification: NotificationUiState,
+    actions: NotificationActions,
+    setupStatus: WorktreeSetupStatus?,
+    actionInProgress: Boolean,
+    onShowReviewDialog: () -> Unit,
+) {
+    val setupInProgress = setupStatus != null
+
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        notificationOpenButton(notification, actions, actionInProgress)
+        notificationSetupButton(notification, actions, setupStatus, setupInProgress, actionInProgress)
+        notificationReviewButtons(notification, actions, actionInProgress, onShowReviewDialog)
+        notificationDoneButton(notification, actions, actionInProgress)
+        notificationUnsubscribeButton(notification, actions, actionInProgress)
+    }
+}
+
+@Composable
+private fun notificationOpenButton(
+    notification: NotificationUiState,
+    actions: NotificationActions,
+    actionInProgress: Boolean,
+) {
+    notification.htmlUrl?.let { htmlUrl ->
+        Button(
+            onClick = { actions.onOpenInBrowser(htmlUrl) },
+            enabled = !actionInProgress,
+        ) {
+            Text("Open")
+        }
+    }
+}
+
+@Composable
+private fun notificationSetupButton(
+    notification: NotificationUiState,
+    actions: NotificationActions,
+    setupStatus: WorktreeSetupStatus?,
+    setupInProgress: Boolean,
+    actionInProgress: Boolean,
+) {
+    val headRef = notification.headRef
+    if (!notification.isPullRequest || headRef == null) return
+
+    Button(
+        onClick = { actions.onCheckoutAndOpen(notification.repositoryFullName, headRef) },
+        enabled = !setupInProgress && !actionInProgress,
+    ) {
+        Text(setupActionLabel(defaultLabel = "Setup", setupStatus = setupStatus))
+    }
+}
+
+@Composable
+private fun notificationReviewButtons(
+    notification: NotificationUiState,
+    actions: NotificationActions,
+    actionInProgress: Boolean,
+    onShowReviewDialog: () -> Unit,
+) {
+    if (!notification.isPullRequest || notification.apiUrl == null) return
+
+    Button(
+        onClick = { actions.onApprove(notification) },
+        enabled = !actionInProgress,
+    ) {
+        Text("Approve")
+    }
+    Button(
+        onClick = onShowReviewDialog,
+        enabled = !actionInProgress,
+    ) {
+        Text("Review")
+    }
+}
+
+@Composable
+private fun notificationDoneButton(
+    notification: NotificationUiState,
+    actions: NotificationActions,
+    actionInProgress: Boolean,
+) {
+    Button(
+        onClick = { actions.onMarkDone(notification) },
+        enabled = !actionInProgress,
+        colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.secondary),
+    ) {
+        Text("Done")
+    }
+}
+
+@Composable
+private fun notificationUnsubscribeButton(
+    notification: NotificationUiState,
+    actions: NotificationActions,
+    actionInProgress: Boolean,
+) {
+    Button(
+        onClick = { actions.onUnsubscribe(notification) },
+        enabled = !actionInProgress,
+        colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error),
+    ) {
+        Text("Unsubscribe")
     }
 }

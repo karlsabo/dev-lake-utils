@@ -26,8 +26,8 @@ import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -35,40 +35,10 @@ import kotlinx.serialization.json.jsonPrimitive
 
 private val logger = KotlinLogging.logger {}
 
-private data class CiCounts(
-    val total: Int,
-    val passed: Int,
-    val failed: Int,
-    val inProgress: Int,
-) {
-    operator fun plus(other: CiCounts): CiCounts = CiCounts(
-        total = total + other.total,
-        passed = passed + other.passed,
-        failed = failed + other.failed,
-        inProgress = inProgress + other.inProgress,
-    )
-
-    fun toSummary(): CheckRunSummary {
-        val ciStatus = when {
-            failed > 0 -> CiStatus.FAILED
-            inProgress > 0 -> CiStatus.RUNNING
-            total == 0 -> CiStatus.PENDING
-            else -> CiStatus.PASSED
-        }
-
-        return CheckRunSummary(
-            total = total,
-            passed = passed,
-            failed = failed,
-            inProgress = inProgress,
-            status = ciStatus,
-        )
-    }
-}
-
 /**
  * Implementation of the GitHubApi interface using REST.
  */
+@Suppress("TooManyFunctions")
 class GitHubRestApi(
     private val config: GitHubApiRestConfig,
 ) : GitHubApi {
@@ -128,12 +98,14 @@ class GitHubRestApi(
     ): List<Issue> {
         val formattedStartDate = startDateInclusive.toIsoUtcDateTime()
         val formattedEndDate = endDateInclusive.toIsoUtcDateTime()
+        val organizationQuery = organizationQualifier(organizationIds)
+        val query = buildString {
+            append("$organizationQuery is:merged")
+            append(" merged:$formattedStartDate..$formattedEndDate")
+            append(" is:pr $searchText in:title,body")
+        }
 
-        val query =
-            "${organizationIds.joinToString(" ") { "org:$it" }} is:merged merged:$formattedStartDate..$formattedEndDate is:pr $searchText in:title,body"
-        val encodedQuery = query.encodeURLParameter()
-
-        return paginatedIssueQuery(encodedQuery)
+        return paginatedIssueQuery(query.encodeURLParameter())
     }
 
     override suspend fun getMergedPullRequests(
@@ -154,18 +126,21 @@ class GitHubRestApi(
     ): UInt {
         val encodedQuery = createMergedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds)
         val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"
-
         val response = client.get(url)
-
         val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
+
+        if (response.status.value !in successStatusCodes) {
             logger.error { "getMergedPullRequestCount responseText=```$responseText```" }
-            throw Exception("Failed to get merged pull requests count: ${response.status.value} for $gitHubUserId responseText=```$responseText```")
+            throwGitHubApiException(
+                operation = "get merged pull requests count",
+                statusCode = response.status.value,
+                context = "for $gitHubUserId",
+                responseText = responseText,
+            )
         }
+
         val root = Json.parseToJsonElement(responseText).jsonObject
-
         val totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
-
         return totalCount.toUInt()
     }
 
@@ -177,49 +152,53 @@ class GitHubRestApi(
     ): UInt {
         val encodedQuery = createReviewedPrEncodedQuery(startDate, endDate, gitHubUserId, organizationIds)
         val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=1"
-
         val response = client.get(url)
-
         val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
+
+        if (response.status.value !in successStatusCodes) {
             logger.error { "getPullRequestReviewCount responseText=```$responseText```" }
-            throw Exception("Failed to get pull request review count: ${response.status.value} for $gitHubUserId responseText=```$responseText```")
+            throwGitHubApiException(
+                operation = "get pull request review count",
+                statusCode = response.status.value,
+                context = "for $gitHubUserId",
+                responseText = responseText,
+            )
         }
+
         val root = Json.parseToJsonElement(responseText).jsonObject
-
         val totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
-
         return totalCount.toUInt()
     }
 
     private suspend fun paginatedIssueQuery(encodedQuery: String): MutableList<Issue> {
         val pullRequests = mutableListOf<Issue>()
         var page = 1
-        val perPage = 20
-        var totalCount = 1000
+        var totalCount = GITHUB_SEARCH_RESULT_LIMIT
+        var hasMoreResults = true
 
-        while (page <= (totalCount / perPage) + 1) {
-            val url = "https://api.github.com/search/issues?q=$encodedQuery&per_page=$perPage&page=$page"
-
+        while (hasMoreResults && page <= pageLimit(totalCount)) {
+            val url = searchIssuesUrl(encodedQuery, page)
             val response = client.get(url)
-
             val responseText = response.bodyAsText()
-            if (response.status.value !in 200..299) {
+
+            if (response.status.value !in successStatusCodes) {
                 logger.error { "searchPullRequestsByText query failed responseText=```$responseText```" }
-                throw Exception("Failed to search pull requests: ${response.status.value} responseText=```$responseText```")
+                throwGitHubApiException(
+                    operation = "search pull requests",
+                    statusCode = response.status.value,
+                    responseText = responseText,
+                )
             }
 
             val root = lenientJson.parseToJsonElement(responseText).jsonObject
+            val items = root["items"]?.jsonArray.orEmpty()
+            hasMoreResults = items.isNotEmpty()
 
-            val items = root["items"]?.jsonArray ?: break
-            if (items.isEmpty()) break
-
-            for (item in items) {
-                pullRequests.add(item.toPullRequest())
+            if (hasMoreResults) {
+                pullRequests.addAll(items.map { it.toPullRequest() })
+                page++
+                totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
             }
-
-            page++
-            totalCount = root["total_count"]?.jsonPrimitive?.int ?: 0
         }
 
         return pullRequests
@@ -234,25 +213,34 @@ class GitHubRestApi(
     override suspend fun listNotifications(): List<Notification> {
         val notifications = mutableListOf<Notification>()
         var page = 1
-        val perPage = 50
+        var hasMoreResults = true
 
-        while (true) {
-            val url = "https://api.github.com/notifications?participating=false&all=true&per_page=$perPage&page=$page"
+        while (hasMoreResults) {
+            val url = notificationsUrl(page)
             val response = client.get(url) {
                 header(HttpHeaders.CacheControl, "no-cache")
             }
             val responseText = response.bodyAsText()
 
-            if (response.status.value !in 200..299) {
-                logger.error { "Failed to list notifications $url response.status=${response.status} responseText=```$responseText```" }
-                throw Exception("Failed to list notifications: ${response.status.value} responseText=```$responseText```")
+            if (response.status.value !in successStatusCodes) {
+                logger.error {
+                    "Failed to list notifications $url response.status=${response.status} " +
+                        "responseText=```$responseText```"
+                }
+                throwGitHubApiException(
+                    operation = "list notifications",
+                    statusCode = response.status.value,
+                    responseText = responseText,
+                )
             }
 
             val pageNotifications = lenientJson.decodeFromString<List<Notification>>(responseText)
-            if (pageNotifications.isEmpty()) break
+            hasMoreResults = pageNotifications.isNotEmpty()
 
-            notifications.addAll(pageNotifications)
-            page++
+            if (hasMoreResults) {
+                notifications.addAll(pageNotifications)
+                page++
+            }
         }
 
         return notifications
@@ -261,23 +249,35 @@ class GitHubRestApi(
     override suspend fun getPullRequestByUrl(url: String): PullRequest {
         val response = client.get(url)
         val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
-            logger.error { "Failed to get pull request $url response.status=${response.status} responseText=```$responseText```" }
-            throw Exception("Failed to get pull request: ${response.status.value} for url=$url responseText=```$responseText```")
+        if (response.status.value !in successStatusCodes) {
+            logger.error {
+                "Failed to get pull request $url response.status=${response.status} responseText=```$responseText```"
+            }
+            throwGitHubApiException(
+                operation = "get pull request",
+                statusCode = response.status.value,
+                context = "for url=$url",
+                responseText = responseText,
+            )
         }
         return lenientJson.decodeFromString(PullRequest.serializer(), responseText)
     }
 
     override suspend fun approvePullRequestByUrl(url: String, body: String?) {
-        val reviewsUrl = if (url.endsWith("/reviews")) url else "$url/reviews"
+        val reviewsUrl = reviewsUrl(url)
         val response = client.post(reviewsUrl) {
             contentType(ContentType.Application.Json)
             setBody(CreateReviewRequest(event = "APPROVE", body = body ?: ""))
         }
         val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
+        if (response.status.value !in successStatusCodes) {
             logger.error { "approvePullRequest responseText=```$responseText```" }
-            throw Exception("Failed to approve pull request: ${response.status.value} for url=$url responseText=```$responseText```")
+            throwGitHubApiException(
+                operation = "approve pull request",
+                statusCode = response.status.value,
+                context = "for url=$url",
+                responseText = responseText,
+            )
         }
     }
 
@@ -287,75 +287,57 @@ class GitHubRestApi(
      * or known automation accounts like "continuous-deployer") are ignored.
      */
     override suspend fun hasAnyApprovedReview(url: String): Boolean {
-        val reviewsUrl = if (url.endsWith("/reviews")) url else "$url/reviews"
-        val response = client.get(reviewsUrl)
+        val response = client.get(reviewsUrl(url))
         val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
+        if (response.status.value !in successStatusCodes) {
             logger.error { "hasAnyApprovedReview responseText=```$responseText```" }
-            throw Exception("Failed to list pull request reviews: ${response.status.value} for url=$url responseText=```$responseText```")
+            throwGitHubApiException(
+                operation = "list pull request reviews",
+                statusCode = response.status.value,
+                context = "for url=$url",
+                responseText = responseText,
+            )
         }
 
-        return try {
-            val elements = lenientJson.parseToJsonElement(responseText).jsonArray
-            elements.any { el ->
-                val obj = el.jsonObject
-                val state = obj["state"]?.jsonPrimitive?.content
-                if (!state.equals("APPROVED", ignoreCase = true)) return@any false
-
-                val userObj = obj["user"]?.jsonObject
-                val login = userObj?.get("login")?.jsonPrimitive?.content
-                val type = userObj?.get("type")?.jsonPrimitive?.content
-                !isBotUser(login, type)
-            }
-        } catch (error: Exception) {
-            logger.error(error) { "Failed to parse GitHub JSON $responseText" }
-            try {
-                val reviews = lenientJson.decodeFromString<List<PullRequestReview>>(responseText)
-                reviews.any { review ->
-                    review.state.equals("APPROVED", ignoreCase = true) &&
-                        !isBotUser(review.user?.login, review.user?.type)
-                }
-            } catch (_: Exception) {
-                false
-            }
-        }
-    }
-
-    private fun isBotUser(login: String?, type: String?): Boolean {
-        if (type.equals("Bot", ignoreCase = true)) return true
-        val normalizedLogin = login?.lowercase() ?: return false
-        if (normalizedLogin.endsWith("[bot]")) return true
-        // Known automation accounts to ignore for approvals
-        val excluded = setOf(
-            "continuous-deployer",
-        )
-        return normalizedLogin in excluded
+        return hasApprovedHumanReview(responseText)
     }
 
     override suspend fun markNotificationAsDone(threadId: String) {
         val url = "https://api.github.com/notifications/threads/$threadId"
         val response = client.delete(url)
         val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
-            logger.error { "Failed to mark notification done $url response.status=${response.status} responseText=```$responseText```" }
-            throw Exception("Failed to mark notification as done: ${response.status.value} for threadId=$threadId responseText=```$responseText```")
+        if (response.status.value !in successStatusCodes) {
+            logger.error {
+                "Failed to mark notification done $url response.status=${response.status} " +
+                    "responseText=```$responseText```"
+            }
+            throwGitHubApiException(
+                operation = "mark notification as done",
+                statusCode = response.status.value,
+                context = "for threadId=$threadId",
+                responseText = responseText,
+            )
         }
     }
 
     override suspend fun unsubscribeFromNotification(threadId: String) {
         val url = "https://api.github.com/notifications/threads/$threadId/subscription"
         val response = client.delete(url)
-        if (response.status.value !in listOf(204, 404)) {
+        if (response.status.value !in listOf(HTTP_NO_CONTENT, HTTP_NOT_FOUND)) {
             val responseText = response.bodyAsText()
             logger.error { "unsubscribeFromNotification responseText=```$responseText```" }
-            throw Exception("Failed to unsubscribe from notification: ${response.status.value} for threadId=$threadId responseText=```$responseText```")
+            throwGitHubApiException(
+                operation = "unsubscribe from notification",
+                statusCode = response.status.value,
+                context = "for threadId=$threadId",
+                responseText = responseText,
+            )
         }
     }
 
     override suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String): List<Issue> {
-        val query = "author:$author ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:open"
-        val encodedQuery = query.encodeURLParameter()
-        return paginatedIssueQuery(encodedQuery)
+        val query = "author:$author ${organizationQualifier(organizationIds)} is:pr is:open"
+        return paginatedIssueQuery(query.encodeURLParameter())
     }
 
     override suspend fun getCheckRunsForRef(
@@ -363,32 +345,23 @@ class GitHubRestApi(
         repo: String,
         ref: String,
     ): CheckRunSummary {
-        val checkRunsUrl = "https://api.github.com/repos/$owner/$repo/commits/$ref/check-runs?per_page=100"
-        val checkRunsResponse = client.get(checkRunsUrl)
-        val checkRunsText = checkRunsResponse.bodyAsText()
-        if (checkRunsResponse.status.value !in 200..299) {
-            logger.error {
-                "Failed to get check runs for $owner/$repo ref=$ref response.status=${checkRunsResponse.status} responseText=```$checkRunsText```"
-            }
-            throw Exception("Failed to get check runs: ${checkRunsResponse.status.value} for $owner/$repo ref=$ref responseText=```$checkRunsText```")
-        }
+        val checkRunsText = getSuccessfulResponseText(
+            url = "https://api.github.com/repos/$owner/$repo/commits/$ref/check-runs?per_page=$COMMIT_STATUS_PER_PAGE",
+            operation = "get check runs",
+            context = "for $owner/$repo ref=$ref",
+        )
+        val statusContextsText = getSuccessfulResponseText(
+            url = "https://api.github.com/repos/$owner/$repo/commits/$ref/status?per_page=$COMMIT_STATUS_PER_PAGE",
+            operation = "get commit statuses",
+            context = "for $owner/$repo ref=$ref",
+        )
 
-        val statusContextsUrl = "https://api.github.com/repos/$owner/$repo/commits/$ref/status?per_page=100"
-        val statusContextsResponse = client.get(statusContextsUrl)
-        val statusContextsText = statusContextsResponse.bodyAsText()
-        if (statusContextsResponse.status.value !in 200..299) {
-            logger.error {
-                "Failed to get commit statuses for $owner/$repo ref=$ref response.status=${statusContextsResponse.status} responseText=```$statusContextsText```"
-            }
-            throw Exception(
-                "Failed to get commit statuses: ${statusContextsResponse.status.value} for $owner/$repo ref=$ref responseText=```$statusContextsText```",
-            )
-        }
-
-        val checkRunCounts =
-            parseCheckRunCounts(lenientJson.parseToJsonElement(checkRunsText).jsonObject["check_runs"]?.jsonArray.orEmpty())
-        val statusContextCounts =
-            parseCommitStatusCounts(lenientJson.parseToJsonElement(statusContextsText).jsonObject["statuses"]?.jsonArray.orEmpty())
+        val checkRunCounts = parseCheckRunCounts(
+            lenientJson.parseToJsonElement(checkRunsText).jsonObject["check_runs"]?.jsonArray.orEmpty(),
+        )
+        val statusContextCounts = parseCommitStatusCounts(
+            lenientJson.parseToJsonElement(statusContextsText).jsonObject["statuses"]?.jsonArray.orEmpty(),
+        )
 
         return (checkRunCounts + statusContextCounts).toSummary()
     }
@@ -398,53 +371,22 @@ class GitHubRestApi(
         repo: String,
         prNumber: Int,
     ): ReviewSummary {
-        val reviewsUrl = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber/reviews?per_page=100"
-        val reviewsResponse = client.get(reviewsUrl)
-        val reviewsText = reviewsResponse.bodyAsText()
-        if (reviewsResponse.status.value !in 200..299) {
-            logger.error { "Failed to get reviews for $owner/$repo#$prNumber response.status=${reviewsResponse.status} responseText=```$reviewsText```" }
-            throw Exception("Failed to get reviews: ${reviewsResponse.status.value} for $owner/$repo#$prNumber responseText=```$reviewsText```")
-        }
-
-        val reviewElements = lenientJson.parseToJsonElement(reviewsText).jsonArray
-        val latestByUser = mutableMapOf<String, ReviewStateValue>()
-        for (element in reviewElements) {
-            val obj = element.jsonObject
-            val userObj = obj["user"]?.jsonObject
-            val login = userObj?.get("login")?.jsonPrimitive?.content ?: continue
-            val type = userObj["type"]?.jsonPrimitive?.content
-            if (isBotUser(login, type)) continue
-
-            val stateStr = obj["state"]?.jsonPrimitive?.content ?: continue
-            val state = when (stateStr.uppercase()) {
-                "APPROVED" -> ReviewStateValue.APPROVED
-                "CHANGES_REQUESTED" -> ReviewStateValue.CHANGES_REQUESTED
-                "COMMENTED" -> ReviewStateValue.COMMENTED
-                "PENDING" -> ReviewStateValue.PENDING
-                "DISMISSED" -> ReviewStateValue.DISMISSED
-                else -> continue
-            }
-            latestByUser[login] = state
-        }
-
-        val requestedUrl = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber/requested_reviewers"
-        val requestedResponse = client.get(requestedUrl)
-        val requestedText = requestedResponse.bodyAsText()
-        var requestedCount = 0
-        if (requestedResponse.status.value in 200..299) {
-            val requestedRoot = lenientJson.parseToJsonElement(requestedText).jsonObject
-            val users = requestedRoot["users"]?.jsonArray
-            val teams = requestedRoot["teams"]?.jsonArray
-            requestedCount = (users?.size ?: 0) + (teams?.size ?: 0)
-        }
-
-        val reviews = latestByUser.map { (user, state) -> ReviewState(user, state) }
+        val reviewsText = getSuccessfulResponseText(
+            url = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber/reviews?per_page=$COMMIT_STATUS_PER_PAGE",
+            operation = "get reviews",
+            context = "for $owner/$repo#$prNumber",
+        )
+        val requestedCount = getRequestedReviewCount(owner, repo, prNumber)
+        val reviews = latestHumanReviews(reviewsText).map { (user, state) -> ReviewState(user, state) }
         val approvedCount = reviews.count { it.state == ReviewStateValue.APPROVED }
-        val totalRequested = approvedCount + requestedCount + reviews.count {
-            it.state == ReviewStateValue.CHANGES_REQUESTED || it.state == ReviewStateValue.PENDING
-        }
+        val pendingReviewCount = reviews.count(::isPendingReviewState)
+        val totalRequested = approvedCount + requestedCount + pendingReviewCount
 
-        return ReviewSummary(approvedCount = approvedCount, requestedCount = totalRequested, reviews = reviews)
+        return ReviewSummary(
+            approvedCount = approvedCount,
+            requestedCount = totalRequested,
+            reviews = reviews,
+        )
     }
 
     override suspend fun submitReview(
@@ -452,86 +394,69 @@ class GitHubRestApi(
         event: ReviewStateValue,
         reviewComment: String?,
     ) {
-        val reviewsUrl = if (prApiUrl.endsWith("/reviews")) prApiUrl else "$prApiUrl/reviews"
-        val response = client.post(reviewsUrl) {
+        val response = client.post(reviewsUrl(prApiUrl)) {
             contentType(ContentType.Application.Json)
             setBody(CreateReviewRequest(event = event.toSubmitEventString(), body = reviewComment ?: ""))
         }
         val responseText = response.bodyAsText()
-        if (response.status.value !in 200..299) {
+        if (response.status.value !in successStatusCodes) {
             logger.error { "submitReview responseText=```$responseText```" }
-            throw Exception("Failed to submit review: ${response.status.value} for url=$prApiUrl responseText=```$responseText```")
-        }
-    }
-}
-
-private fun parseCheckRunCounts(checkRuns: List<JsonElement>): CiCounts {
-    var passed = 0
-    var failed = 0
-    var inProgress = 0
-
-    for (checkRun in checkRuns) {
-        val obj = checkRun.jsonObject
-        val status = obj["status"]?.jsonPrimitive?.content
-        val conclusion = obj["conclusion"]?.jsonPrimitive?.content
-
-        when {
-            status == "completed" && conclusion == "success" -> passed++
-            status == "completed" && conclusion == "neutral" -> passed++
-            status == "completed" && conclusion == "skipped" -> passed++
-            status == "completed" -> failed++
-            status == "in_progress" || status == "queued" -> inProgress++
+            throwGitHubApiException(
+                operation = "submit review",
+                statusCode = response.status.value,
+                context = "for url=$prApiUrl",
+                responseText = responseText,
+            )
         }
     }
 
-    return CiCounts(total = checkRuns.size, passed = passed, failed = failed, inProgress = inProgress)
-}
+    private suspend fun getSuccessfulResponseText(
+        url: String,
+        operation: String,
+        context: String,
+    ): String {
+        val response = client.get(url)
+        val responseText = response.bodyAsText()
+        if (response.status.value !in successStatusCodes) {
+            logger.error {
+                "Failed to $operation $context response.status=${response.status} responseText=```$responseText```"
+            }
+            throwGitHubApiException(operation, response.status.value, context, responseText)
+        }
+        return responseText
+    }
 
-private fun parseCommitStatusCounts(statuses: List<JsonElement>): CiCounts {
-    var passed = 0
-    var failed = 0
-    var inProgress = 0
-
-    for (status in statuses) {
-        when (status.jsonObject["state"]?.jsonPrimitive?.content) {
-            "success" -> passed++
-            "failure", "error" -> failed++
-            "pending" -> inProgress++
+    private suspend fun getRequestedReviewCount(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): Int {
+        val requestedUrl = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber/requested_reviewers"
+        val requestedResponse = client.get(requestedUrl)
+        val requestedText = requestedResponse.bodyAsText()
+        return if (requestedResponse.status.value in successStatusCodes) {
+            val requestedRoot = lenientJson.parseToJsonElement(requestedText).jsonObject
+            val users = requestedRoot["users"]?.jsonArray
+            val teams = requestedRoot["teams"]?.jsonArray
+            (users?.size ?: 0) + (teams?.size ?: 0)
+        } else {
+            0
         }
     }
 
-    return CiCounts(total = statuses.size, passed = passed, failed = failed, inProgress = inProgress)
+    private fun hasApprovedHumanReview(responseText: String): Boolean = try {
+        lenientJson.parseToJsonElement(responseText).jsonArray.any(::isApprovedHumanReview)
+    } catch (error: SerializationException) {
+        logger.error(error) { "Failed to parse GitHub JSON $responseText" }
+        decodeApprovedHumanReview(responseText)
+    }
+
+    private fun decodeApprovedHumanReview(responseText: String): Boolean = try {
+        lenientJson.decodeFromString<List<PullRequestReview>>(responseText).any { review ->
+            review.state.equals("APPROVED", ignoreCase = true) &&
+                !isBotUser(review.user?.login, review.user?.type)
+        }
+    } catch (_: SerializationException) {
+        false
+    }
 }
-
-private fun createMergedPrEncodedQuery(
-    startDate: Instant,
-    endDate: Instant,
-    gitHubUserId: String,
-    organizationIds: List<String>,
-): String {
-    val formattedStartDate = startDate.toIsoUtcDateTime()
-    val formattedEndDate = endDate.toIsoUtcDateTime()
-
-    val query =
-        "author:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr is:merged merged:$formattedStartDate..$formattedEndDate"
-    val encodedQuery = query.encodeURLParameter()
-    return encodedQuery
-}
-
-private fun createReviewedPrEncodedQuery(
-    startDate: Instant,
-    endDate: Instant,
-    gitHubUserId: String,
-    organizationIds: List<String>,
-): String {
-    val formattedStartDate = startDate.toIsoUtcDateTime()
-    val formattedEndDate = endDate.toIsoUtcDateTime()
-
-    // q=reviewed-by:karlsabo (org:klaviyo OR org:zitadel) is:pr updated:2025-01-01..2025-12-31
-    val query =
-        "reviewed-by:$gitHubUserId ${organizationIds.joinToString(" ") { "org:$it" }} is:pr updated:$formattedStartDate..$formattedEndDate"
-    val encodedQuery = query.encodeURLParameter()
-    return encodedQuery
-}
-
-fun JsonElement.toPullRequest(): Issue = lenientJson.decodeFromJsonElement(Issue.serializer(), this)

@@ -9,12 +9,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.tools.ProjectSummaryHolder
-import com.github.karlsabo.devlake.tools.ui.components.LoadingButton
-import com.github.karlsabo.devlake.tools.ui.components.ProjectSummaryList
-import com.github.karlsabo.devlake.tools.ui.components.SummaryTextField
+import com.github.karlsabo.devlake.tools.ui.components.loadingButton
+import com.github.karlsabo.devlake.tools.ui.components.projectSummaryList
+import com.github.karlsabo.devlake.tools.ui.components.summaryTextField
 
 @Composable
-fun SummaryPublisherScreen(
+fun summaryPublisherScreen(
     topLevelSummary: String,
     onTopLevelSummaryChange: (String) -> Unit,
     projectSummaries: List<ProjectSummaryHolder>,
@@ -29,20 +29,20 @@ fun SummaryPublisherScreen(
     MaterialTheme {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                LoadingButton(
+                loadingButton(
                     text = publishButtonText,
                     isLoading = isSendingSlackMessage,
                     enabled = publishButtonEnabled && !isLoadingSummary,
                     onClick = onPublishClick,
                 )
 
-                SummaryTextField(
+                summaryTextField(
                     value = topLevelSummary,
                     onValueChange = onTopLevelSummaryChange,
                     modifier = Modifier.padding(8.dp),
                 )
 
-                ProjectSummaryList(
+                projectSummaryList(
                     summaries = projectSummaries,
                     onMessageChange = onProjectMessageChange,
                     onDelete = onProjectDelete,

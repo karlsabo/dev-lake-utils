@@ -6,6 +6,12 @@ import com.github.karlsabo.linear.WorkflowState
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.StatusCategory
 
+private const val NO_PRIORITY = 0
+private const val URGENT_PRIORITY = 1
+private const val HIGH_PRIORITY = 2
+private const val MEDIUM_PRIORITY = 3
+private const val LOW_PRIORITY = 4
+
 /**
  * Converts a Linear Issue to a unified ProjectIssue.
  */
@@ -51,11 +57,11 @@ fun WorkflowState.toProjectStatusCategory(): StatusCategory? = when (type?.lower
  * Converts Linear priority integer to a string representation.
  */
 internal fun priorityToString(priority: Int?): String? = when (priority) {
-    0 -> "No Priority"
-    1 -> "Urgent"
-    2 -> "High"
-    3 -> "Medium"
-    4 -> "Low"
+    NO_PRIORITY -> "No Priority"
+    URGENT_PRIORITY -> "Urgent"
+    HIGH_PRIORITY -> "High"
+    MEDIUM_PRIORITY -> "Medium"
+    LOW_PRIORITY -> "Low"
     else -> null
 }
 

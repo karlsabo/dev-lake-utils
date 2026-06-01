@@ -6,6 +6,7 @@ package com.github.karlsabo.git
  * All methods throw [GitCommandException] on non-zero exit codes unless
  * documented otherwise (e.g. [isGitRepository] returns a Boolean).
  */
+@Suppress("TooManyFunctions")
 interface GitCommandApi {
     /** Clone [url] into [targetPath]. */
     fun clone(url: String, targetPath: String)

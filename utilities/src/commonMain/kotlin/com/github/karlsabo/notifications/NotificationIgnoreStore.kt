@@ -36,6 +36,7 @@ interface NotificationIgnoreStore {
         )
     }
 
+    @Suppress("LongParameterList")
     fun saveIgnoredThread(
         threadId: String,
         repositoryFullName: String,

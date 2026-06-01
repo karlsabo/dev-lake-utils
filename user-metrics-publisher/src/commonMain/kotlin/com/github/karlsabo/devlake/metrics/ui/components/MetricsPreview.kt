@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun MetricsPreview(
+fun metricsPreview(
     text: String,
     modifier: Modifier = Modifier,
 ) {

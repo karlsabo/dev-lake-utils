@@ -9,6 +9,9 @@ import kotlinx.datetime.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.measureTime
 
+private const val DEFAULT_WEEKS_BACK = 30
+private const val DAYS_PER_WEEK = 7
+
 /**
  * Demo that pulls issues assigned to a user from Linear.
  *
@@ -20,9 +23,10 @@ import kotlin.time.measureTime
 fun main(args: Array<String>): Unit = runBlocking {
     val userId =
         args.find { it.startsWith("--user=") }?.substringAfter("=")
-            ?: throw Exception("No --user=<linear-user-id> provided")
+            ?: throw IllegalArgumentException("No --user=<linear-user-id> provided")
 
-    val weeksBack = args.find { it.startsWith("--weeks=") }?.substringAfter("=")?.toIntOrNull() ?: 30
+    val weeksBack = args.find { it.startsWith("--weeks=") }
+        ?.substringAfter("=")?.toIntOrNull() ?: DEFAULT_WEEKS_BACK
 
     val linearApi = LinearRestApi(loadLinearConfig(linearConfigPath))
 
@@ -30,7 +34,7 @@ fun main(args: Array<String>): Unit = runBlocking {
 
     val executionTime = measureTime {
         val endDate = Clock.System.now()
-        val startDate = endDate.minus((weeksBack * 7).days)
+        val startDate = endDate.minus((weeksBack * DAYS_PER_WEEK).days)
 
         val user = User(id = userId, name = userId, linearId = userId)
         val resolvedIssues = linearApi.getIssuesResolved(user, startDate, endDate)

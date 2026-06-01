@@ -20,6 +20,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
 import kotlin.time.Duration.Companion.days
 
+private const val SUMMARY_DAYS = 7
+
 fun main(args: Array<String>) {
     val configParameter = args.find { it.startsWith("--config=") }?.substringAfter("=")
     val configFilePath: Path = configParameter?.let { Path(configParameter) } ?: summaryPublisherConfigPath
@@ -29,8 +31,11 @@ fun main(args: Array<String>) {
 
         val projectManagementApi = LinearRestApi(loadLinearConfig(linearConfigPath))
         val gitHubApi = GitHubRestApi(loadGitHubConfig(gitHubConfigPath))
-        val pagerDutyApi =
-            if (summaryConfig.pagerDutyServiceIds.isNotEmpty()) PagerDutyRestApi(loadPagerDutyConfig(pagerDutyConfigPath)) else null
+        val pagerDutyApi = if (summaryConfig.pagerDutyServiceIds.isNotEmpty()) {
+            PagerDutyRestApi(loadPagerDutyConfig(pagerDutyConfigPath))
+        } else {
+            null
+        }
         val usersConfig = loadUsersConfig()!!
 
         val textSummarizer = TextSummarizerFake()
@@ -42,7 +47,7 @@ fun main(args: Array<String>) {
             summaryConfig.pagerDutyServiceIds,
             textSummarizer,
             summaryConfig.projects,
-            7.days,
+            SUMMARY_DAYS.days,
             usersConfig.users,
             summaryConfig.miscUserIds.map { userId -> usersConfig.users.first { it.id == userId } },
             summaryConfig.summaryName,

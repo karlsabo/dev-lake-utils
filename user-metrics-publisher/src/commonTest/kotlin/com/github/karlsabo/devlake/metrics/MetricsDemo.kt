@@ -26,7 +26,7 @@ fun main() {
         val jobs = config.userIds.map { userId ->
             async(Dispatchers.IO) {
                 val user = users!!.users.firstOrNull { it.id == userId }
-                    ?: throw Exception("User not found: $userId in ${users.users}")
+                    ?: throw IllegalArgumentException("User not found: $userId in ${users.users}")
                 measureTime {
                     val userMetrics = MetricsService.createUserMetrics(
                         user,

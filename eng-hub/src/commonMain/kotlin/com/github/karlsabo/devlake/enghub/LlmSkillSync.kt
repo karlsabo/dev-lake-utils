@@ -9,7 +9,8 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 
 private val logger = KotlinLogging.logger {}
-private const val planningMarkdownDirToken = "\${PLANNING_MARKDOWN_DIR}"
+private const val PLANNING_MARKDOWN_DIR_TOKEN = "\${PLANNING_MARKDOWN_DIR}"
+private val windowsAbsolutePath = Regex("^[A-Za-z]:[\\\\/].*")
 
 /**
  * Each tool target defines where skills and shared markdown land.
@@ -40,6 +41,8 @@ data class SyncResult(
 class LlmSkillSync(
     private val fileSystem: FileSystem = SystemFileSystem,
 ) {
+    private val fileCopier = LlmFileCopier(fileSystem)
+
     /** Sync skills, shared notes, and guidelines to a single tool target. */
     fun sync(
         sourceLlmDir: Path,
@@ -77,7 +80,10 @@ class LlmSkillSync(
     private fun preparePlanningMarkdownDir(planningMarkdownDir: String): String? {
         val trimmed = planningMarkdownDir.trim()
         if (trimmed.isBlank()) {
-            logger.error { "planningMarkdownDir is blank; copying markdown files without replacing $planningMarkdownDirToken" }
+            logger.error {
+                "planningMarkdownDir is blank; copying markdown files " +
+                    "without replacing $PLANNING_MARKDOWN_DIR_TOKEN"
+            }
             return null
         }
 
@@ -85,7 +91,7 @@ class LlmSkillSync(
             "planningMarkdownDir must be an absolute path, got: $trimmed"
         }
 
-        Path(trimmed).create()
+        Path(trimmed).create(fileSystem)
         return trimmed
     }
 
@@ -110,8 +116,8 @@ class LlmSkillSync(
         for (skillDir in skillDirs) {
             val skillName = skillDir.name
             val destDir = Path(destSkillsDir, skillName)
-            destDir.create()
-            copyDirectoryRecursively(skillDir, destDir, replacementDir)
+            destDir.create(fileSystem)
+            fileCopier.copyDirectoryRecursively(skillDir, destDir, replacementDir)
             copiedSkills.add(skillName)
             logger.info { "${target.name}: synced skill '$skillName'" }
         }
@@ -125,17 +131,20 @@ class LlmSkillSync(
         target: ToolTarget,
         replacementDir: String?,
     ): Boolean {
-        val guidelinesFileName = target.guidelinesFileName ?: return false
-        val agentsFile = Path(sourceLlmDir, "AGENTS.md")
-        if (!fileSystem.exists(agentsFile)) {
-            logger.warn { "Guidelines file not found: $agentsFile" }
-            return false
+        var copied = false
+        val guidelinesFileName = target.guidelinesFileName
+        if (guidelinesFileName != null) {
+            val agentsFile = Path(sourceLlmDir, "AGENTS.md")
+            if (fileSystem.exists(agentsFile)) {
+                val destFile = Path(homeDir, target.toolDir, guidelinesFileName)
+                fileCopier.writeFileWithReplacement(agentsFile, destFile, replacementDir)
+                logger.info { "${target.name}: synced guidelines → $guidelinesFileName" }
+                copied = true
+            } else {
+                logger.warn { "Guidelines file not found: $agentsFile" }
+            }
         }
-
-        val destFile = Path(homeDir, target.toolDir, guidelinesFileName)
-        writeFileWithReplacement(agentsFile, destFile, replacementDir)
-        logger.info { "${target.name}: synced guidelines → $guidelinesFileName" }
-        return true
+        return copied
     }
 
     private fun syncNotes(
@@ -151,12 +160,16 @@ class LlmSkillSync(
         }
 
         val destFile = Path(homeDir, target.toolDir, "notes.md")
-        writeFileWithReplacement(notesFile, destFile, replacementDir)
+        fileCopier.writeFileWithReplacement(notesFile, destFile, replacementDir)
         logger.info { "${target.name}: synced notes → notes.md" }
         return true
     }
+}
 
-    private fun copyDirectoryRecursively(
+private class LlmFileCopier(
+    private val fileSystem: FileSystem,
+) {
+    fun copyDirectoryRecursively(
         source: Path,
         dest: Path,
         replacementDir: String?,
@@ -164,7 +177,7 @@ class LlmSkillSync(
         for (entry in fileSystem.list(source)) {
             val destEntry = Path(dest, entry.name)
             if (fileSystem.metadataOrNull(entry)?.isDirectory == true) {
-                destEntry.create()
+                destEntry.create(fileSystem)
                 copyDirectoryRecursively(entry, destEntry, replacementDir)
             } else {
                 writeFileWithReplacement(entry, destEntry, replacementDir)
@@ -172,15 +185,17 @@ class LlmSkillSync(
         }
     }
 
-    private fun writeFileWithReplacement(
+    fun writeFileWithReplacement(
         source: Path,
         dest: Path,
         replacementDir: String?,
     ) {
-        (dest.parent ?: return).create()
+        (dest.parent ?: return).create(fileSystem)
         if (source.name.endsWith(".md")) {
             val content = fileSystem.source(source).buffered().use { it.readString() }
-            val updatedContent = replacementDir?.let { content.replace(planningMarkdownDirToken, it) } ?: content
+            val updatedContent = replacementDir?.let {
+                content.replace(PLANNING_MARKDOWN_DIR_TOKEN, it)
+            } ?: content
             fileSystem.sink(dest).buffered().use { it.writeString(updatedContent) }
             return
         }
@@ -189,16 +204,16 @@ class LlmSkillSync(
             fileSystem.sink(dest).buffered().use { sink -> sink.transferFrom(rawSource) }
         }
     }
+}
 
-    private fun isAbsolutePath(path: String): Boolean = path.startsWith("/") || windowsAbsolutePath.matches(path) || path.startsWith("\\\\")
+private fun isAbsolutePath(path: String): Boolean {
+    val isUnixAbsolute = path.startsWith("/")
+    val isWindowsAbsolute = windowsAbsolutePath.matches(path) || path.startsWith("\\\\")
+    return isUnixAbsolute || isWindowsAbsolute
+}
 
-    private fun Path.create() {
-        if (!fileSystem.exists(this)) {
-            fileSystem.createDirectories(this)
-        }
-    }
-
-    private companion object {
-        val windowsAbsolutePath = Regex("^[A-Za-z]:[\\\\/].*")
+private fun Path.create(fileSystem: FileSystem) {
+    if (!fileSystem.exists(this)) {
+        fileSystem.createDirectories(this)
     }
 }

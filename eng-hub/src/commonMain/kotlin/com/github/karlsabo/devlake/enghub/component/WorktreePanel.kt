@@ -92,7 +92,10 @@ internal fun isWorktreeCreateEnabled(
     isArchiving: Boolean,
 ): Boolean = setupStatus == null && !isArchiving && !worktree.isDetachedDisplayBranch()
 
-internal fun isWorktreeArchiveEnabled(setupStatus: WorktreeSetupStatus?, isArchiving: Boolean): Boolean = setupStatus == null && !isArchiving
+internal fun isWorktreeArchiveEnabled(
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+): Boolean = setupStatus == null && !isArchiving
 
 internal data class CreateWorktreeTargetBranchValidation(
     val result: WorktreeBranchNameValidationResult,
@@ -144,7 +147,11 @@ internal fun createWorktreeTargetBranchValidationMessage(
     else -> validation.result.message
 }
 
-internal fun isCreateWorktreeConfirmEnabled(validation: CreateWorktreeTargetBranchValidation): Boolean = !validation.isCheckingGitRefFormat && validation.result.isValid && !validation.targetBranchMatchesBase
+internal fun isCreateWorktreeConfirmEnabled(
+    validation: CreateWorktreeTargetBranchValidation,
+): Boolean = !validation.isCheckingGitRefFormat &&
+    validation.result.isValid &&
+    !validation.targetBranchMatchesBase
 
 internal fun submitCreateWorktreeDialog(
     state: PendingCreateWorktree,
@@ -158,10 +165,13 @@ internal fun createTargetBranchInputValue(targetBranch: String): TextFieldValue 
     selection = TextRange(targetBranch.length),
 )
 
-private fun targetBranchMatchesBase(baseBranch: String, targetBranch: String): Boolean = targetBranch.isNotEmpty() && targetBranch == baseBranch
+private fun targetBranchMatchesBase(
+    baseBranch: String,
+    targetBranch: String,
+): Boolean = targetBranch.isNotEmpty() && targetBranch == baseBranch
 
 @Composable
-fun WorktreePanel(
+fun worktreePanel(
     localRepositories: List<LocalRepositoryUiState>,
     onAddRepository: () -> Unit,
     onToggleRepository: (String) -> Unit,
@@ -179,7 +189,7 @@ fun WorktreePanel(
     var pendingCreateWorktree by remember { mutableStateOf<PendingCreateWorktree?>(null) }
 
     pendingArchive?.let { archive ->
-        ArchiveWorktreeDialog(
+        archiveWorktreeDialog(
             worktreePath = archive.worktreePath,
             onConfirm = {
                 pendingArchive = null
@@ -190,7 +200,7 @@ fun WorktreePanel(
     }
 
     forceArchiveRequest?.let { archive ->
-        ForceArchiveWorktreeDialog(
+        forceArchiveWorktreeDialog(
             worktreePath = archive.worktreePath,
             onConfirm = {
                 onConfirmForceArchiveWorktree(archive.repoRootPath, archive.worktreePath)
@@ -200,7 +210,7 @@ fun WorktreePanel(
     }
 
     pendingCreateWorktree?.let { createWorktree ->
-        CreateWorktreeDialog(
+        createWorktreeDialog(
             state = createWorktree,
             onTargetBranchChange = { targetBranch ->
                 pendingCreateWorktree = pendingCreateWorktree?.copy(targetBranch = targetBranch)
@@ -233,7 +243,7 @@ fun WorktreePanel(
             } else {
                 LazyColumn {
                     items(localRepositories, key = { it.path }) { repository ->
-                        LocalRepositoryRow(
+                        localRepositoryRow(
                             repository = repository,
                             onToggleRepository = { onToggleRepository(repository.path) },
                             onOpenWorktree = onOpenWorktree,
@@ -254,7 +264,7 @@ fun WorktreePanel(
 }
 
 @Composable
-private fun LocalRepositoryRow(
+private fun localRepositoryRow(
     repository: LocalRepositoryUiState,
     onToggleRepository: () -> Unit,
     onOpenWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
@@ -302,7 +312,7 @@ private fun LocalRepositoryRow(
                     val normalizedWorktreePath = worktree.path.normalizedWorktreePath()
                     val worktreeSetupStatus = setupStatuses[WorktreePath(normalizedWorktreePath)]
                     key(normalizedWorktreePath) {
-                        LocalWorktreeRow(
+                        localWorktreeRow(
                             worktree = worktree,
                             setupStatus = worktreeSetupStatus,
                             isArchiving = normalizedWorktreePath in archivingWorktreePaths,
@@ -318,7 +328,7 @@ private fun LocalRepositoryRow(
 }
 
 @Composable
-private fun LocalWorktreeRow(
+private fun localWorktreeRow(
     worktree: LocalWorktreeUiState,
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
@@ -411,7 +421,7 @@ private fun LocalWorktreeRow(
 }
 
 @Composable
-private fun CreateWorktreeDialog(
+private fun createWorktreeDialog(
     state: PendingCreateWorktree,
     onTargetBranchChange: (String) -> Unit,
     onConfirm: (PendingCreateWorktree) -> Unit,
@@ -503,7 +513,7 @@ private fun CreateWorktreeDialog(
 }
 
 @Composable
-private fun ArchiveWorktreeDialog(
+private fun archiveWorktreeDialog(
     worktreePath: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -544,7 +554,7 @@ private fun ArchiveWorktreeDialog(
 }
 
 @Composable
-private fun ForceArchiveWorktreeDialog(
+private fun forceArchiveWorktreeDialog(
     worktreePath: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,

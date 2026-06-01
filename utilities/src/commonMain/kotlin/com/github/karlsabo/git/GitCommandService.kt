@@ -5,6 +5,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
 
+@Suppress("TooManyFunctions")
 class GitCommandService : GitCommandApi {
 
     override fun clone(url: String, targetPath: String) {
@@ -24,9 +25,7 @@ class GitCommandService : GitCommandApi {
         remote: String,
         vararg refSpecs: String,
     ) {
-        val args = mutableListOf("fetch", remote)
-        args.addAll(refSpecs)
-        executeGitCommand(buildRepoCommand(repoPath, *args.toTypedArray()))
+        executeGitCommand(buildRepoCommand(repoPath, listOf("fetch", remote) + refSpecs.toList()))
     }
 
     override fun remoteBranchExists(
@@ -35,7 +34,14 @@ class GitCommandService : GitCommandApi {
         remote: String,
     ): Boolean {
         val remoteBranchRef = "refs/heads/$branch"
-        val command = buildRepoCommand(repoPath, "ls-remote", "--exit-code", "--heads", remote, remoteBranchRef)
+        val command = buildRepoCommand(
+            repoPath,
+            "ls-remote",
+            "--exit-code",
+            "--heads",
+            remote,
+            remoteBranchRef,
+        )
         logger.debug { "Executing: ${command.joinToString(" ")}" }
         val result = executeCommand(command, workingDirectory = null)
         return when (result.exitCode) {
@@ -89,7 +95,9 @@ class GitCommandService : GitCommandApi {
         executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", "-b", newBranch, path, baseBranch))
     }
 
-    override fun worktreeList(repoPath: String): String = executeGitCommand(buildRepoCommand(repoPath, "worktree", "list", "--porcelain"))
+    override fun worktreeList(repoPath: String): String = executeGitCommand(
+        buildRepoCommand(repoPath, "worktree", "list", "--porcelain"),
+    )
 
     override fun worktreeRemove(repoPath: String, path: String) {
         executeGitCommand(buildRepoCommand(repoPath, "worktree", "remove", path))
@@ -99,24 +107,40 @@ class GitCommandService : GitCommandApi {
         executeGitCommand(buildRepoCommand(repoPath, "checkout", ref))
     }
 
-    override fun status(repoPath: String): String = executeGitCommand(buildRepoCommand(repoPath, "status", "--porcelain"))
+    override fun status(repoPath: String): String = executeGitCommand(
+        buildRepoCommand(repoPath, "status", "--porcelain"),
+    )
 
-    override fun log(repoPath: String, vararg args: String): String = executeGitCommand(buildRepoCommand(repoPath, "log", *args))
+    override fun log(repoPath: String, vararg args: String): String = executeGitCommand(
+        buildRepoCommand(repoPath, listOf("log") + args.toList()),
+    )
 
-    override fun diff(repoPath: String, vararg args: String): String = executeGitCommand(buildRepoCommand(repoPath, "diff", *args))
+    override fun diff(repoPath: String, vararg args: String): String = executeGitCommand(
+        buildRepoCommand(repoPath, listOf("diff") + args.toList()),
+    )
 
-    override fun revParse(repoPath: String, vararg args: String): String = executeGitCommand(buildRepoCommand(repoPath, "rev-parse", *args))
+    override fun revParse(repoPath: String, vararg args: String): String = executeGitCommand(
+        buildRepoCommand(repoPath, listOf("rev-parse") + args.toList()),
+    )
 
     override fun execute(repoPath: String?, vararg args: String): String {
         val command = if (repoPath != null) {
-            buildRepoCommand(repoPath, *args)
+            buildRepoCommand(repoPath, args.toList())
         } else {
             listOf("git") + args.toList()
         }
         return executeGitCommand(command)
     }
 
-    private fun buildRepoCommand(repoPath: String, vararg args: String): List<String> = listOf("git", "-C", repoPath) + args.toList()
+    private fun buildRepoCommand(
+        repoPath: String,
+        vararg args: String,
+    ): List<String> = buildRepoCommand(repoPath, args.toList())
+
+    private fun buildRepoCommand(
+        repoPath: String,
+        args: List<String>,
+    ): List<String> = listOf("git", "-C", repoPath) + args
 
     private fun executeGitCommand(command: List<String>): String {
         logger.debug { "Executing: ${command.joinToString(" ")}" }

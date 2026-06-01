@@ -51,20 +51,23 @@ compose.desktop {
     }
 }
 
-// Helper function to create JavaExec tasks with lazy configuration
+data class JvmExecTaskSpec(
+    val taskName: String,
+    val mainClassName: String,
+    val compilationName: String = "main",
+    val taskGroup: String = "run",
+    val supportsArgs: Boolean = false,
+)
+
 fun createJvmExecTask(
-    taskName: String,
-    mainClassName: String,
-    compilationName: String = "main",
-    taskGroup: String = "run",
-    supportsArgs: Boolean = false,
+    spec: JvmExecTaskSpec,
     configure: JavaExec.() -> Unit = {},
 ) {
-    tasks.register<JavaExec>(taskName) {
-        group = taskGroup
-        mainClass.set(mainClassName)
+    tasks.register<JavaExec>(spec.taskName) {
+        group = spec.taskGroup
+        mainClass.set(spec.mainClassName)
 
-        if (supportsArgs) {
+        if (spec.supportsArgs) {
             val argLine: String? = project.findProperty("args") as String?
             if (argLine != null) {
                 args = argLine.split("\\s+".toRegex())
@@ -73,7 +76,7 @@ fun createJvmExecTask(
 
         val jvmTarget = kotlin.targets.named("jvm")
         val compilation = jvmTarget.flatMap { target ->
-            target.compilations.named(compilationName)
+            target.compilations.named(spec.compilationName)
         }
 
         classpath(
@@ -86,34 +89,44 @@ fun createJvmExecTask(
 }
 
 createJvmExecTask(
-    taskName = "runSummaryDemo",
-    mainClassName = "com.github.karlsabo.devlake.tools.SummaryDemoKt",
-    compilationName = "test",
+    JvmExecTaskSpec(
+        taskName = "runSummaryDemo",
+        mainClassName = "com.github.karlsabo.devlake.tools.SummaryDemoKt",
+        compilationName = "test",
+    ),
 )
 
 createJvmExecTask(
-    taskName = "runSummaryDetailDemo",
-    mainClassName = "com.github.karlsabo.devlake.tools.SummaryDetailDemoKt",
-    compilationName = "test",
-    supportsArgs = true,
+    JvmExecTaskSpec(
+        taskName = "runSummaryDetailDemo",
+        mainClassName = "com.github.karlsabo.devlake.tools.SummaryDetailDemoKt",
+        compilationName = "test",
+        supportsArgs = true,
+    ),
 )
 
 createJvmExecTask(
-    taskName = "runUiDemo",
-    mainClassName = "com.github.karlsabo.devlake.tools.UiDemoKt",
-    compilationName = "test",
+    JvmExecTaskSpec(
+        taskName = "runUiDemo",
+        mainClassName = "com.github.karlsabo.devlake.tools.UiDemoKt",
+        compilationName = "test",
+    ),
 )
 
 createJvmExecTask(
-    taskName = "runSummaryPublisherWithConfig",
-    mainClassName = "com.github.karlsabo.devlake.tools.SummaryPublisherKt",
-    compilationName = "main",
-    supportsArgs = true,
+    JvmExecTaskSpec(
+        taskName = "runSummaryPublisherWithConfig",
+        mainClassName = "com.github.karlsabo.devlake.tools.SummaryPublisherKt",
+        compilationName = "main",
+        supportsArgs = true,
+    ),
 )
 
 createJvmExecTask(
-    taskName = "runJiraTeamMerDemo",
-    mainClassName = "com.github.karlsabo.devlake.tools.JiraTeamMerDemoKt",
-    compilationName = "test",
-    supportsArgs = true,
+    JvmExecTaskSpec(
+        taskName = "runJiraTeamMerDemo",
+        mainClassName = "com.github.karlsabo.devlake.tools.JiraTeamMerDemoKt",
+        compilationName = "test",
+        supportsArgs = true,
+    ),
 )

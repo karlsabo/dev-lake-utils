@@ -8,10 +8,10 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.github.karlsabo.devlake.metrics.ui.components.MetricsPreview
+import com.github.karlsabo.devlake.metrics.ui.components.metricsPreview
 
 @Composable
-fun UserMetricPublisherScreen(
+fun userMetricPublisherScreen(
     metricsPreviewText: String,
     publishButtonText: String,
     publishButtonEnabled: Boolean,
@@ -27,7 +27,7 @@ fun UserMetricPublisherScreen(
                     Text(publishButtonText)
                 }
 
-                MetricsPreview(
+                metricsPreview(
                     text = metricsPreviewText,
                     modifier = Modifier.weight(1f),
                 )

@@ -5,6 +5,7 @@ import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 import java.sql.DriverManager
+import java.sql.ResultSet
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -204,61 +205,53 @@ class NotificationDatabaseMigrationTest {
         }
     }
 
-    private fun readUserVersion(databasePath: String): Long {
-        DriverManager.getConnection("jdbc:sqlite:$databasePath").use { connection ->
-            connection.createStatement().use { statement ->
-                statement.executeQuery("PRAGMA user_version").use { resultSet ->
-                    check(resultSet.next())
-                    return resultSet.getLong(1)
-                }
-            }
-        }
+    private fun readUserVersion(databasePath: String): Long = queryDatabase(
+        databasePath = databasePath,
+        sql = "PRAGMA user_version",
+    ) { resultSet ->
+        check(resultSet.next())
+        resultSet.getLong(1)
     }
 
-    private fun readIgnoredColumnNames(databasePath: String): List<String> {
-        DriverManager.getConnection("jdbc:sqlite:$databasePath").use { connection ->
-            connection.createStatement().use { statement ->
-                statement.executeQuery("PRAGMA table_info(ignored_notification_threads)").use { resultSet ->
-                    val columnNames = mutableListOf<String>()
-                    while (resultSet.next()) {
-                        columnNames += resultSet.getString("name")
-                    }
-                    return columnNames
-                }
-            }
+    private fun readIgnoredColumnNames(databasePath: String): List<String> = queryDatabase(
+        databasePath = databasePath,
+        sql = "PRAGMA table_info(ignored_notification_threads)",
+    ) { resultSet ->
+        val columnNames = mutableListOf<String>()
+        while (resultSet.next()) {
+            columnNames += resultSet.getString("name")
         }
+        columnNames
     }
 
-    private fun readIgnoredRows(databasePath: String): List<IgnoredThreadRow> {
-        DriverManager.getConnection("jdbc:sqlite:$databasePath").use { connection ->
-            connection.createStatement().use { statement ->
-                statement.executeQuery(
-                    """
-                    SELECT
-                      thread_id,
-                      repository_full_name,
-                      subject_type,
-                      ignore_reason,
-                      ignored_at_epoch_ms,
-                      notification_updated_at_epoch_ms
-                    FROM ignored_notification_threads
-                    ORDER BY thread_id
-                    """.trimIndent(),
-                ).use { resultSet ->
-                    val rows = mutableListOf<IgnoredThreadRow>()
-                    while (resultSet.next()) {
-                        rows += IgnoredThreadRow(
-                            threadId = resultSet.getString("thread_id"),
-                            repositoryFullName = resultSet.getString("repository_full_name"),
-                            subjectType = resultSet.getString("subject_type"),
-                            ignoreReason = resultSet.getString("ignore_reason"),
-                            ignoredAtEpochMs = resultSet.getLong("ignored_at_epoch_ms"),
-                            notificationUpdatedAtEpochMs = resultSet.getNullableLong("notification_updated_at_epoch_ms"),
-                        )
-                    }
-                    return rows
-                }
-            }
+    private fun readIgnoredRows(databasePath: String): List<IgnoredThreadRow> = queryDatabase(
+        databasePath = databasePath,
+        sql = """
+            SELECT
+              thread_id,
+              repository_full_name,
+              subject_type,
+              ignore_reason,
+              ignored_at_epoch_ms,
+              notification_updated_at_epoch_ms
+            FROM ignored_notification_threads
+            ORDER BY thread_id
+        """.trimIndent(),
+    ) { resultSet ->
+        val rows = mutableListOf<IgnoredThreadRow>()
+        while (resultSet.next()) {
+            rows += resultSet.toIgnoredThreadRow()
+        }
+        rows
+    }
+
+    private fun <T> queryDatabase(
+        databasePath: String,
+        sql: String,
+        readResult: (ResultSet) -> T,
+    ): T = DriverManager.getConnection("jdbc:sqlite:$databasePath").use { connection ->
+        connection.createStatement().use { statement ->
+            statement.executeQuery(sql).use(readResult)
         }
     }
 
@@ -289,7 +282,16 @@ private data class IgnoredThreadRow(
     val notificationUpdatedAtEpochMs: Long?,
 )
 
-private fun java.sql.ResultSet.getNullableLong(columnLabel: String): Long? {
+private fun ResultSet.toIgnoredThreadRow(): IgnoredThreadRow = IgnoredThreadRow(
+    threadId = getString("thread_id"),
+    repositoryFullName = getString("repository_full_name"),
+    subjectType = getString("subject_type"),
+    ignoreReason = getString("ignore_reason"),
+    ignoredAtEpochMs = getLong("ignored_at_epoch_ms"),
+    notificationUpdatedAtEpochMs = getNullableLong("notification_updated_at_epoch_ms"),
+)
+
+private fun ResultSet.getNullableLong(columnLabel: String): Long? {
     val value = getLong(columnLabel)
     return if (wasNull()) null else value
 }

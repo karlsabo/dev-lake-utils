@@ -35,6 +35,8 @@ import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Instant
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -42,12 +44,35 @@ import kotlinx.serialization.json.jsonPrimitive
 
 private val logger = KotlinLogging.logger {}
 
+private const val HTTP_SUCCESS_MIN = 200
+private const val HTTP_SUCCESS_MAX = 299
+private const val JQL_PAGE_SIZE = 100
+
+class JiraApiException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+
+private data class JqlPage(
+    val issues: JsonArray,
+    val isLast: Boolean,
+    val nextPageToken: String?,
+    val total: Int?,
+)
+
+private data class JqlPageState(
+    val startAt: Int,
+    val nextPageToken: String?,
+    val hasMore: Boolean,
+)
+
 /**
  * Jira REST API implementation of ProjectManagementApi.
  *
  * @param config The Jira API configuration
  * @param labelCustomFieldId Optional custom field ID used for labels in Jira (e.g., "customfield_12345")
  */
+@Suppress("TooManyFunctions")
 class JiraRestApi(
     private val config: JiraApiRestConfig,
     private val labelCustomFieldId: String? = null,
@@ -138,13 +163,13 @@ class JiraRestApi(
         return (root["count"]?.jsonPrimitive?.int ?: 0).toUInt()
     }
 
-    override suspend fun getIssuesByFilter(filter: IssueFilter): List<ProjectIssue> {
-        if (labelCustomFieldId != null && !filter.labels.isNullOrEmpty()) {
+    override suspend fun getIssuesByFilter(filter: IssueFilter): List<ProjectIssue> = when {
+        labelCustomFieldId != null && !filter.labels.isNullOrEmpty() -> {
             val customFieldFilter = CustomFieldFilter(
                 fieldId = labelCustomFieldId,
                 values = filter.labels,
             )
-            return getIssuesByCustomFieldFilter(
+            getIssuesByCustomFieldFilter(
                 issueTypes = filter.issueTypes ?: emptyList(),
                 customFieldFilter = customFieldFilter,
                 resolvedAfter = filter.completedAfter,
@@ -152,15 +177,16 @@ class JiraRestApi(
             )
         }
 
-        if (!filter.issueTypes.isNullOrEmpty()) {
-            val jql = buildJqlFromFilter(filter)
-            return runJql(jql)
-        }
+        !filter.issueTypes.isNullOrEmpty() -> runJql(buildJqlFromFilter(filter))
 
-        return emptyList()
+        else -> emptyList()
     }
 
-    override suspend fun getMilestones(projectId: String): List<ProjectMilestone> = runJqlPaginated("project = \"$projectId\" AND issuetype = ${JiraConstants.ISSUE_TYPE_EPIC} ORDER BY created DESC") { it.toProjectMilestone() }
+    override suspend fun getMilestones(projectId: String): List<ProjectMilestone> = runJqlPaginated(
+        "project = \"$projectId\" AND issuetype = ${JiraConstants.ISSUE_TYPE_EPIC} ORDER BY created DESC",
+    ) { issue ->
+        issue.toProjectMilestone()
+    }
 
     override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> = getDirectChildIssues(milestoneId)
 
@@ -188,7 +214,7 @@ class JiraRestApi(
             if (resolvedBefore != null) {
                 append(" AND resolutiondate <= \"${resolvedBefore.toCompactUtcDateTime()}\"")
             }
-            append(" AND \"${customFieldFilter.fieldId}\" in (${customFieldFilter.values.joinToString(", ") { "\"$it\"" }})")
+            appendCustomFieldFilter(customFieldFilter)
             append(" ORDER BY resolutiondate DESC")
         }
         return runJql(jql)
@@ -198,38 +224,54 @@ class JiraRestApi(
      * Executes a paginated JQL query and transforms results using the provided mapper.
      */
     private suspend fun <T> runJqlPaginated(jql: String, transform: (Issue) -> T): List<T> = buildList {
-        val maxResults = 100
-        var startAt = 0
-        var nextPageToken: String? = null
+        var pageState = JqlPageState(startAt = 0, nextPageToken = null, hasMore = true)
 
-        while (true) {
-            val url = buildJqlSearchUrl(jql, maxResults, startAt, nextPageToken)
-            val response = client.get(url).also { it.ensureSuccess("run JQL: $jql") }
-            val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
-
-            val issues = root["issues"]?.jsonArray ?: break
-            issues.mapTo(this) { issue ->
+        while (pageState.hasMore) {
+            val page = fetchJqlPage(jql, pageState.startAt, pageState.nextPageToken)
+            page.issues.mapTo(this) { issue ->
                 transform(lenientJson.decodeFromJsonElement(Issue.serializer(), issue.jsonObject))
             }
-
-            // Check pagination termination conditions
-            if (root["isLast"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() == true) break
-
-            root["nextPageToken"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }?.let {
-                nextPageToken = it
-                return@let
-            } ?: run {
-                val total = root["total"]?.jsonPrimitive?.int
-                if (total != null) {
-                    startAt += maxResults
-                    if (startAt >= total) return@buildList
-                } else if (issues.size < maxResults) {
-                    return@buildList
-                } else {
-                    throw Exception("JQL results appear truncated (no pagination fields) for jql=$jql")
-                }
-            }
+            pageState = nextPageState(jql, page, pageState.startAt)
         }
+    }
+
+    private suspend fun fetchJqlPage(
+        jql: String,
+        startAt: Int,
+        nextPageToken: String?,
+    ): JqlPage {
+        val url = buildJqlSearchUrl(jql, JQL_PAGE_SIZE, startAt, nextPageToken)
+        val response = client.get(url).also { it.ensureSuccess("run JQL: $jql") }
+        val root = lenientJson.parseToJsonElement(response.bodyAsText()).jsonObject
+        return root.toJqlPage()
+    }
+
+    private fun JsonObject.toJqlPage(): JqlPage = JqlPage(
+        issues = this["issues"]?.jsonArray ?: JsonArray(emptyList()),
+        isLast = this["isLast"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() == true,
+        nextPageToken = this["nextPageToken"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+        total = this["total"]?.jsonPrimitive?.int,
+    )
+
+    private fun nextPageState(
+        jql: String,
+        page: JqlPage,
+        startAt: Int,
+    ): JqlPageState = when {
+        page.isLast -> JqlPageState(startAt, page.nextPageToken, hasMore = false)
+        page.nextPageToken != null -> JqlPageState(startAt, page.nextPageToken, hasMore = true)
+        page.total != null -> nextOffsetPageState(startAt, page.total)
+        page.issues.size < JQL_PAGE_SIZE -> JqlPageState(startAt, null, hasMore = false)
+        else -> throw JiraApiException("JQL results appear truncated (no pagination fields) for jql=$jql")
+    }
+
+    private fun nextOffsetPageState(startAt: Int, total: Int): JqlPageState {
+        val nextStartAt = startAt + JQL_PAGE_SIZE
+        return JqlPageState(
+            startAt = nextStartAt,
+            nextPageToken = null,
+            hasMore = nextStartAt < total,
+        )
     }
 
     private fun buildJqlSearchUrl(
@@ -253,7 +295,8 @@ class JiraRestApi(
         userId: String,
         startDate: Instant,
         endDate: Instant,
-    ): String = "assignee = $userId AND resolutiondate >= \"${startDate.toCompactUtcDateTime()}\" AND resolutiondate <= \"${endDate.toCompactUtcDateTime()}\""
+    ): String = "assignee = $userId AND resolutiondate >= \"${startDate.toCompactUtcDateTime()}\" " +
+        "AND resolutiondate <= \"${endDate.toCompactUtcDateTime()}\""
 
     private fun buildJqlFromFilter(filter: IssueFilter): String {
         val conditions = mutableListOf<String>()
@@ -275,10 +318,15 @@ class JiraRestApi(
     }
 }
 
+private fun StringBuilder.appendCustomFieldFilter(customFieldFilter: CustomFieldFilter) {
+    val values = customFieldFilter.values.joinToString(", ") { "\"$it\"" }
+    append(" AND \"${customFieldFilter.fieldId}\" in ($values)")
+}
+
 private suspend fun HttpResponse.ensureSuccess(operation: String) {
-    if (status.value !in 200..299) {
+    if (status.value !in HTTP_SUCCESS_MIN..HTTP_SUCCESS_MAX) {
         val responseBody = bodyAsText()
         logger.debug { "Jira API error response: ```$responseBody```" }
-        throw Exception("Failed to $operation: HTTP ${status.value}")
+        throw JiraApiException("Failed to $operation: HTTP ${status.value}")
     }
 }

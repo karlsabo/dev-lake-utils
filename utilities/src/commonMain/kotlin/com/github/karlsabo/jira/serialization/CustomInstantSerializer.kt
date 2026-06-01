@@ -10,8 +10,18 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 
+private const val DATE_TIME_WITH_MILLIS_LENGTH = 23
+private const val OFFSET_HOURS_END_INDEX = 3
+private const val OFFSET_SIGN_END_INDEX = 1
+private const val OFFSET_MINUTES_START_INDEX = 3
+private const val OFFSET_MINUTES_END_INDEX = 5
+private const val MINUTES_PER_HOUR = 60
+private const val MILLIS_PER_MINUTE = 60_000
+
+private val dateOnlyPattern = Regex("\\d{4}-\\d{2}-\\d{2}")
+
 fun parseOffsetDateTime(dateString: String): Instant {
-    if (dateString.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+    if (dateString.matches(dateOnlyPattern)) {
         val dateParts = dateString.split("-")
         val year = dateParts[0].toInt()
         val month = dateParts[1].toInt()
@@ -21,23 +31,23 @@ fun parseOffsetDateTime(dateString: String): Instant {
         return local.toInstant(TimeZone.UTC)
     }
 
-    val dateTimePart = dateString.substring(0, 23) // "2025-03-29T15:17:30.431"
-    val offsetPart = dateString.substring(23) // "-0400"
+    val dateTimePart = dateString.substring(0, DATE_TIME_WITH_MILLIS_LENGTH)
+    val offsetPart = dateString.substring(DATE_TIME_WITH_MILLIS_LENGTH)
 
     val local = LocalDateTime.parse(dateTimePart)
 
-    val offsetHours = offsetPart.substring(0, 3).toInt() // e.g. "-04"
-    val offsetMinutes = offsetPart.substring(0, 1) + offsetPart.substring(3, 5) // same sign, minutes
-    val totalOffsetMinutes = offsetHours * 60 + offsetMinutes.toInt()
+    val offsetHours = offsetPart.substring(0, OFFSET_HOURS_END_INDEX).toInt()
+    val offsetMinutes = offsetPart.substring(0, OFFSET_SIGN_END_INDEX) +
+        offsetPart.substring(OFFSET_MINUTES_START_INDEX, OFFSET_MINUTES_END_INDEX)
+    val totalOffsetMinutes = offsetHours * MINUTES_PER_HOUR + offsetMinutes.toInt()
 
     val instantEpochMillis = local.toInstant(TimeZone.UTC).toEpochMilliseconds() -
-        (totalOffsetMinutes * 60_000)
+        (totalOffsetMinutes * MILLIS_PER_MINUTE)
 
     return Instant.fromEpochMilliseconds(instantEpochMillis)
 }
 
 object CustomInstantSerializer : KSerializer<Instant> {
-    // Describes the shape of the serialized data (a string in this case)
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("kotlinx.datetime.Instant", PrimitiveKind.STRING)
 

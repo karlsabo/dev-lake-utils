@@ -30,10 +30,13 @@ fun main(args: Array<String>) {
         // Get username from args or use default
         val username =
             args.find { it.startsWith("--user=") }?.substringAfter("=")
-                ?: throw Exception("No --user=username provided")
+                ?: throw IllegalArgumentException("No --user=username provided")
         println("Using GitHub username: $username")
 
-        val organizations = args.find { it.startsWith("--orgs=") }?.substringAfter("=")?.split(",") ?: emptyList()
+        val organizations = args.find { it.startsWith("--orgs=") }
+            ?.substringAfter("=")
+            ?.split(",")
+            ?: emptyList()
 
         // Get PR count for the past year
         val now = Clock.System.now()
@@ -76,9 +79,8 @@ fun main(args: Array<String>) {
             val mergedPRsCount = githubApi.getMergedPullRequestCount(userId, organizations, oneWeekAgo, now)
             println("\nCount of PRs merged by user ID $userId in the last week: $mergedPRsCount")
         }
-    } catch (e: Exception) {
-        println("Error: ${e.message}")
-        e.printStackTrace()
+    } catch (error: RuntimeException) {
+        println("Error: ${error.message}")
     }
 }
 

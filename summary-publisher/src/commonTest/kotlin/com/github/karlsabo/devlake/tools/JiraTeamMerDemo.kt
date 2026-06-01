@@ -12,9 +12,12 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.io.files.Path
 import kotlin.time.Duration.Companion.days
 
+private const val DEFAULT_DAYS_BACK = 30
+private const val MAX_DESCRIPTION_LENGTH = 500
+
 fun main(args: Array<String>) {
     val daysBack = args.find { it.startsWith("--days=") }
-        ?.substringAfter("=")?.toIntOrNull() ?: 30
+        ?.substringAfter("=")?.toIntOrNull() ?: DEFAULT_DAYS_BACK
 
     val configPath = args.find { it.startsWith("--config=") }
         ?.substringAfter("=")?.let { Path(it) }
@@ -24,7 +27,7 @@ fun main(args: Array<String>) {
         ?.substringAfter("=")
         ?.split(",")
         ?.map { it.trim() }
-        ?: throw Exception("--teams is required as a parameter")
+        ?: throw IllegalArgumentException("--teams is required as a parameter")
 
     runBlocking {
         val jiraApi = JiraRestApi(loadJiraConfig(configPath))
@@ -91,8 +94,8 @@ private fun printMarkdownReport(
 
         val description = issue.description
         if (!description.isNullOrBlank()) {
-            val truncatedDesc = if (description.length > 500) {
-                description.take(500) + "..."
+            val truncatedDesc = if (description.length > MAX_DESCRIPTION_LENGTH) {
+                description.take(MAX_DESCRIPTION_LENGTH) + "..."
             } else {
                 description
             }

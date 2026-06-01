@@ -19,7 +19,7 @@ import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
 
 @Composable
-fun PullRequestItem(
+fun pullRequestItem(
     pr: PullRequestUiState,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
@@ -51,7 +51,7 @@ fun PullRequestItem(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(text = pr.repositoryFullName, style = MaterialTheme.typography.caption)
-                    StatusBadge(status = pr.ciStatus)
+                    statusBadge(status = pr.ciStatus)
                     Text(text = pr.ciSummaryText, style = MaterialTheme.typography.caption)
                     Text(text = pr.reviewSummaryText, style = MaterialTheme.typography.caption)
                 }

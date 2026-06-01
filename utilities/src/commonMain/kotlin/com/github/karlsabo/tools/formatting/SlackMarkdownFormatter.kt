@@ -1,11 +1,14 @@
 package com.github.karlsabo.tools.formatting
 
+import com.github.karlsabo.github.Issue
+import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.isCompleted
+import com.github.karlsabo.tools.model.Milestone
 import com.github.karlsabo.tools.model.ProjectSummary
 import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.days
+
+private const val RECENT_ACTIVITY_DAYS = 14
 
 /**
  * Converts the project summary into a detailed Slack-compatible Markdown string.
@@ -18,109 +21,97 @@ import kotlin.time.Duration.Companion.days
  * @return A formatted Markdown string that represents the project's verbose summary,
  *         tailored for Slack communication.
  */
-fun ProjectSummary.toVerboseSlackMarkdown(): String {
-    val summary = StringBuilder()
-    createTitle(summary)
+fun ProjectSummary.toVerboseSlackMarkdown(): String = buildString {
+    createTitle(this)
+    append(createSlackMarkdownProgressBar(issues, durationIssues))
+    append(durationProgressSummary)
+    appendLine()
+    appendVerboseMilestones(this@toVerboseSlackMarkdown)
+}
 
-    summary.append(createSlackMarkdownProgressBar(issues, durationIssues))
-    summary.append(this.durationProgressSummary)
-    summary.appendLine()
+private fun StringBuilder.appendVerboseMilestones(summary: ProjectSummary) {
+    if (summary.milestones.isEmpty()) return
 
-    if (milestones.isNotEmpty()) {
-        summary.appendLine("🛣️ *Milestones*")
-        summary.appendLine()
-        this.milestones.sortedBy { it.issue.title }.forEach { milestone ->
-            if (milestone.issue.completedAt != null && milestone.issue.completedAt < Clock.System.now()
-                    .minus(14.days)
-            ) {
-                return@forEach
-            }
+    appendLine("🛣️ *Milestones*")
+    appendLine()
+    summary.milestones
+        .sortedBy { it.issue.title }
+        .filterNot { it.wasCompletedBeforeRecentWindow() }
+        .forEach { milestone -> appendVerboseMilestone(summary, milestone) }
+}
 
-            summary.appendLine()
-            val complete = if (milestone.issue.completedAt == null) "" else "✅ "
-            summary.appendLine("*$complete<${milestone.issue.url}|${milestone.issue.title}>: ${milestone.issue.assigneeName ?: "No assignee"}*")
-            summary.append(createSlackMarkdownProgressBar(milestone.issues, milestone.durationIssues))
+private fun StringBuilder.appendVerboseMilestone(summary: ProjectSummary, milestone: Milestone) {
+    appendLine()
+    val complete = if (milestone.issue.completedAt == null) "" else "✅ "
+    appendLine(milestone.header(complete))
+    append(createSlackMarkdownProgressBar(milestone.issues, milestone.durationIssues))
 
-            if (milestone.issue.completedAt == null) {
-                val issuesResolved = milestone.durationIssues.filter { it.isCompleted() }
-                if (issuesResolved.isNotEmpty()) {
-                    summary.appendLine(
-                        "📍 Issues resolved: ${
-                            issuesResolved.joinToString(", ") { "<${it.url}|${it.key}>" }
-                        }",
-                    )
-                } else {
-                    val changeCharacterLimit = 200
-                    val lastIssue = milestone.issues.sortedByDescending { it.completedAt }.firstOrNull()
-                    val lastIssueResolutionDate = lastIssue?.completedAt
+    if (milestone.issue.completedAt == null) {
+        appendOpenMilestoneDetails(summary, milestone)
+    }
+}
 
-                    // Check for the most recent update from changelogs, issue resolutions, or comments
-                    val lastComment = milestone.milestoneComments.maxByOrNull { it.createdAt ?: Clock.System.now() }
-                    val lastCommentDate = lastComment?.createdAt
+private fun StringBuilder.appendOpenMilestoneDetails(summary: ProjectSummary, milestone: Milestone) {
+    val issuesResolved = milestone.durationIssues.filter { it.isCompleted() }
+    if (issuesResolved.isNotEmpty()) {
+        appendIssueLinks("📍 Issues resolved", issuesResolved)
+    } else {
+        appendMilestoneStatusWarning(summary, milestone)
+    }
 
-                    val isStatusRecent: Boolean
-                    // Determine which is the most recent update: changelog, issue resolution, or comment
-                    if (lastCommentDate != null &&
-                        (lastIssueResolutionDate == null || lastCommentDate > lastIssue.completedAt)
-                    ) {
-                        // Comment is the most recent
-                        val dateStr = lastCommentDate.toLocalDateTime(TimeZone.of("America/New_York")).date
-                        isStatusRecent = lastCommentDate >= Clock.System.now().minus(14.days)
-                        val warningEmoji = if (!isStatusRecent) "⚠️ " else ""
-                        val commentBody = (lastComment.body ?: "").take(changeCharacterLimit)
-                        val commentDescription =
-                            commentBody + if ((lastComment.body?.length ?: 0) > changeCharacterLimit) "..." else ""
-                        summary.appendLine("$warningEmoji🗓️ Last update $dateStr: \"$commentDescription\"")
-                    } else if (lastIssueResolutionDate != null) {
-                        // Issue resolution is the most recent
-                        val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
-                        isStatusRecent = lastIssueResolutionDate >= Clock.System.now().minus(14.days)
-                        val warningEmoji =
-                            if (!isStatusRecent) "⚠️ " else ""
-                        summary.appendLine(
-                            "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.key}> \"${
-                                lastIssue.title?.take(
-                                    changeCharacterLimit,
-                                )
-                            }${if ((lastIssue.title?.length ?: 0) > changeCharacterLimit) "..." else ""}\"",
-                        )
-                    } else {
-                        isStatusRecent = false
-                    }
+    val issuesOpened = milestone.durationIssues.filter { !it.isCompleted() }
+    if (issuesOpened.isNotEmpty()) {
+        appendIssueLinks("📩 Issues opened", issuesOpened)
+    }
+    if (milestone.durationMergedPullRequests.isNotEmpty()) {
+        appendPullRequestLinks(milestone.durationMergedPullRequests)
+    }
+}
 
-                    if (milestone.issue.dueDate == null) {
-                        if (milestone.assignee == null) {
-                            summary.appendLine("‼️⚠️ This milestone doesn't have a due date or an assignee.")
-                        } else {
-                            summary.append(milestone.assignee.name)
-                            if (isTagMilestoneAssignees) summary.append(" <@${milestone.assignee.slackId}>")
-                            summary.appendLine(", please add a due date on the Epic")
-                        }
-                    } else if (!isStatusRecent && milestone.issue.dueDate.minus(90.days) < Clock.System.now()) {
-                        if (milestone.assignee == null) {
-                            summary.appendLine("‼️⚠️ There hasn't been any activity for two weeks, and this Epic doesn't have an assignee")
-                        } else {
-                            summary.append(milestone.assignee.name)
-                            if (isTagMilestoneAssignees) summary.append(" <@${milestone.assignee.slackId}>")
-                            summary.appendLine(", there hasn't been any activity for two weeks, please add a status update comment on the Epic.")
-                        }
-                    }
-                }
-                val issuesOpened = milestone.durationIssues.filter { !it.isCompleted() }
-                if (issuesOpened.isNotEmpty()) {
-                    summary.appendLine(
-                        "📩 Issues opened: ${
-                            issuesOpened.joinToString(", ") { "<${it.url}|${it.key}>" }
-                        }",
-                    )
-                }
-                if (milestone.durationMergedPullRequests.isNotEmpty()) {
-                    summary.appendLine("🔹 PRs merged: ${milestone.durationMergedPullRequests.joinToString(", ") { "<${it.htmlUrl}|${it.number}>" }}")
-                }
-            }
+private fun StringBuilder.appendMilestoneStatusWarning(summary: ProjectSummary, milestone: Milestone) {
+    val status = milestone.latestStatus()
+    if (status != null) {
+        appendLine(status.format())
+    }
+
+    when {
+        milestone.issue.dueDate == null -> appendMissingDueDateWarning(summary, milestone)
+
+        status?.isRecent == false && milestone.issue.dueDate.isWithinStaleWarningWindow() -> {
+            appendStaleActivityWarning(summary, milestone)
         }
     }
-    return summary.toString()
+}
+
+private fun StringBuilder.appendMissingDueDateWarning(summary: ProjectSummary, milestone: Milestone) {
+    if (milestone.assignee == null) {
+        appendLine("‼️⚠️ This milestone doesn't have a due date or an assignee.")
+    } else {
+        append(milestone.assignee.name)
+        if (summary.isTagMilestoneAssignees) append(" <@${milestone.assignee.slackId}>")
+        appendLine(", please add a due date on the Epic")
+    }
+}
+
+private fun StringBuilder.appendStaleActivityWarning(summary: ProjectSummary, milestone: Milestone) {
+    if (milestone.assignee == null) {
+        appendLine("‼️⚠️ There hasn't been any activity for two weeks, and this Epic doesn't have an assignee")
+    } else {
+        append(milestone.assignee.name)
+        if (summary.isTagMilestoneAssignees) append(" <@${milestone.assignee.slackId}>")
+        appendLine(
+            ", there hasn't been any activity for two weeks, " +
+                "please add a status update comment on the Epic.",
+        )
+    }
+}
+
+private fun StringBuilder.appendIssueLinks(label: String, issues: List<ProjectIssue>) {
+    appendLine("$label: ${issues.joinToString(", ") { "<${it.url}|${it.key}>" }}")
+}
+
+private fun StringBuilder.appendPullRequestLinks(pullRequests: Collection<Issue>) {
+    appendLine("🔹 PRs merged: ${pullRequests.joinToString(", ") { "<${it.htmlUrl}|${it.number}>" }}")
 }
 
 internal fun ProjectSummary.createTitle(summary: StringBuilder) {
@@ -165,7 +156,7 @@ fun ProjectSummary.toSlackMarkup(): String {
         )
     }
     if (durationMergedPullRequests.isNotEmpty()) {
-        summary.appendLine("🔹 PRs merged: ${durationMergedPullRequests.joinToString(", ") { "<${it.htmlUrl}|${it.number}>" }}")
+        summary.appendPullRequestLinks(durationMergedPullRequests)
     }
 
     if (milestones.isNotEmpty()) {
@@ -177,7 +168,7 @@ fun ProjectSummary.toSlackMarkup(): String {
         var milestoneCount = 0
         this.milestones.sortedBy { it.issue.title }.forEach { milestone ->
             if (milestone.issue.completedAt == null || milestone.issue.completedAt < Clock.System.now()
-                    .minus(14.days)
+                    .minus(RECENT_ACTIVITY_DAYS.days)
             ) {
                 return@forEach
             }

@@ -5,6 +5,7 @@ import kotlinx.datetime.Instant
 /**
  * Interface for interacting with the GitHub API.
  */
+@Suppress("TooManyFunctions")
 interface GitHubApi {
     /**
      * Retrieves the count of pull requests merged by a specific user within a given date range.

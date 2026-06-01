@@ -18,23 +18,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
-import com.github.karlsabo.github.ReviewStateValue
 
 internal fun NotificationUiState.checkoutSetupStatus(
     setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
 ): WorktreeSetupStatus? = headRef?.let { setupStatusFor(repositoryFullName, it) }
 
 @Composable
-fun NotificationPanel(
+fun notificationPanel(
     notificationsResult: Result<List<NotificationUiState>>?,
-    onOpenInBrowser: (String) -> Unit,
-    onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
+    actions: NotificationActions,
     setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
     actingOnThreadIds: Set<String> = emptySet(),
-    onApprove: (NotificationUiState) -> Unit,
-    onSubmitReview: (NotificationUiState, event: ReviewStateValue, reviewComment: String?) -> Unit,
-    onMarkDone: (NotificationUiState) -> Unit,
-    onUnsubscribe: (NotificationUiState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -54,16 +48,11 @@ fun NotificationPanel(
                     val listState = rememberLazyListState()
                     LazyColumn(state = listState) {
                         items(notifications, key = { it.notificationThreadId }) { notification ->
-                            NotificationItem(
+                            notificationItem(
                                 notification = notification,
-                                onOpenInBrowser = onOpenInBrowser,
-                                onCheckoutAndOpen = onCheckoutAndOpen,
+                                actions = actions,
                                 setupStatus = notification.checkoutSetupStatus(setupStatusFor),
                                 actionInProgress = notification.notificationThreadId in actingOnThreadIds,
-                                onApprove = onApprove,
-                                onSubmitReview = onSubmitReview,
-                                onMarkDone = onMarkDone,
-                                onUnsubscribe = onUnsubscribe,
                             )
                         }
                     }

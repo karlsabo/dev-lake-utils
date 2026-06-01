@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.tools.ProjectSummaryHolder
 
 @Composable
-fun ProjectSummaryList(
+fun projectSummaryList(
     summaries: List<ProjectSummaryHolder>,
     onMessageChange: (Int, String) -> Unit,
     onDelete: (Int) -> Unit,
@@ -26,7 +26,7 @@ fun ProjectSummaryList(
             items = summaries,
             key = { _, summary -> summary.projectSummary.project.id },
         ) { index, summaryHolder ->
-            ProjectSummaryItem(
+            projectSummaryItem(
                 message = summaryHolder.message,
                 onMessageChange = { onMessageChange(index, it) },
                 onDelete = { onDelete(index) },
@@ -36,7 +36,7 @@ fun ProjectSummaryList(
 }
 
 @Composable
-private fun ProjectSummaryItem(
+private fun projectSummaryItem(
     message: String,
     onMessageChange: (String) -> Unit,
     onDelete: () -> Unit,

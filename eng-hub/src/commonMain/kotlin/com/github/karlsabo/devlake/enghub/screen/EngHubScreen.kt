@@ -27,10 +27,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.github.karlsabo.devlake.enghub.component.ErrorDialog
-import com.github.karlsabo.devlake.enghub.component.NotificationPanel
-import com.github.karlsabo.devlake.enghub.component.PullRequestPanel
-import com.github.karlsabo.devlake.enghub.component.WorktreePanel
+import com.github.karlsabo.devlake.enghub.component.NotificationActions
+import com.github.karlsabo.devlake.enghub.component.errorDialog
+import com.github.karlsabo.devlake.enghub.component.notificationPanel
+import com.github.karlsabo.devlake.enghub.component.pullRequestPanel
+import com.github.karlsabo.devlake.enghub.component.worktreePanel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
 
 private enum class EngHubPane(
@@ -43,7 +44,7 @@ private enum class EngHubPane(
 }
 
 @Composable
-fun EngHubScreen(viewModel: EngHubViewModel) {
+fun engHubScreen(viewModel: EngHubViewModel) {
     val pullRequestsResult by viewModel.pullRequests.collectAsState()
     val notificationsResult by viewModel.notifications.collectAsState()
     val actionError by viewModel.actionErrorStateFlow.collectAsState()
@@ -55,12 +56,12 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
     var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
 
     actionError?.let { error ->
-        ErrorDialog(message = error.message, onDismiss = { viewModel.clearActionError() })
+        errorDialog(message = error.message, onDismiss = { viewModel.clearActionError() })
     }
 
     MaterialTheme {
         Row(modifier = Modifier.fillMaxSize()) {
-            EngHubSidebar(
+            engHubSidebar(
                 selectedPane = selectedPane,
                 onPaneSelected = { selectedPane = it },
             )
@@ -75,7 +76,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                 Spacer(modifier = Modifier.size(8.dp))
 
                 when (selectedPane) {
-                    EngHubPane.PullRequests -> PullRequestPanel(
+                    EngHubPane.PullRequests -> pullRequestPanel(
                         pullRequestsResult = pullRequestsResult,
                         onOpenInBrowser = { viewModel.openInBrowser(it) },
                         onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
@@ -85,24 +86,28 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
                         modifier = Modifier.weight(1f),
                     )
 
-                    EngHubPane.Notifications -> NotificationPanel(
+                    EngHubPane.Notifications -> notificationPanel(
                         notificationsResult = notificationsResult,
-                        onOpenInBrowser = { viewModel.openInBrowser(it) },
-                        onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
+                        actions = NotificationActions(
+                            onOpenInBrowser = { viewModel.openInBrowser(it) },
+                            onCheckoutAndOpen = { repoFullName, branch ->
+                                viewModel.checkoutAndOpen(repoFullName, branch)
+                            },
+                            onApprove = { viewModel.approvePullRequest(it) },
+                            onSubmitReview = { notification, event, reviewComment ->
+                                viewModel.submitReview(notification, event, reviewComment)
+                            },
+                            onMarkDone = { viewModel.markNotificationDone(it) },
+                            onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },
+                        ),
                         setupStatusFor = { repoFullName, branch ->
                             setupStatuses[viewModel.checkoutWorktreePath(repoFullName, branch)]
                         },
                         actingOnThreadIds = actingOnThreadIds,
-                        onApprove = { viewModel.approvePullRequest(it) },
-                        onSubmitReview = { notification, event, reviewComment ->
-                            viewModel.submitReview(notification, event, reviewComment)
-                        },
-                        onMarkDone = { viewModel.markNotificationDone(it) },
-                        onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },
                         modifier = Modifier.weight(1f),
                     )
 
-                    EngHubPane.Worktrees -> WorktreePanel(
+                    EngHubPane.Worktrees -> worktreePanel(
                         localRepositories = localRepositories,
                         onAddRepository = { viewModel.pickAndAddLocalRepository() },
                         onToggleRepository = { viewModel.toggleLocalRepositoryExpansion(it) },
@@ -138,7 +143,7 @@ fun EngHubScreen(viewModel: EngHubViewModel) {
 }
 
 @Composable
-private fun EngHubSidebar(
+private fun engHubSidebar(
     selectedPane: EngHubPane,
     onPaneSelected: (EngHubPane) -> Unit,
 ) {
@@ -148,7 +153,7 @@ private fun EngHubSidebar(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         EngHubPane.entries.forEach { pane ->
-            EngHubSidebarButton(
+            engHubSidebarButton(
                 pane = pane,
                 selected = pane == selectedPane,
                 onClick = { onPaneSelected(pane) },
@@ -158,7 +163,7 @@ private fun EngHubSidebar(
 }
 
 @Composable
-private fun EngHubSidebarButton(
+private fun engHubSidebarButton(
     pane: EngHubPane,
     selected: Boolean,
     onClick: () -> Unit,
