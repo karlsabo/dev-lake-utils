@@ -23,7 +23,7 @@ internal class NotificationActionController(
             actionLogName = "approve PR $apiUrl",
             actionFailureMessage = "Failed to approve pull request",
         ) {
-            gitHubServices.api.approvePullRequestByUrl(apiUrl)
+            gitHubServices.pullRequestReviewApi.approvePullRequestByUrl(apiUrl)
         }
     }
 
@@ -40,7 +40,7 @@ internal class NotificationActionController(
             actionLogName = "submit review for $apiUrl",
             actionFailureMessage = "Failed to submit review",
         ) {
-            gitHubServices.api.submitReview(apiUrl, event, reviewComment)
+            gitHubServices.pullRequestReviewApi.submitReview(apiUrl, event, reviewComment)
         }
     }
 
@@ -48,7 +48,7 @@ internal class NotificationActionController(
         val notificationThreadId = notification.notificationThreadId
         markThreadActingAndIgnored(notification, NotificationIgnoreReason.DONE)
         viewModel.viewModelScope.launch(Dispatchers.IO) {
-            runCatching { gitHubServices.api.markNotificationAsDone(notificationThreadId) }
+            runCatching { gitHubServices.notificationApi.markNotificationAsDone(notificationThreadId) }
                 .onFailure { failure ->
                     logger.error(failure) { "Failed to mark notification done $notificationThreadId" }
                     state.ignoredThreads.update { it - notificationThreadId }
@@ -67,7 +67,7 @@ internal class NotificationActionController(
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             if (!unsubscribeAndPersist(notification)) return@launch
 
-            runCatching { gitHubServices.api.markNotificationAsDone(notificationThreadId) }
+            runCatching { gitHubServices.notificationApi.markNotificationAsDone(notificationThreadId) }
                 .onFailure { failure ->
                     logger.error(failure) { "Failed to mark unsubscribed notification done $notificationThreadId" }
                     errorReporter.enqueueActionError(failure.message ?: "Failed to mark notification as done")
@@ -103,7 +103,7 @@ internal class NotificationActionController(
             it + (notificationThreadId to notification.toIgnoredNotificationThread(NotificationIgnoreReason.DONE))
         }
 
-        runCatching { gitHubServices.api.markNotificationAsDone(notificationThreadId) }
+        runCatching { gitHubServices.notificationApi.markNotificationAsDone(notificationThreadId) }
             .onFailure { failure ->
                 logger.error(failure) {
                     "Failed to mark notification done $notificationThreadId after $actionLogName"
@@ -132,7 +132,9 @@ internal class NotificationActionController(
 
     private suspend fun unsubscribeAndPersist(notification: NotificationUiState): Boolean {
         val notificationThreadId = notification.notificationThreadId
-        val unsubscribed = runCatching { gitHubServices.api.unsubscribeFromNotification(notificationThreadId) }
+        val unsubscribed = runCatching {
+            gitHubServices.notificationApi.unsubscribeFromNotification(notificationThreadId)
+        }
             .onFailure { failure ->
                 logger.error(failure) { "Failed to unsubscribe from notification $notificationThreadId" }
                 rollbackActingIgnoredThread(notificationThreadId)

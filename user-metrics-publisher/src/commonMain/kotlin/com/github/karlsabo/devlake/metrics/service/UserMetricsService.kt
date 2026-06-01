@@ -2,7 +2,7 @@ package com.github.karlsabo.devlake.metrics.service
 
 import com.github.karlsabo.devlake.metrics.model.UserMetrics
 import com.github.karlsabo.dto.User
-import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import me.tatarka.inject.annotations.Inject
 
@@ -11,6 +11,6 @@ open class UserMetricsService @Inject constructor() {
         user: User,
         organizationIds: List<String>,
         projectManagementApi: ProjectManagementApi,
-        gitHubApi: GitHubApi,
+        gitHubApi: GitHubPullRequestSearchApi,
     ): UserMetrics = MetricsService.createUserMetrics(user, organizationIds, projectManagementApi, gitHubApi)
 }

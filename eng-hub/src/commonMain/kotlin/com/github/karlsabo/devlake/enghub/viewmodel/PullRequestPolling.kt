@@ -10,6 +10,9 @@ import com.github.karlsabo.devlake.enghub.state.toPullRequestUiState
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus.PENDING
 import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestReviewApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
+import com.github.karlsabo.github.GitHubPullRequestSummaryApi
 import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.extractOwnerAndRepo
@@ -32,12 +35,14 @@ internal const val STATE_FLOW_STOP_TIMEOUT_MS = 5_000L
 private const val ZERO_CHECK_RUNS = 0
 
 internal fun ViewModel.pullRequestsStateFlow(
-    gitHubApi: GitHubApi,
+    searchApi: GitHubPullRequestSearchApi,
+    reviewApi: GitHubPullRequestReviewApi,
+    summaryApi: GitHubPullRequestSummaryApi,
     config: EngHubConfig,
 ): StateFlow<Result<List<PullRequestUiState>>?> = flow {
     while (true) {
-        val issues = gitHubApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
-        val prStates = gitHubApi.buildPullRequestUiStates(issues)
+        val issues = searchApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
+        val prStates = buildPullRequestUiStates(issues, reviewApi, summaryApi)
         emit(Result.success(prStates))
         delay(config.pollIntervalMs.milliseconds)
     }
@@ -59,19 +64,25 @@ internal fun ViewModel.pullRequestsStateFlow(
 
 internal suspend fun GitHubApi.buildPullRequestUiStates(
     issues: List<Issue>,
+): List<PullRequestUiState> = buildPullRequestUiStates(issues, this, this)
+
+internal suspend fun buildPullRequestUiStates(
+    issues: List<Issue>,
+    reviewApi: GitHubPullRequestReviewApi,
+    summaryApi: GitHubPullRequestSummaryApi,
 ): List<PullRequestUiState> = issues.map { issue ->
-    val pr = getPullRequestByUrl(issue.pullRequestDetailsUrl)
+    val pr = reviewApi.getPullRequestByUrl(issue.pullRequestDetailsUrl)
     val headRef = pr.head?.ref
     val headSha = pr.head?.sha
     val repoUrl = issue.repositoryUrl ?: ""
     val (owner, repo) = if (repoUrl.isNotEmpty()) extractOwnerAndRepo(repoUrl) else ("" to "")
     val checkRunSummary = if (headSha != null && owner.isNotEmpty()) {
-        getCheckRunsForRef(owner, repo, headSha)
+        summaryApi.getCheckRunsForRef(owner, repo, headSha)
     } else {
         CheckRunSummary(ZERO_CHECK_RUNS, ZERO_CHECK_RUNS, ZERO_CHECK_RUNS, ZERO_CHECK_RUNS, PENDING)
     }
     val reviewSummary = if (owner.isNotEmpty()) {
-        getReviewSummary(owner, repo, issue.number)
+        summaryApi.getReviewSummary(owner, repo, issue.number)
     } else {
         ReviewSummary(ZERO_CHECK_RUNS, ZERO_CHECK_RUNS, emptyList())
     }

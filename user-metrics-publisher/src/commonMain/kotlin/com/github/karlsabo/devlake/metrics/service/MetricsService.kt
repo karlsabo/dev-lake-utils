@@ -2,7 +2,7 @@ package com.github.karlsabo.devlake.metrics.service
 
 import com.github.karlsabo.devlake.metrics.model.UserMetrics
 import com.github.karlsabo.dto.User
-import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import kotlinx.datetime.Clock.System
 import kotlinx.datetime.Instant
@@ -15,7 +15,7 @@ object MetricsService {
         user: User,
         organizationIds: List<String>,
         projectManagementApi: ProjectManagementApi,
-        gitHubApi: GitHubApi,
+        gitHubApi: GitHubPullRequestSearchApi,
     ): UserMetrics {
         val now = System.now()
         val startOfYear = startOfCurrentYear()

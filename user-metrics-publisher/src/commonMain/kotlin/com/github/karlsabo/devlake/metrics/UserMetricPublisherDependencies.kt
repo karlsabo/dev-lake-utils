@@ -1,12 +1,9 @@
 package com.github.karlsabo.devlake.metrics
 
-import com.github.karlsabo.devlake.metrics.model.UserMetrics
-import com.github.karlsabo.devlake.metrics.service.SlackMessage
 import com.github.karlsabo.devlake.metrics.service.UserMetricMessagePublisherService
 import com.github.karlsabo.devlake.metrics.service.UserMetricsService
-import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
-import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.linear.config.LinearApiRestConfig
@@ -20,7 +17,7 @@ import me.tatarka.inject.annotations.Inject
 data class UserMetricPublisherDependencies @Inject constructor(
     val usersConfig: UsersConfig,
     val projectManagementApi: ProjectManagementApi,
-    val gitHubApi: GitHubApi,
+    val gitHubApi: GitHubPullRequestSearchApi,
     val metricsService: UserMetricsService,
     val messagePublisherService: UserMetricMessagePublisherService,
 )

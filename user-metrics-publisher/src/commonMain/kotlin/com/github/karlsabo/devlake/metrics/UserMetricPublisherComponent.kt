@@ -1,7 +1,7 @@
 package com.github.karlsabo.devlake.metrics
 
 import com.github.karlsabo.dto.UsersConfig
-import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.linear.LinearRestApi
@@ -24,7 +24,9 @@ interface UserMetricPublisherBindings {
     ): ProjectManagementApi = LinearRestApi(linearApiConfig)
 
     @Provides
-    fun provideGitHubApi(gitHubApiConfig: GitHubApiRestConfig): GitHubApi = GitHubRestApi(gitHubApiConfig)
+    fun provideGitHubApi(
+        gitHubApiConfig: GitHubApiRestConfig,
+    ): GitHubPullRequestSearchApi = GitHubRestApi(gitHubApiConfig)
 }
 
 @MergeComponent(UserMetricPublisherScope::class)

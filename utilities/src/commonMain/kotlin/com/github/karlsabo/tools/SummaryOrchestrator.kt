@@ -3,7 +3,7 @@ package com.github.karlsabo.tools
 import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
-import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.pagerduty.PagerDutyApi
 import com.github.karlsabo.pagerduty.PagerDutyIncident
 import com.github.karlsabo.projectmanagement.ProjectIssue
@@ -42,7 +42,7 @@ private val logger = KotlinLogging.logger {}
  */
 suspend fun createSummary(
     projectManagementApi: ProjectManagementApi,
-    gitHubApi: GitHubApi,
+    gitHubApi: GitHubPullRequestSearchApi,
     gitHubOrganizationIds: List<String>,
     pagerDutyApi: PagerDutyApi?,
     pagerDutyServiceIds: List<String>,
@@ -148,7 +148,7 @@ suspend fun createSummary(
 private suspend fun collectMiscellaneousWork(
     miscUsers: List<User>,
     projectManagementApi: ProjectManagementApi,
-    gitHubApi: GitHubApi,
+    gitHubApi: GitHubPullRequestSearchApi,
     gitHubOrganizationIds: List<String>,
     duration: Duration,
     mutex: Mutex,

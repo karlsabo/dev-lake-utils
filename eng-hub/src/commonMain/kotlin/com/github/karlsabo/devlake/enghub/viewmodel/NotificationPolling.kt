@@ -7,8 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.state.toNotificationUiState
-import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubNotificationService
+import com.github.karlsabo.github.GitHubPullRequestReviewApi
 import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.NotificationAction
 import com.github.karlsabo.github.NotificationProcessingResult
@@ -42,15 +42,13 @@ private data class NotificationPullRequestDetails(
 )
 
 internal fun ViewModel.notificationsStateFlow(
-    gitHubApi: GitHubApi,
-    gitHubNotificationService: GitHubNotificationService,
+    gitHubServices: EngHubGitHubServices,
     config: EngHubConfig,
     state: EngHubViewModelState,
     persistence: IgnoredNotificationPersistence,
 ): StateFlow<Result<List<NotificationUiState>>?> {
     val polledNotifications = polledNotifications(
-        gitHubApi = gitHubApi,
-        gitHubNotificationService = gitHubNotificationService,
+        gitHubServices = gitHubServices,
         config = config,
         state = state,
         persistence = persistence,
@@ -62,21 +60,22 @@ internal fun ViewModel.notificationsStateFlow(
 }
 
 private fun polledNotifications(
-    gitHubApi: GitHubApi,
-    gitHubNotificationService: GitHubNotificationService,
+    gitHubServices: EngHubGitHubServices,
     config: EngHubConfig,
     state: EngHubViewModelState,
     persistence: IgnoredNotificationPersistence,
 ): Flow<Result<List<NotificationUiState>>> = flow {
     while (true) {
-        val uiStates = gitHubApi.listNotifications()
+        val uiStates = gitHubServices.notificationApi.listNotifications()
             .filterNot { state.ignoredThreads.value.hides(it) }
             .asSequence()
             .asFlow()
             .flatMapMerge(concurrency = NOTIFICATION_CONCURRENCY) { notif ->
-                processedNotificationFlow(notif, gitHubNotificationService, persistence)
+                processedNotificationFlow(notif, gitHubServices.notificationService, persistence)
             }
-            .mapNotNull { notif -> gitHubApi.toNotificationUiStateOrNull(notif) }
+            .mapNotNull { notif ->
+                gitHubServices.pullRequestReviewApi.toNotificationUiStateOrNull(notif)
+            }
             .toList()
         emit(Result.success(uiStates))
         delay(config.pollIntervalMs.milliseconds)
@@ -113,7 +112,7 @@ private fun processedNotificationFlow(
     }
 }
 
-private suspend fun GitHubApi.toNotificationUiStateOrNull(notif: Notification): NotificationUiState? {
+private suspend fun GitHubPullRequestReviewApi.toNotificationUiStateOrNull(notif: Notification): NotificationUiState? {
     val prDetails = getNotificationPullRequestDetails(
         subjectType = notif.subject.type,
         subjectUrl = notif.subject.url,
@@ -127,7 +126,7 @@ private suspend fun GitHubApi.toNotificationUiStateOrNull(notif: Notification): 
     )
 }
 
-private suspend fun GitHubApi.getNotificationPullRequestDetails(
+private suspend fun GitHubPullRequestReviewApi.getNotificationPullRequestDetails(
     subjectType: String,
     subjectUrl: String?,
 ): NotificationPullRequestDetails? {

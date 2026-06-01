@@ -2,7 +2,7 @@ package com.github.karlsabo.tools
 
 import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
-import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.projectmanagement.ProjectComment
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
@@ -31,7 +31,7 @@ private val logger = KotlinLogging.logger {}
  */
 suspend fun Project.createSummary(
     users: Set<User>,
-    gitHubApi: GitHubApi,
+    gitHubApi: GitHubPullRequestSearchApi,
     gitHubOrganizationIds: List<String>,
     projectManagementApi: ProjectManagementApi,
     textSummarizer: TextSummarizer,
@@ -122,7 +122,7 @@ private suspend fun generateSummaryText(
 private suspend fun fetchRelatedPullRequests(
     resolvedChildIssues: List<ProjectIssue>,
     initialPullRequests: Set<com.github.karlsabo.github.Issue>,
-    gitHubApi: GitHubApi,
+    gitHubApi: GitHubPullRequestSearchApi,
     gitHubOrganizationIds: List<String>,
     duration: Duration,
 ): MutableSet<com.github.karlsabo.github.Issue> {

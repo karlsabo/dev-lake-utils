@@ -46,8 +46,9 @@ class GitWorktreeService(
         childBranch: String,
     ): Boolean = ancestryChecker.isBranchAncestor(repoPath, baseBranch, childBranch)
 
-    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees =
-        repoResolver.resolveRepositoryRoot(selectedPath)
+    override fun resolveRepositoryRoot(
+        selectedPath: String,
+    ): RepositoryWorktrees = repoResolver.resolveRepositoryRoot(selectedPath)
 
     override fun listWorktrees(repoPath: String): List<Worktree> = lister.listWorktrees(repoPath)
 

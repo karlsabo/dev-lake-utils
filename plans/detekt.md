@@ -61,7 +61,7 @@
 
 **Notes:** Keep dependencies explicit. Avoid a hidden service locator that just moves dynamic coupling elsewhere.
 
-### 3. GitHub API client is decomposed into focused ports
+### 3. GitHub API client is decomposed into focused ports (Finished 2026-06-01) - Done
 
 **Acceptance criteria:** Given metrics, summary, and EngHub notification flows, when their tests run with detekt, then GitHub search, notification, review, and CI behavior still works and no `TooManyFunctions` suppression remains in `utilities/src/commonMain/kotlin/com/github/karlsabo/github/GitHubApi.kt` or `utilities/src/commonMain/kotlin/com/github/karlsabo/github/GitHubRestApi.kt`.
 

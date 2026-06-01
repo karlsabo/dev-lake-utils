@@ -59,13 +59,27 @@ sealed interface NotificationProcessingResult {
 }
 
 class GitHubNotificationService(
-    private val gitHubApi: GitHubApi,
+    private val notificationApi: GitHubNotificationApi,
+    private val pullRequestReviewApi: GitHubPullRequestReviewApi,
     private val maxConcurrency: Int = 5,
     private val autoApprovePredicate: (String) -> Boolean = ::defaultAutoApprovePredicate,
     private val approvalMessage: String = "Auto-approving demo appfile update",
 ) {
+    constructor(
+        gitHubApi: GitHubApi,
+        maxConcurrency: Int = 5,
+        autoApprovePredicate: (String) -> Boolean = ::defaultAutoApprovePredicate,
+        approvalMessage: String = "Auto-approving demo appfile update",
+    ) : this(
+        notificationApi = gitHubApi,
+        pullRequestReviewApi = gitHubApi,
+        maxConcurrency = maxConcurrency,
+        autoApprovePredicate = autoApprovePredicate,
+        approvalMessage = approvalMessage,
+    )
+
     suspend fun processAllNotifications(): List<NotificationProcessingResult> {
-        val notifications = gitHubApi.listNotifications()
+        val notifications = notificationApi.listNotifications()
         logger.info { "Found ${notifications.size} notifications" }
 
         if (notifications.isEmpty()) return emptyList()
@@ -110,7 +124,7 @@ class GitHubNotificationService(
     ): NotificationProcessingResult.Processed {
         val actions = mutableListOf<NotificationAction>()
 
-        val pr = gitHubApi.getPullRequestByUrl(prUrl)
+        val pr = pullRequestReviewApi.getPullRequestByUrl(prUrl)
         val status = pr.toPullRequestStatus()
 
         val title = notification.subject.title
@@ -139,7 +153,7 @@ class GitHubNotificationService(
         actions: MutableList<NotificationAction>,
     ) {
         try {
-            val alreadyApproved = gitHubApi.hasAnyApprovedReview(prUrl)
+            val alreadyApproved = pullRequestReviewApi.hasAnyApprovedReview(prUrl)
             if (alreadyApproved) {
                 actions.add(
                     NotificationAction.SkippedApproval(
@@ -147,7 +161,7 @@ class GitHubNotificationService(
                     ),
                 )
             } else {
-                gitHubApi.approvePullRequestByUrl(prUrl, body = approvalMessage)
+                pullRequestReviewApi.approvePullRequestByUrl(prUrl, body = approvalMessage)
                 actions.add(
                     NotificationAction.ApprovedPullRequest(
                         "Approved PR based on title match ${pr.url} $title",
@@ -169,7 +183,7 @@ class GitHubNotificationService(
         actions: MutableList<NotificationAction>,
     ) {
         try {
-            gitHubApi.markNotificationAsDone(notification.id)
+            notificationApi.markNotificationAsDone(notification.id)
             actions.add(NotificationAction.MarkedAsDone("Marked notification as done"))
         } catch (e: Exception) {
             actions.add(

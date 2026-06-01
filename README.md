@@ -50,9 +50,9 @@
 * [ ] Clicking "Setup" greys out all Setup buttons, it should only do it for the current task
 * [ ] Add a UI menu option to sync skills
     * Maybe a searchable menu that pops up, like JB Fleet had with cmd+k
-    * Add a settings option that allows it to run automatically 
+  * Add a settings option that allows it to run automatically
 * [ ] Add a UI menu option to upgrade agent harnesses (claude code, codex, pi, goose, etc)
-    * Add a settings option that allows it to run automatically 
+    * Add a settings option that allows it to run automatically
 * [ ] Create native executables
 * [ ] Consider consolidating into a single configuration file
 * [ ] Add a UI panel for showing tickets assigned to the user

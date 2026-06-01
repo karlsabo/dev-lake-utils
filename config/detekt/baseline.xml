@@ -9,7 +9,12 @@
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRunsSetupAndRefreshesWhenExactTargetWorktreeAlreadyExists()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun forceArchiveConfirmationStartsWhileDirtyFailureRefreshIsStillRunning()</ID>
     <ID>LongMethod:SummaryDetailTest.kt$SummaryDetailTest$@Test fun testCreateSummary()</ID>
-    <ID>LongMethod:SummaryOrchestrator.kt$suspend fun createSummary( projectManagementApi: ProjectManagementApi, gitHubApi: GitHubApi, gitHubOrganizationIds: List&lt;String&gt;, pagerDutyApi: PagerDutyApi?, pagerDutyServiceIds: List&lt;String&gt;, textSummarizer: TextSummarizer, projects: List&lt;Project&gt;, duration: Duration, users: List&lt;User&gt;, miscUsers: List&lt;User&gt;, summaryName: String, isMiscellaneousProjectIncluded: Boolean, ): MultiProjectSummary</ID>
+      <ID>LongMethod:SummaryOrchestrator.kt$suspend fun createSummary( projectManagementApi: ProjectManagementApi,
+          gitHubApi: GitHubPullRequestSearchApi, gitHubOrganizationIds: List&lt;String&gt;, pagerDutyApi: PagerDutyApi?,
+          pagerDutyServiceIds: List&lt;String&gt;, textSummarizer: TextSummarizer, projects: List&lt;Project&gt;,
+          duration: Duration, users: List&lt;User&gt;, miscUsers: List&lt;User&gt;, summaryName: String,
+          isMiscellaneousProjectIncluded: Boolean, ): MultiProjectSummary
+      </ID>
     <ID>LongMethod:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest$@Test fun loadConfigurationCreatesMissingTemplatesWhenBootstrapFails()</ID>
     <ID>LongMethod:UiDemo.kt$fun main()</ID>
     <ID>LongMethod:UserEpicsWithIssuesDemo.kt$fun main(args: Array&lt;String&gt;): Unit</ID>
@@ -20,9 +25,22 @@
     <ID>LongMethod:WorktreePanel.kt$@Composable private fun createWorktreeDialog( state: PendingCreateWorktree, onTargetBranchChange: (String) -&gt; Unit, onConfirm: (PendingCreateWorktree) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>LongMethod:WorktreePanel.kt$@Composable private fun localWorktreeRow( worktree: LocalWorktreeUiState, setupStatus: WorktreeSetupStatus?, isArchiving: Boolean, onOpen: () -&gt; Unit, onArchive: () -&gt; Unit, onOpenCreateWorktreeDialog: () -&gt; Unit, )</ID>
     <ID>LongMethod:WorktreeSetupCoordinatorTest.kt$WorktreeSetupCoordinatorTest$@Test fun repositoryEnsureIsSerializedPerRepoWhileDifferentWorktreesProceedIndependently()</ID>
-    <ID>LongParameterList:ProjectSummaryBuilder.kt$( users: Set&lt;User&gt;, gitHubApi: GitHubApi, gitHubOrganizationIds: List&lt;String&gt;, projectManagementApi: ProjectManagementApi, textSummarizer: TextSummarizer, duration: Duration, pullRequests: Set&lt;com.github.karlsabo.github.Issue&gt;, parentIssuesAreChildren: Boolean = false, )</ID>
-    <ID>LongParameterList:SummaryOrchestrator.kt$( miscUsers: List&lt;User&gt;, projectManagementApi: ProjectManagementApi, gitHubApi: GitHubApi, gitHubOrganizationIds: List&lt;String&gt;, duration: Duration, mutex: Mutex, miscIssueSet: MutableSet&lt;ProjectIssue&gt;, miscPrSet: MutableSet&lt;com.github.karlsabo.github.Issue&gt;, )</ID>
-    <ID>LongParameterList:SummaryOrchestrator.kt$( projectManagementApi: ProjectManagementApi, gitHubApi: GitHubApi, gitHubOrganizationIds: List&lt;String&gt;, pagerDutyApi: PagerDutyApi?, pagerDutyServiceIds: List&lt;String&gt;, textSummarizer: TextSummarizer, projects: List&lt;Project&gt;, duration: Duration, users: List&lt;User&gt;, miscUsers: List&lt;User&gt;, summaryName: String, isMiscellaneousProjectIncluded: Boolean, )</ID>
+      <ID>LongParameterList:ProjectSummaryBuilder.kt$( users: Set&lt;User&gt;, gitHubApi: GitHubPullRequestSearchApi,
+          gitHubOrganizationIds: List&lt;String&gt;, projectManagementApi: ProjectManagementApi, textSummarizer:
+          TextSummarizer, duration: Duration, pullRequests: Set&lt;com.github.karlsabo.github.Issue&gt;,
+          parentIssuesAreChildren: Boolean = false, )
+      </ID>
+      <ID>LongParameterList:SummaryOrchestrator.kt$( miscUsers: List&lt;User&gt;, projectManagementApi:
+          ProjectManagementApi, gitHubApi: GitHubPullRequestSearchApi, gitHubOrganizationIds: List&lt;String&gt;,
+          duration: Duration, mutex: Mutex, miscIssueSet: MutableSet&lt;ProjectIssue&gt;, miscPrSet: MutableSet&lt;com.github.karlsabo.github.Issue&gt;,
+          )
+      </ID>
+      <ID>LongParameterList:SummaryOrchestrator.kt$( projectManagementApi: ProjectManagementApi, gitHubApi:
+          GitHubPullRequestSearchApi, gitHubOrganizationIds: List&lt;String&gt;, pagerDutyApi: PagerDutyApi?,
+          pagerDutyServiceIds: List&lt;String&gt;, textSummarizer: TextSummarizer, projects: List&lt;Project&gt;,
+          duration: Duration, users: List&lt;User&gt;, miscUsers: List&lt;User&gt;, summaryName: String,
+          isMiscellaneousProjectIncluded: Boolean, )
+      </ID>
     <ID>LongParameterList:SummaryPublisherDependencies.kt$( config: SummaryPublisherConfig, loadUsersConfig: () -&gt; UsersConfig? = ::loadUsersConfig, loadLinearApiConfig: () -&gt; LinearApiRestConfig = { loadLinearConfig(linearConfigPath) }, loadGitHubApiConfig: () -&gt; GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) }, loadPagerDutyApiConfig: () -&gt; PagerDutyApiRestConfig = { loadPagerDutyConfig(pagerDutyConfigPath) }, loadTextSummarizerConfig: () -&gt; TextSummarizerOpenAiConfig = { requireNotNull(loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)) { "Text summarizer config is required" }.toTextSummarizerOpenAiConfig() }, componentFactory: SummaryPublisherComponentFactory = ::createSummaryPublisherComponent, )</ID>
     <ID>LongParameterList:SummaryPublisherDependencies.kt$( config: SummaryPublisherConfig, usersConfig: UsersConfig, linearApiConfig: LinearApiRestConfig, gitHubApiConfig: GitHubApiRestConfig, pagerDutyApiConfig: PagerDutyApiRestConfig, textSummarizerConfig: TextSummarizerOpenAiConfig, )</ID>
     <ID>LongParameterList:SummaryPublisherScreen.kt$( topLevelSummary: String, onTopLevelSummaryChange: (String) -&gt; Unit, projectSummaries: List&lt;ProjectSummaryHolder&gt;, onProjectMessageChange: (Int, String) -&gt; Unit, onProjectDelete: (Int) -&gt; Unit, publishButtonText: String, publishButtonEnabled: Boolean, isLoadingSummary: Boolean, isSendingSlackMessage: Boolean, onPublishClick: () -&gt; Unit, )</ID>

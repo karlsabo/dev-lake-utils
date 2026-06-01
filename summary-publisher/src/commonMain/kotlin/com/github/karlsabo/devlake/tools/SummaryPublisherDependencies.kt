@@ -3,7 +3,7 @@ package com.github.karlsabo.devlake.tools
 import com.github.karlsabo.devlake.tools.service.SummaryBuilderService
 import com.github.karlsabo.devlake.tools.service.SummaryMessagePublisherService
 import com.github.karlsabo.dto.UsersConfig
-import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.github.GitHubRestApi
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.github.config.loadGitHubConfig
@@ -48,7 +48,9 @@ interface SummaryPublisherBindings {
     ): ProjectManagementApi = LinearRestApi(linearApiConfig)
 
     @Provides
-    fun provideGitHubApi(gitHubApiConfig: GitHubApiRestConfig): GitHubApi = GitHubRestApi(gitHubApiConfig)
+    fun provideGitHubApi(
+        gitHubApiConfig: GitHubApiRestConfig,
+    ): GitHubPullRequestSearchApi = GitHubRestApi(gitHubApiConfig)
 
     @Provides
     fun providePagerDutyApi(

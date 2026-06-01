@@ -15,6 +15,7 @@ import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus
 import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.PullRequest
@@ -468,14 +469,14 @@ private class RecordingMetricsService(
     val requestedOrganizationIds = mutableListOf<List<String>>()
     var projectManagementApi: ProjectManagementApi? = null
         private set
-    var gitHubApi: GitHubApi? = null
+    var gitHubApi: GitHubPullRequestSearchApi? = null
         private set
 
     override suspend fun createUserMetrics(
         user: User,
         organizationIds: List<String>,
         projectManagementApi: ProjectManagementApi,
-        gitHubApi: GitHubApi,
+        gitHubApi: GitHubPullRequestSearchApi,
     ): UserMetrics {
         requestedUserIds += user.id
         requestedOrganizationIds += organizationIds
