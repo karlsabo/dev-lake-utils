@@ -11,48 +11,203 @@ class GitWorktreeException(
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
 
-@Suppress("TooManyFunctions")
 class GitWorktreeService(
-    private val gitCommandApi: GitCommandApi = GitCommandService(),
-    private val deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
-    private val branchNameValidator: WorktreeBranchNameValidator = WorktreeBranchNameValidator { branch ->
+    gitCommandApi: GitCommandApi = GitCommandService(),
+    deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
+    branchNameValidator: WorktreeBranchNameValidator = WorktreeBranchNameValidator { branch ->
         gitCommandApi.isValidBranchRefFormat(branch)
     },
 ) : GitWorktreeApi {
+    private val branchValidator = GitWorktreeBranchValidator(branchNameValidator)
+    private val lister = GitWorktreeLister(gitCommandApi)
+    private val repoResolver = GitRepositoryResolver(gitCommandApi, lister)
+    private val creator = GitWorktreeCreator(gitCommandApi, lister, branchValidator)
+    private val ancestryChecker = GitBranchAncestryChecker(gitCommandApi, branchValidator)
+    private val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
 
     override fun ensureRepository(repoPath: String, cloneUrl: String) {
+        repoResolver.ensureRepository(repoPath, cloneUrl)
+    }
+
+    override fun ensureWorktree(repoPath: String, branch: String): String = creator.ensureWorktree(repoPath, branch)
+
+    override fun createBranchWorktree(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ): String = creator.createBranchWorktree(repoPath, baseWorktreePath, baseBranch, targetBranch)
+
+    override fun worktreeExists(repoPath: String, branch: String): Boolean = creator.worktreeExists(repoPath, branch)
+
+    override fun isBranchAncestor(
+        repoPath: String,
+        baseBranch: String,
+        childBranch: String,
+    ): Boolean = ancestryChecker.isBranchAncestor(repoPath, baseBranch, childBranch)
+
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees =
+        repoResolver.resolveRepositoryRoot(selectedPath)
+
+    override fun listWorktrees(repoPath: String): List<Worktree> = lister.listWorktrees(repoPath)
+
+    override fun removeWorktree(worktreePath: String, force: Boolean) {
+        archiver.removeWorktree(worktreePath, force)
+    }
+
+    override fun archiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        force: Boolean,
+    ) {
+        archiver.archiveWorktree(repoPath, worktreePath, force)
+    }
+}
+
+private class GitWorktreeBranchValidator(
+    private val branchNameValidator: WorktreeBranchNameValidator,
+) {
+    fun validate(branch: String) {
+        val validation = branchNameValidator.validate(branch)
+        if (!validation.isValid) {
+            throw GitWorktreeException("Invalid worktree branch name: ${validation.message}")
+        }
+    }
+}
+
+private class GitRepositoryResolver(
+    private val gitCommandApi: GitCommandApi,
+    private val lister: GitWorktreeLister,
+) {
+    fun ensureRepository(repoPath: String, cloneUrl: String) {
         if (!SystemFileSystem.exists(Path(repoPath))) {
-            logger.info { "Repository not found at $repoPath, cloning from $cloneUrl" }
-            try {
-                gitCommandApi.clone(cloneUrl, repoPath)
-            } catch (e: GitCommandException) {
-                throw GitWorktreeException("Failed to clone $cloneUrl to $repoPath: ${e.gitOutput}", e)
-            }
-            logger.info { "Cloned $cloneUrl to $repoPath" }
+            cloneRepository(repoPath, cloneUrl)
         } else {
-            if (!gitCommandApi.isGitRepository(repoPath)) {
-                throw GitWorktreeException("Directory $repoPath exists but is not a git repository")
-            }
-            logger.info { "Repository already exists at $repoPath" }
+            verifyExistingRepository(repoPath)
         }
     }
 
-    override fun ensureWorktree(repoPath: String, branch: String): String {
-        validateWorktreeBranchName(branch)
-        val worktreePath = buildWorktreePath(repoPath, branch)
+    fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        verifySelectedPathIsRepository(selectedPath)
+        val selectedWorktreePath = resolveSelectedWorktreePath(selectedPath)
+        val worktrees = lister.listWorktrees(selectedWorktreePath)
+        verifySelectedWorktreeIsListed(selectedPath, selectedWorktreePath, worktrees)
 
-        val existing = listWorktrees(repoPath)
-        if (existing.any { it.path == worktreePath }) {
+        return RepositoryWorktrees(
+            rootPath = rootPathFrom(worktrees, selectedPath),
+            selectedWorktreePath = selectedWorktreePath,
+            worktrees = worktrees,
+        )
+    }
+
+    private fun verifySelectedPathIsRepository(selectedPath: String) {
+        if (!gitCommandApi.isGitRepository(selectedPath)) {
+            throw GitWorktreeException("Directory $selectedPath is not a git repository")
+        }
+    }
+
+    private fun rootPathFrom(worktrees: List<Worktree>, selectedPath: String): String = worktrees.firstOrNull()?.path
+        ?: throw GitWorktreeException("No git worktrees found for $selectedPath")
+
+    private fun verifySelectedWorktreeIsListed(
+        selectedPath: String,
+        selectedWorktreePath: String,
+        worktrees: List<Worktree>,
+    ) {
+        if (worktrees.none { it.path == selectedWorktreePath }) {
+            throw GitWorktreeException(
+                "Could not match $selectedPath to a git worktree. Please add the repository root directory.",
+            )
+        }
+    }
+
+    private fun cloneRepository(repoPath: String, cloneUrl: String) {
+        logger.info { "Repository not found at $repoPath, cloning from $cloneUrl" }
+        try {
+            gitCommandApi.clone(cloneUrl, repoPath)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to clone $cloneUrl to $repoPath: ${e.gitOutput}", e)
+        }
+        logger.info { "Cloned $cloneUrl to $repoPath" }
+    }
+
+    private fun verifyExistingRepository(repoPath: String) {
+        if (!gitCommandApi.isGitRepository(repoPath)) {
+            throw GitWorktreeException("Directory $repoPath exists but is not a git repository")
+        }
+        logger.info { "Repository already exists at $repoPath" }
+    }
+
+    private fun resolveSelectedWorktreePath(selectedPath: String): String = try {
+        gitCommandApi.revParse(selectedPath, "--show-toplevel")
+    } catch (e: GitCommandException) {
+        throw GitWorktreeException(
+            "Could not resolve a worktree root for $selectedPath. Please add the repository root directory.",
+            e,
+        )
+    }
+}
+
+private class GitWorktreeCreator(
+    private val gitCommandApi: GitCommandApi,
+    private val lister: GitWorktreeLister,
+    private val branchValidator: GitWorktreeBranchValidator,
+) {
+    fun ensureWorktree(repoPath: String, branch: String): String {
+        branchValidator.validate(branch)
+        val worktreePath = buildWorktreePath(repoPath, branch).value
+        if (lister.listWorktreeEntries(repoPath).any { it.path == worktreePath }) {
             logger.info { "Worktree already exists at $worktreePath" }
             return worktreePath
         }
 
+        fetchBranchBestEffort(repoPath, branch)
+        addWorktree(repoPath, worktreePath, branch)
+        logger.info { "Created worktree at $worktreePath for branch $branch" }
+        return worktreePath
+    }
+
+    fun createBranchWorktree(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+    ): String {
+        require(baseWorktreePath.isNotBlank()) { "baseWorktreePath must not be blank" }
+        branchValidator.validate(baseBranch)
+        branchValidator.validate(targetBranch)
+        val worktreePath = buildWorktreePath(repoPath, targetBranch).value
+        val existingWorktrees = lister.listWorktreeEntries(repoPath)
+
+        failIfBranchCheckedOutElsewhere(existingWorktrees, targetBranch, worktreePath)
+        if (exactTargetWorktreeExists(existingWorktrees, targetBranch, worktreePath)) {
+            logger.info { "Worktree already exists at $worktreePath for branch $targetBranch" }
+            return worktreePath
+        }
+        failIfRemoteBranchExists(repoPath, targetBranch)
+        addNewBranchWorktree(baseWorktreePath, targetBranch, worktreePath, baseBranch)
+        logger.info { "Created worktree at $worktreePath for branch $targetBranch from $baseBranch" }
+        return worktreePath
+    }
+
+    fun worktreeExists(repoPath: String, branch: String): Boolean {
+        val worktreePath = buildWorktreePath(repoPath, branch).value
+        return lister.listWorktreeEntries(repoPath).any { it.path == worktreePath }
+    }
+
+    private fun fetchBranchBestEffort(repoPath: String, branch: String) {
         try {
             gitCommandApi.fetch(repoPath, "origin", branch)
         } catch (e: GitCommandException) {
             logger.warn { "git fetch origin $branch failed (exitCode=${e.exitCode}): ${e.gitOutput}" }
         }
+    }
 
+    private fun addWorktree(
+        repoPath: String,
+        worktreePath: String,
+        branch: String,
+    ) {
         try {
             gitCommandApi.worktreeAdd(repoPath, worktreePath, branch)
         } catch (e: GitCommandException) {
@@ -61,23 +216,14 @@ class GitWorktreeService(
                 e,
             )
         }
-
-        logger.info { "Created worktree at $worktreePath for branch $branch" }
-        return worktreePath
     }
 
-    override fun createBranchWorktree(
-        repoPath: String,
-        baseWorktreePath: String,
-        baseBranch: String,
+    private fun failIfBranchCheckedOutElsewhere(
+        worktrees: List<Worktree>,
         targetBranch: String,
-    ): String {
-        require(baseWorktreePath.isNotBlank()) { "baseWorktreePath must not be blank" }
-        validateWorktreeBranchName(baseBranch)
-        validateWorktreeBranchName(targetBranch)
-        val worktreePath = buildWorktreePath(repoPath, targetBranch)
-        val existingWorktrees = listWorktreeEntries(repoPath)
-        val checkedOutElsewhere = existingWorktrees.firstOrNull { worktree ->
+        worktreePath: String,
+    ) {
+        val checkedOutElsewhere = worktrees.firstOrNull { worktree ->
             worktree.branch == targetBranch && worktree.path != worktreePath
         }
         if (checkedOutElsewhere != null) {
@@ -86,20 +232,35 @@ class GitWorktreeService(
                     "Choose a different branch name.",
             )
         }
-        val exactTargetWorktree = existingWorktrees.firstOrNull { worktree ->
-            worktree.path == worktreePath && worktree.branch == targetBranch
-        }
-        if (exactTargetWorktree != null) {
-            logger.info { "Worktree already exists at $worktreePath for branch $targetBranch" }
-            return worktreePath
-        }
+    }
 
-        if (remoteBranchExists(repoPath, targetBranch)) {
+    private fun exactTargetWorktreeExists(
+        worktrees: List<Worktree>,
+        targetBranch: String,
+        worktreePath: String,
+    ): Boolean = worktrees.any { worktree ->
+        worktree.path == worktreePath && worktree.branch == targetBranch
+    }
+
+    private fun failIfRemoteBranchExists(repoPath: String, targetBranch: String) {
+        val exists = try {
+            gitCommandApi.remoteBranchExists(repoPath, targetBranch, remote = "origin")
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to check remote branch origin/$targetBranch: ${e.gitOutput}", e)
+        }
+        if (exists) {
             throw GitWorktreeException(
                 "Remote branch origin/$targetBranch already exists. Choose a different branch name.",
             )
         }
+    }
 
+    private fun addNewBranchWorktree(
+        baseWorktreePath: String,
+        targetBranch: String,
+        worktreePath: String,
+        baseBranch: String,
+    ) {
         try {
             gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseBranch)
         } catch (e: GitCommandException) {
@@ -108,23 +269,20 @@ class GitWorktreeService(
                 e,
             )
         }
-
-        logger.info { "Created worktree at $worktreePath for branch $targetBranch from $baseBranch" }
-        return worktreePath
     }
+}
 
-    override fun worktreeExists(repoPath: String, branch: String): Boolean {
-        val worktreePath = buildWorktreePath(repoPath, branch)
-        return listWorktrees(repoPath).any { it.path == worktreePath }
-    }
-
-    override fun isBranchAncestor(
+private class GitBranchAncestryChecker(
+    private val gitCommandApi: GitCommandApi,
+    private val branchValidator: GitWorktreeBranchValidator,
+) {
+    fun isBranchAncestor(
         repoPath: String,
         baseBranch: String,
         childBranch: String,
     ): Boolean {
-        validateWorktreeBranchName(baseBranch)
-        validateWorktreeBranchName(childBranch)
+        branchValidator.validate(baseBranch)
+        branchValidator.validate(childBranch)
         return try {
             gitCommandApi.isAncestor(repoPath, "refs/heads/$baseBranch", "refs/heads/$childBranch")
         } catch (e: GitCommandException) {
@@ -134,42 +292,40 @@ class GitWorktreeService(
             )
         }
     }
+}
 
-    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
-        if (!gitCommandApi.isGitRepository(selectedPath)) {
-            throw GitWorktreeException("Directory $selectedPath is not a git repository")
-        }
-
-        val selectedWorktreePath = try {
-            gitCommandApi.revParse(selectedPath, "--show-toplevel")
-        } catch (e: GitCommandException) {
-            throw GitWorktreeException(
-                "Could not resolve a worktree root for $selectedPath. Please add the repository root directory.",
-                e,
-            )
-        }
-        val worktrees = listWorktrees(selectedWorktreePath)
-        val rootPath = worktrees.firstOrNull()?.path
-            ?: throw GitWorktreeException("No git worktrees found for $selectedPath")
-
-        if (worktrees.none { it.path == selectedWorktreePath }) {
-            throw GitWorktreeException(
-                "Could not match $selectedPath to a git worktree. Please add the repository root directory.",
-            )
-        }
-
-        return RepositoryWorktrees(
-            rootPath = rootPath,
-            selectedWorktreePath = selectedWorktreePath,
-            worktrees = worktrees,
-        )
-    }
-
-    override fun listWorktrees(repoPath: String): List<Worktree> = listWorktreeEntries(repoPath).map { worktree ->
+private class GitWorktreeLister(
+    private val gitCommandApi: GitCommandApi,
+) {
+    fun listWorktrees(repoPath: String): List<Worktree> = listWorktreeEntries(repoPath).map { worktree ->
         worktree.copy(isDirty = isWorktreeDirty(worktree.path))
     }
 
-    override fun removeWorktree(worktreePath: String, force: Boolean) {
+    fun listWorktreeEntries(repoPath: String): List<Worktree> {
+        val output = try {
+            gitCommandApi.worktreeList(repoPath)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException("Failed to list worktrees for $repoPath: ${e.gitOutput}", e)
+        }
+        return parseWorktreeListPorcelain(output)
+    }
+
+    private fun isWorktreeDirty(worktreePath: String): Boolean {
+        val output = try {
+            gitCommandApi.status(worktreePath)
+        } catch (e: GitCommandException) {
+            logger.warn(e) { "Failed to read worktree status for $worktreePath; treating it as dirty" }
+            return true
+        }
+        return output.isNotBlank()
+    }
+}
+
+private class GitWorktreeArchiver(
+    private val gitCommandApi: GitCommandApi,
+    private val deleteCheckoutDirectory: (String) -> Unit,
+) {
+    fun removeWorktree(worktreePath: String, force: Boolean) {
         removeWorktree(worktreePath) {
             if (force) {
                 gitCommandApi.execute(null, "worktree", "remove", "--force", worktreePath)
@@ -179,7 +335,7 @@ class GitWorktreeService(
         }
     }
 
-    override fun archiveWorktree(
+    fun archiveWorktree(
         repoPath: String,
         worktreePath: String,
         force: Boolean,
@@ -197,76 +353,6 @@ class GitWorktreeService(
         }
 
         if (pruneFailure != null) throw pruneFailure
-    }
-
-    companion object {
-        fun buildWorktreePath(repoPath: String, branch: String): String = com.github.karlsabo.git.buildWorktreePath(repoPath, branch).value
-
-        @Suppress("unused")
-        fun sanitizeBranchName(branch: String): String = com.github.karlsabo.git.sanitizeBranchName(branch)
-
-        internal fun parseWorktreeListPorcelain(output: String): List<Worktree> {
-            val worktrees = mutableListOf<Worktree>()
-            var path = ""
-            var commitHash = ""
-            var branch = ""
-
-            for (line in output.lines()) {
-                when {
-                    line.startsWith("worktree ") -> path = line.removePrefix("worktree ")
-
-                    line.startsWith("HEAD ") -> commitHash = line.removePrefix("HEAD ")
-
-                    line.startsWith("branch ") -> branch = line.removePrefix("branch ").removePrefix("refs/heads/")
-
-                    line.isBlank() && path.isNotEmpty() -> {
-                        worktrees.add(Worktree(path = path, branch = branch, commitHash = commitHash))
-                        path = ""
-                        commitHash = ""
-                        branch = ""
-                    }
-                }
-            }
-
-            if (path.isNotEmpty()) {
-                worktrees.add(Worktree(path = path, branch = branch, commitHash = commitHash))
-            }
-
-            return worktrees
-        }
-    }
-
-    private fun validateWorktreeBranchName(branch: String) {
-        val validation = branchNameValidator.validate(branch)
-        if (!validation.isValid) {
-            throw GitWorktreeException("Invalid worktree branch name: ${validation.message}")
-        }
-    }
-
-    private fun listWorktreeEntries(repoPath: String): List<Worktree> {
-        val output = try {
-            gitCommandApi.worktreeList(repoPath)
-        } catch (e: GitCommandException) {
-            throw GitWorktreeException("Failed to list worktrees for $repoPath: ${e.gitOutput}", e)
-        }
-
-        return parseWorktreeListPorcelain(output)
-    }
-
-    private fun remoteBranchExists(repoPath: String, branch: String): Boolean = try {
-        gitCommandApi.remoteBranchExists(repoPath, branch, remote = "origin")
-    } catch (e: GitCommandException) {
-        throw GitWorktreeException("Failed to check remote branch origin/$branch: ${e.gitOutput}", e)
-    }
-
-    private fun isWorktreeDirty(worktreePath: String): Boolean {
-        val output = try {
-            gitCommandApi.status(worktreePath)
-        } catch (e: GitCommandException) {
-            logger.warn(e) { "Failed to read worktree status for $worktreePath; treating it as dirty" }
-            return true
-        }
-        return output.isNotBlank()
     }
 
     private fun removeWorktree(
@@ -300,6 +386,36 @@ class GitWorktreeService(
         }
         logger.info { "Pruned worktree metadata for $repoPath" }
     }
+}
+
+private fun parseWorktreeListPorcelain(output: String): List<Worktree> {
+    val worktrees = mutableListOf<Worktree>()
+    var path = ""
+    var commitHash = ""
+    var branch = ""
+
+    for (line in output.lines()) {
+        when {
+            line.startsWith("worktree ") -> path = line.removePrefix("worktree ")
+
+            line.startsWith("HEAD ") -> commitHash = line.removePrefix("HEAD ")
+
+            line.startsWith("branch ") -> branch = line.removePrefix("branch ").removePrefix("refs/heads/")
+
+            line.isBlank() && path.isNotEmpty() -> {
+                worktrees.add(Worktree(path = path, branch = branch, commitHash = commitHash))
+                path = ""
+                commitHash = ""
+                branch = ""
+            }
+        }
+    }
+
+    if (path.isNotEmpty()) {
+        worktrees.add(Worktree(path = path, branch = branch, commitHash = commitHash))
+    }
+
+    return worktrees
 }
 
 private fun deleteCheckoutDirectory(worktreePath: String) {

@@ -48,7 +48,6 @@
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitValue(): List&lt;T&gt;</ID>
     <ID>MaxLineLength:GitCommandServiceTest.kt$GitCommandServiceTest$executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr", baseCommit), workingDirectory = null)</ID>
-    <ID>MaxLineLength:GitWorktreeService.kt$GitWorktreeService.Companion$fun buildWorktreePath(repoPath: String, branch: String): String</ID>
     <ID>MaxLineLength:IgnoredNotificationHelpers.kt$private fun IgnoredNotificationThread.hides(notification: Notification): Boolean</ID>
     <ID>MaxLineLength:IgnoredNotificationHelpers.kt$private fun IgnoredNotificationThread.hides(notification: NotificationUiState): Boolean</ID>
     <ID>MaxLineLength:LinearRestApi.kt$LinearRestApi$override suspend fun getDirectChildIssues(parentKey: String): List&lt;ProjectIssue&gt;</ID>

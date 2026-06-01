@@ -137,6 +137,7 @@ class EngHubViewModel(
         targetBranch = targetBranch,
     )
     val openLocalWorktree: (String, String) -> Unit = existingWorktreeController::openLocalWorktree
+
     @Suppress("unused")
     internal val requestExistingWorktreeSetup: (String, String) -> WorktreeSetupHandle =
         existingWorktreeController::requestExistingWorktreeSetup

@@ -45,7 +45,7 @@
 
 **Notes:** Do not keep helpers just because they might be useful later. If no code or test needs them, delete them.
 
-### 2. Git command and worktree APIs are split by responsibility
+### 2. Git command and worktree APIs are split by responsibility (Finished 2026-06-01) - Done
 
 **Acceptance criteria:** Given the worktree tests, when `./gradlew :utilities:allTests detekt` runs, then git clone/fetch/worktree/archive behavior still passes and no `@Suppress("TooManyFunctions")` or git-related baseline entry remains for `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitCommandApi.kt`, `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitCommandService.kt`, or `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeService.kt`.
 

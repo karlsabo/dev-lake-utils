@@ -169,7 +169,7 @@ class GitWorktreeServiceTest {
         val fake = FakeGitCommandApi()
         val repoPath = "/tmp/repo"
         val branch = "feature/test"
-        val expectedWorktreePath = GitWorktreeService.buildWorktreePath(repoPath, branch)
+        val expectedWorktreePath = buildWorktreePath(repoPath, branch).value
 
         // Return porcelain output that includes the expected worktree path
         fake.worktreeListResult = "worktree $expectedWorktreePath\nHEAD abc123\nbranch refs/heads/feature/test\n"
@@ -243,7 +243,7 @@ class GitWorktreeServiceTest {
         val service = GitWorktreeService(fake)
 
         val result = service.ensureWorktree(repoPath, branch)
-        assertEquals(GitWorktreeService.buildWorktreePath(repoPath, branch), result)
+        assertEquals(buildWorktreePath(repoPath, branch).value, result)
 
         // worktreeAdd should still have been called despite fetch failure
         assertTrue(fake.calls.any { it.method == "worktreeAdd" })
@@ -279,7 +279,7 @@ class GitWorktreeServiceTest {
         val baseWorktreePath = "/repos/dev-lake-utils-feature-base-pr"
         val baseBranch = "feature/base-pr"
         val targetBranch = "feature/stacked-pr"
-        val expectedWorktreePath = GitWorktreeService.buildWorktreePath(repoPath, targetBranch)
+        val expectedWorktreePath = buildWorktreePath(repoPath, targetBranch).value
         val service = GitWorktreeService(fake)
 
         val result = service.createBranchWorktree(
@@ -309,7 +309,7 @@ class GitWorktreeServiceTest {
         val repoPath = "/repos/dev-lake-utils"
         val baseWorktreePath = "/repos/dev-lake-utils-feature-base-pr"
         val targetBranch = "feature/stacked-pr"
-        val targetWorktreePath = GitWorktreeService.buildWorktreePath(repoPath, targetBranch)
+        val targetWorktreePath = buildWorktreePath(repoPath, targetBranch).value
         fake.worktreeListResult = """
             worktree /repos/dev-lake-utils
             HEAD abc123

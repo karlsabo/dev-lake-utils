@@ -1,48 +1,40 @@
 package com.github.karlsabo.git
 
-/**
- * Typed interface for common git CLI operations.
- *
- * All methods throw [GitCommandException] on non-zero exit codes unless
- * documented otherwise (e.g. [isGitRepository] returns a Boolean).
- */
-@Suppress("TooManyFunctions")
-interface GitCommandApi {
-    /** Clone [url] into [targetPath]. */
+interface GitRepositoryCommandApi {
     fun clone(url: String, targetPath: String)
-
-    /** Return `true` when [repoPath] is inside a git work tree / bare repo. */
     fun isGitRepository(repoPath: String): Boolean
+    fun checkout(repoPath: String, ref: String)
+}
 
-    /** `git -C <repoPath> fetch [remote] [refSpecs]`. */
+interface GitRemoteCommandApi {
     fun fetch(
         repoPath: String,
         remote: String = "origin",
         vararg refSpecs: String,
     )
 
-    /** Return `true` when `refs/heads/<branch>` exists on [remote]. */
     fun remoteBranchExists(
         repoPath: String,
         branch: String,
         remote: String = "origin",
     ): Boolean
+}
 
-    /** Return `true` when [ancestorRef] is an ancestor of [descendantRef]. */
+interface GitAncestryCommandApi {
     fun isAncestor(
         repoPath: String,
         ancestorRef: String,
         descendantRef: String,
     ): Boolean
+}
 
-    /** `git -C <repoPath> worktree add <path> <commitIsh>`. */
+interface GitWorktreeCommandApi {
     fun worktreeAdd(
         repoPath: String,
         path: String,
         commitIsh: String,
     )
 
-    /** `git -C <repoPath> worktree add -b <newBranch> <path> <baseBranch>`. */
     fun worktreeAddNewBranch(
         repoPath: String,
         newBranch: String,
@@ -50,33 +42,29 @@ interface GitCommandApi {
         baseBranch: String,
     )
 
-    /** `git -C <repoPath> worktree list --porcelain` — returns raw porcelain output. */
     fun worktreeList(repoPath: String): String
-
-    /** `git -C <repoPath> worktree remove <path>`. */
     fun worktreeRemove(repoPath: String, path: String)
+}
 
-    /** `git -C <repoPath> checkout <ref>`. */
-    fun checkout(repoPath: String, ref: String)
-
-    /** `git -C <repoPath> status --porcelain` — returns raw output. */
+interface GitWorkingTreeCommandApi {
     fun status(repoPath: String): String
+}
 
-    /** `git -C <repoPath> log <args>` — returns raw output. */
+interface GitHistoryCommandApi {
     fun log(repoPath: String, vararg args: String): String
-
-    /** `git -C <repoPath> diff <args>` — returns raw output. */
     fun diff(repoPath: String, vararg args: String): String
-
-    /** `git -C <repoPath> rev-parse <args>` — returns raw output. */
     fun revParse(repoPath: String, vararg args: String): String
+}
 
-    /**
-     * Escape-hatch: run an arbitrary `git` command.
-     *
-     * @param repoPath working directory for `-C`; pass `null` to omit `-C`.
-     * @param args     arguments appended after `git [-C repoPath]`.
-     * @return the trimmed stdout of the command.
-     */
+interface GitRawCommandExecutor {
     fun execute(repoPath: String? = null, vararg args: String): String
 }
+
+interface GitCommandApi :
+    GitRepositoryCommandApi,
+    GitRemoteCommandApi,
+    GitAncestryCommandApi,
+    GitWorktreeCommandApi,
+    GitWorkingTreeCommandApi,
+    GitHistoryCommandApi,
+    GitRawCommandExecutor

@@ -1,31 +1,69 @@
 package com.github.karlsabo.git
 
+import com.github.karlsabo.system.ProcessResult
 import com.github.karlsabo.system.executeCommand
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
 
-@Suppress("TooManyFunctions")
-class GitCommandService : GitCommandApi {
+class GitCommandService : GitCommandApi by DefaultGitCommandApi(GitCliCommandRunner())
 
+private class DefaultGitCommandApi(
+    commandRunner: GitCliCommandRunner,
+) : GitCommandApi,
+    GitRepositoryCommandApi by GitRepositoryCommandService(commandRunner),
+    GitRemoteCommandApi by GitRemoteCommandService(commandRunner),
+    GitAncestryCommandApi by GitAncestryCommandService(commandRunner),
+    GitWorktreeCommandApi by GitWorktreeCommandService(commandRunner),
+    GitWorkingTreeCommandApi by GitWorkingTreeCommandService(commandRunner),
+    GitHistoryCommandApi by GitHistoryCommandService(commandRunner),
+    GitRawCommandExecutor by GitRawCommandService(commandRunner)
+
+private class GitCliCommandRunner {
+    fun run(command: List<String>): String {
+        val result = runForResult(command)
+        if (result.exitCode != 0) {
+            throw GitCommandException(
+                command = command,
+                exitCode = result.exitCode,
+                gitOutput = result.stderr.ifEmpty { result.stdout },
+            )
+        }
+        return result.stdout.trim()
+    }
+
+    fun runForResult(command: List<String>): ProcessResult {
+        logger.debug { "Executing: ${command.joinToString(" ")}" }
+        return executeCommand(command, workingDirectory = null)
+    }
+}
+
+private class GitRepositoryCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitRepositoryCommandApi {
     override fun clone(url: String, targetPath: String) {
-        executeGitCommand(listOf("git", "clone", url, targetPath))
+        commandRunner.run(listOf("git", "clone", url, targetPath))
     }
 
     override fun isGitRepository(repoPath: String): Boolean {
-        val result = executeCommand(
-            buildRepoCommand(repoPath, "rev-parse", "--git-dir"),
-            workingDirectory = null,
-        )
+        val result = commandRunner.runForResult(gitRepoCommand(repoPath, "rev-parse", "--git-dir"))
         return result.exitCode == 0
     }
 
+    override fun checkout(repoPath: String, ref: String) {
+        commandRunner.run(gitRepoCommand(repoPath, "checkout", ref))
+    }
+}
+
+private class GitRemoteCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitRemoteCommandApi {
     override fun fetch(
         repoPath: String,
         remote: String,
         vararg refSpecs: String,
     ) {
-        executeGitCommand(buildRepoCommand(repoPath, listOf("fetch", remote) + refSpecs.toList()))
+        commandRunner.run(gitRepoCommand(repoPath, listOf("fetch", remote) + refSpecs.toList()))
     }
 
     override fun remoteBranchExists(
@@ -33,57 +71,50 @@ class GitCommandService : GitCommandApi {
         branch: String,
         remote: String,
     ): Boolean {
-        val remoteBranchRef = "refs/heads/$branch"
-        val command = buildRepoCommand(
+        val command = gitRepoCommand(
             repoPath,
             "ls-remote",
             "--exit-code",
             "--heads",
             remote,
-            remoteBranchRef,
+            "refs/heads/$branch",
         )
-        logger.debug { "Executing: ${command.joinToString(" ")}" }
-        val result = executeCommand(command, workingDirectory = null)
+        val result = commandRunner.runForResult(command)
         return when (result.exitCode) {
             0 -> true
-
             2 -> false
-
-            else -> throw GitCommandException(
-                command = command,
-                exitCode = result.exitCode,
-                gitOutput = result.stderr.ifEmpty { result.stdout },
-            )
+            else -> throwGitCommandException(command, result)
         }
     }
+}
 
+private class GitAncestryCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitAncestryCommandApi {
     override fun isAncestor(
         repoPath: String,
         ancestorRef: String,
         descendantRef: String,
     ): Boolean {
-        val command = buildRepoCommand(repoPath, "merge-base", "--is-ancestor", ancestorRef, descendantRef)
-        logger.debug { "Executing: ${command.joinToString(" ")}" }
-        val result = executeCommand(command, workingDirectory = null)
+        val command = gitRepoCommand(repoPath, "merge-base", "--is-ancestor", ancestorRef, descendantRef)
+        val result = commandRunner.runForResult(command)
         return when (result.exitCode) {
             0 -> true
-
             1 -> false
-
-            else -> throw GitCommandException(
-                command = command,
-                exitCode = result.exitCode,
-                gitOutput = result.stderr.ifEmpty { result.stdout },
-            )
+            else -> throwGitCommandException(command, result)
         }
     }
+}
 
+private class GitWorktreeCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitWorktreeCommandApi {
     override fun worktreeAdd(
         repoPath: String,
         path: String,
         commitIsh: String,
     ) {
-        executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", path, commitIsh))
+        commandRunner.run(gitRepoCommand(repoPath, "worktree", "add", path, commitIsh))
     }
 
     override fun worktreeAddNewBranch(
@@ -92,67 +123,70 @@ class GitCommandService : GitCommandApi {
         path: String,
         baseBranch: String,
     ) {
-        executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", "-b", newBranch, path, baseBranch))
+        commandRunner.run(gitRepoCommand(repoPath, "worktree", "add", "-b", newBranch, path, baseBranch))
     }
 
-    override fun worktreeList(repoPath: String): String = executeGitCommand(
-        buildRepoCommand(repoPath, "worktree", "list", "--porcelain"),
+    override fun worktreeList(repoPath: String): String = commandRunner.run(
+        gitRepoCommand(repoPath, "worktree", "list", "--porcelain"),
     )
 
     override fun worktreeRemove(repoPath: String, path: String) {
-        executeGitCommand(buildRepoCommand(repoPath, "worktree", "remove", path))
-    }
-
-    override fun checkout(repoPath: String, ref: String) {
-        executeGitCommand(buildRepoCommand(repoPath, "checkout", ref))
-    }
-
-    override fun status(repoPath: String): String = executeGitCommand(
-        buildRepoCommand(repoPath, "status", "--porcelain"),
-    )
-
-    override fun log(repoPath: String, vararg args: String): String = executeGitCommand(
-        buildRepoCommand(repoPath, listOf("log") + args.toList()),
-    )
-
-    override fun diff(repoPath: String, vararg args: String): String = executeGitCommand(
-        buildRepoCommand(repoPath, listOf("diff") + args.toList()),
-    )
-
-    override fun revParse(repoPath: String, vararg args: String): String = executeGitCommand(
-        buildRepoCommand(repoPath, listOf("rev-parse") + args.toList()),
-    )
-
-    override fun execute(repoPath: String?, vararg args: String): String {
-        val command = if (repoPath != null) {
-            buildRepoCommand(repoPath, args.toList())
-        } else {
-            listOf("git") + args.toList()
-        }
-        return executeGitCommand(command)
-    }
-
-    private fun buildRepoCommand(
-        repoPath: String,
-        vararg args: String,
-    ): List<String> = buildRepoCommand(repoPath, args.toList())
-
-    private fun buildRepoCommand(
-        repoPath: String,
-        args: List<String>,
-    ): List<String> = listOf("git", "-C", repoPath) + args
-
-    private fun executeGitCommand(command: List<String>): String {
-        logger.debug { "Executing: ${command.joinToString(" ")}" }
-        val result = executeCommand(command, workingDirectory = null)
-        if (result.exitCode != 0) {
-            val output = result.stderr.ifEmpty { result.stdout }
-            throw GitCommandException(
-                command = command,
-                exitCode = result.exitCode,
-                gitOutput = output,
-            )
-        }
-        return result.stdout.trim()
+        commandRunner.run(gitRepoCommand(repoPath, "worktree", "remove", path))
     }
 }
+
+private class GitWorkingTreeCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitWorkingTreeCommandApi {
+    override fun status(repoPath: String): String = commandRunner.run(
+        gitRepoCommand(repoPath, "status", "--porcelain"),
+    )
+}
+
+private class GitHistoryCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitHistoryCommandApi {
+    override fun log(repoPath: String, vararg args: String): String = commandRunner.run(
+        gitRepoCommand(repoPath, listOf("log") + args.toList()),
+    )
+
+    override fun diff(repoPath: String, vararg args: String): String = commandRunner.run(
+        gitRepoCommand(repoPath, listOf("diff") + args.toList()),
+    )
+
+    override fun revParse(repoPath: String, vararg args: String): String = commandRunner.run(
+        gitRepoCommand(repoPath, listOf("rev-parse") + args.toList()),
+    )
+}
+
+private class GitRawCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitRawCommandExecutor {
+    override fun execute(repoPath: String?, vararg args: String): String {
+        val command = if (repoPath == null) {
+            listOf("git") + args.toList()
+        } else {
+            gitRepoCommand(repoPath, args.toList())
+        }
+        return commandRunner.run(command)
+    }
+}
+
+private fun gitRepoCommand(
+    repoPath: String,
+    vararg args: String,
+): List<String> = gitRepoCommand(repoPath, args.toList())
+
+private fun gitRepoCommand(
+    repoPath: String,
+    args: List<String>,
+): List<String> = listOf("git", "-C", repoPath) + args
+
+private fun throwGitCommandException(
+    command: List<String>,
+    result: ProcessResult,
+): Nothing = throw GitCommandException(
+    command = command,
+    exitCode = result.exitCode,
+    gitOutput = result.stderr.ifEmpty { result.stdout },
+)

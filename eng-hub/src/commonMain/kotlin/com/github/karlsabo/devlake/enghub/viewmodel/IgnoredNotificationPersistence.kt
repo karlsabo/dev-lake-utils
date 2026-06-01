@@ -46,7 +46,10 @@ internal class IgnoredNotificationPersistence(
         )
     }
 
-    private fun persistIgnoredThread(notification: Notification, @Suppress("SameParameterValue") reason: NotificationIgnoreReason) {
+    private fun persistIgnoredThread(
+        notification: Notification,
+        @Suppress("SameParameterValue") reason: NotificationIgnoreReason,
+    ) {
         persistIgnoredThread(
             threadId = notification.id,
             repositoryFullName = notification.repository.fullName,

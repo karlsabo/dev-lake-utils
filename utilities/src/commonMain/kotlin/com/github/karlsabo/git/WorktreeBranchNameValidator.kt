@@ -54,7 +54,7 @@ class WorktreeBranchNameValidator(
     }
 }
 
-fun GitCommandApi.isValidBranchRefFormat(branch: String): Boolean = try {
+fun GitRawCommandExecutor.isValidBranchRefFormat(branch: String): Boolean = try {
     execute(null, "check-ref-format", "--branch", branch)
     true
 } catch (_: GitCommandException) {
