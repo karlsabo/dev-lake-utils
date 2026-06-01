@@ -3,80 +3,56 @@ package com.github.karlsabo.tools
 import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.github.GitHubPullRequestSearchApi
-import com.github.karlsabo.projectmanagement.ProjectComment
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.projectmanagement.isIssueOrBug
-import com.github.karlsabo.projectmanagement.isMilestone
 import com.github.karlsabo.text.TextSummarizer
-import com.github.karlsabo.tools.model.Milestone
 import com.github.karlsabo.tools.model.ProjectSummary
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlin.time.Duration
+import com.github.karlsabo.github.Issue as GitHubIssue
 
 private val logger = KotlinLogging.logger {}
 
-/**
- * Creates a summary for a single project.
- *
- * @param users Users associated with this project (for milestone ownership)
- * @param gitHubApi API for fetching GitHub PR data
- * @param gitHubOrganizationIds GitHub organization IDs to search for PRs
- * @param projectManagementApi API for fetching project management data
- * @param textSummarizer Summarizer for generating issue summaries
- * @param duration Time period to look back for activity
- * @param pullRequests Additional PRs to include (for misc project)
- * @param parentIssuesAreChildren If true, treats parent issues as the children (for misc project)
- */
-suspend fun Project.createSummary(
-    users: Set<User>,
-    gitHubApi: GitHubPullRequestSearchApi,
-    gitHubOrganizationIds: List<String>,
-    projectManagementApi: ProjectManagementApi,
-    textSummarizer: TextSummarizer,
-    duration: Duration,
-    pullRequests: Set<com.github.karlsabo.github.Issue>,
-    parentIssuesAreChildren: Boolean = false,
-): ProjectSummary {
+data class ProjectSummaryDependencies(
+    val gitHubApi: GitHubPullRequestSearchApi,
+    val gitHubOrganizationIds: List<String>,
+    val projectManagementApi: ProjectManagementApi,
+    val textSummarizer: TextSummarizer,
+)
+
+data class ProjectSummaryRequest(
+    val users: Set<User>,
+    val dependencies: ProjectSummaryDependencies,
+    val duration: Duration,
+    val pullRequests: Set<GitHubIssue> = emptySet(),
+    val parentIssuesAreChildren: Boolean = false,
+)
+
+suspend fun Project.createSummary(request: ProjectSummaryRequest): ProjectSummary {
+    val dependencies = request.dependencies
     val (issueKeys, projectIds) = topLevelIssueIds.partition { issueIdentifierPattern.matches(it) }
     val hasProjectIds = projectIds.isNotEmpty()
 
-    val parentIssues = fetchParentIssues(issueKeys, projectIds, projectManagementApi)
-    val effectiveParentIssuesAreChildren = parentIssuesAreChildren || hasProjectIds
-    val childIssues = if (effectiveParentIssuesAreChildren) {
-        parentIssues.toMutableList()
-    } else {
-        val parentIssueKeys = parentIssues.map { it.key }
-        logger.debug { "Getting child issues for $parentIssues" }
-        projectManagementApi.getChildIssues(parentIssueKeys).toMutableList()
-    }
+    val parentIssues = fetchParentIssues(issueKeys, projectIds, dependencies.projectManagementApi)
+    val effectiveParentIssuesAreChildren = request.parentIssuesAreChildren || hasProjectIds
+    val childIssues = fetchChildIssues(
+        parentIssues = parentIssues,
+        parentIssuesAreChildren = effectiveParentIssuesAreChildren,
+        projectManagementApi = dependencies.projectManagementApi,
+    )
 
-    val resolvedChildIssues = childIssues.filter {
-        it.completedAt != null && it.completedAt >= Clock.System.now().minus(duration) && it.isIssueOrBug()
-    }
-
-    val summary = generateSummaryText(resolvedChildIssues, textSummarizer, duration)
-    val mergedPrs =
-        fetchRelatedPullRequests(resolvedChildIssues, pullRequests, gitHubApi, gitHubOrganizationIds, duration)
-
-    val milestones = if (effectiveParentIssuesAreChildren) {
-        emptySet()
-    } else {
-        buildMilestones(parentIssues, childIssues, users, projectManagementApi, duration)
-    }
+    val resolvedChildIssues = childIssues.filterResolvedIssues(request.duration)
+    val summary = generateSummaryText(resolvedChildIssues, dependencies.textSummarizer, request.duration)
+    val mergedPrs = fetchRelatedPullRequests(resolvedChildIssues, request)
+    val milestones = buildProjectMilestones(parentIssues, childIssues, request, effectiveParentIssuesAreChildren)
 
     return ProjectSummary(
         this,
         summary,
         childIssues.filter { it.isIssueOrBug() }.toSet(),
-        childIssues.filter {
-            it.isIssueOrBug() &&
-                (
-                    (it.completedAt != null && it.completedAt >= Clock.System.now().minus(duration)) ||
-                        (it.createdAt != null && it.createdAt >= Clock.System.now().minus(duration))
-                    )
-        }.toSet(),
+        childIssues.filterRecentIssues(request.duration),
         mergedPrs,
         milestones,
         isTagMilestoneOwners,
@@ -102,13 +78,25 @@ private suspend fun fetchParentIssues(
     return issues
 }
 
+private suspend fun fetchChildIssues(
+    parentIssues: List<ProjectIssue>,
+    parentIssuesAreChildren: Boolean,
+    projectManagementApi: ProjectManagementApi,
+): MutableList<ProjectIssue> = if (parentIssuesAreChildren) {
+    parentIssues.toMutableList()
+} else {
+    val parentIssueKeys = parentIssues.map { it.key }
+    logger.debug { "Getting child issues for $parentIssues" }
+    projectManagementApi.getChildIssues(parentIssueKeys).toMutableList()
+}
+
 private suspend fun generateSummaryText(
     resolvedChildIssues: List<ProjectIssue>,
     textSummarizer: TextSummarizer,
     duration: Duration,
 ): String = if (resolvedChildIssues.isNotEmpty()) {
     val summaryRawInput = StringBuilder()
-    summaryRawInput.appendLine("# Issues\n\n")
+    summaryRawInput.appendLine("# Issues\n")
     resolvedChildIssues.forEach { issue ->
         summaryRawInput.appendLine("## ${issue.title}")
         summaryRawInput.appendLine("Assignee: ${issue.assigneeName}")
@@ -121,81 +109,18 @@ private suspend fun generateSummaryText(
 
 private suspend fun fetchRelatedPullRequests(
     resolvedChildIssues: List<ProjectIssue>,
-    initialPullRequests: Set<com.github.karlsabo.github.Issue>,
-    gitHubApi: GitHubPullRequestSearchApi,
-    gitHubOrganizationIds: List<String>,
-    duration: Duration,
-): MutableSet<com.github.karlsabo.github.Issue> {
-    val mergedPrs = mutableSetOf(*initialPullRequests.toTypedArray())
+    request: ProjectSummaryRequest,
+): MutableSet<GitHubIssue> {
+    val dependencies = request.dependencies
+    val mergedPrs = request.pullRequests.toMutableSet()
     resolvedChildIssues.forEach { issue ->
         logger.debug { "Searching PRs for ${issue.key}" }
-        mergedPrs += gitHubApi.searchPullRequestsByText(
+        mergedPrs += dependencies.gitHubApi.searchPullRequestsByText(
             issue.key,
-            gitHubOrganizationIds,
-            Clock.System.now().minus(duration),
+            dependencies.gitHubOrganizationIds,
+            Clock.System.now().minus(request.duration),
             Clock.System.now(),
         )
     }
     return mergedPrs
-}
-
-private suspend fun Project.buildMilestones(
-    parentIssues: List<ProjectIssue>,
-    childIssues: List<ProjectIssue>,
-    users: Set<User>,
-    projectManagementApi: ProjectManagementApi,
-    duration: Duration,
-): Set<Milestone> = parentIssues.plus(childIssues).toSet()
-    .filter { it.isMilestone() }
-    .map { milestoneIssue ->
-        buildMilestone(milestoneIssue, users, projectManagementApi, duration)
-    }.toSet()
-
-private suspend fun Project.buildMilestone(
-    milestoneIssue: ProjectIssue,
-    users: Set<User>,
-    projectManagementApi: ProjectManagementApi,
-    duration: Duration,
-): Milestone {
-    // Get direct child issues for this milestone
-    val milestoneChildIssues = projectManagementApi.getDirectChildIssues(milestoneIssue.key)
-        .filter { issue -> issue.isIssueOrBug() }
-        .toSet()
-
-    // Find the owner of the milestone
-    val owner = findMilestoneOwner(milestoneIssue, users)
-
-    // Get recent comments for the milestone
-    val milestoneCommentSet = mutableSetOf<ProjectComment>()
-    if (milestoneIssue.key.isNotBlank()) {
-        milestoneCommentSet.addAll(
-            projectManagementApi.getRecentComments(milestoneIssue.key, 5),
-        )
-    }
-
-    return Milestone(
-        owner,
-        milestoneIssue,
-        milestoneChildIssues,
-        milestoneCommentSet,
-        milestoneChildIssues.filter { issue ->
-            issue.isIssueOrBug() &&
-                (
-                    (issue.completedAt != null && issue.completedAt >= Clock.System.now().minus(duration)) ||
-                        (issue.createdAt != null && issue.createdAt >= Clock.System.now().minus(duration))
-                    )
-        }.toSet(),
-        mutableSetOf(), // milestonePrs - placeholder for future implementation
-    )
-}
-
-private fun Project.findMilestoneOwner(
-    milestoneIssue: ProjectIssue,
-    users: Set<User>,
-): User? = if (milestoneIssue.assigneeName != null && milestoneIssue.assigneeName.isNotBlank()) {
-    users.firstOrNull { it.name == milestoneIssue.assigneeName }
-} else if (projectLeadUserId != null) {
-    users.firstOrNull { it.email == projectLeadUserId }
-} else {
-    null
 }

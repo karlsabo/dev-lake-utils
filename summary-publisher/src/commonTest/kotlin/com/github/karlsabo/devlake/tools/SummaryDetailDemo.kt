@@ -9,6 +9,9 @@ import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.pagerduty.PagerDutyRestApi
 import com.github.karlsabo.pagerduty.loadPagerDutyConfig
 import com.github.karlsabo.text.TextSummarizerFake
+import com.github.karlsabo.tools.CreateSummaryRequest
+import com.github.karlsabo.tools.SummaryOptions
+import com.github.karlsabo.tools.SummarySources
 import com.github.karlsabo.tools.createSummary
 import com.github.karlsabo.tools.formatting.toSlackMarkup
 import com.github.karlsabo.tools.formatting.toVerboseSlackMarkdown
@@ -40,18 +43,24 @@ fun main(args: Array<String>) {
 
         val textSummarizer = TextSummarizerFake()
         val summaryLast7Days = createSummary(
-            projectManagementApi,
-            gitHubApi,
-            summaryConfig.gitHubOrganizationIds,
-            pagerDutyApi,
-            summaryConfig.pagerDutyServiceIds,
-            textSummarizer,
-            summaryConfig.projects,
-            SUMMARY_DAYS.days,
-            usersConfig.users,
-            summaryConfig.miscUserIds.map { userId -> usersConfig.users.first { it.id == userId } },
-            summaryConfig.summaryName,
-            summaryConfig.isMiscellaneousProjectIncluded,
+            CreateSummaryRequest(
+                sources = SummarySources(
+                    projectManagementApi = projectManagementApi,
+                    gitHubApi = gitHubApi,
+                    gitHubOrganizationIds = summaryConfig.gitHubOrganizationIds,
+                    pagerDutyApi = pagerDutyApi,
+                    pagerDutyServiceIds = summaryConfig.pagerDutyServiceIds,
+                    textSummarizer = textSummarizer,
+                ),
+                projects = summaryConfig.projects,
+                duration = SUMMARY_DAYS.days,
+                users = usersConfig.users,
+                miscUsers = summaryConfig.miscUserIds.map { userId -> usersConfig.users.first { it.id == userId } },
+                options = SummaryOptions(
+                    summaryName = summaryConfig.summaryName,
+                    isMiscellaneousProjectIncluded = summaryConfig.isMiscellaneousProjectIncluded,
+                ),
+            ),
         )
 
         println("Summary:")

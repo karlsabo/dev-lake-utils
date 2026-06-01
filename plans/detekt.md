@@ -75,7 +75,7 @@
 
 **Notes:** A temporary compatibility facade is acceptable only if it does not trigger detekt and is removed or narrowed before the final baseline-removal story.
 
-### 4. Jira and Linear clients are decomposed without changing project-management behavior
+### 4. Jira and Linear clients are decomposed without changing project-management behavior (Finished 2026-06-01) - Done
 
 **Acceptance criteria:** Given project summary and user metrics tests, when detekt runs, then Jira/Linear issue, comment, milestone, and filter behavior is unchanged and no `TooManyFunctions` suppression remains in `utilities/src/commonMain/kotlin/com/github/karlsabo/jira/JiraRestApi.kt`, `utilities/src/commonMain/kotlin/com/github/karlsabo/linear/LinearRestApi.kt`, or `utilities/src/commonMain/kotlin/com/github/karlsabo/linear/query/LinearQueryBuilder.kt`.
 

@@ -16,6 +16,9 @@ import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.projectmanagement.ProjectMilestone
 import com.github.karlsabo.projectmanagement.StatusCategory
 import com.github.karlsabo.text.TextSummarizerFake
+import com.github.karlsabo.tools.CreateSummaryRequest
+import com.github.karlsabo.tools.SummaryOptions
+import com.github.karlsabo.tools.SummarySources
 import com.github.karlsabo.tools.createSummary
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
@@ -83,18 +86,24 @@ class SummaryDetailTest {
         val isMiscellaneousProjectIncluded = true
 
         val summary = createSummary(
-            projectManagementApi,
-            gitHubApi,
-            gitHubOrganizationIds,
-            pagerDutyApi,
-            pagerDutyServiceIds,
-            textSummarizer,
-            projects,
-            7.days,
-            users,
-            miscUsers,
-            summaryName,
-            isMiscellaneousProjectIncluded,
+            CreateSummaryRequest(
+                sources = SummarySources(
+                    projectManagementApi = projectManagementApi,
+                    gitHubApi = gitHubApi,
+                    gitHubOrganizationIds = gitHubOrganizationIds,
+                    pagerDutyApi = pagerDutyApi,
+                    pagerDutyServiceIds = pagerDutyServiceIds,
+                    textSummarizer = textSummarizer,
+                ),
+                projects = projects,
+                duration = 7.days,
+                users = users,
+                miscUsers = miscUsers,
+                options = SummaryOptions(
+                    summaryName = summaryName,
+                    isMiscellaneousProjectIncluded = isMiscellaneousProjectIncluded,
+                ),
+            ),
         )
 
         assertNotNull(summary)

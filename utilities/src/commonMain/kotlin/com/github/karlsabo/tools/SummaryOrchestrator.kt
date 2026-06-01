@@ -5,7 +5,6 @@ import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.pagerduty.PagerDutyApi
-import com.github.karlsabo.pagerduty.PagerDutyIncident
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.text.TextSummarizer
@@ -21,184 +20,133 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration
+import com.github.karlsabo.github.Issue as GitHubIssue
 
 private val logger = KotlinLogging.logger {}
 
-/**
- * Creates a multi-project summary by aggregating data from various sources.
- *
- * @param projectManagementApi API for fetching project management data (Jira/Linear)
- * @param gitHubApi API for fetching GitHub PR data
- * @param gitHubOrganizationIds GitHub organization IDs to search for PRs
- * @param pagerDutyApi Optional API for fetching PagerDuty incidents
- * @param pagerDutyServiceIds PagerDuty service IDs to fetch incidents for
- * @param textSummarizer Summarizer for generating issue summaries
- * @param projects List of projects to include in the summary
- * @param duration Time period to look back for activity
- * @param users Users associated with projects
- * @param miscUsers Users to track for miscellaneous (unassigned) work
- * @param summaryName Name for the summary
- * @param isMiscellaneousProjectIncluded Whether to include a "misc" section for untracked work
- */
-suspend fun createSummary(
-    projectManagementApi: ProjectManagementApi,
-    gitHubApi: GitHubPullRequestSearchApi,
-    gitHubOrganizationIds: List<String>,
-    pagerDutyApi: PagerDutyApi?,
-    pagerDutyServiceIds: List<String>,
-    textSummarizer: TextSummarizer,
-    projects: List<Project>,
-    duration: Duration,
-    users: List<User>,
-    miscUsers: List<User>,
-    summaryName: String,
-    isMiscellaneousProjectIncluded: Boolean,
-): MultiProjectSummary {
-    val timeInPast = Clock.System.now().minus(duration)
+private const val MISCELLANEOUS_PROJECT_ID = 123456789101112L
 
-    val mutex = Mutex()
-    val projectSummaries = mutableListOf<ProjectSummary>()
-    val miscIssueSet = mutableSetOf<ProjectIssue>()
-    val miscPrSet = mutableSetOf<com.github.karlsabo.github.Issue>()
+data class SummarySources(
+    val projectManagementApi: ProjectManagementApi,
+    val gitHubApi: GitHubPullRequestSearchApi,
+    val gitHubOrganizationIds: List<String>,
+    val pagerDutyApi: PagerDutyApi?,
+    val pagerDutyServiceIds: List<String>,
+    val textSummarizer: TextSummarizer,
+)
 
-    coroutineScope {
-        val projectJobs = projects.map { project ->
-            async(Dispatchers.Default) {
-                logger.info { "Creating summary for project ${project.title}" }
-                val projectSummary =
-                    project.createSummary(
-                        users.toSet(),
-                        gitHubApi,
-                        gitHubOrganizationIds,
-                        projectManagementApi,
-                        textSummarizer,
-                        duration,
-                        emptySet(),
-                    )
-                mutex.withLock {
-                    projectSummaries.add(projectSummary)
-                }
-            }
-        }
+data class SummaryOptions(
+    val summaryName: String,
+    val isMiscellaneousProjectIncluded: Boolean,
+)
 
-        val userJobs = if (isMiscellaneousProjectIncluded) {
-            collectMiscellaneousWork(
-                miscUsers,
-                projectManagementApi,
-                gitHubApi,
-                gitHubOrganizationIds,
-                duration,
-                mutex,
-                miscIssueSet,
-                miscPrSet,
-            )
-        } else {
-            emptyList()
-        }
+data class CreateSummaryRequest(
+    val sources: SummarySources,
+    val projects: List<Project>,
+    val duration: Duration,
+    val users: List<User>,
+    val miscUsers: List<User>,
+    val options: SummaryOptions,
+)
 
-        projectJobs.joinAll()
-        userJobs.joinAll()
-    }
+suspend fun createSummary(request: CreateSummaryRequest): MultiProjectSummary {
+    val timeInPast = Clock.System.now().minus(request.duration)
+    val summaryWork = collectSummaryWork(request)
 
-    // Remove items already captured in project summaries from misc sets
-    projectSummaries.forEach { projectSummary ->
-        miscIssueSet.removeAll(projectSummary.issues)
-        miscIssueSet.removeAll(projectSummary.milestones.map { it.issue }.toSet())
-        miscIssueSet.removeAll(projectSummary.milestones.flatMap { it.issues }.toSet())
-        miscPrSet.removeAll(projectSummary.durationMergedPullRequests)
-    }
-    projectSummaries.sortBy { it.project.title?.replaceFirst(Regex("""^[^\p{L}\p{N}]+"""), "") }
-
-    // Add miscellaneous project if enabled
-    if (isMiscellaneousProjectIncluded) {
-        val miscProject = Project(
-            id = 123456789101112L,
-            title = "📋 Other (Misc)",
-            topLevelIssueIds = miscIssueSet.map { it.key },
-        )
-        projectSummaries.add(
-            miscProject.createSummary(
-                miscUsers.toSet(),
-                gitHubApi,
-                gitHubOrganizationIds,
-                projectManagementApi,
-                textSummarizer,
-                duration,
-                miscPrSet,
-                true,
-            ),
-        )
-    }
-
-    val pagerDutyIncidentList = fetchPagerDutyIncidents(
-        pagerDutyApi,
-        pagerDutyServiceIds,
-        duration,
-    )
+    removeProjectWorkFromMiscellaneous(summaryWork)
+    summaryWork.projectSummaries.sortByProjectTitle()
+    addMiscellaneousProjectSummary(request, summaryWork)
 
     return MultiProjectSummary(
         timeInPast.toLocalDateTime(TimeZone.UTC).date,
         Clock.System.now().toLocalDateTime(TimeZone.UTC).date,
-        summaryName,
-        projectSummaries,
-        pagerDutyIncidentList,
+        request.options.summaryName,
+        summaryWork.projectSummaries,
+        fetchPagerDutyIncidents(request.sources, request.duration),
     )
 }
 
-private suspend fun collectMiscellaneousWork(
-    miscUsers: List<User>,
-    projectManagementApi: ProjectManagementApi,
-    gitHubApi: GitHubPullRequestSearchApi,
-    gitHubOrganizationIds: List<String>,
-    duration: Duration,
-    mutex: Mutex,
-    miscIssueSet: MutableSet<ProjectIssue>,
-    miscPrSet: MutableSet<com.github.karlsabo.github.Issue>,
-) = coroutineScope {
-    val issueJobs = miscUsers.map { user ->
+private data class SummaryWork(
+    val projectSummaries: MutableList<ProjectSummary> = mutableListOf(),
+    val miscIssues: MutableSet<ProjectIssue> = mutableSetOf(),
+    val miscPullRequests: MutableSet<GitHubIssue> = mutableSetOf(),
+)
+
+private suspend fun collectSummaryWork(request: CreateSummaryRequest): SummaryWork = coroutineScope {
+    val mutex = Mutex()
+    val work = SummaryWork()
+    val projectJobs = request.projects.map { project ->
         async(Dispatchers.Default) {
-            logger.info { "Pulling issues for user ${user.id}" }
-            val issuesForUser = projectManagementApi.getIssuesResolved(
-                user,
-                Clock.System.now().minus(duration),
-                Clock.System.now(),
-            )
-            mutex.withLock {
-                miscIssueSet.addAll(issuesForUser)
-            }
+            val projectSummary = createProjectSummary(project, request)
+            mutex.withLock { work.projectSummaries.add(projectSummary) }
         }
     }
-    val prJobs = miscUsers.map { user ->
-        async(Dispatchers.Default) {
-            logger.info { "Pulling PRs for user ${user.id}" }
-            val prsForUser = gitHubApi.getMergedPullRequests(
-                user.gitHubId!!,
-                gitHubOrganizationIds,
-                Clock.System.now().minus(duration),
-                Clock.System.now(),
-            )
-            mutex.withLock {
-                miscPrSet.addAll(prsForUser)
-            }
-        }
-    }
-    issueJobs + prJobs
-}
 
-private suspend fun fetchPagerDutyIncidents(
-    pagerDutyApi: PagerDutyApi?,
-    pagerDutyServiceIds: List<String>,
-    duration: Duration,
-): List<PagerDutyIncident>? {
-    if (pagerDutyApi == null || pagerDutyServiceIds.isEmpty()) return null
-
-    val alertList = mutableListOf<PagerDutyIncident>()
-    pagerDutyServiceIds.forEach { serviceId ->
-        alertList += pagerDutyApi.getServicePages(
-            serviceId,
-            Clock.System.now().minus(duration),
-            Clock.System.now(),
+    if (request.options.isMiscellaneousProjectIncluded) {
+        collectMiscellaneousWork(
+            request = MiscWorkRequest(request.miscUsers, request.sources, request.duration),
+            accumulator = MiscWorkAccumulator(mutex, work.miscIssues, work.miscPullRequests),
         )
     }
-    return alertList
+
+    projectJobs.joinAll()
+    work
+}
+
+private suspend fun createProjectSummary(
+    project: Project,
+    request: CreateSummaryRequest,
+): ProjectSummary {
+    logger.info { "Creating summary for project ${project.title}" }
+    return project.createSummary(
+        ProjectSummaryRequest(
+            users = request.users.toSet(),
+            dependencies = request.sources.toProjectSummaryDependencies(),
+            duration = request.duration,
+        ),
+    )
+}
+
+private fun SummarySources.toProjectSummaryDependencies(): ProjectSummaryDependencies = ProjectSummaryDependencies(
+    gitHubApi = gitHubApi,
+    gitHubOrganizationIds = gitHubOrganizationIds,
+    projectManagementApi = projectManagementApi,
+    textSummarizer = textSummarizer,
+)
+
+private fun removeProjectWorkFromMiscellaneous(summaryWork: SummaryWork) {
+    summaryWork.projectSummaries.forEach { projectSummary ->
+        summaryWork.miscIssues.removeAll(projectSummary.issues)
+        summaryWork.miscIssues.removeAll(projectSummary.milestones.map { it.issue }.toSet())
+        summaryWork.miscIssues.removeAll(projectSummary.milestones.flatMap { it.issues }.toSet())
+        summaryWork.miscPullRequests.removeAll(projectSummary.durationMergedPullRequests)
+    }
+}
+
+private fun MutableList<ProjectSummary>.sortByProjectTitle() {
+    sortBy { projectSummary -> projectSummary.project.title?.replaceFirst(Regex("""^[^\p{L}\p{N}]+"""), "") }
+}
+
+private suspend fun addMiscellaneousProjectSummary(
+    request: CreateSummaryRequest,
+    summaryWork: SummaryWork,
+) {
+    if (!request.options.isMiscellaneousProjectIncluded) return
+
+    val miscProject = Project(
+        id = MISCELLANEOUS_PROJECT_ID,
+        title = "📋 Other (Misc)",
+        topLevelIssueIds = summaryWork.miscIssues.map { it.key },
+    )
+    summaryWork.projectSummaries.add(
+        miscProject.createSummary(
+            ProjectSummaryRequest(
+                users = request.miscUsers.toSet(),
+                dependencies = request.sources.toProjectSummaryDependencies(),
+                duration = request.duration,
+                pullRequests = summaryWork.miscPullRequests,
+                parentIssuesAreChildren = true,
+            ),
+        ),
+    )
 }
