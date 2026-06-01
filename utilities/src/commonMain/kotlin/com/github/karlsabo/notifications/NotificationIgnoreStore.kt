@@ -14,35 +14,28 @@ data class IgnoredNotificationThread(
     val notificationUpdatedAtEpochMs: Long?,
 )
 
+data class SaveIgnoredNotificationThreadRequest(
+    val threadId: String,
+    val repositoryFullName: String,
+    val subjectType: String,
+    val reason: NotificationIgnoreReason,
+    val ignoredAtEpochMs: Long,
+    val notificationUpdatedAtEpochMs: Long? = null,
+)
+
+fun SaveIgnoredNotificationThreadRequest.toIgnoredNotificationThread() = IgnoredNotificationThread(
+    threadId = threadId,
+    repositoryFullName = repositoryFullName,
+    subjectType = subjectType,
+    reason = reason,
+    ignoredAtEpochMs = ignoredAtEpochMs,
+    notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+)
+
 interface NotificationIgnoreStore {
     fun listIgnoredThreadIds(): Set<String>
 
     fun listIgnoredThreads(): List<IgnoredNotificationThread>
 
-    fun saveIgnoredThread(
-        threadId: String,
-        repositoryFullName: String,
-        subjectType: String,
-        reason: NotificationIgnoreReason,
-        ignoredAtEpochMs: Long,
-    ) {
-        saveIgnoredThread(
-            threadId = threadId,
-            repositoryFullName = repositoryFullName,
-            subjectType = subjectType,
-            reason = reason,
-            ignoredAtEpochMs = ignoredAtEpochMs,
-            notificationUpdatedAtEpochMs = null,
-        )
-    }
-
-    @Suppress("LongParameterList")
-    fun saveIgnoredThread(
-        threadId: String,
-        repositoryFullName: String,
-        subjectType: String,
-        reason: NotificationIgnoreReason,
-        ignoredAtEpochMs: Long,
-        notificationUpdatedAtEpochMs: Long?,
-    )
+    fun saveIgnoredThread(request: SaveIgnoredNotificationThreadRequest)
 }

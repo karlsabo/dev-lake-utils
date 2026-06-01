@@ -34,39 +34,14 @@ class SqlDelightNotificationIgnoreStore(
         ).toIgnoredNotificationThread()
     }.executeAsList()
 
-    override fun saveIgnoredThread(
-        threadId: String,
-        repositoryFullName: String,
-        subjectType: String,
-        reason: NotificationIgnoreReason,
-        ignoredAtEpochMs: Long,
-    ) {
-        saveIgnoredThread(
-            threadId = threadId,
-            repositoryFullName = repositoryFullName,
-            subjectType = subjectType,
-            reason = reason,
-            ignoredAtEpochMs = ignoredAtEpochMs,
-            notificationUpdatedAtEpochMs = null,
-        )
-    }
-
-    @Suppress("LongParameterList")
-    override fun saveIgnoredThread(
-        threadId: String,
-        repositoryFullName: String,
-        subjectType: String,
-        reason: NotificationIgnoreReason,
-        ignoredAtEpochMs: Long,
-        notificationUpdatedAtEpochMs: Long?,
-    ) {
+    override fun saveIgnoredThread(request: SaveIgnoredNotificationThreadRequest) {
         queries.upsertThread(
-            thread_id = threadId,
-            repository_full_name = repositoryFullName,
-            subject_type = subjectType,
-            ignore_reason = reason.name,
-            ignored_at_epoch_ms = ignoredAtEpochMs,
-            notification_updated_at_epoch_ms = notificationUpdatedAtEpochMs,
+            thread_id = request.threadId,
+            repository_full_name = request.repositoryFullName,
+            subject_type = request.subjectType,
+            ignore_reason = request.reason.name,
+            ignored_at_epoch_ms = request.ignoredAtEpochMs,
+            notification_updated_at_epoch_ms = request.notificationUpdatedAtEpochMs,
         )
     }
 }

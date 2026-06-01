@@ -30,8 +30,8 @@ import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.User
 import com.github.karlsabo.notifications.IgnoredNotificationThread
-import com.github.karlsabo.notifications.NotificationIgnoreReason
 import com.github.karlsabo.notifications.NotificationIgnoreStore
+import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
 import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -2690,12 +2690,5 @@ private class NoOpNotificationIgnoreStore : NotificationIgnoreStore {
 
     override fun listIgnoredThreads(): List<IgnoredNotificationThread> = emptyList()
 
-    override fun saveIgnoredThread(
-        threadId: String,
-        repositoryFullName: String,
-        subjectType: String,
-        reason: NotificationIgnoreReason,
-        ignoredAtEpochMs: Long,
-        notificationUpdatedAtEpochMs: Long?,
-    ) = Unit
+    override fun saveIgnoredThread(request: SaveIgnoredNotificationThreadRequest) = Unit
 }

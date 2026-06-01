@@ -2,13 +2,10 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.git.GitCommandException
-import com.github.karlsabo.github.Notification
 import com.github.karlsabo.notifications.IgnoredNotificationThread
-import com.github.karlsabo.notifications.NotificationIgnoreReason
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
-import kotlinx.datetime.Clock
 
 internal val logger = KotlinLogging.logger {}
 
@@ -25,17 +22,6 @@ internal fun loadIgnoredThreads(
 }
     .onFailure { logger.error(it) { "Failed to load persisted ignored notifications" } }
     .getOrElse { emptyMap() }
-
-internal fun Notification.toIgnoredNotificationThread(
-    reason: NotificationIgnoreReason,
-): IgnoredNotificationThread = IgnoredNotificationThread(
-    threadId = id,
-    repositoryFullName = repository.fullName,
-    subjectType = subject.type,
-    reason = reason,
-    ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
-    notificationUpdatedAtEpochMs = updatedAt.toEpochMilliseconds(),
-)
 
 internal fun checkoutRepoPath(repoFullName: String, config: EngHubConfig): String {
     val repoName = repoFullName.substringAfterLast('/')

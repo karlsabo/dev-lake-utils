@@ -23,6 +23,8 @@ import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreReason
 import com.github.karlsabo.notifications.NotificationIgnoreStore
+import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
+import com.github.karlsabo.notifications.toIgnoredNotificationThread
 import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -779,7 +781,7 @@ class EngHubNotificationPersistenceViewModelTest {
                 .first { notifications -> notifications.any { it.notificationThreadId == "thread-1" } }
         }
 
-        viewModel.markNotificationDone(testNotificationUiState("thread-1"))
+        viewModel.markNotificationDone(testNotificationUiState())
 
         assertEquals(listOf("thread-1"), api.markedDoneThreadIds.awaitValue())
         assertEquals(
@@ -800,7 +802,7 @@ class EngHubNotificationPersistenceViewModelTest {
         val api = NotificationPersistenceGitHubApi()
         val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
-        val notification = testNotificationUiState("thread-1")
+        val notification = testNotificationUiState()
 
         viewModel.unsubscribeFromNotification(notification)
 
@@ -827,7 +829,7 @@ class EngHubNotificationPersistenceViewModelTest {
         val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
 
-        viewModel.unsubscribeFromNotification(testNotificationUiState("thread-1"))
+        viewModel.unsubscribeFromNotification(testNotificationUiState())
 
         assertEquals(
             "boom",
@@ -857,7 +859,7 @@ class EngHubNotificationPersistenceViewModelTest {
                 .first { notifications -> notifications.any { it.notificationThreadId == "thread-1" } }
         }
 
-        viewModel.unsubscribeFromNotification(testNotificationUiState("thread-1"))
+        viewModel.unsubscribeFromNotification(testNotificationUiState())
 
         assertEquals(
             "persist failed",
@@ -974,6 +976,15 @@ private data class SavedThread(
     fun withoutTimestamp(): SavedThread = copy(ignoredAtEpochMs = null, notificationUpdatedAtEpochMs = null)
 }
 
+private fun SaveIgnoredNotificationThreadRequest.toSavedThread(): SavedThread = SavedThread(
+    threadId = threadId,
+    repositoryFullName = repositoryFullName,
+    subjectType = subjectType,
+    reason = reason,
+    ignoredAtEpochMs = ignoredAtEpochMs,
+    notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+)
+
 private fun ignoredThread(
     threadId: String,
     reason: NotificationIgnoreReason,
@@ -1005,32 +1016,11 @@ private class RecordingNotificationIgnoreStore(
 
     override fun listIgnoredThreads(): List<IgnoredNotificationThread> = storedIgnoredThreads.values.toList()
 
-    override fun saveIgnoredThread(
-        threadId: String,
-        repositoryFullName: String,
-        subjectType: String,
-        reason: NotificationIgnoreReason,
-        ignoredAtEpochMs: Long,
-        notificationUpdatedAtEpochMs: Long?,
-    ) {
+    override fun saveIgnoredThread(request: SaveIgnoredNotificationThreadRequest) {
         saveFailure?.let { throw it }
         if (queuedSaveFailures.isNotEmpty()) throw queuedSaveFailures.removeAt(0)
-        storedIgnoredThreads[threadId] = IgnoredNotificationThread(
-            threadId = threadId,
-            repositoryFullName = repositoryFullName,
-            subjectType = subjectType,
-            reason = reason,
-            ignoredAtEpochMs = ignoredAtEpochMs,
-            notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
-        )
-        savedThreads.value += SavedThread(
-            threadId = threadId,
-            repositoryFullName = repositoryFullName,
-            subjectType = subjectType,
-            reason = reason,
-            ignoredAtEpochMs = ignoredAtEpochMs,
-            notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
-        )
+        storedIgnoredThreads[request.threadId] = request.toIgnoredNotificationThread()
+        savedThreads.value += request.toSavedThread()
     }
 }
 
@@ -1166,11 +1156,9 @@ private fun testNotification(
     ),
 )
 
-private fun testNotificationUiState(
-    @Suppress("SameParameterValue") threadId: String,
-): NotificationUiState = NotificationUiState(
-    notificationThreadId = threadId,
-    title = "Notification $threadId",
+private fun testNotificationUiState(): NotificationUiState = NotificationUiState(
+    notificationThreadId = "thread-1",
+    title = "Notification thread-1",
     reason = "review_requested",
     updatedAtEpochMs = 2_026_052_910_000,
     repositoryFullName = "test-org/test-repo",

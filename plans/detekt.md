@@ -91,7 +91,7 @@
 
 **Notes:** Preserve `ProjectManagementApi` as the external abstraction unless a split has a clear consumer payoff.
 
-### 5. Notification ignore persistence uses a cohesive request object
+### 5. Notification ignore persistence uses a cohesive request object — Done
 
 **Acceptance criteria:** Given EngHub notification persistence tests, when a notification is marked done, unsubscribed, or automatically hidden, then the same thread fields are persisted and no `LongParameterList`/`SameParameterValue` suppressions remain in notification ignore persistence.
 

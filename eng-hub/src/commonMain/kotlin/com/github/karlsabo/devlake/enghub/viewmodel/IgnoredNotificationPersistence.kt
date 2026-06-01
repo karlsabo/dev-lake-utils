@@ -4,6 +4,8 @@ import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.github.Notification
 import com.github.karlsabo.notifications.NotificationIgnoreReason
 import com.github.karlsabo.notifications.NotificationIgnoreStore
+import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
+import com.github.karlsabo.notifications.toIgnoredNotificationThread
 import kotlinx.coroutines.flow.update
 import kotlinx.datetime.Clock
 
@@ -21,9 +23,10 @@ internal class IgnoredNotificationPersistence(
 
     fun persistAutomaticallyDoneThreadOrLog(notification: Notification) {
         runCatching {
-            persistIgnoredThread(notification, NotificationIgnoreReason.DONE)
+            val request = notification.toDoneSaveIgnoredThreadRequest()
+            notificationIgnoreStore.saveIgnoredThread(request)
             state.ignoredThreads.update {
-                it + (notification.id to notification.toIgnoredNotificationThread(NotificationIgnoreReason.DONE))
+                it + (request.threadId to request.toIgnoredNotificationThread())
             }
         }.onFailure { failure ->
             logger.error(failure) {
@@ -37,42 +40,26 @@ internal class IgnoredNotificationPersistence(
         notification: NotificationUiState,
         reason: NotificationIgnoreReason,
     ) {
-        persistIgnoredThread(
-            threadId = notification.notificationThreadId,
-            repositoryFullName = notification.repositoryFullName,
-            subjectType = notification.subjectType,
-            reason = reason,
-            notificationUpdatedAtEpochMs = notification.updatedAtEpochMs,
-        )
-    }
-
-    private fun persistIgnoredThread(
-        notification: Notification,
-        @Suppress("SameParameterValue") reason: NotificationIgnoreReason,
-    ) {
-        persistIgnoredThread(
-            threadId = notification.id,
-            repositoryFullName = notification.repository.fullName,
-            subjectType = notification.subject.type,
-            reason = reason,
-            notificationUpdatedAtEpochMs = notification.updatedAt.toEpochMilliseconds(),
-        )
-    }
-
-    private fun persistIgnoredThread(
-        threadId: String,
-        repositoryFullName: String,
-        subjectType: String,
-        reason: NotificationIgnoreReason,
-        notificationUpdatedAtEpochMs: Long?,
-    ) {
-        notificationIgnoreStore.saveIgnoredThread(
-            threadId = threadId,
-            repositoryFullName = repositoryFullName,
-            subjectType = subjectType,
-            reason = reason,
-            ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
-            notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
-        )
+        notificationIgnoreStore.saveIgnoredThread(notification.toSaveIgnoredThreadRequest(reason))
     }
 }
+
+private fun NotificationUiState.toSaveIgnoredThreadRequest(
+    reason: NotificationIgnoreReason,
+): SaveIgnoredNotificationThreadRequest = SaveIgnoredNotificationThreadRequest(
+    threadId = notificationThreadId,
+    repositoryFullName = repositoryFullName,
+    subjectType = subjectType,
+    reason = reason,
+    ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
+    notificationUpdatedAtEpochMs = updatedAtEpochMs,
+)
+
+private fun Notification.toDoneSaveIgnoredThreadRequest() = SaveIgnoredNotificationThreadRequest(
+    threadId = id,
+    repositoryFullName = repository.fullName,
+    subjectType = subject.type,
+    reason = NotificationIgnoreReason.DONE,
+    ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
+    notificationUpdatedAtEpochMs = updatedAt.toEpochMilliseconds(),
+)

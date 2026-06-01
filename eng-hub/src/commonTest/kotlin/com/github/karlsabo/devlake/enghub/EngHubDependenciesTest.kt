@@ -19,8 +19,8 @@ import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.notifications.IgnoredNotificationThread
-import com.github.karlsabo.notifications.NotificationIgnoreReason
 import com.github.karlsabo.notifications.NotificationIgnoreStore
+import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
 import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -95,7 +95,7 @@ class EngHubDependenciesTest {
             fakeGitWorktreeApi.ensureWorktreeCalls.awaitValue(),
         )
 
-        viewModel.markNotificationDone(testNotificationUiState("thread-1"))
+        viewModel.markNotificationDone(testNotificationUiState())
         assertEquals(listOf("thread-1"), fakeGitHubApi.markedDoneThreadIds.awaitValue())
     }
 
@@ -152,9 +152,9 @@ class EngHubDependenciesTest {
     }
 }
 
-private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: String): NotificationUiState = NotificationUiState(
-    notificationThreadId = threadId,
-    title = "Notification $threadId",
+private fun testNotificationUiState(): NotificationUiState = NotificationUiState(
+    notificationThreadId = "thread-1",
+    title = "Notification thread-1",
     reason = "review_requested",
     updatedAtEpochMs = 2_026_052_910_000,
     repositoryFullName = "test-org/test-repo",
@@ -317,12 +317,5 @@ private class RecordingNotificationIgnoreStore : NotificationIgnoreStore {
 
     override fun listIgnoredThreads(): List<IgnoredNotificationThread> = emptyList()
 
-    override fun saveIgnoredThread(
-        threadId: String,
-        repositoryFullName: String,
-        subjectType: String,
-        reason: NotificationIgnoreReason,
-        ignoredAtEpochMs: Long,
-        notificationUpdatedAtEpochMs: Long?,
-    ) = Unit
+    override fun saveIgnoredThread(request: SaveIgnoredNotificationThreadRequest) = Unit
 }

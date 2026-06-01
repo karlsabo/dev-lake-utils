@@ -40,28 +40,46 @@ class SqlDelightNotificationIgnoreStoreTest {
 
 private fun SqlDelightNotificationIgnoreStore.saveIgnoredThreadFixtures() {
     saveIgnoredThread(
-        threadId = "thread-1",
-        repositoryFullName = "example-org/example-repo",
-        subjectType = "PullRequest",
-        reason = NotificationIgnoreReason.UNSUBSCRIBED,
-        ignoredAtEpochMs = 1_000,
+        saveRequest(
+            threadId = "thread-1",
+            subjectType = "PullRequest",
+            reason = NotificationIgnoreReason.UNSUBSCRIBED,
+            ignoredAtEpochMs = 1_000,
+        ),
     )
     saveIgnoredThread(
-        threadId = "thread-1",
-        repositoryFullName = "example-org/example-repo",
-        subjectType = "PullRequest",
-        reason = NotificationIgnoreReason.UNSUBSCRIBED,
-        ignoredAtEpochMs = 2_000,
+        saveRequest(
+            threadId = "thread-1",
+            subjectType = "PullRequest",
+            reason = NotificationIgnoreReason.UNSUBSCRIBED,
+            ignoredAtEpochMs = 2_000,
+        ),
     )
     saveIgnoredThread(
-        threadId = "thread-2",
-        repositoryFullName = "example-org/example-repo",
-        subjectType = "Issue",
-        reason = NotificationIgnoreReason.DONE,
-        ignoredAtEpochMs = 3_000,
-        notificationUpdatedAtEpochMs = 2_026_052_910_000,
+        saveRequest(
+            threadId = "thread-2",
+            subjectType = "Issue",
+            reason = NotificationIgnoreReason.DONE,
+            ignoredAtEpochMs = 3_000,
+            notificationUpdatedAtEpochMs = 2_026_052_910_000,
+        ),
     )
 }
+
+private fun saveRequest(
+    threadId: String,
+    subjectType: String,
+    reason: NotificationIgnoreReason,
+    ignoredAtEpochMs: Long,
+    notificationUpdatedAtEpochMs: Long? = null,
+): SaveIgnoredNotificationThreadRequest = SaveIgnoredNotificationThreadRequest(
+    threadId = threadId,
+    repositoryFullName = "example-org/example-repo",
+    subjectType = subjectType,
+    reason = reason,
+    ignoredAtEpochMs = ignoredAtEpochMs,
+    notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+)
 
 private fun expectedIgnoredThreads(): List<IgnoredNotificationThread> = listOf(
     IgnoredNotificationThread(
