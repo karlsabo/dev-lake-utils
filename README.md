@@ -15,6 +15,8 @@
 
 * [ ] Clicking open on a notification takes you to the PR, not to what GitHub wants to take you to such as a new commit or comment.
 * [ ] Copy .idea folder from the base/root repo. Or come up with a copy script to call as part of the setup procedure.
+* [ ] Fix detekt to support Compose: https://detekt.dev/docs/introduction/compose/
+    * Fix ktlint to support Compose: https://mrmans0n.github.io/compose-rules/ktlint/
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on
     * Clicking on the worktree to expand, it sometimes takes too long to expand

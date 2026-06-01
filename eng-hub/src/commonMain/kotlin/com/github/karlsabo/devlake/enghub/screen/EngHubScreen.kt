@@ -27,7 +27,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
+import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
+import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
+import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.component.errorDialog
 import com.github.karlsabo.devlake.enghub.component.notificationPanel
 import com.github.karlsabo.devlake.enghub.component.pullRequestPanel
@@ -108,32 +112,38 @@ fun engHubScreen(viewModel: EngHubViewModel) {
                     )
 
                     EngHubPane.Worktrees -> worktreePanel(
-                        localRepositories = localRepositories,
-                        onAddRepository = { viewModel.pickAndAddLocalRepository() },
-                        onToggleRepository = { viewModel.toggleLocalRepositoryExpansion(it) },
-                        onOpenWorktree = { repoRootPath, worktreePath ->
-                            viewModel.openLocalWorktree(repoRootPath, worktreePath)
-                        },
-                        onArchiveWorktree = { repoRootPath, worktreePath ->
-                            viewModel.archiveLocalWorktree(repoRootPath, worktreePath)
-                        },
-                        onCreateWorktree = { repoRootPath, baseWorktreePath, baseBranch, targetBranch ->
-                            viewModel.createLocalWorktreeFromBase(
-                                repoRootPath = repoRootPath,
-                                baseWorktreePath = baseWorktreePath,
-                                baseBranch = baseBranch,
-                                targetBranch = targetBranch,
-                            )
-                        },
-                        forceArchiveRequest = forceArchiveWorktreeRequest,
-                        onConfirmForceArchiveWorktree = { repoRootPath, worktreePath ->
-                            viewModel.confirmForceArchiveLocalWorktree(repoRootPath, worktreePath)
-                        },
-                        onDismissForceArchiveWorktree = {
-                            viewModel.dismissForceArchiveWorktreeRequest()
-                        },
-                        setupStatuses = setupStatuses,
-                        archivingWorktreePaths = archivingLocalWorktreePaths,
+                        state = WorktreePanelState(
+                            localRepositories = localRepositories,
+                            forceArchiveRequest = forceArchiveWorktreeRequest,
+                            setupStatuses = setupStatuses,
+                            archivingWorktreePaths = archivingLocalWorktreePaths,
+                        ),
+                        actions = WorktreePanelActions(
+                            onAddRepository = { viewModel.pickAndAddLocalRepository() },
+                            onToggleRepository = { viewModel.toggleLocalRepositoryExpansion(it) },
+                            worktrees = LocalWorktreeActions(
+                                onOpenWorktree = { repoRootPath, worktreePath ->
+                                    viewModel.openLocalWorktree(repoRootPath, worktreePath)
+                                },
+                                onArchiveWorktree = { repoRootPath, worktreePath ->
+                                    viewModel.archiveLocalWorktree(repoRootPath, worktreePath)
+                                },
+                                onCreateWorktree = { repoRootPath, baseWorktreePath, baseBranch, targetBranch ->
+                                    viewModel.createLocalWorktreeFromBase(
+                                        repoRootPath = repoRootPath,
+                                        baseWorktreePath = baseWorktreePath,
+                                        baseBranch = baseBranch,
+                                        targetBranch = targetBranch,
+                                    )
+                                },
+                            ),
+                            forceArchive = ForceArchiveWorktreeActions(
+                                onConfirm = { repoRootPath, worktreePath ->
+                                    viewModel.confirmForceArchiveLocalWorktree(repoRootPath, worktreePath)
+                                },
+                                onDismiss = { viewModel.dismissForceArchiveWorktreeRequest() },
+                            ),
+                        ),
                         modifier = Modifier.weight(1f),
                     )
                 }

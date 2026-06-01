@@ -106,7 +106,9 @@
 
 **Notes:** This should shrink call sites and remove the temptation to suppress long parameter lists in tests.
 
-### 6. EngHub worktree UI is split into state, actions, rows, and dialogs
+### 6. EngHub worktree UI is split into state, actions, rows, and dialogs - Done
+
+**Done** 2026-06-01
 
 **Acceptance criteria:** Given the Worktrees pane, when a user adds a repository, expands it, opens a worktree, creates a worktree, archives a clean worktree, or confirms force archive, then behavior is unchanged and `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/component/WorktreePanel.kt` has no `LongMethod`, `LongParameterList`, or `TooManyFunctions` baseline entry.
 
