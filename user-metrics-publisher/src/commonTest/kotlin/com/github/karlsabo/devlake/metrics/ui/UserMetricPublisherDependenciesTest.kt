@@ -83,7 +83,7 @@ class UserMetricPublisherDependenciesTest {
                     providedConfig,
                     providedUsersConfig,
                     providedLinearApiConfig,
-                    providedGitHubApiConfig
+                    providedGitHubApiConfig,
                 ) {
                     override val dependencies = dependencies
                 }
@@ -288,14 +288,14 @@ class UserMetricPublisherDependenciesTest {
                 SlackMessage(
                     userEmail = metricOne.email,
                     message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricOne.userId})\n" +
-                            metricOne.toSlackMarkdown() +
-                            "\nConfigured postfix",
+                        metricOne.toSlackMarkdown() +
+                        "\nConfigured postfix",
                 ),
                 SlackMessage(
                     userEmail = metricTwo.email,
                     message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricTwo.userId})\n" +
-                            metricTwo.toSlackMarkdown() +
-                            "\nConfigured postfix",
+                        metricTwo.toSlackMarkdown() +
+                        "\nConfigured postfix",
                 ),
             ),
             recordingPublisher.messages,
@@ -353,20 +353,20 @@ class UserMetricPublisherDependenciesTest {
                 SlackMessage(
                     userEmail = metricOne.email,
                     message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricOne.userId})\n" +
-                            metricOne.toSlackMarkdown() +
-                            "\nConfigured postfix",
+                        metricOne.toSlackMarkdown() +
+                        "\nConfigured postfix",
                 ),
                 SlackMessage(
                     userEmail = metricTwo.email,
                     message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricTwo.userId})\n" +
-                            metricTwo.toSlackMarkdown() +
-                            "\nConfigured postfix",
+                        metricTwo.toSlackMarkdown() +
+                        "\nConfigured postfix",
                 ),
                 SlackMessage(
                     userEmail = metricThree.email,
                     message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricThree.userId})\n" +
-                            metricThree.toSlackMarkdown() +
-                            "\nConfigured postfix",
+                        metricThree.toSlackMarkdown() +
+                        "\nConfigured postfix",
                 ),
             ),
             recordingPublisher.messages,
@@ -424,20 +424,20 @@ class UserMetricPublisherDependenciesTest {
                 SlackMessage(
                     userEmail = metricOne.email,
                     message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricOne.userId})\n" +
-                            metricOne.toSlackMarkdown() +
-                            "\nConfigured postfix",
+                        metricOne.toSlackMarkdown() +
+                        "\nConfigured postfix",
                 ),
                 SlackMessage(
                     userEmail = metricTwo.email,
                     message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricTwo.userId})\n" +
-                            metricTwo.toSlackMarkdown() +
-                            "\nConfigured postfix",
+                        metricTwo.toSlackMarkdown() +
+                        "\nConfigured postfix",
                 ),
                 SlackMessage(
                     userEmail = metricThree.email,
                     message = "📢 *Weekly PR & Issue Summary* 🚀 (${metricThree.userId})\n" +
-                            metricThree.toSlackMarkdown() +
-                            "\nConfigured postfix",
+                        metricThree.toSlackMarkdown() +
+                        "\nConfigured postfix",
                 ),
             ),
             recordingPublisher.messages,
@@ -453,15 +453,13 @@ private fun testDependencies(
     gitHubApi: GitHubApi,
     metricsService: UserMetricsService,
     messagePublisherService: UserMetricMessagePublisherService,
-): UserMetricPublisherDependencies {
-    return UserMetricPublisherDependencies(
-        usersConfig = usersConfig,
-        projectManagementApi = projectManagementApi,
-        gitHubApi = gitHubApi,
-        metricsService = metricsService,
-        messagePublisherService = messagePublisherService,
-    )
-}
+): UserMetricPublisherDependencies = UserMetricPublisherDependencies(
+    usersConfig = usersConfig,
+    projectManagementApi = projectManagementApi,
+    gitHubApi = gitHubApi,
+    metricsService = metricsService,
+    messagePublisherService = messagePublisherService,
+)
 
 private class RecordingMetricsService(
     private val metrics: UserMetrics,
@@ -540,10 +538,17 @@ private class NoOpProjectManagementApi : ProjectManagementApi {
 
     override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<ProjectComment> = emptyList()
 
-    override suspend fun getIssuesResolved(user: User, startDate: Instant, endDate: Instant): List<ProjectIssue> =
-        emptyList()
+    override suspend fun getIssuesResolved(
+        user: User,
+        startDate: Instant,
+        endDate: Instant,
+    ): List<ProjectIssue> = emptyList()
 
-    override suspend fun getIssuesResolvedCount(user: User, startDate: Instant, endDate: Instant): UInt = 0u
+    override suspend fun getIssuesResolvedCount(
+        user: User,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt = 0u
 
     override suspend fun getIssuesByFilter(filter: IssueFilter): List<ProjectIssue> = emptyList()
 
@@ -593,16 +598,23 @@ private class NoOpGitHubApi : GitHubApi {
 
     override suspend fun hasAnyApprovedReview(url: String): Boolean = false
 
-    override suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String): List<Issue> =
-        emptyList()
+    override suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String): List<Issue> = emptyList()
 
-    override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary {
-        return CheckRunSummary(total = 0, passed = 0, failed = 0, inProgress = 0, status = CiStatus.PENDING)
-    }
+    override suspend fun getCheckRunsForRef(
+        owner: String,
+        repo: String,
+        ref: String,
+    ): CheckRunSummary = CheckRunSummary(total = 0, passed = 0, failed = 0, inProgress = 0, status = CiStatus.PENDING)
 
-    override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary {
-        return ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
-    }
+    override suspend fun getReviewSummary(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): ReviewSummary = ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
 
-    override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) = Unit
+    override suspend fun submitReview(
+        prApiUrl: String,
+        event: ReviewStateValue,
+        reviewComment: String?,
+    ) = Unit
 }

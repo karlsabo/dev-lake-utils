@@ -37,7 +37,7 @@ fun main(args: Array<String>): Unit = runBlocking {
         val userIssues = jiraApi.getIssuesResolved(
             User(id = userId, name = userId, jiraId = userId),
             startDate,
-            Clock.System.now()
+            Clock.System.now(),
         )
         println("Found ${userIssues.size} issues assigned to user")
 
@@ -85,7 +85,7 @@ fun main(args: Array<String>): Unit = runBlocking {
                 val date = epic.completedAt ?: epic.createdAt
 
                 // Get all issues under this epic
-                val allChildIssues = runBlocking { jiraApi.getChildIssues(listOf(key)) }
+                val allChildIssues = jiraApi.getChildIssues(listOf(key))
                     .filter { it.isIssueOrBug() }
 
                 // Get completed issues under this epic

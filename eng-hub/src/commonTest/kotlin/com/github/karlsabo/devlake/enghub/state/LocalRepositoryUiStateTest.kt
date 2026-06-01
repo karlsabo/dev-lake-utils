@@ -39,7 +39,7 @@ class LocalRepositoryUiStateTest {
 
         assertEquals(
             listOf(LocalRepositoryUiState(name = "atlas-tooling", path = "/workspace/atlas-tooling/")),
-            uiStates
+            uiStates,
         )
     }
 

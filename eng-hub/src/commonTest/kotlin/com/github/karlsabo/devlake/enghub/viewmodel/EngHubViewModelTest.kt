@@ -385,6 +385,7 @@ class EngHubViewModelTest {
                     }
 
                     DOCS_ROOT -> listOf(Worktree(path = DOCS_ROOT, branch = "docs-main", commitHash = "123abc"))
+
                     else -> error("Unexpected repo path $repoPath")
                 }
             },
@@ -412,16 +413,17 @@ class EngHubViewModelTest {
                 val devLake = repositories.single { it.path == DEV_LAKE_ROOT }
                 val docs = repositories.single { it.path == DOCS_ROOT }
                 !devLake.isExpanded &&
-                        !docs.isExpanded &&
-                        devLake.worktrees.size == 2 &&
-                        docs.worktrees.size == 1
+                    !docs.isExpanded &&
+                    devLake.worktrees.size == 2 &&
+                    docs.worktrees.size == 1
             }
         }
 
         assertEquals(setOf(DEV_LAKE_ROOT, DOCS_ROOT), api.listWorktreeRepoPaths.toSet())
         assertEquals(
             listOf("main", "feature/worktree-panel"),
-            repositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.branch })
+            repositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.branch },
+        )
         assertEquals(listOf(false, true), repositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.isDirty })
         assertEquals(listOf("docs-main"), repositories.single { it.path == DOCS_ROOT }.worktrees.map { it.branch })
         assertEquals(0, gitHubApi.openPullRequestCalls)
@@ -1081,7 +1083,7 @@ class EngHubViewModelTest {
             onCreateBranchWorktree = { _, _, _, _ ->
                 throw GitWorktreeException(
                     "Branch feature/stacked-pr is already checked out elsewhere at " +
-                            "/repos/dev-lake-utils-feature-stacked-pr-existing. Choose a different branch name.",
+                        "/repos/dev-lake-utils-feature-stacked-pr-existing. Choose a different branch name.",
                 )
             },
         )
@@ -1112,7 +1114,7 @@ class EngHubViewModelTest {
 
         assertEquals(
             "Branch feature/stacked-pr is already checked out elsewhere at " +
-                    "/repos/dev-lake-utils-feature-stacked-pr-existing. Choose a different branch name.",
+                "/repos/dev-lake-utils-feature-stacked-pr-existing. Choose a different branch name.",
             actionError?.message,
         )
         assertEquals(0, setupRunner.calls())
@@ -1445,7 +1447,7 @@ class EngHubViewModelTest {
             statuses = withTimeout(2_000.milliseconds) {
                 viewModel.setupStatusesStateFlow.first { current ->
                     current[firstWorktreePath] == WorktreeSetupStatus.RUNNING_SETUP_COMMANDS &&
-                            current[secondWorktreePath] == WorktreeSetupStatus.RUNNING_SETUP_COMMANDS
+                        current[secondWorktreePath] == WorktreeSetupStatus.RUNNING_SETUP_COMMANDS
                 }
             }
 
@@ -1496,10 +1498,12 @@ class EngHubViewModelTest {
             )
             val pullRequestWorktreePath = viewModel.checkoutWorktreePath(repoFullName, branch)
             val setupStatusFor = { currentRepoFullName: String, currentBranch: String ->
-                viewModel.setupStatusesStateFlow.value[viewModel.checkoutWorktreePath(
-                    currentRepoFullName,
-                    currentBranch
-                )]
+                viewModel.setupStatusesStateFlow.value[
+                    viewModel.checkoutWorktreePath(
+                        currentRepoFullName,
+                        currentBranch,
+                    ),
+                ]
             }
 
             val firstCheckout = viewModel.checkoutAndOpen(repoFullName, branch)
@@ -1559,10 +1563,12 @@ class EngHubViewModelTest {
             )
             val worktreePath = viewModel.checkoutWorktreePath(repoFullName, branch)
             val setupStatusFor = { currentRepoFullName: String, currentBranch: String ->
-                viewModel.setupStatusesStateFlow.value[viewModel.checkoutWorktreePath(
-                    currentRepoFullName,
-                    currentBranch
-                )]
+                viewModel.setupStatusesStateFlow.value[
+                    viewModel.checkoutWorktreePath(
+                        currentRepoFullName,
+                        currentBranch,
+                    ),
+                ]
             }
 
             viewModel.openLocalWorktree(repoPath, worktreePath.value)
@@ -2258,13 +2264,17 @@ private class RecordingGitHubApi(
         error("Unexpected call")
     }
 
-    override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary {
-        return CheckRunSummary(total = 3, passed = 3, failed = 0, inProgress = 0, status = CiStatus.PASSED)
-    }
+    override suspend fun getCheckRunsForRef(
+        owner: String,
+        repo: String,
+        ref: String,
+    ): CheckRunSummary = CheckRunSummary(total = 3, passed = 3, failed = 0, inProgress = 0, status = CiStatus.PASSED)
 
-    override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary {
-        return ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
-    }
+    override suspend fun getReviewSummary(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): ReviewSummary = ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
 
     override suspend fun getMergedPullRequestCount(
         gitHubUserId: String,
@@ -2323,7 +2333,11 @@ private class RecordingGitHubApi(
         error("Unexpected call")
     }
 
-    override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) {
+    override suspend fun submitReview(
+        prApiUrl: String,
+        event: ReviewStateValue,
+        reviewComment: String?,
+    ) {
         error("Unexpected call")
     }
 }
@@ -2359,44 +2373,40 @@ private fun testIssue(@Suppress("SameParameterValue") issueApiUrl: String, pullA
 private fun sharedProgressPullRequest(
     @Suppress("SameParameterValue") repoFullName: String,
     @Suppress("SameParameterValue") branch: String,
-): PullRequestUiState {
-    return PullRequestUiState(
-        number = 1,
-        title = "Shared progress",
-        htmlUrl = "https://github.com/$repoFullName/pull/1",
-        repositoryFullName = repoFullName,
-        owner = repoFullName.substringBefore('/'),
-        repo = repoFullName.substringAfter('/'),
-        isDraft = false,
-        ciStatus = CiStatus.PENDING,
-        ciSummaryText = "0/0 passed",
-        approvedCount = 0,
-        requestedCount = 0,
-        reviewSummaryText = "0/0 approved",
-        headRef = branch,
-        apiUrl = "https://api.github.com/repos/$repoFullName/pulls/1",
-    )
-}
+): PullRequestUiState = PullRequestUiState(
+    number = 1,
+    title = "Shared progress",
+    htmlUrl = "https://github.com/$repoFullName/pull/1",
+    repositoryFullName = repoFullName,
+    owner = repoFullName.substringBefore('/'),
+    repo = repoFullName.substringAfter('/'),
+    isDraft = false,
+    ciStatus = CiStatus.PENDING,
+    ciSummaryText = "0/0 passed",
+    approvedCount = 0,
+    requestedCount = 0,
+    reviewSummaryText = "0/0 approved",
+    headRef = branch,
+    apiUrl = "https://api.github.com/repos/$repoFullName/pulls/1",
+)
 
 private fun sharedProgressNotification(
     @Suppress("SameParameterValue") repoFullName: String,
     @Suppress("SameParameterValue") branch: String,
-): NotificationUiState {
-    return NotificationUiState(
-        notificationThreadId = "thread-1",
-        title = "Shared progress",
-        reason = "review_requested",
-        updatedAtEpochMs = 2_026_052_910_000,
-        repositoryFullName = repoFullName,
-        subjectType = "PullRequest",
-        htmlUrl = "https://github.com/$repoFullName/pull/1",
-        apiUrl = "https://api.github.com/repos/$repoFullName/pulls/1",
-        isPullRequest = true,
-        pullRequestNumber = 1,
-        unread = true,
-        headRef = branch,
-    )
-}
+): NotificationUiState = NotificationUiState(
+    notificationThreadId = "thread-1",
+    title = "Shared progress",
+    reason = "review_requested",
+    updatedAtEpochMs = 2_026_052_910_000,
+    repositoryFullName = repoFullName,
+    subjectType = "PullRequest",
+    htmlUrl = "https://github.com/$repoFullName/pull/1",
+    apiUrl = "https://api.github.com/repos/$repoFullName/pulls/1",
+    isPullRequest = true,
+    pullRequestNumber = 1,
+    unread = true,
+    headRef = branch,
+)
 
 private fun createLocalRepositoryViewModel(
     gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()),
@@ -2409,25 +2419,23 @@ private fun createLocalRepositoryViewModel(
     worktreePollIntervalMs: Long = 120_000,
     repositoriesBaseDir: String = "",
     setupShell: String = "/bin/zsh",
-): EngHubViewModel {
-    return EngHubViewModel(
-        gitHubApi = gitHubApi,
-        gitHubNotificationService = GitHubNotificationService(gitHubApi),
-        gitWorktreeApi = gitWorktreeApi,
-        worktreeSetupCoordinator = worktreeSetupCoordinator,
-        desktopLauncher = LocalRepositoryNoOpDesktopLauncher(),
-        directoryPicker = LocalRepositoryNoOpDirectoryPicker(),
-        configWriter = configWriter,
-        config = EngHubConfig(
-            pollIntervalMs = 60_000,
-            worktreePollIntervalMs = worktreePollIntervalMs,
-            repositoriesBaseDir = repositoriesBaseDir,
-            localRepositories = localRepositoryConfigs,
-            setupShell = setupShell,
-        ),
-        notificationIgnoreStore = NoOpNotificationIgnoreStore(),
-    )
-}
+): EngHubViewModel = EngHubViewModel(
+    gitHubApi = gitHubApi,
+    gitHubNotificationService = GitHubNotificationService(gitHubApi),
+    gitWorktreeApi = gitWorktreeApi,
+    worktreeSetupCoordinator = worktreeSetupCoordinator,
+    desktopLauncher = LocalRepositoryNoOpDesktopLauncher(),
+    directoryPicker = LocalRepositoryNoOpDirectoryPicker(),
+    configWriter = configWriter,
+    config = EngHubConfig(
+        pollIntervalMs = 60_000,
+        worktreePollIntervalMs = worktreePollIntervalMs,
+        repositoriesBaseDir = repositoriesBaseDir,
+        localRepositories = localRepositoryConfigs,
+        setupShell = setupShell,
+    ),
+    notificationIgnoreStore = NoOpNotificationIgnoreStore(),
+)
 
 private class BlockingCoordinatorSetupRunner : WorktreeSetupCommandRunner {
     private val signals = WorktreeSetupRunnerSignals()
@@ -2596,6 +2604,13 @@ private class RecordingGitWorktreeApi(
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
+    override fun isBranchAncestor(
+        repoPath: String,
+        baseBranch: String,
+        childBranch: String,
+    ): Boolean {
+        TODO("Not yet implemented")
+    }
 
     override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
         resolvedPaths += selectedPath
@@ -2611,7 +2626,11 @@ private class RecordingGitWorktreeApi(
 
     override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
 
-    override fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean) {
+    override fun archiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        force: Boolean,
+    ) {
         archiveWorktreeCalls += repoPath to worktreePath
         archiveWorktreeForceValues += force
         archiveWorktreeFailure?.let { throw it }
@@ -2639,9 +2658,7 @@ private fun deleteRecursively(path: Path) {
     SystemFileSystem.delete(path, mustExist = false)
 }
 
-private fun readText(path: Path): String {
-    return SystemFileSystem.source(path).buffered().use { it.readString() }
-}
+private fun readText(path: Path): String = SystemFileSystem.source(path).buffered().use { it.readString() }
 
 private fun writeText(path: Path, @Suppress("SameParameterValue") text: String) {
     SystemFileSystem.sink(path).buffered().use { it.writeString(text) }

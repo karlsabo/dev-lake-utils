@@ -49,6 +49,6 @@ fun UserMetrics.toSlackMarkdown(): String {
 private fun weeksElapsedThisYear(): Int {
     val now = System.now()
     val startOfYear = now.toLocalDateTime(TimeZone.currentSystemDefault())
-        .run { Instant.parse("${year}-01-01T00:00:00Z") }
+        .run { Instant.parse("$year-01-01T00:00:00Z") }
     return ((now - startOfYear).inWholeDays / 7).toInt()
 }

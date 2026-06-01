@@ -30,7 +30,7 @@ fun ErrorDialog(
                 modifier = Modifier
                     .padding(16.dp)
                     .fillMaxWidth()
-                    .wrapContentHeight()
+                    .wrapContentHeight(),
             ) {
                 Text(text = "Error", style = MaterialTheme.typography.h6)
                 Spacer(modifier = Modifier.height(8.dp))

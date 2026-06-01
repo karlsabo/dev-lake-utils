@@ -41,14 +41,12 @@ private data class CiCounts(
     val failed: Int,
     val inProgress: Int,
 ) {
-    operator fun plus(other: CiCounts): CiCounts {
-        return CiCounts(
-            total = total + other.total,
-            passed = passed + other.passed,
-            failed = failed + other.failed,
-            inProgress = inProgress + other.inProgress,
-        )
-    }
+    operator fun plus(other: CiCounts): CiCounts = CiCounts(
+        total = total + other.total,
+        passed = passed + other.passed,
+        failed = failed + other.failed,
+        inProgress = inProgress + other.inProgress,
+    )
 
     fun toSummary(): CheckRunSummary {
         val ciStatus = when {
@@ -71,7 +69,9 @@ private data class CiCounts(
 /**
  * Implementation of the GitHubApi interface using REST.
  */
-class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
+class GitHubRestApi(
+    private val config: GitHubApiRestConfig,
+) : GitHubApi {
     constructor(config: GitHubApiRestConfig, httpClient: HttpClient) : this(config) {
         clientOverride = httpClient
     }
@@ -102,7 +102,10 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
     }
 
     @Serializable
-    private data class CreateReviewRequest(val event: String, val body: String = "")
+    private data class CreateReviewRequest(
+        val event: String,
+        val body: String = "",
+    )
 
     @Serializable
     private data class PullRequestReview(
@@ -310,7 +313,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
                 val reviews = lenientJson.decodeFromString<List<PullRequestReview>>(responseText)
                 reviews.any { review ->
                     review.state.equals("APPROVED", ignoreCase = true) &&
-                            !isBotUser(review.user?.login, review.user?.type)
+                        !isBotUser(review.user?.login, review.user?.type)
                 }
             } catch (_: Exception) {
                 false
@@ -355,7 +358,11 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         return paginatedIssueQuery(encodedQuery)
     }
 
-    override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary {
+    override suspend fun getCheckRunsForRef(
+        owner: String,
+        repo: String,
+        ref: String,
+    ): CheckRunSummary {
         val checkRunsUrl = "https://api.github.com/repos/$owner/$repo/commits/$ref/check-runs?per_page=100"
         val checkRunsResponse = client.get(checkRunsUrl)
         val checkRunsText = checkRunsResponse.bodyAsText()
@@ -374,7 +381,7 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
                 "Failed to get commit statuses for $owner/$repo ref=$ref response.status=${statusContextsResponse.status} responseText=```$statusContextsText```"
             }
             throw Exception(
-                "Failed to get commit statuses: ${statusContextsResponse.status.value} for $owner/$repo ref=$ref responseText=```$statusContextsText```"
+                "Failed to get commit statuses: ${statusContextsResponse.status.value} for $owner/$repo ref=$ref responseText=```$statusContextsText```",
             )
         }
 
@@ -386,7 +393,11 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         return (checkRunCounts + statusContextCounts).toSummary()
     }
 
-    override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary {
+    override suspend fun getReviewSummary(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): ReviewSummary {
         val reviewsUrl = "https://api.github.com/repos/$owner/$repo/pulls/$prNumber/reviews?per_page=100"
         val reviewsResponse = client.get(reviewsUrl)
         val reviewsText = reviewsResponse.bodyAsText()
@@ -436,7 +447,11 @@ class GitHubRestApi(private val config: GitHubApiRestConfig) : GitHubApi {
         return ReviewSummary(approvedCount = approvedCount, requestedCount = totalRequested, reviews = reviews)
     }
 
-    override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) {
+    override suspend fun submitReview(
+        prApiUrl: String,
+        event: ReviewStateValue,
+        reviewComment: String?,
+    ) {
         val reviewsUrl = if (prApiUrl.endsWith("/reviews")) prApiUrl else "$prApiUrl/reviews"
         val response = client.post(reviewsUrl) {
             contentType(ContentType.Application.Json)
@@ -519,6 +534,4 @@ private fun createReviewedPrEncodedQuery(
     return encodedQuery
 }
 
-fun JsonElement.toPullRequest(): Issue {
-    return lenientJson.decodeFromJsonElement(Issue.serializer(), this)
-}
+fun JsonElement.toPullRequest(): Issue = lenientJson.decodeFromJsonElement(Issue.serializer(), this)

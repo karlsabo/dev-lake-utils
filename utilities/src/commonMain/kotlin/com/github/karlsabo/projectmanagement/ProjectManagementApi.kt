@@ -59,7 +59,11 @@ interface ProjectManagementApi {
      * @param endDate End of the date range (inclusive)
      * @return List of resolved issues
      */
-    suspend fun getIssuesResolved(user: User, startDate: Instant, endDate: Instant): List<ProjectIssue>
+    suspend fun getIssuesResolved(
+        user: User,
+        startDate: Instant,
+        endDate: Instant,
+    ): List<ProjectIssue>
 
     /**
      * Counts issues resolved by a user within a date range.
@@ -71,7 +75,11 @@ interface ProjectManagementApi {
      * @param endDate End of the date range (inclusive)
      * @return Count of resolved issues
      */
-    suspend fun getIssuesResolvedCount(user: User, startDate: Instant, endDate: Instant): UInt
+    suspend fun getIssuesResolvedCount(
+        user: User,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt
 
     /**
      * Retrieves issues matching the given filter criteria.

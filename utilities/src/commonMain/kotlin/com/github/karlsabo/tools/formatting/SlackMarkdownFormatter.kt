@@ -32,7 +32,9 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
         this.milestones.sortedBy { it.issue.title }.forEach { milestone ->
             if (milestone.issue.completedAt != null && milestone.issue.completedAt < Clock.System.now()
                     .minus(14.days)
-            ) return@forEach
+            ) {
+                return@forEach
+            }
 
             summary.appendLine()
             val complete = if (milestone.issue.completedAt == null) "" else "✅ "
@@ -45,7 +47,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     summary.appendLine(
                         "📍 Issues resolved: ${
                             issuesResolved.joinToString(", ") { "<${it.url}|${it.key}>" }
-                        }"
+                        }",
                     )
                 } else {
                     val changeCharacterLimit = 200
@@ -68,7 +70,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         val commentBody = (lastComment.body ?: "").take(changeCharacterLimit)
                         val commentDescription =
                             commentBody + if ((lastComment.body?.length ?: 0) > changeCharacterLimit) "..." else ""
-                        summary.appendLine("${warningEmoji}🗓️ Last update $dateStr: \"$commentDescription\"")
+                        summary.appendLine("$warningEmoji🗓️ Last update $dateStr: \"$commentDescription\"")
                     } else if (lastIssueResolutionDate != null) {
                         // Issue resolution is the most recent
                         val dateStr = lastIssueResolutionDate.toLocalDateTime(TimeZone.of("America/New_York")).date
@@ -78,9 +80,9 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                         summary.appendLine(
                             "$warningEmoji🗓️ Last update $dateStr: <${lastIssue.url}|${lastIssue.key}> \"${
                                 lastIssue.title?.take(
-                                    changeCharacterLimit
+                                    changeCharacterLimit,
                                 )
-                            }${if ((lastIssue.title?.length ?: 0) > changeCharacterLimit) "..." else ""}\""
+                            }${if ((lastIssue.title?.length ?: 0) > changeCharacterLimit) "..." else ""}\"",
                         )
                     } else {
                         isStatusRecent = false
@@ -109,7 +111,7 @@ fun ProjectSummary.toVerboseSlackMarkdown(): String {
                     summary.appendLine(
                         "📩 Issues opened: ${
                             issuesOpened.joinToString(", ") { "<${it.url}|${it.key}>" }
-                        }"
+                        }",
                     )
                 }
                 if (milestone.durationMergedPullRequests.isNotEmpty()) {
@@ -151,7 +153,7 @@ fun ProjectSummary.toSlackMarkup(): String {
         summary.appendLine(
             "📍 Issues resolved: ${
                 issuesResolved.joinToString(", ") { "<${it.url}|${it.key}>" }
-            }"
+            }",
         )
     }
     val issuesOpened = durationIssues.filter { !it.isCompleted() }
@@ -159,7 +161,7 @@ fun ProjectSummary.toSlackMarkup(): String {
         summary.appendLine(
             "📩 Issues opened: ${
                 issuesOpened.joinToString(", ") { "<${it.url}|${it.key}>" }
-            }"
+            }",
         )
     }
     if (durationMergedPullRequests.isNotEmpty()) {

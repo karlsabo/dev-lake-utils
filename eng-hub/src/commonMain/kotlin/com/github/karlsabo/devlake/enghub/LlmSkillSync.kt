@@ -41,7 +41,12 @@ class LlmSkillSync(
     private val fileSystem: FileSystem = SystemFileSystem,
 ) {
     /** Sync skills, shared notes, and guidelines to a single tool target. */
-    fun sync(sourceLlmDir: Path, homeDir: Path, target: ToolTarget, planningMarkdownDir: String): SyncResult {
+    fun sync(
+        sourceLlmDir: Path,
+        homeDir: Path,
+        target: ToolTarget,
+        planningMarkdownDir: String,
+    ): SyncResult {
         val replacementDir = preparePlanningMarkdownDir(planningMarkdownDir)
         return syncPrepared(sourceLlmDir, homeDir, target, replacementDir)
     }
@@ -151,7 +156,11 @@ class LlmSkillSync(
         return true
     }
 
-    private fun copyDirectoryRecursively(source: Path, dest: Path, replacementDir: String?) {
+    private fun copyDirectoryRecursively(
+        source: Path,
+        dest: Path,
+        replacementDir: String?,
+    ) {
         for (entry in fileSystem.list(source)) {
             val destEntry = Path(dest, entry.name)
             if (fileSystem.metadataOrNull(entry)?.isDirectory == true) {
@@ -163,7 +172,11 @@ class LlmSkillSync(
         }
     }
 
-    private fun writeFileWithReplacement(source: Path, dest: Path, replacementDir: String?) {
+    private fun writeFileWithReplacement(
+        source: Path,
+        dest: Path,
+        replacementDir: String?,
+    ) {
         (dest.parent ?: return).create()
         if (source.name.endsWith(".md")) {
             val content = fileSystem.source(source).buffered().use { it.readString() }
@@ -177,8 +190,7 @@ class LlmSkillSync(
         }
     }
 
-    private fun isAbsolutePath(path: String): Boolean =
-        path.startsWith("/") || windowsAbsolutePath.matches(path) || path.startsWith("\\\\")
+    private fun isAbsolutePath(path: String): Boolean = path.startsWith("/") || windowsAbsolutePath.matches(path) || path.startsWith("\\\\")
 
     private fun Path.create() {
         if (!fileSystem.exists(this)) {

@@ -20,7 +20,10 @@ import kotlinx.serialization.Serializable
 private val logger = KotlinLogging.logger {}
 
 @Serializable
-data class SlackMessage(val userEmail: String, val message: String)
+data class SlackMessage(
+    val userEmail: String,
+    val message: String,
+)
 
 object ZapierMetricService {
     private val client: HttpClient by lazy {

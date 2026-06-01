@@ -12,7 +12,11 @@ import kotlinx.serialization.KSerializer
 @PublishedApi
 internal val logger = KotlinLogging.logger {}
 
-fun <T> saveConfig(configPath: Path, config: T, serializer: KSerializer<T>) {
+fun <T> saveConfig(
+    configPath: Path,
+    config: T,
+    serializer: KSerializer<T>,
+) {
     SystemFileSystem.sink(configPath).buffered()
         .writeText(lenientJson.encodeToString(serializer, config))
 }

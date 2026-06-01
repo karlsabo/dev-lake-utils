@@ -69,32 +69,32 @@ fun createJvmExecTask(
 
         classpath(
             compilation.map { it.output.allOutputs },
-            compilation.map { it.runtimeDependencyFiles ?: files() }
+            compilation.map { it.runtimeDependencyFiles ?: files() },
         )
     }
 }
 
 createJvmExecTask(
     taskName = "runMetricsDemo",
-    mainClassName = "com.github.karlsabo.devlake.metrics.MetricsDemoKt"
+    mainClassName = "com.github.karlsabo.devlake.metrics.MetricsDemoKt",
 )
 
 createJvmExecTask(
     taskName = "runUserEpicsDemo",
-    mainClassName = "com.github.karlsabo.devlake.metrics.UserEpicsDemoKt"
+    mainClassName = "com.github.karlsabo.devlake.metrics.UserEpicsDemoKt",
 )
 
 createJvmExecTask(
     taskName = "runUserIssuesByParentDemo",
-    mainClassName = "com.github.karlsabo.devlake.metrics.UserIssuesByParentDemoKt"
+    mainClassName = "com.github.karlsabo.devlake.metrics.UserIssuesByParentDemoKt",
 )
 
 createJvmExecTask(
     taskName = "runUserEpicsWithIssuesDemo",
-    mainClassName = "com.github.karlsabo.devlake.metrics.UserEpicsWithIssuesDemoKt"
+    mainClassName = "com.github.karlsabo.devlake.metrics.UserEpicsWithIssuesDemoKt",
 )
 
 createJvmExecTask(
     taskName = "runLinearDemo",
-    mainClassName = "com.github.karlsabo.devlake.metrics.LinearDemoKt"
+    mainClassName = "com.github.karlsabo.devlake.metrics.LinearDemoKt",
 )

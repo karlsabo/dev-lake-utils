@@ -15,8 +15,8 @@ fun <T : HttpClientEngineConfig> HttpClientConfig<T>.installHttpRetry() {
         retryOnException(maxRetries, true)
         retryIf { _, response ->
             response.status == HttpStatusCode.TooManyRequests ||
-                    response.status == HttpStatusCode.Forbidden ||
-                    response.status.value.let { it >= 500 && it <= 599 }
+                response.status == HttpStatusCode.Forbidden ||
+                response.status.value.let { it >= 500 && it <= 599 }
         }
         modifyRequest { request ->
             request.headers.append("X-Ktor-Retry-Count", retryCount.toString())

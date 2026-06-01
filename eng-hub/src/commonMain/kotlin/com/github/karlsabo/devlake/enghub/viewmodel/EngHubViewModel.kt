@@ -52,7 +52,26 @@ import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.retry
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -65,48 +84,40 @@ private val logger = KotlinLogging.logger {}
 
 private fun loadIgnoredThreads(
     notificationIgnoreStore: NotificationIgnoreStore,
-): Map<String, IgnoredNotificationThread> {
-    return runCatching { notificationIgnoreStore.listIgnoredThreads().associateBy { it.threadId } }
-        .onFailure { logger.error(it) { "Failed to load persisted ignored notifications" } }
-        .getOrElse { emptyMap() }
-}
+): Map<String, IgnoredNotificationThread> = runCatching { notificationIgnoreStore.listIgnoredThreads().associateBy { it.threadId } }
+    .onFailure { logger.error(it) { "Failed to load persisted ignored notifications" } }
+    .getOrElse { emptyMap() }
 
-private fun Map<String, IgnoredNotificationThread>.hides(notification: Notification): Boolean =
-    this[notification.id]?.hides(notification) == true
+private fun Map<String, IgnoredNotificationThread>.hides(notification: Notification): Boolean = this[notification.id]?.hides(notification) == true
 
-private fun Map<String, IgnoredNotificationThread>.hides(notification: NotificationUiState): Boolean =
-    this[notification.notificationThreadId]?.hides(notification) == true
+private fun Map<String, IgnoredNotificationThread>.hides(notification: NotificationUiState): Boolean = this[notification.notificationThreadId]?.hides(notification) == true
 
-private fun IgnoredNotificationThread.hides(notification: Notification): Boolean =
-    hides(notification.updatedAt.toEpochMilliseconds())
+private fun IgnoredNotificationThread.hides(notification: Notification): Boolean = hides(notification.updatedAt.toEpochMilliseconds())
 
-private fun IgnoredNotificationThread.hides(notification: NotificationUiState): Boolean =
-    hides(notification.updatedAtEpochMs)
+private fun IgnoredNotificationThread.hides(notification: NotificationUiState): Boolean = hides(notification.updatedAtEpochMs)
 
 private fun IgnoredNotificationThread.hides(notificationUpdatedAtEpochMs: Long): Boolean = when (reason) {
     NotificationIgnoreReason.UNSUBSCRIBED -> true
     NotificationIgnoreReason.DONE -> this.notificationUpdatedAtEpochMs?.let { it >= notificationUpdatedAtEpochMs } == true
 }
 
-private fun NotificationUiState.toIgnoredNotificationThread(reason: NotificationIgnoreReason): IgnoredNotificationThread =
-    IgnoredNotificationThread(
-        threadId = notificationThreadId,
-        repositoryFullName = repositoryFullName,
-        subjectType = subjectType,
-        reason = reason,
-        ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
-        notificationUpdatedAtEpochMs = updatedAtEpochMs,
-    )
+private fun NotificationUiState.toIgnoredNotificationThread(reason: NotificationIgnoreReason): IgnoredNotificationThread = IgnoredNotificationThread(
+    threadId = notificationThreadId,
+    repositoryFullName = repositoryFullName,
+    subjectType = subjectType,
+    reason = reason,
+    ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
+    notificationUpdatedAtEpochMs = updatedAtEpochMs,
+)
 
-private fun Notification.toIgnoredNotificationThread(reason: NotificationIgnoreReason): IgnoredNotificationThread =
-    IgnoredNotificationThread(
-        threadId = id,
-        repositoryFullName = repository.fullName,
-        subjectType = subject.type,
-        reason = reason,
-        ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
-        notificationUpdatedAtEpochMs = updatedAt.toEpochMilliseconds(),
-    )
+private fun Notification.toIgnoredNotificationThread(reason: NotificationIgnoreReason): IgnoredNotificationThread = IgnoredNotificationThread(
+    threadId = id,
+    repositoryFullName = repository.fullName,
+    subjectType = subject.type,
+    reason = reason,
+    ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
+    notificationUpdatedAtEpochMs = updatedAt.toEpochMilliseconds(),
+)
 
 private data class NotificationPullRequestDetails(
     val number: Int?,
@@ -147,25 +158,23 @@ private suspend fun GitHubApi.toNotificationUiStateOrNull(notif: Notification): 
     )
 }
 
-internal suspend fun GitHubApi.buildPullRequestUiStates(issues: List<Issue>): List<PullRequestUiState> {
-    return issues.map { issue ->
-        val pr = getPullRequestByUrl(issue.pullRequestDetailsUrl)
-        val headRef = pr.head?.ref
-        val headSha = pr.head?.sha
-        val repoUrl = issue.repositoryUrl ?: ""
-        val (owner, repo) = if (repoUrl.isNotEmpty()) extractOwnerAndRepo(repoUrl) else ("" to "")
-        val checkRunSummary = if (headSha != null && owner.isNotEmpty()) {
-            getCheckRunsForRef(owner, repo, headSha)
-        } else {
-            CheckRunSummary(0, 0, 0, 0, PENDING)
-        }
-        val reviewSummary = if (owner.isNotEmpty()) {
-            getReviewSummary(owner, repo, issue.number)
-        } else {
-            ReviewSummary(0, 0, emptyList())
-        }
-        issue.toPullRequestUiState(checkRunSummary, reviewSummary, headRef)
+internal suspend fun GitHubApi.buildPullRequestUiStates(issues: List<Issue>): List<PullRequestUiState> = issues.map { issue ->
+    val pr = getPullRequestByUrl(issue.pullRequestDetailsUrl)
+    val headRef = pr.head?.ref
+    val headSha = pr.head?.sha
+    val repoUrl = issue.repositoryUrl ?: ""
+    val (owner, repo) = if (repoUrl.isNotEmpty()) extractOwnerAndRepo(repoUrl) else ("" to "")
+    val checkRunSummary = if (headSha != null && owner.isNotEmpty()) {
+        getCheckRunsForRef(owner, repo, headSha)
+    } else {
+        CheckRunSummary(0, 0, 0, 0, PENDING)
     }
+    val reviewSummary = if (owner.isNotEmpty()) {
+        getReviewSummary(owner, repo, issue.number)
+    } else {
+        ReviewSummary(0, 0, emptyList())
+    }
+    issue.toPullRequestUiState(checkRunSummary, reviewSummary, headRef)
 }
 
 data class ActionErrorUiState(
@@ -185,23 +194,19 @@ private data class ActionErrorQueueState(
     val queuedMessages: List<String> = emptyList(),
     val nextErrorId: Long = 1L,
 ) {
-    fun enqueue(message: String): ActionErrorQueueState =
-        if (current == null) withCurrent(message) else copy(queuedMessages = queuedMessages + message)
+    fun enqueue(message: String): ActionErrorQueueState = if (current == null) withCurrent(message) else copy(queuedMessages = queuedMessages + message)
 
-    fun clearCurrent(): ActionErrorQueueState =
-        queuedMessages.firstOrNull()?.let { nextMessage ->
-            copy(queuedMessages = queuedMessages.drop(1)).withCurrent(nextMessage)
-        } ?: copy(current = null)
+    fun clearCurrent(): ActionErrorQueueState = queuedMessages.firstOrNull()?.let { nextMessage ->
+        copy(queuedMessages = queuedMessages.drop(1)).withCurrent(nextMessage)
+    } ?: copy(current = null)
 
-    private fun withCurrent(message: String): ActionErrorQueueState =
-        copy(
-            current = ActionErrorUiState(id = nextErrorId, message = message),
-            nextErrorId = nextErrorId + 1,
-        )
+    private fun withCurrent(message: String): ActionErrorQueueState = copy(
+        current = ActionErrorUiState(id = nextErrorId, message = message),
+        nextErrorId = nextErrorId + 1,
+    )
 }
 
-private fun StateFlow<ActionErrorQueueState>.currentActionErrorStateFlow(): StateFlow<ActionErrorUiState?> =
-    MappedStateFlow(this) { it.current }
+private fun StateFlow<ActionErrorQueueState>.currentActionErrorStateFlow(): StateFlow<ActionErrorUiState?> = MappedStateFlow(this) { it.current }
 
 private class MappedStateFlow<T, R>(
     private val source: StateFlow<T>,
@@ -494,8 +499,7 @@ class EngHubViewModel(
         )
     }
 
-    fun checkoutWorktreePath(repoFullName: String, branch: String): WorktreePath =
-        buildWorktreePath(checkoutRepoPath(repoFullName, currentConfig), branch)
+    fun checkoutWorktreePath(repoFullName: String, branch: String): WorktreePath = buildWorktreePath(checkoutRepoPath(repoFullName, currentConfig), branch)
 
     fun createLocalWorktreeFromBase(
         repoRootPath: String,
@@ -535,8 +539,10 @@ class EngHubViewModel(
                     enqueueActionError(message)
                     true
                 }
-                if (shouldReport) logger.error(e) {
-                    "Failed to create local worktree for $repoRootPath base=$baseBranch target=$targetBranch"
+                if (shouldReport) {
+                    logger.error(e) {
+                        "Failed to create local worktree for $repoRootPath base=$baseBranch target=$targetBranch"
+                    }
                 }
                 setupRequest?.let { failedSetupRequest ->
                     refreshedAfterFailure = true
@@ -611,6 +617,7 @@ class EngHubViewModel(
                 }
 
                 PostCreateLocalWorktreeRefreshStatus.STARTED -> true
+
                 PostCreateLocalWorktreeRefreshStatus.CANCELLED_BEFORE_START -> false
             }
         }
@@ -623,6 +630,7 @@ class EngHubViewModel(
                 }
 
                 PostCreateLocalWorktreeRefreshStatus.STARTED -> true
+
                 PostCreateLocalWorktreeRefreshStatus.CANCELLED_BEFORE_START -> false
             }
         }
@@ -728,7 +736,11 @@ class EngHubViewModel(
         forceArchiveWorktreeRequest.value = null
     }
 
-    private fun archiveLocalWorktree(repoRootPath: String, worktreePath: String, force: Boolean) {
+    private fun archiveLocalWorktree(
+        repoRootPath: String,
+        worktreePath: String,
+        force: Boolean,
+    ) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
         val normalizedWorktreePath = worktreePath.normalizedRepoPath()
         if (normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty()) return
@@ -769,7 +781,11 @@ class EngHubViewModel(
         }
     }
 
-    fun submitReview(notification: NotificationUiState, event: ReviewStateValue, reviewComment: String?) {
+    fun submitReview(
+        notification: NotificationUiState,
+        event: ReviewStateValue,
+        reviewComment: String?,
+    ) {
         val apiUrl = requireNotNull(notification.apiUrl) { "Cannot submit review for notification without an API URL" }
         runPullRequestDoneAction(
             notification = notification,
@@ -807,9 +823,11 @@ class EngHubViewModel(
     private suspend fun finishPullRequestDoneAction(notification: NotificationUiState, actionLogName: String) {
         val notificationThreadId = notification.notificationThreadId
         ignoredThreads.update {
-            it + (notificationThreadId to notification.toIgnoredNotificationThread(
-                NotificationIgnoreReason.DONE
-            ))
+            it + (
+                notificationThreadId to notification.toIgnoredNotificationThread(
+                    NotificationIgnoreReason.DONE,
+                )
+                )
         }
 
         try {
@@ -839,9 +857,11 @@ class EngHubViewModel(
         val notificationThreadId = notification.notificationThreadId
         actingOnThreadIds.update { it + notificationThreadId }
         ignoredThreads.update {
-            it + (notificationThreadId to notification.toIgnoredNotificationThread(
-                NotificationIgnoreReason.DONE
-            ))
+            it + (
+                notificationThreadId to notification.toIgnoredNotificationThread(
+                    NotificationIgnoreReason.DONE,
+                )
+                )
         }
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -864,9 +884,11 @@ class EngHubViewModel(
         val notificationThreadId = notification.notificationThreadId
         actingOnThreadIds.update { it + notificationThreadId }
         ignoredThreads.update {
-            it + (notificationThreadId to notification.toIgnoredNotificationThread(
-                NotificationIgnoreReason.UNSUBSCRIBED
-            ))
+            it + (
+                notificationThreadId to notification.toIgnoredNotificationThread(
+                    NotificationIgnoreReason.UNSUBSCRIBED,
+                )
+                )
         }
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -922,9 +944,11 @@ class EngHubViewModel(
         try {
             persistIgnoredThread(notification, NotificationIgnoreReason.DONE)
             ignoredThreads.update {
-                it + (notification.id to notification.toIgnoredNotificationThread(
-                    NotificationIgnoreReason.DONE
-                ))
+                it + (
+                    notification.id to notification.toIgnoredNotificationThread(
+                        NotificationIgnoreReason.DONE,
+                    )
+                    )
             }
         } catch (e: Exception) {
             logger.error(e) {
@@ -987,9 +1011,7 @@ class EngHubViewModel(
             }
     }
 
-    private fun listLocalWorktreeUiStates(repoRootPath: String): List<LocalWorktreeUiState> {
-        return gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
-    }
+    private fun listLocalWorktreeUiStates(repoRootPath: String): List<LocalWorktreeUiState> = gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
 
     private fun refreshLocalRepositoryAfterArchiveFailure(repoRootPath: String) {
         refreshLocalRepositoryWorktreesBestEffort(
@@ -1025,8 +1047,7 @@ class EngHubViewModel(
         localRepositoryExpansionsInFlight.update { it - normalizedRepoRootPath }
     }
 
-    private fun isLocalRepositoryExpansionInFlight(normalizedRepoRootPath: String): Boolean =
-        normalizedRepoRootPath in localRepositoryExpansionsInFlight.value
+    private fun isLocalRepositoryExpansionInFlight(normalizedRepoRootPath: String): Boolean = normalizedRepoRootPath in localRepositoryExpansionsInFlight.value
 
     private fun markLocalWorktreeArchiving(normalizedWorktreePath: String): Boolean {
         while (true) {
@@ -1061,22 +1082,17 @@ class EngHubViewModel(
 
 private fun String.normalizedRepoPath(): String = trim().trimEnd('/', '\\')
 
-private fun NotificationProcessingResult.Processed.shouldPersistAutomaticallyDoneThread(): Boolean =
-    wasMarkedDoneForClosedOrMergedPullRequest() || wasMarkedDoneByAutoApprovalWorkflow()
+private fun NotificationProcessingResult.Processed.shouldPersistAutomaticallyDoneThread(): Boolean = wasMarkedDoneForClosedOrMergedPullRequest() || wasMarkedDoneByAutoApprovalWorkflow()
 
-private fun NotificationProcessingResult.Processed.wasMarkedDoneForClosedOrMergedPullRequest(): Boolean =
-    wasMarkedAsDone() && pullRequestStatus.isClosedOrMerged()
+private fun NotificationProcessingResult.Processed.wasMarkedDoneForClosedOrMergedPullRequest(): Boolean = wasMarkedAsDone() && pullRequestStatus.isClosedOrMerged()
 
-private fun NotificationProcessingResult.Processed.wasMarkedDoneByAutoApprovalWorkflow(): Boolean =
-    wasMarkedAsDone() && actions.any {
-        it is NotificationAction.ApprovedPullRequest || it is NotificationAction.SkippedApproval
-    }
+private fun NotificationProcessingResult.Processed.wasMarkedDoneByAutoApprovalWorkflow(): Boolean = wasMarkedAsDone() && actions.any {
+    it is NotificationAction.ApprovedPullRequest || it is NotificationAction.SkippedApproval
+}
 
-private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean =
-    actions.any { it is NotificationAction.MarkedAsDone }
+private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean = actions.any { it is NotificationAction.MarkedAsDone }
 
-private fun PullRequestStatus?.isClosedOrMerged(): Boolean =
-    this == PullRequestStatus.CLOSED || this == PullRequestStatus.MERGED
+private fun PullRequestStatus?.isClosedOrMerged(): Boolean = this == PullRequestStatus.CLOSED || this == PullRequestStatus.MERGED
 
 private fun checkoutRepoPath(repoFullName: String, config: EngHubConfig): String {
     val repoName = repoFullName.substringAfterLast('/')

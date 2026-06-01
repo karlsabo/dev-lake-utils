@@ -19,6 +19,7 @@ class GitHubRestApiReviewSummaryTest {
                     val body =
                         when (request.url.encodedPath) {
                             "/repos/test-org/test-repo/pulls/25843/reviews" -> "[]"
+
                             "/repos/test-org/test-repo/pulls/25843/requested_reviewers" ->
                                 """
                                 {

@@ -17,9 +17,7 @@ import com.github.karlsabo.git.WorktreeSetupStatus
 
 internal fun PullRequestUiState.checkoutSetupStatus(
     setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
-): WorktreeSetupStatus? {
-    return headRef?.let { setupStatusFor(repositoryFullName, it) }
-}
+): WorktreeSetupStatus? = headRef?.let { setupStatusFor(repositoryFullName, it) }
 
 @Composable
 fun PullRequestPanel(

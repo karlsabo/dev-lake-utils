@@ -32,9 +32,7 @@ import kotlinx.serialization.json.jsonPrimitive
 data class PagerDutyApiRestConfig(
     val apiKey: String,
 ) {
-    override fun toString(): String {
-        return "PagerDutyApiRestConfig()"
-    }
+    override fun toString(): String = "PagerDutyApiRestConfig()"
 }
 
 /**
@@ -84,7 +82,9 @@ private val logger = KotlinLogging.logger {}
 /**
  * Implementation of the PagerDutyApi interface using REST.
  */
-class PagerDutyRestApi(private val config: PagerDutyApiRestConfig) : PagerDutyApi {
+class PagerDutyRestApi(
+    private val config: PagerDutyApiRestConfig,
+) : PagerDutyApi {
     private val client: HttpClient = HttpClient(CIO) {
         install(Auth) {
         }
@@ -115,9 +115,9 @@ class PagerDutyRestApi(private val config: PagerDutyApiRestConfig) : PagerDutyAp
 
         while (moreItems) {
             val url = "https://api.pagerduty.com/incidents?service_ids[]=${serviceId.encodeURLParameter()}" +
-                    "&since=${formattedStartTime.encodeURLParameter()}" +
-                    "&until=${formattedEndTime.encodeURLParameter()}" +
-                    "&limit=$limit&offset=$offset"
+                "&since=${formattedStartTime.encodeURLParameter()}" +
+                "&until=${formattedEndTime.encodeURLParameter()}" +
+                "&limit=$limit&offset=$offset"
 
             val response = client.get(url)
 

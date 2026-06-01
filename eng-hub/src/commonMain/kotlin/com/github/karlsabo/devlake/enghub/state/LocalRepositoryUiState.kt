@@ -22,22 +22,20 @@ data class ForceArchiveWorktreeUiState(
     val worktreePath: String,
 )
 
-fun List<LocalRepositoryConfig>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> {
-    return asSequence()
-        .map { it.path.trim() }
-        .filter { it.isNotEmpty() }
-        .map { path ->
-            LocalRepositoryUiState(
-                name = path.repositoryFolderName(),
-                path = path,
-            )
-        }
-        .sortedWith(
-            compareBy<LocalRepositoryUiState> { it.name.lowercase() }
-                .thenBy { it.path.lowercase() }
+fun List<LocalRepositoryConfig>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> = asSequence()
+    .map { it.path.trim() }
+    .filter { it.isNotEmpty() }
+    .map { path ->
+        LocalRepositoryUiState(
+            name = path.repositoryFolderName(),
+            path = path,
         )
-        .toList()
-}
+    }
+    .sortedWith(
+        compareBy<LocalRepositoryUiState> { it.name.lowercase() }
+            .thenBy { it.path.lowercase() },
+    )
+    .toList()
 
 fun List<Worktree>.toLocalWorktreeUiStates(repositoryRootPath: String): List<LocalWorktreeUiState> {
     val normalizedRepositoryRootPath = repositoryRootPath.normalizedLocalPath()

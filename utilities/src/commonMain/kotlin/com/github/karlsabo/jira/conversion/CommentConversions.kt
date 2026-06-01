@@ -7,13 +7,11 @@ import com.github.karlsabo.projectmanagement.ProjectComment
 /**
  * Converts a Jira Comment to a unified ProjectComment.
  */
-fun Comment.toProjectComment(): ProjectComment {
-    return ProjectComment(
-        id = id,
-        body = body.toPlainText(),
-        authorId = author.accountId,
-        authorName = author.displayName,
-        createdAt = created,
-        updatedAt = updated,
-    )
-}
+fun Comment.toProjectComment(): ProjectComment = ProjectComment(
+    id = id,
+    body = body.toPlainText(),
+    authorId = author.accountId,
+    authorName = author.displayName,
+    createdAt = created,
+    updatedAt = updated,
+)

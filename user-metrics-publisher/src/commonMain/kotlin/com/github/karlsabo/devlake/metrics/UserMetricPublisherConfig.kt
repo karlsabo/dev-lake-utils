@@ -31,4 +31,3 @@ fun saveUserMetricPublisherConfig(config: UserMetricPublisherConfig) {
     SystemFileSystem.sink(userMetricPublisherConfigPath).buffered()
         .writeText(lenientJson.encodeToString(UserMetricPublisherConfig.serializer(), config))
 }
-

@@ -27,16 +27,13 @@ interface EngHubBindings {
     fun provideGitHubApi(gitHubApiConfig: GitHubApiRestConfig): GitHubApi = GitHubRestApi(gitHubApiConfig)
 
     @Provides
-    fun provideGitHubNotificationService(gitHubApi: GitHubApi): GitHubNotificationService {
-        return GitHubNotificationService(gitHubApi)
-    }
+    fun provideGitHubNotificationService(gitHubApi: GitHubApi): GitHubNotificationService = GitHubNotificationService(gitHubApi)
 
     @Provides
     fun provideGitWorktreeApi(): GitWorktreeApi = GitWorktreeService()
 
     @Provides
-    fun provideWorktreeSetupCoordinator(gitWorktreeApi: GitWorktreeApi): WorktreeSetupCoordinator =
-        WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi)
+    fun provideWorktreeSetupCoordinator(gitWorktreeApi: GitWorktreeApi): WorktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi)
 
     @Provides
     fun provideDesktopLauncher(): DesktopLauncher = DesktopLauncherService()
@@ -48,9 +45,7 @@ interface EngHubBindings {
     fun provideEngHubConfigWriter(): EngHubConfigWriter = EngHubConfigWriter(::saveEngHubConfig)
 
     @Provides
-    fun provideNotificationIgnoreStore(): NotificationIgnoreStore {
-        return SqlDelightNotificationIgnoreStore()
-    }
+    fun provideNotificationIgnoreStore(): NotificationIgnoreStore = SqlDelightNotificationIgnoreStore()
 }
 
 @MergeComponent(EngHubScope::class)

@@ -17,7 +17,10 @@ import kotlin.test.assertTrue
  */
 private class FakeGitCommandApi : GitCommandApi {
 
-    data class Call(val method: String, val args: List<String> = emptyList())
+    data class Call(
+        val method: String,
+        val args: List<String> = emptyList(),
+    )
 
     val calls = mutableListOf<Call>()
 
@@ -45,22 +48,38 @@ private class FakeGitCommandApi : GitCommandApi {
         return isGitRepositoryResult
     }
 
-    override fun fetch(repoPath: String, remote: String, vararg refSpecs: String) {
+    override fun fetch(
+        repoPath: String,
+        remote: String,
+        vararg refSpecs: String,
+    ) {
         calls.add(Call("fetch", listOf(repoPath, remote) + refSpecs.toList()))
         fetchAction(repoPath, remote, refSpecs)
     }
 
-    override fun remoteBranchExists(repoPath: String, branch: String, remote: String): Boolean {
+    override fun remoteBranchExists(
+        repoPath: String,
+        branch: String,
+        remote: String,
+    ): Boolean {
         calls.add(Call("remoteBranchExists", listOf(repoPath, branch, remote)))
         return remoteBranchExistsAction(repoPath, branch, remote)
     }
 
-    override fun isAncestor(repoPath: String, ancestorRef: String, descendantRef: String): Boolean {
+    override fun isAncestor(
+        repoPath: String,
+        ancestorRef: String,
+        descendantRef: String,
+    ): Boolean {
         calls.add(Call("isAncestor", listOf(repoPath, ancestorRef, descendantRef)))
         return isAncestorAction(repoPath, ancestorRef, descendantRef)
     }
 
-    override fun worktreeAdd(repoPath: String, path: String, commitIsh: String) {
+    override fun worktreeAdd(
+        repoPath: String,
+        path: String,
+        commitIsh: String,
+    ) {
         calls.add(Call("worktreeAdd", listOf(repoPath, path, commitIsh)))
         worktreeAddAction(repoPath, path, commitIsh)
     }
@@ -606,6 +625,7 @@ class GitWorktreeServiceTest {
         fake.statusAction = { path ->
             when (path) {
                 "/tmp/repo" -> ""
+
                 "/tmp/repo-feature" -> throw GitCommandException(
                     command = listOf("git", "status"),
                     exitCode = 128,

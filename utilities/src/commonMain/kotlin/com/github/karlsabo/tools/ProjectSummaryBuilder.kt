@@ -71,9 +71,11 @@ suspend fun Project.createSummary(
         summary,
         childIssues.filter { it.isIssueOrBug() }.toSet(),
         childIssues.filter {
-            it.isIssueOrBug()
-                    && (it.completedAt != null && it.completedAt >= Clock.System.now().minus(duration)
-                    || it.createdAt != null && it.createdAt >= Clock.System.now().minus(duration))
+            it.isIssueOrBug() &&
+                (
+                    (it.completedAt != null && it.completedAt >= Clock.System.now().minus(duration)) ||
+                        (it.createdAt != null && it.createdAt >= Clock.System.now().minus(duration))
+                    )
         }.toSet(),
         mergedPrs,
         milestones,
@@ -104,19 +106,17 @@ private suspend fun generateSummaryText(
     resolvedChildIssues: List<ProjectIssue>,
     textSummarizer: TextSummarizer,
     duration: Duration,
-): String {
-    return if (resolvedChildIssues.isNotEmpty()) {
-        val summaryRawInput = StringBuilder()
-        summaryRawInput.appendLine("# Issues\n\n")
-        resolvedChildIssues.forEach { issue ->
-            summaryRawInput.appendLine("## ${issue.title}")
-            summaryRawInput.appendLine("Assignee: ${issue.assigneeName}")
-            summaryRawInput.appendLine("Description:\n````${issue.description}````\n")
-        }
-        textSummarizer.summarize(summaryRawInput.toString())
-    } else {
-        "* No updates in the last ${duration.inWholeDays} days*"
+): String = if (resolvedChildIssues.isNotEmpty()) {
+    val summaryRawInput = StringBuilder()
+    summaryRawInput.appendLine("# Issues\n\n")
+    resolvedChildIssues.forEach { issue ->
+        summaryRawInput.appendLine("## ${issue.title}")
+        summaryRawInput.appendLine("Assignee: ${issue.assigneeName}")
+        summaryRawInput.appendLine("Description:\n````${issue.description}````\n")
     }
+    textSummarizer.summarize(summaryRawInput.toString())
+} else {
+    "* No updates in the last ${duration.inWholeDays} days*"
 }
 
 private suspend fun fetchRelatedPullRequests(
@@ -133,7 +133,7 @@ private suspend fun fetchRelatedPullRequests(
             issue.key,
             gitHubOrganizationIds,
             Clock.System.now().minus(duration),
-            Clock.System.now()
+            Clock.System.now(),
         )
     }
     return mergedPrs
@@ -145,13 +145,11 @@ private suspend fun Project.buildMilestones(
     users: Set<User>,
     projectManagementApi: ProjectManagementApi,
     duration: Duration,
-): Set<Milestone> {
-    return parentIssues.plus(childIssues).toSet()
-        .filter { it.isMilestone() }
-        .map { milestoneIssue ->
-            buildMilestone(milestoneIssue, users, projectManagementApi, duration)
-        }.toSet()
-}
+): Set<Milestone> = parentIssues.plus(childIssues).toSet()
+    .filter { it.isMilestone() }
+    .map { milestoneIssue ->
+        buildMilestone(milestoneIssue, users, projectManagementApi, duration)
+    }.toSet()
 
 private suspend fun Project.buildMilestone(
     milestoneIssue: ProjectIssue,
@@ -171,7 +169,7 @@ private suspend fun Project.buildMilestone(
     val milestoneCommentSet = mutableSetOf<ProjectComment>()
     if (milestoneIssue.key.isNotBlank()) {
         milestoneCommentSet.addAll(
-            projectManagementApi.getRecentComments(milestoneIssue.key, 5)
+            projectManagementApi.getRecentComments(milestoneIssue.key, 5),
         )
     }
 
@@ -181,10 +179,11 @@ private suspend fun Project.buildMilestone(
         milestoneChildIssues,
         milestoneCommentSet,
         milestoneChildIssues.filter { issue ->
-            issue.isIssueOrBug()
-                    && (issue.completedAt != null
-                    && issue.completedAt >= Clock.System.now().minus(duration)
-                    || issue.createdAt != null && issue.createdAt >= Clock.System.now().minus(duration))
+            issue.isIssueOrBug() &&
+                (
+                    (issue.completedAt != null && issue.completedAt >= Clock.System.now().minus(duration)) ||
+                        (issue.createdAt != null && issue.createdAt >= Clock.System.now().minus(duration))
+                    )
         }.toSet(),
         mutableSetOf(), // milestonePrs - placeholder for future implementation
     )
@@ -193,12 +192,10 @@ private suspend fun Project.buildMilestone(
 private fun Project.findMilestoneOwner(
     milestoneIssue: ProjectIssue,
     users: Set<User>,
-): User? {
-    return if (milestoneIssue.assigneeName != null && milestoneIssue.assigneeName.isNotBlank()) {
-        users.firstOrNull { it.name == milestoneIssue.assigneeName }
-    } else if (projectLeadUserId != null) {
-        users.firstOrNull { it.email == projectLeadUserId }
-    } else {
-        null
-    }
+): User? = if (milestoneIssue.assigneeName != null && milestoneIssue.assigneeName.isNotBlank()) {
+    users.firstOrNull { it.name == milestoneIssue.assigneeName }
+} else if (projectLeadUserId != null) {
+    users.firstOrNull { it.email == projectLeadUserId }
+} else {
+    null
 }

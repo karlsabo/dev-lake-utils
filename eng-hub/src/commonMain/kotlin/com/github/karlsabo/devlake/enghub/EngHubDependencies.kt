@@ -29,10 +29,8 @@ internal fun loadEngHubViewModel(
     loadConfig: () -> EngHubConfig = ::loadEngHubConfig,
     loadGitHubApiConfig: () -> GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) },
     componentFactory: EngHubComponentFactory = ::createEngHubComponent,
-): EngHubViewModel {
-    return loadEngHubDependencies(
-        loadConfig = loadConfig,
-        loadGitHubApiConfig = loadGitHubApiConfig,
-        componentFactory = componentFactory,
-    ).viewModel
-}
+): EngHubViewModel = loadEngHubDependencies(
+    loadConfig = loadConfig,
+    loadGitHubApiConfig = loadGitHubApiConfig,
+    componentFactory = componentFactory,
+).viewModel

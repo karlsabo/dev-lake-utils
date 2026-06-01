@@ -20,7 +20,9 @@ import kotlinx.serialization.Serializable
 
 private val logger = KotlinLogging.logger {}
 
-class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : TextSummarizer {
+class TextSummarizerOpenAi(
+    private val config: TextSummarizerOpenAiConfig,
+) : TextSummarizer {
     override suspend fun summarize(text: String): String {
         val model = "gpt-5-mini"
 
@@ -31,7 +33,7 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
         Combine similar or less critical items to meet the 5-bullet limit, prioritizing relevance and impact.
         Keep summaries terse, avoiding technical jargon, names, and generic phrases (e.g., "improving efficiency," "streamlining").
         Do not use phrases describing the action type (e.g., "closed ticket," "merged PR").
-        """.trimIndent()
+            """.trimIndent()
 
         HttpClient {
             install(ContentNegotiation) {
@@ -45,10 +47,10 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
                 model = model,
                 messages = listOf(
                     Message("system", instructions),
-                    Message("user", text)
+                    Message("user", text),
                 ),
                 maxCompletionTokens = 2048,
-                reasoningEffort = "minimal"
+                reasoningEffort = "minimal",
             )
             val response: HttpResponse = client.post("https://api.openai.com/v1/chat/completions") {
                 headers {
@@ -78,9 +80,7 @@ class TextSummarizerOpenAi(private val config: TextSummarizerOpenAiConfig) : Tex
 
             return summary
         }
-
     }
-
 }
 
 @Serializable
@@ -102,7 +102,9 @@ data class ChatCompletionRequest(
 )
 
 @Serializable
-private data class Choice(val message: Message? = null)
+private data class Choice(
+    val message: Message? = null,
+)
 
 @Serializable
 private data class Error(
@@ -113,4 +115,7 @@ private data class Error(
 )
 
 @Serializable
-private data class OpenAIResponse(val choices: List<Choice>? = null, val error: Error? = null)
+private data class OpenAIResponse(
+    val choices: List<Choice>? = null,
+    val error: Error? = null,
+)

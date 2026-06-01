@@ -10,12 +10,17 @@ object IssueTypeConstants {
     /** Issue types that represent regular work items */
     val WORK_ITEM_TYPES = setOf(
         "bug", "issue", "story", "subtask", "artifact", "task", "vulnerability",
-        "request", "design story", "ds story", "change request"
+        "request", "design story", "ds story", "change request",
     )
 
     /** Issue types that represent container/parent items (not countable work) */
     val CONTAINER_TYPES = setOf(
-        "epic", "theme", "parent artifact", "r&d initiative", "sub-task",
-        "company initiative", "milestone"
+        "epic",
+        "theme",
+        "parent artifact",
+        "r&d initiative",
+        "sub-task",
+        "company initiative",
+        "milestone",
     )
 }

@@ -6,13 +6,11 @@ import com.github.karlsabo.projectmanagement.ProjectComment
 /**
  * Converts a Linear Comment to a unified ProjectComment.
  */
-fun Comment.toProjectComment(): ProjectComment {
-    return ProjectComment(
-        id = id,
-        body = body,
-        authorId = user?.id,
-        authorName = user?.displayName ?: user?.name,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-    )
-}
+fun Comment.toProjectComment(): ProjectComment = ProjectComment(
+    id = id,
+    body = body,
+    authorId = user?.id,
+    authorName = user?.displayName ?: user?.name,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)

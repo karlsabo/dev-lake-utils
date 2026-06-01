@@ -10,14 +10,15 @@ abstract class VerifyNotificationMigrationBaselineTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val baselineFile: RegularFileProperty
 
+    @Suppress("unused")
     @TaskAction
     fun verify() {
         val file = baselineFile.get().asFile
         if (!file.isFile) {
             throw GradleException(
                 "Missing SQLDelight migration baseline artifact " +
-                        "`${file.relativeTo(project.projectDir)}`. " +
-                        "Historical verification requires the committed `1.db` snapshot."
+                    "`${file.relativeTo(project.projectDir)}`. " +
+                    "Historical verification requires the committed `1.db` snapshot.",
             )
         }
     }
@@ -100,7 +101,7 @@ kotlin {
                 compilerOptions {
                     freeCompilerArgs.addAll(
                         "-opt-in=kotlinx.cinterop.ExperimentalForeignApi",
-                        "-opt-in=kotlin.experimental.ExperimentalNativeApi"
+                        "-opt-in=kotlin.experimental.ExperimentalNativeApi",
                     )
                 }
             }
@@ -113,14 +114,14 @@ sqldelight {
         create("NotificationDatabase") {
             packageName.set("com.github.karlsabo.notifications")
             schemaOutputDirectory.set(
-                file("src/commonMain/sqldelight/com/github/karlsabo/notifications")
+                file("src/commonMain/sqldelight/com/github/karlsabo/notifications"),
             )
         }
     }
 }
 
 val notificationMigrationBaseline = layout.projectDirectory.file(
-    "src/commonMain/sqldelight/com/github/karlsabo/notifications/1.db"
+    "src/commonMain/sqldelight/com/github/karlsabo/notifications/1.db",
 )
 
 val requireNotificationMigrationBaseline by tasks.registering(VerifyNotificationMigrationBaselineTask::class) {
@@ -157,7 +158,7 @@ fun createJvmExecTask(
 
         classpath(
             compilation.map { it.output.allOutputs },
-            compilation.map { it.runtimeDependencyFiles ?: files() }
+            compilation.map { it.runtimeDependencyFiles ?: files() },
         )
 
         configure()
@@ -167,19 +168,19 @@ fun createJvmExecTask(
 createJvmExecTask(
     taskName = "createUsersAndTeams",
     mainClassName = "com.github.karlsabo.devlake.CreateUsersAndTeamsKt",
-    compilationName = "main"
+    compilationName = "main",
 )
 
 createJvmExecTask(
     taskName = "gitHubApiDemo",
     mainClassName = "com.github.karlsabo.github.GitHubApiDemoKt",
-    compilationName = "test"
+    compilationName = "test",
 )
 
 createJvmExecTask(
     taskName = "notificationCleanupDemo",
     mainClassName = "com.github.karlsabo.github.notification.GitHubNotificationsCleanupDemoKt",
-    compilationName = "test"
+    compilationName = "test",
 ) {
     dependsOn("jvmTestClasses")
 }
@@ -187,7 +188,7 @@ createJvmExecTask(
 createJvmExecTask(
     taskName = "markdownImageExtractorDemo",
     mainClassName = "com.github.karlsabo.markdown.MarkdownImageExtractorDemoKt",
-    compilationName = "test"
+    compilationName = "test",
 ) {
     dependsOn("jvmTestClasses")
 }

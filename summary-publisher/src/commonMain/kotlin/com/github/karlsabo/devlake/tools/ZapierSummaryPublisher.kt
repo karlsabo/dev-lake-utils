@@ -7,7 +7,5 @@ import me.tatarka.inject.annotations.Inject
 open class ZapierSummaryPublisher @Inject constructor(
     private val config: SummaryPublisherConfig,
 ) {
-    open suspend fun publishSummary(summary: ZapierProjectSummary): Boolean {
-        return ZapierService.sendSummary(summary, config.zapierSummaryUrl)
-    }
+    open suspend fun publishSummary(summary: ZapierProjectSummary): Boolean = ZapierService.sendSummary(summary, config.zapierSummaryUrl)
 }

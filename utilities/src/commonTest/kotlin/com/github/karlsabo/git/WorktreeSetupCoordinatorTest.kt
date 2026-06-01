@@ -64,20 +64,25 @@ private class FakeGitWorktreeApi : GitWorktreeApi {
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 
-    override fun isBranchAncestor(repoPath: String, baseBranch: String, childBranch: String): Boolean =
-        error("isBranchAncestor is not used by WorktreeSetupCoordinator")
+    override fun isBranchAncestor(
+        repoPath: String,
+        baseBranch: String,
+        childBranch: String,
+    ): Boolean = error("isBranchAncestor is not used by WorktreeSetupCoordinator")
 
-    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees =
-        error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees = error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
 
-    override fun listWorktrees(repoPath: String): List<Worktree> =
-        error("listWorktrees is not used by WorktreeSetupCoordinator")
+    override fun listWorktrees(repoPath: String): List<Worktree> = error("listWorktrees is not used by WorktreeSetupCoordinator")
 
     override fun removeWorktree(worktreePath: String, force: Boolean) {
         error("removeWorktree is not used by WorktreeSetupCoordinator")
     }
 
-    override fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean) {
+    override fun archiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        force: Boolean,
+    ) {
         error("archiveWorktree is not used by WorktreeSetupCoordinator")
     }
 }
@@ -139,20 +144,25 @@ private class SerializingFakeGitWorktreeApi : GitWorktreeApi {
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
 
-    override fun isBranchAncestor(repoPath: String, baseBranch: String, childBranch: String): Boolean =
-        error("isBranchAncestor is not used by WorktreeSetupCoordinator")
+    override fun isBranchAncestor(
+        repoPath: String,
+        baseBranch: String,
+        childBranch: String,
+    ): Boolean = error("isBranchAncestor is not used by WorktreeSetupCoordinator")
 
-    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees =
-        error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees = error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
 
-    override fun listWorktrees(repoPath: String): List<Worktree> =
-        error("listWorktrees is not used by WorktreeSetupCoordinator")
+    override fun listWorktrees(repoPath: String): List<Worktree> = error("listWorktrees is not used by WorktreeSetupCoordinator")
 
     override fun removeWorktree(worktreePath: String, force: Boolean) {
         error("removeWorktree is not used by WorktreeSetupCoordinator")
     }
 
-    override fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean) {
+    override fun archiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        force: Boolean,
+    ) {
         error("archiveWorktree is not used by WorktreeSetupCoordinator")
     }
 

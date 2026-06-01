@@ -98,8 +98,7 @@ class JiraRestApi(
      * @param jql The JQL query string
      * @return List of matching issues
      */
-    suspend fun runJql(jql: String): List<ProjectIssue> =
-        runJqlPaginated(jql) { it.toProjectIssue() }
+    suspend fun runJql(jql: String): List<ProjectIssue> = runJqlPaginated(jql) { it.toProjectIssue() }
 
     override suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue> {
         if (issueKeys.isEmpty()) return emptyList()
@@ -111,16 +110,22 @@ class JiraRestApi(
         return runJql(issueKeys.joinToString(" OR ") { key -> "issuekey in portfolioChildIssuesOf(\"$key\")" })
     }
 
-    override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> {
-        return runJql("parent = $parentKey")
-    }
+    override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> = runJql("parent = $parentKey")
 
-    override suspend fun getIssuesResolved(user: User, startDate: Instant, endDate: Instant): List<ProjectIssue> {
+    override suspend fun getIssuesResolved(
+        user: User,
+        startDate: Instant,
+        endDate: Instant,
+    ): List<ProjectIssue> {
         val userId = user.jiraId ?: user.id
         return runJql("${buildResolvedJql(userId, startDate, endDate)} ORDER BY resolutiondate DESC")
     }
 
-    override suspend fun getIssuesResolvedCount(user: User, startDate: Instant, endDate: Instant): UInt {
+    override suspend fun getIssuesResolvedCount(
+        user: User,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt {
         val userId = user.jiraId ?: user.id
         val jql = buildResolvedJql(userId, startDate, endDate)
         val url = "https://${config.domain}/rest/api/3/search/approximate-count"
@@ -155,12 +160,9 @@ class JiraRestApi(
         return emptyList()
     }
 
-    override suspend fun getMilestones(projectId: String): List<ProjectMilestone> =
-        runJqlPaginated("project = \"$projectId\" AND issuetype = ${JiraConstants.ISSUE_TYPE_EPIC} ORDER BY created DESC") { it.toProjectMilestone() }
+    override suspend fun getMilestones(projectId: String): List<ProjectMilestone> = runJqlPaginated("project = \"$projectId\" AND issuetype = ${JiraConstants.ISSUE_TYPE_EPIC} ORDER BY created DESC") { it.toProjectMilestone() }
 
-    override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
-        return getDirectChildIssues(milestoneId)
-    }
+    override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> = getDirectChildIssues(milestoneId)
 
     /**
      * Queries issues by custom field filter.
@@ -230,21 +232,28 @@ class JiraRestApi(
         }
     }
 
-    private fun buildJqlSearchUrl(jql: String, maxResults: Int, startAt: Int, nextPageToken: String?): String =
-        buildString {
-            append("https://${config.domain}/rest/api/3/search/jql")
-            append("?jql=${jql.encodeURLParameter()}")
-            append("&maxResults=$maxResults")
-            append("&fields=*all")
-            if (nextPageToken != null) {
-                append("&nextPageToken=${nextPageToken.encodeURLParameter()}")
-            } else {
-                append("&startAt=$startAt")
-            }
+    private fun buildJqlSearchUrl(
+        jql: String,
+        @Suppress("SameParameterValue") maxResults: Int,
+        startAt: Int,
+        nextPageToken: String?,
+    ): String = buildString {
+        append("https://${config.domain}/rest/api/3/search/jql")
+        append("?jql=${jql.encodeURLParameter()}")
+        append("&maxResults=$maxResults")
+        append("&fields=*all")
+        if (nextPageToken != null) {
+            append("&nextPageToken=${nextPageToken.encodeURLParameter()}")
+        } else {
+            append("&startAt=$startAt")
         }
+    }
 
-    private fun buildResolvedJql(userId: String, startDate: Instant, endDate: Instant): String =
-        "assignee = $userId AND resolutiondate >= \"${startDate.toCompactUtcDateTime()}\" AND resolutiondate <= \"${endDate.toCompactUtcDateTime()}\""
+    private fun buildResolvedJql(
+        userId: String,
+        startDate: Instant,
+        endDate: Instant,
+    ): String = "assignee = $userId AND resolutiondate >= \"${startDate.toCompactUtcDateTime()}\" AND resolutiondate <= \"${endDate.toCompactUtcDateTime()}\""
 
     private fun buildJqlFromFilter(filter: IssueFilter): String {
         val conditions = mutableListOf<String>()

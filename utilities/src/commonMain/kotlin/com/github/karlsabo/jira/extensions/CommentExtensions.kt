@@ -16,6 +16,4 @@ import kotlinx.serialization.json.decodeFromJsonElement
  * @return The parsed [Comment].
  * @throws kotlinx.serialization.SerializationException if parsing fails due to mismatched types or structure.
  */
-fun JsonObject.toComment(): Comment {
-    return lenientJson.decodeFromJsonElement<Comment>(this)
-}
+fun JsonObject.toComment(): Comment = lenientJson.decodeFromJsonElement<Comment>(this)

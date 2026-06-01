@@ -7,17 +7,15 @@ import com.github.karlsabo.projectmanagement.ProjectMilestone as UnifiedProjectM
 /**
  * Converts a Linear ProjectMilestone to the unified ProjectMilestone.
  */
-fun ProjectMilestone.toUnifiedProjectMilestone(): UnifiedProjectMilestone {
-    return UnifiedProjectMilestone(
-        id = id,
-        name = name,
-        description = description,
-        targetDate = parseTargetDate(targetDate),
-        progress = progress,
-        status = status,
-        projectId = null, // Linear milestones don't directly expose project ID in this model
-    )
-}
+fun ProjectMilestone.toUnifiedProjectMilestone(): UnifiedProjectMilestone = UnifiedProjectMilestone(
+    id = id,
+    name = name,
+    description = description,
+    targetDate = parseTargetDate(targetDate),
+    progress = progress,
+    status = status,
+    projectId = null, // Linear milestones don't directly expose project ID in this model
+)
 
 /**
  * Parses a Linear target date string to an Instant.

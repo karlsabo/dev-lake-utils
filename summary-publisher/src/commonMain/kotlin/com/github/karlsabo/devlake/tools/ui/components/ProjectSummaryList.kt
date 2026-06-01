@@ -24,12 +24,12 @@ fun ProjectSummaryList(
     LazyColumn(modifier = modifier) {
         itemsIndexed(
             items = summaries,
-            key = { _, summary -> summary.projectSummary.project.id }
+            key = { _, summary -> summary.projectSummary.project.id },
         ) { index, summaryHolder ->
             ProjectSummaryItem(
                 message = summaryHolder.message,
                 onMessageChange = { onMessageChange(index, it) },
-                onDelete = { onDelete(index) }
+                onDelete = { onDelete(index) },
             )
         }
     }
@@ -45,7 +45,7 @@ private fun ProjectSummaryItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         TextField(
             value = message,
@@ -54,7 +54,7 @@ private fun ProjectSummaryItem(
         )
         Button(
             onClick = onDelete,
-            modifier = Modifier.padding(start = 8.dp)
+            modifier = Modifier.padding(start = 8.dp),
         ) {
             Text("Delete")
         }

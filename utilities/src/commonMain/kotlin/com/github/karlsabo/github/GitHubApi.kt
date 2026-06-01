@@ -128,7 +128,11 @@ interface GitHubApi {
      * @param ref The commit SHA or branch name.
      * @return A summary of CI results for the ref.
      */
-    suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary
+    suspend fun getCheckRunsForRef(
+        owner: String,
+        repo: String,
+        ref: String,
+    ): CheckRunSummary
 
     /**
      * Retrieves a summary of reviews for a specific pull request.
@@ -138,14 +142,22 @@ interface GitHubApi {
      * @param prNumber The pull request number.
      * @return A summary of review states.
      */
-    suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary
+    suspend fun getReviewSummary(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): ReviewSummary
 
     /**
      * Submits a review on a pull request.
      *
      * @param prApiUrl The API URL of the pull request.
      * @param event The review event type.
-     * @param body Optional body/comment for the review.
+     * @param reviewComment Optional body/comment for the review.
      */
-    suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String? = null)
+    suspend fun submitReview(
+        prApiUrl: String,
+        event: ReviewStateValue,
+        reviewComment: String? = null,
+    )
 }

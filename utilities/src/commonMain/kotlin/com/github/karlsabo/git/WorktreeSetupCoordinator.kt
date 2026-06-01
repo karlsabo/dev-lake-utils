@@ -69,7 +69,10 @@ enum class WorktreeSetupStatus {
     RUNNING_SETUP_COMMANDS,
 }
 
-class WorktreeSetupException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+class WorktreeSetupException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 fun interface WorktreeSetupCommandRunner {
     suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult
@@ -251,13 +254,12 @@ class WorktreeSetupCoordinator private constructor(
     }
 }
 
-fun buildWorktreeSetupScript(commands: List<String>): String =
-    buildString {
-        appendLine("setup_exit_code=0")
-        commands.forEach { command ->
-            appendLine(command)
-            appendLine("command_exit_code=$?")
-            appendLine($$"if [ \"$command_exit_code\" -ne 0 ] && [ \"$setup_exit_code\" -eq 0 ]; then setup_exit_code=\"$command_exit_code\"; fi")
-        }
-        append($$"exit \"$setup_exit_code\"")
+fun buildWorktreeSetupScript(commands: List<String>): String = buildString {
+    appendLine("setup_exit_code=0")
+    commands.forEach { command ->
+        appendLine(command)
+        appendLine("command_exit_code=$?")
+        appendLine($$"if [ \"$command_exit_code\" -ne 0 ] && [ \"$setup_exit_code\" -eq 0 ]; then setup_exit_code=\"$command_exit_code\"; fi")
     }
+    append($$"exit \"$setup_exit_code\"")
+}

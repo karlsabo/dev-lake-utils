@@ -5,24 +5,24 @@ import com.github.karlsabo.devlake.tools.SummaryPublisherComponent
 import com.github.karlsabo.devlake.tools.SummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.SummaryPublisherDependencies
 import com.github.karlsabo.devlake.tools.SummaryPublisherState
+import com.github.karlsabo.devlake.tools.ZapierSummaryPublisher
 import com.github.karlsabo.devlake.tools.loadSummaryPublisherDependencies
 import com.github.karlsabo.devlake.tools.service.SummaryBuilderService
 import com.github.karlsabo.devlake.tools.service.SummaryMessagePublisherService
 import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
-import com.github.karlsabo.devlake.tools.ZapierSummaryPublisher
 import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.dto.toTerseSlackMarkup
+import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.linear.config.LinearApiRestConfig
-import com.github.karlsabo.pagerduty.PagerDutyApiRestConfig
-import com.github.karlsabo.text.TextSummarizerOpenAiConfig
-import com.github.karlsabo.tools.model.ProjectSummary
-import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.pagerduty.PagerDutyApi
+import com.github.karlsabo.pagerduty.PagerDutyApiRestConfig
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.text.TextSummarizer
+import com.github.karlsabo.text.TextSummarizerOpenAiConfig
+import com.github.karlsabo.tools.model.ProjectSummary
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -193,11 +193,11 @@ class SummaryPublisherDependenciesTest {
             assertEquals(true, state.isDisplayErrorDialog)
             assertEquals(
                 "Failed to load configuration: java.lang.IllegalStateException: missing config." +
-                        "\nCreating new configuration.\n Please update the configuration file:\n$summaryConfigPath." +
-                        "Please update the configuration file:\n$textSummarizerPath." +
-                        "Please update the configuration file:\n$linearPath." +
-                        "Please update the configuration file:\n$gitHubPath." +
-                        "Please update the configuration file:\n$pagerDutyPath.",
+                    "\nCreating new configuration.\n Please update the configuration file:\n$summaryConfigPath." +
+                    "Please update the configuration file:\n$textSummarizerPath." +
+                    "Please update the configuration file:\n$linearPath." +
+                    "Please update the configuration file:\n$gitHubPath." +
+                    "Please update the configuration file:\n$pagerDutyPath.",
                 state.errorMessage,
             )
             assertEquals(
@@ -225,11 +225,11 @@ class SummaryPublisherDependenciesTest {
             projectSummaries = listOf(
                 ProjectSummaryHolder(
                     projectSummary = emptyProjectSummary("project-1"),
-                    message = "Project one message"
+                    message = "Project one message",
                 ),
                 ProjectSummaryHolder(
                     projectSummary = emptyProjectSummary("project-2"),
-                    message = "Project two message"
+                    message = "Project two message",
                 ),
             )
         }
@@ -241,7 +241,7 @@ class SummaryPublisherDependenciesTest {
                 ZapierProjectSummary(
                     message = "Top level summary",
                     projectMessages = listOf("Project one message", "Project two message"),
-                )
+                ),
             ),
             recordingPublisher.publishedSummaries,
         )
@@ -263,7 +263,7 @@ class SummaryPublisherDependenciesTest {
             projectSummaries = listOf(
                 ProjectSummaryHolder(
                     projectSummary = emptyProjectSummary("project-1"),
-                    message = "Project one message"
+                    message = "Project one message",
                 ),
             )
         }
@@ -275,7 +275,7 @@ class SummaryPublisherDependenciesTest {
                 ZapierProjectSummary(
                     message = "Top level summary",
                     projectMessages = listOf("Project one message"),
-                )
+                ),
             ),
             recordingPublisher.publishedSummaries,
         )
@@ -297,7 +297,7 @@ class SummaryPublisherDependenciesTest {
             projectSummaries = listOf(
                 ProjectSummaryHolder(
                     projectSummary = emptyProjectSummary("project-1"),
-                    message = "Project one message"
+                    message = "Project one message",
                 ),
             )
         }
@@ -309,7 +309,7 @@ class SummaryPublisherDependenciesTest {
                 ZapierProjectSummary(
                     message = "Top level summary",
                     projectMessages = listOf("Project one message"),
-                )
+                ),
             ),
             recordingPublisher.publishedSummaries,
         )
@@ -321,24 +321,20 @@ class SummaryPublisherDependenciesTest {
     private fun emptySummaryBuilderService(
         config: SummaryPublisherConfig = SummaryPublisherConfig(),
         usersConfig: UsersConfig = UsersConfig(users = emptyList()),
-    ): SummaryBuilderService {
-        return SummaryBuilderService(
-            config = config,
-            usersConfig = usersConfig,
-            projectManagementApi = NoOpProjectManagementApi,
-            gitHubApi = NoOpGitHubApi,
-            pagerDutyApi = NoOpPagerDutyApi,
-            textSummarizer = NoOpTextSummarizer,
-        )
-    }
+    ): SummaryBuilderService = SummaryBuilderService(
+        config = config,
+        usersConfig = usersConfig,
+        projectManagementApi = NoOpProjectManagementApi,
+        gitHubApi = NoOpGitHubApi,
+        pagerDutyApi = NoOpPagerDutyApi,
+        textSummarizer = NoOpTextSummarizer,
+    )
 
     private fun summaryMessagePublisherService(
         config: SummaryPublisherConfig = SummaryPublisherConfig(),
-    ): SummaryMessagePublisherService {
-        return SummaryMessagePublisherService(
-            zapierSummaryPublisher = RecordingZapierSummaryPublisher(config = config),
-        )
-    }
+    ): SummaryMessagePublisherService = SummaryMessagePublisherService(
+        zapierSummaryPublisher = RecordingZapierSummaryPublisher(config = config),
+    )
 
     private class RecordingZapierSummaryPublisher(
         config: SummaryPublisherConfig = SummaryPublisherConfig(),
@@ -432,9 +428,17 @@ class SummaryPublisherDependenciesTest {
 
         override suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String) = unexpected()
 
-        override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String) = unexpected()
+        override suspend fun getCheckRunsForRef(
+            owner: String,
+            repo: String,
+            ref: String,
+        ) = unexpected()
 
-        override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int) = unexpected()
+        override suspend fun getReviewSummary(
+            owner: String,
+            repo: String,
+            prNumber: Int,
+        ) = unexpected()
 
         override suspend fun submitReview(
             prApiUrl: String,

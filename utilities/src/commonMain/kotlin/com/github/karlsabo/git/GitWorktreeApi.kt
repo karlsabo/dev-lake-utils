@@ -10,11 +10,19 @@ interface GitWorktreeApi {
         targetBranch: String,
     ): String
     fun worktreeExists(repoPath: String, branch: String): Boolean
-    fun isBranchAncestor(repoPath: String, baseBranch: String, childBranch: String): Boolean
+    fun isBranchAncestor(
+        repoPath: String,
+        baseBranch: String,
+        childBranch: String,
+    ): Boolean
     fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees
     fun listWorktrees(repoPath: String): List<Worktree>
     fun removeWorktree(worktreePath: String, force: Boolean = false)
-    fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean = false)
+    fun archiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        force: Boolean = false,
+    )
 }
 
 data class RepositoryWorktrees(

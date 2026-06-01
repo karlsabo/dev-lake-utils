@@ -1,6 +1,8 @@
 package com.github.karlsabo.git
 
-enum class WorktreeBranchNameValidationFailure(val message: String) {
+enum class WorktreeBranchNameValidationFailure(
+    val message: String,
+) {
     EMPTY("Branch name is required"),
     WHITESPACE("Branch name must not contain whitespace"),
     CONTROL_CHARACTER("Branch name must not contain control characters"),
@@ -16,7 +18,9 @@ sealed interface WorktreeBranchNameValidationResult {
         override val failure: WorktreeBranchNameValidationFailure? = null
     }
 
-    data class Invalid(override val failure: WorktreeBranchNameValidationFailure) : WorktreeBranchNameValidationResult
+    data class Invalid(
+        override val failure: WorktreeBranchNameValidationFailure,
+    ) : WorktreeBranchNameValidationResult
 }
 
 class WorktreeBranchNameValidator(
@@ -26,6 +30,7 @@ class WorktreeBranchNameValidator(
 ) {
     fun validateWithoutGitRefFormatCheck(branch: String): WorktreeBranchNameValidationResult = when {
         branch.isEmpty() -> WorktreeBranchNameValidationResult.Invalid(WorktreeBranchNameValidationFailure.EMPTY)
+
         branch.any { it.isWhitespace() } -> {
             WorktreeBranchNameValidationResult.Invalid(WorktreeBranchNameValidationFailure.WHITESPACE)
         }
@@ -55,4 +60,3 @@ fun GitCommandApi.isValidBranchRefFormat(branch: String): Boolean = try {
 } catch (_: GitCommandException) {
     false
 }
-

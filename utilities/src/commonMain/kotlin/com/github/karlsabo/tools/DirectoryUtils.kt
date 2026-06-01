@@ -43,7 +43,7 @@ private fun saveUserConfig(userConfig: UsersConfig) {
             lenientJson.encodeToString(
                 UsersConfig.serializer(),
                 userConfig,
-            )
+            ),
         )
     }
 }
@@ -63,6 +63,7 @@ fun getApplicationDirectory(appName: String): Path {
 
     val directory = when (osFamily()) {
         OsFamily.MACOS -> Path(userHome, "Library", "Application Support", appName)
+
         OsFamily.WINDOWS -> {
             val appDataEnv = getEnv("APPDATA")
             val appData: Path = if (appDataEnv != null) Path(appDataEnv) else Path(userHome, "AppData", "Roaming")

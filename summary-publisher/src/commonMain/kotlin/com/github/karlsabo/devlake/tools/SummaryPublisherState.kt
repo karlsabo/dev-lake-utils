@@ -7,7 +7,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.github.karlsabo.tools.model.ProjectSummary
 
-data class ProjectSummaryHolder(val projectSummary: ProjectSummary, val message: String)
+data class ProjectSummaryHolder(
+    val projectSummary: ProjectSummary,
+    val message: String,
+)
 
 class SummaryPublisherState {
     var isConfigLoaded by mutableStateOf(false)

@@ -17,4 +17,3 @@ interface PagerDutyApi {
         endTimeExclusive: Instant,
     ): List<PagerDutyIncident>
 }
-

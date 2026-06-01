@@ -7,7 +7,7 @@ enum class OsFamily {
     MACOS,
     WINDOWS,
     LINUX,
-    UNKNOWN
+    UNKNOWN,
 }
 
 /**

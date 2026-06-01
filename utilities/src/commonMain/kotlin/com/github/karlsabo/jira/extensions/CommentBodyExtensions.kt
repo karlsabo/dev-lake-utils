@@ -10,6 +10,4 @@ import com.github.karlsabo.jira.model.CommentBody
  *
  * @return A String representing the plain text content of the comment body.
  */
-fun CommentBody.toPlainText(): String {
-    return extractTextFromAdf(this.content) ?: ""
-}
+fun CommentBody.toPlainText(): String = extractTextFromAdf(this.content) ?: ""

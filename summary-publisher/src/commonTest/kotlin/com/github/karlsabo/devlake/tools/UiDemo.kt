@@ -30,7 +30,7 @@ import kotlin.uuid.Uuid
 
 data class ProjectMessage(
     val id: Uuid,
-    val text: String
+    val text: String,
 )
 
 fun main() = application {
@@ -51,7 +51,7 @@ fun main() = application {
                 mutableListOf(
                     ProjectMessage(Uuid.random(), "Project A"),
                     ProjectMessage(Uuid.random(), "Project B"),
-                )
+                ),
             )
         }
 
@@ -59,7 +59,7 @@ fun main() = application {
             Column(modifier = Modifier.fillMaxSize()) {
                 Button(
                     onClick = { println("helo moto") },
-                    modifier = Modifier.padding(8.dp)
+                    modifier = Modifier.padding(8.dp),
                 ) {
                     Text("Hello")
                 }
@@ -68,19 +68,19 @@ fun main() = application {
                     onValueChange = { zapierJson = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp)
+                        .padding(8.dp),
                 )
 
                 LazyColumn {
                     itemsIndexed(
                         items = projectMessages,
-                        key = { _, item -> item.id } // the key is the unique ID!
+                        key = { _, item -> item.id }, // the key is the unique ID!
                     ) { index, project ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             TextField(
                                 value = project.text,
@@ -95,7 +95,7 @@ fun main() = application {
                                 onClick = {
                                     projectMessages = projectMessages.toMutableList().also { it.removeAt(index) }
                                 },
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier.padding(start = 8.dp),
                             ) {
                                 Text("Delete")
                             }

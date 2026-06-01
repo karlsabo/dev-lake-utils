@@ -110,6 +110,6 @@ private fun printUsage() {
         |  --file=/path/to/document.md
         |  --directory=/path/to/docs --recursive
         |  --file=/path/to/document.md --dry-run --images-dir=assets
-    """.trimMargin()
+        """.trimMargin(),
     )
 }

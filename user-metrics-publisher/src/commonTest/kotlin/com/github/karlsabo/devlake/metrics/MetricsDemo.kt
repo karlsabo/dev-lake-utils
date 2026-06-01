@@ -32,13 +32,13 @@ fun main() {
                         user,
                         config.organizationIds,
                         JiraRestApi(jiraConfig),
-                        GitHubRestApi(gitHubConfig)
+                        GitHubRestApi(gitHubConfig),
                     )
                     synchronized(metrics) {
                         metrics.add(userMetrics)
                     }
                 }.also {
-                    println("Time to load metrics for ${userId}: $it")
+                    println("Time to load metrics for $userId: $it")
                 }
             }
         }
@@ -46,10 +46,10 @@ fun main() {
 
         metrics.forEach { metric ->
             println(
-                "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n"
-                        + metric.toSlackMarkdown()
-                        + "\n"
-                        + config.metricInformationPostfix
+                "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n" +
+                    metric.toSlackMarkdown() +
+                    "\n" +
+                    config.metricInformationPostfix,
             )
         }
     }

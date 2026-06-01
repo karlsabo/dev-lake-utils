@@ -83,7 +83,5 @@ fun EngHub(onExitApplication: () -> Unit) {
     }
 }
 
-private fun buildEngHubConfigurationErrorMessage(error: Exception): String {
-    return "Failed to load configuration: $error.\nCreating new configuration.\n" +
-        "Please update the configuration file:\n$engHubConfigPath."
-}
+private fun buildEngHubConfigurationErrorMessage(error: Exception): String = "Failed to load configuration: $error.\nCreating new configuration.\n" +
+    "Please update the configuration file:\n$engHubConfigPath."

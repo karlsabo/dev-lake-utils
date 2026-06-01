@@ -3,7 +3,9 @@ package com.github.karlsabo.git
 import kotlin.jvm.JvmInline
 
 @JvmInline
-value class WorktreePath(val value: String) {
+value class WorktreePath(
+    val value: String,
+) {
     init {
         require(value.isNotBlank()) { "worktreePath must not be blank" }
     }
@@ -22,8 +24,6 @@ fun buildWorktreePath(repoPath: String, branch: String): WorktreePath {
     return WorktreePath("$parentDir/$repoName-$sanitized")
 }
 
-fun sanitizeBranchName(branch: String): String {
-    return branch
-        .replace(Regex("[^a-zA-Z0-9._-]"), "-")
-        .trim('-')
-}
+fun sanitizeBranchName(branch: String): String = branch
+    .replace(Regex("[^a-zA-Z0-9._-]"), "-")
+    .trim('-')

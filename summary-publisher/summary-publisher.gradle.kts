@@ -78,7 +78,7 @@ fun createJvmExecTask(
 
         classpath(
             compilation.map { it.output.allOutputs },
-            compilation.map { it.runtimeDependencyFiles ?: files() }
+            compilation.map { it.runtimeDependencyFiles ?: files() },
         )
 
         configure()
@@ -88,32 +88,32 @@ fun createJvmExecTask(
 createJvmExecTask(
     taskName = "runSummaryDemo",
     mainClassName = "com.github.karlsabo.devlake.tools.SummaryDemoKt",
-    compilationName = "test"
+    compilationName = "test",
 )
 
 createJvmExecTask(
     taskName = "runSummaryDetailDemo",
     mainClassName = "com.github.karlsabo.devlake.tools.SummaryDetailDemoKt",
     compilationName = "test",
-    supportsArgs = true
+    supportsArgs = true,
 )
 
 createJvmExecTask(
     taskName = "runUiDemo",
     mainClassName = "com.github.karlsabo.devlake.tools.UiDemoKt",
-    compilationName = "test"
+    compilationName = "test",
 )
 
 createJvmExecTask(
     taskName = "runSummaryPublisherWithConfig",
     mainClassName = "com.github.karlsabo.devlake.tools.SummaryPublisherKt",
     compilationName = "main",
-    supportsArgs = true
+    supportsArgs = true,
 )
 
 createJvmExecTask(
     taskName = "runJiraTeamMerDemo",
     mainClassName = "com.github.karlsabo.devlake.tools.JiraTeamMerDemoKt",
     compilationName = "test",
-    supportsArgs = true
+    supportsArgs = true,
 )

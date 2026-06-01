@@ -14,16 +14,32 @@ interface GitCommandApi {
     fun isGitRepository(repoPath: String): Boolean
 
     /** `git -C <repoPath> fetch [remote] [refSpecs]`. */
-    fun fetch(repoPath: String, remote: String = "origin", vararg refSpecs: String)
+    fun fetch(
+        repoPath: String,
+        remote: String = "origin",
+        vararg refSpecs: String,
+    )
 
     /** Return `true` when `refs/heads/<branch>` exists on [remote]. */
-    fun remoteBranchExists(repoPath: String, branch: String, remote: String = "origin"): Boolean
+    fun remoteBranchExists(
+        repoPath: String,
+        branch: String,
+        remote: String = "origin",
+    ): Boolean
 
     /** Return `true` when [ancestorRef] is an ancestor of [descendantRef]. */
-    fun isAncestor(repoPath: String, ancestorRef: String, descendantRef: String): Boolean
+    fun isAncestor(
+        repoPath: String,
+        ancestorRef: String,
+        descendantRef: String,
+    ): Boolean
 
     /** `git -C <repoPath> worktree add <path> <commitIsh>`. */
-    fun worktreeAdd(repoPath: String, path: String, commitIsh: String)
+    fun worktreeAdd(
+        repoPath: String,
+        path: String,
+        commitIsh: String,
+    )
 
     /** `git -C <repoPath> worktree add -b <newBranch> <path> <baseBranch>`. */
     fun worktreeAddNewBranch(

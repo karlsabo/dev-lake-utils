@@ -18,9 +18,7 @@ data class LinearApiRestConfig(
     val endpoint: String = DEFAULT_LINEAR_ENDPOINT,
     val useBearerAuth: Boolean = false,
 ) {
-    override fun toString(): String {
-        return "LinearApiRestConfig(endpoint=$endpoint, useBearerAuth=$useBearerAuth)"
-    }
+    override fun toString(): String = "LinearApiRestConfig(endpoint=$endpoint, useBearerAuth=$useBearerAuth)"
 }
 
 /**

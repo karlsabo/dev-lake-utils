@@ -14,12 +14,14 @@ class GitHubRestApiCheckRunSummaryTest {
     @Test
     fun getCheckRunsForRef_countsCheckRunsAndCommitStatusContexts() = runBlocking {
         val api = createApi(
-            checkRunsBody = checkRunsResponse(List(10) {
-                CheckRunPayload(
-                    status = "completed",
-                    conclusion = "success"
-                )
-            }),
+            checkRunsBody = checkRunsResponse(
+                List(10) {
+                    CheckRunPayload(
+                        status = "completed",
+                        conclusion = "success",
+                    )
+                },
+            ),
             statusBody = statusResponse(listOf("success")),
         )
 
@@ -27,7 +29,7 @@ class GitHubRestApiCheckRunSummaryTest {
 
         assertEquals(
             CheckRunSummary(total = 11, passed = 11, failed = 0, inProgress = 0, status = CiStatus.PASSED),
-            summary
+            summary,
         )
     }
 
@@ -42,7 +44,7 @@ class GitHubRestApiCheckRunSummaryTest {
 
         assertEquals(
             CheckRunSummary(total = 2, passed = 1, failed = 1, inProgress = 0, status = CiStatus.FAILED),
-            summary
+            summary,
         )
     }
 
@@ -57,7 +59,7 @@ class GitHubRestApiCheckRunSummaryTest {
 
         assertEquals(
             CheckRunSummary(total = 2, passed = 1, failed = 0, inProgress = 1, status = CiStatus.RUNNING),
-            summary
+            summary,
         )
     }
 }

@@ -71,12 +71,10 @@ internal data class PendingCreateWorktree(
     val targetBranch: String = "",
 )
 
-internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<WorktreeMenuAction> {
-    return buildList {
-        add(WorktreeMenuAction.Open)
-        add(WorktreeMenuAction.CreateWorktree)
-        if (!worktree.isRoot) add(WorktreeMenuAction.Archive)
-    }
+internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<WorktreeMenuAction> = buildList {
+    add(WorktreeMenuAction.Open)
+    add(WorktreeMenuAction.CreateWorktree)
+    if (!worktree.isRoot) add(WorktreeMenuAction.Archive)
 }
 
 internal fun createWorktreeDialogState(
@@ -94,8 +92,7 @@ internal fun isWorktreeCreateEnabled(
     isArchiving: Boolean,
 ): Boolean = setupStatus == null && !isArchiving && !worktree.isDetachedDisplayBranch()
 
-internal fun isWorktreeArchiveEnabled(setupStatus: WorktreeSetupStatus?, isArchiving: Boolean): Boolean =
-    setupStatus == null && !isArchiving
+internal fun isWorktreeArchiveEnabled(setupStatus: WorktreeSetupStatus?, isArchiving: Boolean): Boolean = setupStatus == null && !isArchiving
 
 internal data class CreateWorktreeTargetBranchValidation(
     val result: WorktreeBranchNameValidationResult,
@@ -147,8 +144,7 @@ internal fun createWorktreeTargetBranchValidationMessage(
     else -> validation.result.message
 }
 
-internal fun isCreateWorktreeConfirmEnabled(validation: CreateWorktreeTargetBranchValidation): Boolean =
-    !validation.isCheckingGitRefFormat && validation.result.isValid && !validation.targetBranchMatchesBase
+internal fun isCreateWorktreeConfirmEnabled(validation: CreateWorktreeTargetBranchValidation): Boolean = !validation.isCheckingGitRefFormat && validation.result.isValid && !validation.targetBranchMatchesBase
 
 internal fun submitCreateWorktreeDialog(
     state: PendingCreateWorktree,
@@ -162,8 +158,7 @@ internal fun createTargetBranchInputValue(targetBranch: String): TextFieldValue 
     selection = TextRange(targetBranch.length),
 )
 
-private fun targetBranchMatchesBase(baseBranch: String, targetBranch: String): Boolean =
-    targetBranch.isNotEmpty() && targetBranch == baseBranch
+private fun targetBranchMatchesBase(baseBranch: String, targetBranch: String): Boolean = targetBranch.isNotEmpty() && targetBranch == baseBranch
 
 @Composable
 fun WorktreePanel(

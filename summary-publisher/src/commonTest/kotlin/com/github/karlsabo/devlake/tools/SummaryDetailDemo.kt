@@ -46,21 +46,23 @@ fun main(args: Array<String>) {
             usersConfig.users,
             summaryConfig.miscUserIds.map { userId -> usersConfig.users.first { it.id == userId } },
             summaryConfig.summaryName,
-            summaryConfig.isMiscellaneousProjectIncluded
+            summaryConfig.isMiscellaneousProjectIncluded,
         )
 
         println("Summary:")
-        if (summaryConfig.isTerseSummaryUsed)
+        if (summaryConfig.isTerseSummaryUsed) {
             println(summaryLast7Days.toTerseSlackMarkup())
-        else
+        } else {
             println(summaryLast7Days.toSlackMarkup())
+        }
         println()
 
         summaryLast7Days.projectSummaries.forEach {
-            if (it.project.isVerboseMilestones)
+            if (it.project.isVerboseMilestones) {
                 println(it.toVerboseSlackMarkdown())
-            else
+            } else {
                 println(it.toSlackMarkup())
+            }
             println()
         }
     }

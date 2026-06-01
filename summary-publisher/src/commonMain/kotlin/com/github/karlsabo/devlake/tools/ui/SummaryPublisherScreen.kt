@@ -33,20 +33,20 @@ fun SummaryPublisherScreen(
                     text = publishButtonText,
                     isLoading = isSendingSlackMessage,
                     enabled = publishButtonEnabled && !isLoadingSummary,
-                    onClick = onPublishClick
+                    onClick = onPublishClick,
                 )
 
                 SummaryTextField(
                     value = topLevelSummary,
                     onValueChange = onTopLevelSummaryChange,
-                    modifier = Modifier.padding(8.dp)
+                    modifier = Modifier.padding(8.dp),
                 )
 
                 ProjectSummaryList(
                     summaries = projectSummaries,
                     onMessageChange = onProjectMessageChange,
                     onDelete = onProjectDelete,
-                    modifier = Modifier.weight(1f).padding(8.dp)
+                    modifier = Modifier.weight(1f).padding(8.dp),
                 )
             }
         }

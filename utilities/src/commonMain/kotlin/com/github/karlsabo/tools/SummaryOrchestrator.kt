@@ -73,7 +73,7 @@ suspend fun createSummary(
                         projectManagementApi,
                         textSummarizer,
                         duration,
-                        emptySet()
+                        emptySet(),
                     )
                 mutex.withLock {
                     projectSummaries.add(projectSummary)
@@ -125,15 +125,15 @@ suspend fun createSummary(
                 textSummarizer,
                 duration,
                 miscPrSet,
-                true
-            )
+                true,
+            ),
         )
     }
 
     val pagerDutyIncidentList = fetchPagerDutyIncidents(
         pagerDutyApi,
         pagerDutyServiceIds,
-        duration
+        duration,
     )
 
     return MultiProjectSummary(
@@ -161,7 +161,7 @@ private suspend fun collectMiscellaneousWork(
             val issuesForUser = projectManagementApi.getIssuesResolved(
                 user,
                 Clock.System.now().minus(duration),
-                Clock.System.now()
+                Clock.System.now(),
             )
             mutex.withLock {
                 miscIssueSet.addAll(issuesForUser)
@@ -172,8 +172,10 @@ private suspend fun collectMiscellaneousWork(
         async(Dispatchers.Default) {
             logger.info { "Pulling PRs for user ${user.id}" }
             val prsForUser = gitHubApi.getMergedPullRequests(
-                user.gitHubId!!, gitHubOrganizationIds, Clock.System.now().minus(duration),
-                Clock.System.now()
+                user.gitHubId!!,
+                gitHubOrganizationIds,
+                Clock.System.now().minus(duration),
+                Clock.System.now(),
             )
             mutex.withLock {
                 miscPrSet.addAll(prsForUser)
@@ -195,7 +197,7 @@ private suspend fun fetchPagerDutyIncidents(
         alertList += pagerDutyApi.getServicePages(
             serviceId,
             Clock.System.now().minus(duration),
-            Clock.System.now()
+            Clock.System.now(),
         )
     }
     return alertList

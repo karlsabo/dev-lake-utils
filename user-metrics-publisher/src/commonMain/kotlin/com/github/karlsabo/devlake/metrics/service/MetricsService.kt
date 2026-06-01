@@ -56,8 +56,6 @@ object MetricsService {
         )
     }
 
-    private fun startOfCurrentYear(): Instant {
-        return System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            .run { Instant.parse("${year}-01-01T00:00:00Z") }
-    }
+    private fun startOfCurrentYear(): Instant = System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        .run { Instant.parse("$year-01-01T00:00:00Z") }
 }

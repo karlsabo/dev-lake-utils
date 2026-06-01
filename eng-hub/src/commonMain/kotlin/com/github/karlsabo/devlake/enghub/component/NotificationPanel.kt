@@ -22,9 +22,7 @@ import com.github.karlsabo.github.ReviewStateValue
 
 internal fun NotificationUiState.checkoutSetupStatus(
     setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
-): WorktreeSetupStatus? {
-    return headRef?.let { setupStatusFor(repositoryFullName, it) }
-}
+): WorktreeSetupStatus? = headRef?.let { setupStatusFor(repositoryFullName, it) }
 
 @Composable
 fun NotificationPanel(

@@ -15,7 +15,7 @@ data class ProjectMilestone(
     val name: String? = null,
     val description: String? = null,
     val targetDate: Instant? = null,
-    val progress: Double? = null,  // 0.0 to 1.0
+    val progress: Double? = null, // 0.0 to 1.0
     val status: String? = null,
     val projectId: String? = null,
 )

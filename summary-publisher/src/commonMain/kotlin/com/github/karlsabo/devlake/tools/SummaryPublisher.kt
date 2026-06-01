@@ -10,6 +10,6 @@ fun main(args: Array<String>) = application {
 
     SummaryPublisherApp(
         configFilePath = configFilePath,
-        onExitApplication = ::exitApplication
+        onExitApplication = ::exitApplication,
     )
 }

@@ -18,11 +18,9 @@ actual class NotificationDatabaseDriverFactory {
     }
 }
 
-private fun DatabaseConfiguration.configureNotificationDatabase(basePath: String?): DatabaseConfiguration {
-    return copy(
-        extendedConfig =
-            extendedConfig.copy(
-                basePath = basePath ?: extendedConfig.basePath,
-            ),
-    )
-}
+private fun DatabaseConfiguration.configureNotificationDatabase(basePath: String?): DatabaseConfiguration = copy(
+    extendedConfig =
+    extendedConfig.copy(
+        basePath = basePath ?: extendedConfig.basePath,
+    ),
+)

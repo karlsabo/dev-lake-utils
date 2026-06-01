@@ -8,5 +8,4 @@ internal fun WorktreeSetupStatus.setupStatusLabel(): String = when (this) {
     WorktreeSetupStatus.RUNNING_SETUP_COMMANDS -> "Running setup..."
 }
 
-internal fun setupActionLabel(defaultLabel: String, setupStatus: WorktreeSetupStatus?): String =
-    setupStatus?.setupStatusLabel() ?: defaultLabel
+internal fun setupActionLabel(defaultLabel: String, setupStatus: WorktreeSetupStatus?): String = setupStatus?.setupStatusLabel() ?: defaultLabel

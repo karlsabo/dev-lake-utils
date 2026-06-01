@@ -14,13 +14,9 @@ class SqlDelightNotificationIgnoreStore(
     private val queries =
         NotificationDatabase(driverFactory.createDriver(databasePath)).ignoredNotificationThreadsQueries
 
-    override fun listIgnoredThreadIds(): Set<String> {
-        return queries.selectAllThreadIds().executeAsList().toSet()
-    }
+    override fun listIgnoredThreadIds(): Set<String> = queries.selectAllThreadIds().executeAsList().toSet()
 
-    override fun listIgnoredThreads(): List<IgnoredNotificationThread> {
-        return queries.selectAll(::toIgnoredNotificationThread).executeAsList()
-    }
+    override fun listIgnoredThreads(): List<IgnoredNotificationThread> = queries.selectAll(::toIgnoredNotificationThread).executeAsList()
 
     override fun saveIgnoredThread(
         threadId: String,
@@ -65,13 +61,11 @@ private fun toIgnoredNotificationThread(
     ignoreReason: String,
     ignoredAtEpochMs: Long,
     notificationUpdatedAtEpochMs: Long?,
-): IgnoredNotificationThread {
-    return IgnoredNotificationThread(
-        threadId = threadId,
-        repositoryFullName = repositoryFullName,
-        subjectType = subjectType,
-        reason = NotificationIgnoreReason.valueOf(ignoreReason),
-        ignoredAtEpochMs = ignoredAtEpochMs,
-        notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
-    )
-}
+): IgnoredNotificationThread = IgnoredNotificationThread(
+    threadId = threadId,
+    repositoryFullName = repositoryFullName,
+    subjectType = subjectType,
+    reason = NotificationIgnoreReason.valueOf(ignoreReason),
+    ignoredAtEpochMs = ignoredAtEpochMs,
+    notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
+)

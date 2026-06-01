@@ -9,8 +9,11 @@ class DesktopLauncherService : DesktopLauncher {
     override fun openUrl(url: String) {
         val command = when (osFamily()) {
             OsFamily.MACOS -> listOf("open", url)
+
             OsFamily.LINUX -> listOf("xdg-open", url)
+
             OsFamily.WINDOWS -> listOf("cmd", "/c", "start", url)
+
             OsFamily.UNKNOWN -> {
                 logger.warn { "Unknown OS family, attempting xdg-open" }
                 listOf("xdg-open", url)

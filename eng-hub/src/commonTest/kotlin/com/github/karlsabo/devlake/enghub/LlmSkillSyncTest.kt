@@ -28,8 +28,7 @@ class LlmSkillSyncTest {
         fs.sink(path).buffered().use { it.writeString(content) }
     }
 
-    private fun readFile(path: Path): String =
-        fs.source(path).buffered().readString()
+    private fun readFile(path: Path): String = fs.source(path).buffered().readString()
 
     private fun deleteRecursively(path: Path) {
         if (!fs.exists(path)) return
@@ -129,7 +128,7 @@ class LlmSkillSyncTest {
                         "SKILL.md" to "Write to \${PLANNING_MARKDOWN_DIR}/story.md",
                         "references/output.md" to "Also use \${PLANNING_MARKDOWN_DIR}/review.md",
                         "script.txt" to "\${PLANNING_MARKDOWN_DIR} should stay untouched",
-                    )
+                    ),
                 ),
                 agentsContent = "Guide path: \${PLANNING_MARKDOWN_DIR}/guide.md",
                 notesContent = "Notes path: \${PLANNING_MARKDOWN_DIR}/notes.md",
@@ -139,24 +138,24 @@ class LlmSkillSyncTest {
 
             assertEquals(listOf("templated"), result.skillsCopied)
             assertEquals(
-                "Write to ${planningDir}/story.md",
-                readFile(Path(homeDir, ".codex", "skills", "templated", "SKILL.md"))
+                "Write to $planningDir/story.md",
+                readFile(Path(homeDir, ".codex", "skills", "templated", "SKILL.md")),
             )
             assertEquals(
-                "Also use ${planningDir}/review.md",
-                readFile(Path(homeDir, ".codex", "skills", "templated", "references", "output.md"))
+                "Also use $planningDir/review.md",
+                readFile(Path(homeDir, ".codex", "skills", "templated", "references", "output.md")),
             )
             assertEquals(
                 "\${PLANNING_MARKDOWN_DIR} should stay untouched",
-                readFile(Path(homeDir, ".codex", "skills", "templated", "script.txt"))
+                readFile(Path(homeDir, ".codex", "skills", "templated", "script.txt")),
             )
             assertEquals(
-                "Guide path: ${planningDir}/guide.md",
-                readFile(Path(homeDir, ".codex", "instructions.md"))
+                "Guide path: $planningDir/guide.md",
+                readFile(Path(homeDir, ".codex", "instructions.md")),
             )
             assertEquals(
-                "Notes path: ${planningDir}/notes.md",
-                readFile(Path(homeDir, ".codex", "notes.md"))
+                "Notes path: $planningDir/notes.md",
+                readFile(Path(homeDir, ".codex", "notes.md")),
             )
         } finally {
             deleteRecursively(sourceDir)
@@ -181,7 +180,7 @@ class LlmSkillSyncTest {
             assertEquals(listOf("templated"), result.skillsCopied)
             assertEquals(
                 "Path: \${PLANNING_MARKDOWN_DIR}/story.md",
-                readFile(Path(homeDir, ".claude", "skills", "templated", "SKILL.md"))
+                readFile(Path(homeDir, ".claude", "skills", "templated", "SKILL.md")),
             )
             assertFalse(fs.exists(Path(homeDir, "planning")))
         } finally {

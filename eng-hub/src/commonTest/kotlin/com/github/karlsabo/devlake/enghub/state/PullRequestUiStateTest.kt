@@ -20,7 +20,7 @@ class PullRequestUiStateTest {
                     passed = 3,
                     failed = 0,
                     inProgress = 0,
-                    status = CiStatus.PASSED
+                    status = CiStatus.PASSED,
                 ),
                 reviewSummary = ReviewSummary(approvedCount = 0, requestedCount = 1, reviews = emptyList()),
                 headRef = "feature/team-review",

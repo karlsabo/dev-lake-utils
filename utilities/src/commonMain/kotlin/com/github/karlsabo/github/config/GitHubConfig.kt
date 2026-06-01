@@ -14,9 +14,7 @@ import kotlinx.serialization.Serializable
 data class GitHubApiRestConfig(
     val token: String,
 ) {
-    override fun toString(): String {
-        return "GitHubApiRestConfig()"
-    }
+    override fun toString(): String = "GitHubApiRestConfig()"
 }
 
 /**

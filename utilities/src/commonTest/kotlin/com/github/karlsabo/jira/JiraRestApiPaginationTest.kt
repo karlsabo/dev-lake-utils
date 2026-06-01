@@ -61,4 +61,3 @@ class JiraRestApiPaginationTest {
         assertEquals(listOf(null, "token-1"), requestedTokens)
     }
 }
-

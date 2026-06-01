@@ -31,7 +31,7 @@ fun main(args: Array<String>) {
 
         val filter = CustomFieldFilter(
             fieldId = "R&D Team",
-            values = teams
+            values = teams,
         )
 
         val now = Clock.System.now()

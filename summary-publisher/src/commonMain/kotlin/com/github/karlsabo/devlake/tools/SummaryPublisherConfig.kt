@@ -35,4 +35,3 @@ fun saveSummaryPublisherConfig(config: SummaryPublisherConfig) {
     SystemFileSystem.sink(summaryPublisherConfigPath).buffered()
         .writeText(lenientJson.encodeToString(SummaryPublisherConfig.serializer(), config))
 }
-

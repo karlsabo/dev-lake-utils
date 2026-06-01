@@ -19,20 +19,30 @@ class GitCommandService : GitCommandApi {
         return result.exitCode == 0
     }
 
-    override fun fetch(repoPath: String, remote: String, vararg refSpecs: String) {
+    override fun fetch(
+        repoPath: String,
+        remote: String,
+        vararg refSpecs: String,
+    ) {
         val args = mutableListOf("fetch", remote)
         args.addAll(refSpecs)
         executeGitCommand(buildRepoCommand(repoPath, *args.toTypedArray()))
     }
 
-    override fun remoteBranchExists(repoPath: String, branch: String, remote: String): Boolean {
+    override fun remoteBranchExists(
+        repoPath: String,
+        branch: String,
+        remote: String,
+    ): Boolean {
         val remoteBranchRef = "refs/heads/$branch"
         val command = buildRepoCommand(repoPath, "ls-remote", "--exit-code", "--heads", remote, remoteBranchRef)
         logger.debug { "Executing: ${command.joinToString(" ")}" }
         val result = executeCommand(command, workingDirectory = null)
         return when (result.exitCode) {
             0 -> true
+
             2 -> false
+
             else -> throw GitCommandException(
                 command = command,
                 exitCode = result.exitCode,
@@ -41,13 +51,19 @@ class GitCommandService : GitCommandApi {
         }
     }
 
-    override fun isAncestor(repoPath: String, ancestorRef: String, descendantRef: String): Boolean {
+    override fun isAncestor(
+        repoPath: String,
+        ancestorRef: String,
+        descendantRef: String,
+    ): Boolean {
         val command = buildRepoCommand(repoPath, "merge-base", "--is-ancestor", ancestorRef, descendantRef)
         logger.debug { "Executing: ${command.joinToString(" ")}" }
         val result = executeCommand(command, workingDirectory = null)
         return when (result.exitCode) {
             0 -> true
+
             1 -> false
+
             else -> throw GitCommandException(
                 command = command,
                 exitCode = result.exitCode,
@@ -56,7 +72,11 @@ class GitCommandService : GitCommandApi {
         }
     }
 
-    override fun worktreeAdd(repoPath: String, path: String, commitIsh: String) {
+    override fun worktreeAdd(
+        repoPath: String,
+        path: String,
+        commitIsh: String,
+    ) {
         executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", path, commitIsh))
     }
 
@@ -69,9 +89,7 @@ class GitCommandService : GitCommandApi {
         executeGitCommand(buildRepoCommand(repoPath, "worktree", "add", "-b", newBranch, path, baseBranch))
     }
 
-    override fun worktreeList(repoPath: String): String {
-        return executeGitCommand(buildRepoCommand(repoPath, "worktree", "list", "--porcelain"))
-    }
+    override fun worktreeList(repoPath: String): String = executeGitCommand(buildRepoCommand(repoPath, "worktree", "list", "--porcelain"))
 
     override fun worktreeRemove(repoPath: String, path: String) {
         executeGitCommand(buildRepoCommand(repoPath, "worktree", "remove", path))
@@ -81,21 +99,13 @@ class GitCommandService : GitCommandApi {
         executeGitCommand(buildRepoCommand(repoPath, "checkout", ref))
     }
 
-    override fun status(repoPath: String): String {
-        return executeGitCommand(buildRepoCommand(repoPath, "status", "--porcelain"))
-    }
+    override fun status(repoPath: String): String = executeGitCommand(buildRepoCommand(repoPath, "status", "--porcelain"))
 
-    override fun log(repoPath: String, vararg args: String): String {
-        return executeGitCommand(buildRepoCommand(repoPath, "log", *args))
-    }
+    override fun log(repoPath: String, vararg args: String): String = executeGitCommand(buildRepoCommand(repoPath, "log", *args))
 
-    override fun diff(repoPath: String, vararg args: String): String {
-        return executeGitCommand(buildRepoCommand(repoPath, "diff", *args))
-    }
+    override fun diff(repoPath: String, vararg args: String): String = executeGitCommand(buildRepoCommand(repoPath, "diff", *args))
 
-    override fun revParse(repoPath: String, vararg args: String): String {
-        return executeGitCommand(buildRepoCommand(repoPath, "rev-parse", *args))
-    }
+    override fun revParse(repoPath: String, vararg args: String): String = executeGitCommand(buildRepoCommand(repoPath, "rev-parse", *args))
 
     override fun execute(repoPath: String?, vararg args: String): String {
         val command = if (repoPath != null) {
@@ -106,9 +116,7 @@ class GitCommandService : GitCommandApi {
         return executeGitCommand(command)
     }
 
-    private fun buildRepoCommand(repoPath: String, vararg args: String): List<String> {
-        return listOf("git", "-C", repoPath) + args.toList()
-    }
+    private fun buildRepoCommand(repoPath: String, vararg args: String): List<String> = listOf("git", "-C", repoPath) + args.toList()
 
     private fun executeGitCommand(command: List<String>): String {
         logger.debug { "Executing: ${command.joinToString(" ")}" }

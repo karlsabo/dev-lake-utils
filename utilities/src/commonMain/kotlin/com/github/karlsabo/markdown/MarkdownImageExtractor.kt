@@ -115,26 +115,24 @@ class MarkdownImageExtractor(
         }
     }
 
-    private fun listMarkdownFiles(directory: Path, recursive: Boolean): List<Path> =
-        if (recursive) {
-            listMarkdownFilesRecursively(directory)
-        } else {
-            fileSystem.list(directory).filter { it.name.endsWith(".md") }
+    private fun listMarkdownFiles(directory: Path, recursive: Boolean): List<Path> = if (recursive) {
+        listMarkdownFilesRecursively(directory)
+    } else {
+        fileSystem.list(directory).filter { it.name.endsWith(".md") }
+    }
+
+    private fun listMarkdownFilesRecursively(directory: Path): List<Path> = fileSystem.list(directory).flatMap { path ->
+        when {
+            fileSystem.metadataOrNull(path)?.isDirectory == true ->
+                listMarkdownFilesRecursively(path)
+
+            path.name.endsWith(".md") -> listOf(path)
+
+            else -> emptyList()
         }
+    }
 
-    private fun listMarkdownFilesRecursively(directory: Path): List<Path> =
-        fileSystem.list(directory).flatMap { path ->
-            when {
-                fileSystem.metadataOrNull(path)?.isDirectory == true ->
-                    listMarkdownFilesRecursively(path)
-
-                path.name.endsWith(".md") -> listOf(path)
-                else -> emptyList()
-            }
-        }
-
-    private fun readFile(path: Path): String =
-        fileSystem.source(path).buffered().readString()
+    private fun readFile(path: Path): String = fileSystem.source(path).buffered().readString()
 
     private fun writeFile(path: Path, content: String) {
         fileSystem.sink(path).buffered().use { it.writeString(content) }

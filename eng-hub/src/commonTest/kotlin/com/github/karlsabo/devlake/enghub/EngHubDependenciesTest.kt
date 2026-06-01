@@ -141,22 +141,20 @@ class EngHubDependenciesTest {
     }
 }
 
-private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: String): NotificationUiState {
-    return NotificationUiState(
-        notificationThreadId = threadId,
-        title = "Notification $threadId",
-        reason = "review_requested",
-        updatedAtEpochMs = 2_026_052_910_000,
-        repositoryFullName = "test-org/test-repo",
-        subjectType = "PullRequest",
-        htmlUrl = "https://github.com/test-org/test-repo/pull/1",
-        apiUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
-        isPullRequest = true,
-        pullRequestNumber = 1,
-        unread = true,
-        headRef = "feature/test",
-    )
-}
+private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: String): NotificationUiState = NotificationUiState(
+    notificationThreadId = threadId,
+    title = "Notification $threadId",
+    reason = "review_requested",
+    updatedAtEpochMs = 2_026_052_910_000,
+    repositoryFullName = "test-org/test-repo",
+    subjectType = "PullRequest",
+    htmlUrl = "https://github.com/test-org/test-repo/pull/1",
+    apiUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
+    isPullRequest = true,
+    pullRequestNumber = 1,
+    unread = true,
+    headRef = "feature/test",
+)
 
 private data class EnsureRepositoryCall(
     val repoPath: String,
@@ -168,8 +166,7 @@ private data class EnsureWorktreeCall(
     val branch: String,
 )
 
-private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> =
-    withTimeout(2_000.milliseconds) { first { it.isNotEmpty() } }
+private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> = withTimeout(2_000.milliseconds) { first { it.isNotEmpty() } }
 
 private class RecordingGitWorktreeApi : GitWorktreeApi {
     val ensureRepositoryCalls = MutableStateFlow<List<EnsureRepositoryCall>>(emptyList())
@@ -194,6 +191,13 @@ private class RecordingGitWorktreeApi : GitWorktreeApi {
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
+    override fun isBranchAncestor(
+        repoPath: String,
+        baseBranch: String,
+        childBranch: String,
+    ): Boolean {
+        TODO("Not yet implemented")
+    }
 
     override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
         error("Unexpected call")
@@ -203,7 +207,11 @@ private class RecordingGitWorktreeApi : GitWorktreeApi {
 
     override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
 
-    override fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean) = Unit
+    override fun archiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        force: Boolean,
+    ) = Unit
 }
 
 private class RecordingDirectoryPicker : DirectoryPicker {
@@ -274,15 +282,23 @@ private class RecordingGitHubApi : GitHubApi {
         author: String,
     ): List<Issue> = emptyList()
 
-    override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary {
-        return CheckRunSummary(total = 0, passed = 0, failed = 0, inProgress = 0, status = CiStatus.PENDING)
-    }
+    override suspend fun getCheckRunsForRef(
+        owner: String,
+        repo: String,
+        ref: String,
+    ): CheckRunSummary = CheckRunSummary(total = 0, passed = 0, failed = 0, inProgress = 0, status = CiStatus.PENDING)
 
-    override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary {
-        return ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
-    }
+    override suspend fun getReviewSummary(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): ReviewSummary = ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
 
-    override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) = Unit
+    override suspend fun submitReview(
+        prApiUrl: String,
+        event: ReviewStateValue,
+        reviewComment: String?,
+    ) = Unit
 }
 
 private class RecordingNotificationIgnoreStore : NotificationIgnoreStore {

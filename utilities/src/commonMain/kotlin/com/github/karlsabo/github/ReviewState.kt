@@ -5,7 +5,8 @@ enum class ReviewStateValue {
     CHANGES_REQUESTED,
     COMMENTED,
     PENDING,
-    DISMISSED;
+    DISMISSED,
+    ;
 
     /**
      * Converts this review state to the string expected by the GitHub "create review" API.

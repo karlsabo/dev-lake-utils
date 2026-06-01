@@ -38,7 +38,7 @@ fun main(args: Array<String>) {
         // Get PR count for the past year
         val now = Clock.System.now()
         val currentYear = now.toString().substring(0, 4)
-        val startOfTheYear = Instant.parse("${currentYear}-01-01T00:00:00Z")
+        val startOfTheYear = Instant.parse("$currentYear-01-01T00:00:00Z")
 
         runBlocking {
             // Get PR count for the past year
@@ -76,7 +76,6 @@ fun main(args: Array<String>) {
             val mergedPRsCount = githubApi.getMergedPullRequestCount(userId, organizations, oneWeekAgo, now)
             println("\nCount of PRs merged by user ID $userId in the last week: $mergedPRsCount")
         }
-
     } catch (e: Exception) {
         println("Error: ${e.message}")
         e.printStackTrace()

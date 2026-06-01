@@ -20,7 +20,10 @@ import kotlinx.serialization.Serializable
 private val logger = KotlinLogging.logger {}
 
 @Serializable
-data class ZapierProjectSummary(val message: String, val projectMessages: List<String>)
+data class ZapierProjectSummary(
+    val message: String,
+    val projectMessages: List<String>,
+)
 
 object ZapierService {
     private val client: HttpClient by lazy {

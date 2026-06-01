@@ -43,7 +43,7 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
     if (!state.isLoadingConfig && state.isDisplayErrorDialog) {
         ErrorDialog(
             message = state.errorMessage,
-            onDismiss = onExitApplication
+            onDismiss = onExitApplication,
         )
         return
     }
@@ -72,7 +72,7 @@ fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
                 scope.launch {
                     publishMetrics(state)
                 }
-            }
+            },
         )
     }
 }
@@ -136,18 +136,14 @@ internal fun loadConfiguration(
 internal fun buildConfigurationErrorMessage(
     error: Exception,
     configFilePath: Path = userMetricPublisherConfigPath,
-): String {
-    return "Failed to load configuration: $error.\nCreating new configuration.\n" +
-        "Please update the configuration file:\n$configFilePath."
-}
+): String = "Failed to load configuration: $error.\nCreating new configuration.\n" +
+    "Please update the configuration file:\n$configFilePath."
 
 internal fun buildDependenciesErrorMessage(
     error: Exception,
     configFilePath: Path = userMetricPublisherConfigPath,
-): String {
-    return "Failed to load dependencies: $error.\n" +
-        "Please update the configuration file:\n$configFilePath."
-}
+): String = "Failed to load dependencies: $error.\n" +
+    "Please update the configuration file:\n$configFilePath."
 
 internal suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState) {
     logger.info { "Loading metrics" }
@@ -200,9 +196,9 @@ internal suspend fun publishMetrics(state: com.github.karlsabo.devlake.metrics.U
         val message = SlackMessage(
             userEmail = metric.email,
             message = "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n" +
-                    metric.toSlackMarkdown() +
-                    "\n" +
-                    state.config.metricInformationPostfix
+                metric.toSlackMarkdown() +
+                "\n" +
+                state.config.metricInformationPostfix,
         )
         val publishSucceeded = runCatching {
             messagePublisherService.publishMessage(message)

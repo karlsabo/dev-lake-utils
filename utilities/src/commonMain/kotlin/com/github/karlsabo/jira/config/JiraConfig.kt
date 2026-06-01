@@ -31,7 +31,9 @@ data class JiraConfig(
  * Secret configuration for Jira API.
  */
 @Serializable
-data class JiraSecret(val jiraApiKey: String)
+data class JiraSecret(
+    val jiraApiKey: String,
+)
 
 /**
  * Loads Jira configuration from a file.
@@ -56,6 +58,7 @@ fun loadJiraConfig(configFilePath: Path): JiraApiRestConfig {
 /**
  * Saves Jira configuration to a file.
  */
+@Suppress("unused")
 fun saveJiraConfig(configPath: Path, config: JiraConfig) {
     SystemFileSystem.sink(configPath, false).buffered().use { sink ->
         sink.writeString(lenientJson.encodeToString(JiraConfig.serializer(), config))

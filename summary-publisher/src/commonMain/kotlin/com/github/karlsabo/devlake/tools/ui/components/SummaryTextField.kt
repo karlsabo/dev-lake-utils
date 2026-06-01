@@ -18,6 +18,6 @@ fun SummaryTextField(
         onValueChange = onValueChange,
         modifier = modifier
             .fillMaxWidth()
-            .padding(8.dp)
+            .padding(8.dp),
     )
 }

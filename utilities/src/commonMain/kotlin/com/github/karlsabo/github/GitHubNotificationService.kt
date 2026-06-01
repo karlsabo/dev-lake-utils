@@ -12,7 +12,10 @@ import kotlinx.coroutines.sync.withPermit
 private val logger = KotlinLogging.logger {}
 
 enum class PullRequestStatus {
-    OPEN, MERGED, CLOSED, UNKNOWN
+    OPEN,
+    MERGED,
+    CLOSED,
+    UNKNOWN,
 }
 
 fun PullRequest.toPullRequestStatus(): PullRequestStatus = when {
@@ -25,10 +28,18 @@ fun PullRequest.toPullRequestStatus(): PullRequestStatus = when {
 sealed interface NotificationAction {
     val description: String
 
-    data class ApprovedPullRequest(override val description: String) : NotificationAction
-    data class SkippedApproval(override val description: String) : NotificationAction
-    data class MarkedAsDone(override val description: String) : NotificationAction
-    data class ActionFailed(override val description: String) : NotificationAction
+    data class ApprovedPullRequest(
+        override val description: String,
+    ) : NotificationAction
+    data class SkippedApproval(
+        override val description: String,
+    ) : NotificationAction
+    data class MarkedAsDone(
+        override val description: String,
+    ) : NotificationAction
+    data class ActionFailed(
+        override val description: String,
+    ) : NotificationAction
 }
 
 sealed interface NotificationProcessingResult {
@@ -71,28 +82,26 @@ class GitHubNotificationService(
         }
     }
 
-    suspend fun processNotification(notification: Notification): NotificationProcessingResult {
-        return try {
-            if (notification.isPullRequest) {
-                val prUrl = notification.subjectApiUrl
-                if (prUrl != null) {
-                    processPullRequestNotification(notification, prUrl)
-                } else {
-                    NotificationProcessingResult.Processed(
-                        notification = notification,
-                        pullRequestStatus = PullRequestStatus.UNKNOWN,
-                    )
-                }
+    suspend fun processNotification(notification: Notification): NotificationProcessingResult = try {
+        if (notification.isPullRequest) {
+            val prUrl = notification.subjectApiUrl
+            if (prUrl != null) {
+                processPullRequestNotification(notification, prUrl)
             } else {
-                NotificationProcessingResult.Processed(notification = notification)
+                NotificationProcessingResult.Processed(
+                    notification = notification,
+                    pullRequestStatus = PullRequestStatus.UNKNOWN,
+                )
             }
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to process notification ${notification.id}: ${notification.subject.title}" }
-            NotificationProcessingResult.Failed(
-                notification = notification,
-                error = e.message ?: "Unknown error",
-            )
+        } else {
+            NotificationProcessingResult.Processed(notification = notification)
         }
+    } catch (e: Exception) {
+        logger.warn(e) { "Failed to process notification ${notification.id}: ${notification.subject.title}" }
+        NotificationProcessingResult.Failed(
+            notification = notification,
+            error = e.message ?: "Unknown error",
+        )
     }
 
     private suspend fun processPullRequestNotification(
@@ -134,23 +143,23 @@ class GitHubNotificationService(
             if (alreadyApproved) {
                 actions.add(
                     NotificationAction.SkippedApproval(
-                        "PR already approved; skipping additional approval ${pr.url} $title"
-                    )
+                        "PR already approved; skipping additional approval ${pr.url} $title",
+                    ),
                 )
             } else {
                 gitHubApi.approvePullRequestByUrl(prUrl, body = approvalMessage)
                 actions.add(
                     NotificationAction.ApprovedPullRequest(
-                        "Approved PR based on title match ${pr.url} $title"
-                    )
+                        "Approved PR based on title match ${pr.url} $title",
+                    ),
                 )
             }
             markNotificationDone(notification, actions)
         } catch (e: Exception) {
             actions.add(
                 NotificationAction.ActionFailed(
-                    "Failed to check/approve PR ${pr.url} $title (${e.message})"
-                )
+                    "Failed to check/approve PR ${pr.url} $title (${e.message})",
+                ),
             )
         }
     }
@@ -165,15 +174,15 @@ class GitHubNotificationService(
         } catch (e: Exception) {
             actions.add(
                 NotificationAction.ActionFailed(
-                    "Failed to mark notification as done (${e.message})"
-                )
+                    "Failed to mark notification as done (${e.message})",
+                ),
             )
         }
     }
 }
 
-private fun defaultAutoApprovePredicate(title: String): Boolean {
-    return title.startsWith("Updating appfile", ignoreCase = true)
-            && (title.contains("demo", ignoreCase = true)
-            || title.contains("to dev", ignoreCase = true))
-}
+private fun defaultAutoApprovePredicate(title: String): Boolean = title.startsWith("Updating appfile", ignoreCase = true) &&
+    (
+        title.contains("demo", ignoreCase = true) ||
+            title.contains("to dev", ignoreCase = true)
+        )

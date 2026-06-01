@@ -12,7 +12,5 @@ open class UserMetricsService @Inject constructor() {
         organizationIds: List<String>,
         projectManagementApi: ProjectManagementApi,
         gitHubApi: GitHubApi,
-    ): UserMetrics {
-        return MetricsService.createUserMetrics(user, organizationIds, projectManagementApi, gitHubApi)
-    }
+    ): UserMetrics = MetricsService.createUserMetrics(user, organizationIds, projectManagementApi, gitHubApi)
 }

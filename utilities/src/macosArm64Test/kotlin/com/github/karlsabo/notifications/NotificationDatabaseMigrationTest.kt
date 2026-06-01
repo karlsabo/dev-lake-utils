@@ -46,8 +46,8 @@ class NotificationDatabaseMigrationTest {
                         "PullRequest",
                         "UNSUBSCRIBED",
                         1L,
-                        null
-                    )
+                        null,
+                    ),
                 ),
                 readIgnoredRows(databasePath),
             )
@@ -202,33 +202,28 @@ class NotificationDatabaseMigrationTest {
         }
     }
 
-    private fun readUserVersion(databasePath: Path): Long {
-        return withDatabaseConnection(databasePath) { connection ->
-            connection.getVersion().toLong()
-        }
+    private fun readUserVersion(databasePath: Path): Long = withDatabaseConnection(databasePath) { connection ->
+        connection.getVersion().toLong()
     }
 
-    private fun readIgnoredColumnNames(databasePath: Path): List<String> {
-        return withDatabaseConnection(databasePath) { connection ->
-            connection.withStatement("PRAGMA table_info(ignored_notification_threads)") {
-                val cursor = query()
-                val columnNames = mutableListOf<String>()
-                try {
-                    while (cursor.next()) {
-                        columnNames += cursor.getString(1)
-                    }
-                    columnNames
-                } finally {
-                    resetStatement()
+    private fun readIgnoredColumnNames(databasePath: Path): List<String> = withDatabaseConnection(databasePath) { connection ->
+        connection.withStatement("PRAGMA table_info(ignored_notification_threads)") {
+            val cursor = query()
+            val columnNames = mutableListOf<String>()
+            try {
+                while (cursor.next()) {
+                    columnNames += cursor.getString(1)
                 }
+                columnNames
+            } finally {
+                resetStatement()
             }
         }
     }
 
-    private fun readIgnoredRows(databasePath: Path): List<IgnoredThreadRow> {
-        return withDatabaseConnection(databasePath) { connection ->
-            connection.withStatement(
-                """
+    private fun readIgnoredRows(databasePath: Path): List<IgnoredThreadRow> = withDatabaseConnection(databasePath) { connection ->
+        connection.withStatement(
+            """
                 SELECT
                   thread_id,
                   repository_full_name,
@@ -238,25 +233,24 @@ class NotificationDatabaseMigrationTest {
                   notification_updated_at_epoch_ms
                 FROM ignored_notification_threads
                 ORDER BY thread_id
-                """.trimIndent(),
-            ) {
-                val cursor = query()
-                val rows = mutableListOf<IgnoredThreadRow>()
-                try {
-                    while (cursor.next()) {
-                        rows += IgnoredThreadRow(
-                            threadId = cursor.getString(0),
-                            repositoryFullName = cursor.getString(1),
-                            subjectType = cursor.getString(2),
-                            ignoreReason = cursor.getString(3),
-                            ignoredAtEpochMs = cursor.getLong(4),
-                            notificationUpdatedAtEpochMs = cursor.getNullableLong(5),
-                        )
-                    }
-                    rows
-                } finally {
-                    resetStatement()
+            """.trimIndent(),
+        ) {
+            val cursor = query()
+            val rows = mutableListOf<IgnoredThreadRow>()
+            try {
+                while (cursor.next()) {
+                    rows += IgnoredThreadRow(
+                        threadId = cursor.getString(0),
+                        repositoryFullName = cursor.getString(1),
+                        subjectType = cursor.getString(2),
+                        ignoreReason = cursor.getString(3),
+                        ignoredAtEpochMs = cursor.getLong(4),
+                        notificationUpdatedAtEpochMs = cursor.getNullableLong(5),
+                    )
                 }
+                rows
+            } finally {
+                resetStatement()
             }
         }
     }
@@ -270,9 +264,9 @@ private fun <T> withDatabaseConnection(databasePath: Path, block: (co.touchlab.s
                 version = NO_VERSION_CHECK,
                 create = {},
                 extendedConfig =
-                    DatabaseConfiguration.Extended(
-                        basePath = databasePath.parent?.toString(),
-                    ),
+                DatabaseConfiguration.Extended(
+                    basePath = databasePath.parent?.toString(),
+                ),
             ),
         )
 
@@ -288,6 +282,4 @@ private data class IgnoredThreadRow(
     val notificationUpdatedAtEpochMs: Long?,
 )
 
-private fun Cursor.getNullableLong(index: Int): Long? {
-    return if (isNull(index)) null else getLong(index)
-}
+private fun Cursor.getNullableLong(index: Int): Long? = if (isNull(index)) null else getLong(index)

@@ -29,7 +29,7 @@ fun UserMetricPublisherScreen(
 
                 MetricsPreview(
                     text = metricsPreviewText,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
             }
         }

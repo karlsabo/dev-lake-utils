@@ -3,8 +3,12 @@ package com.github.karlsabo.system
 import io.github.oshai.kotlinlogging.KLogger
 
 sealed interface DesktopAppBootstrapResult<out T> {
-    data class Loaded<T>(val value: T) : DesktopAppBootstrapResult<T>
-    data class Failed(val errorMessage: String) : DesktopAppBootstrapResult<Nothing>
+    data class Loaded<T>(
+        val value: T,
+    ) : DesktopAppBootstrapResult<T>
+    data class Failed(
+        val errorMessage: String,
+    ) : DesktopAppBootstrapResult<Nothing>
 }
 
 inline fun <T> runDesktopAppBootstrap(

@@ -75,7 +75,7 @@ fun createJvmExecTask(
 
         classpath(
             compilation.map { it.output.allOutputs },
-            compilation.map { it.runtimeDependencyFiles ?: files() }
+            compilation.map { it.runtimeDependencyFiles ?: files() },
         )
 
         configure()

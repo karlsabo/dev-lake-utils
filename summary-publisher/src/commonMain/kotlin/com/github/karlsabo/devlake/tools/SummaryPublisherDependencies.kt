@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.tools
 
+import com.github.karlsabo.devlake.tools.service.SummaryBuilderService
+import com.github.karlsabo.devlake.tools.service.SummaryMessagePublisherService
 import com.github.karlsabo.dto.UsersConfig
 import com.github.karlsabo.github.GitHubApi
 import com.github.karlsabo.github.GitHubRestApi
@@ -23,8 +25,6 @@ import com.github.karlsabo.tools.linearConfigPath
 import com.github.karlsabo.tools.loadUsersConfig
 import com.github.karlsabo.tools.pagerDutyConfigPath
 import com.github.karlsabo.tools.textSummarizerConfigPath
-import com.github.karlsabo.devlake.tools.service.SummaryBuilderService
-import com.github.karlsabo.devlake.tools.service.SummaryMessagePublisherService
 import me.tatarka.inject.annotations.Inject
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
@@ -43,22 +43,16 @@ object SummaryPublisherScope
 interface SummaryPublisherBindings {
 
     @Provides
-    fun provideProjectManagementApi(linearApiConfig: LinearApiRestConfig): ProjectManagementApi {
-        return LinearRestApi(linearApiConfig)
-    }
+    fun provideProjectManagementApi(linearApiConfig: LinearApiRestConfig): ProjectManagementApi = LinearRestApi(linearApiConfig)
 
     @Provides
     fun provideGitHubApi(gitHubApiConfig: GitHubApiRestConfig): GitHubApi = GitHubRestApi(gitHubApiConfig)
 
     @Provides
-    fun providePagerDutyApi(pagerDutyApiConfig: PagerDutyApiRestConfig): PagerDutyApi {
-        return PagerDutyRestApi(pagerDutyApiConfig)
-    }
+    fun providePagerDutyApi(pagerDutyApiConfig: PagerDutyApiRestConfig): PagerDutyApi = PagerDutyRestApi(pagerDutyApiConfig)
 
     @Provides
-    fun provideTextSummarizer(textSummarizerConfig: TextSummarizerOpenAiConfig): TextSummarizer {
-        return TextSummarizerOpenAi(textSummarizerConfig)
-    }
+    fun provideTextSummarizer(textSummarizerConfig: TextSummarizerOpenAiConfig): TextSummarizer = TextSummarizerOpenAi(textSummarizerConfig)
 }
 
 @MergeComponent(SummaryPublisherScope::class)

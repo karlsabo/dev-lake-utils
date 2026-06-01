@@ -9,7 +9,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
 import kotlinx.io.files.Path
 
-fun main(args: Array<String>) {
+fun main() {
     println("GitHub Notifications Demo")
 
     val configPath = Path(gitHubConfigPath)
@@ -67,6 +67,4 @@ private fun printResult(index: Int, result: NotificationProcessingResult) {
     }
 }
 
-private fun formatDate(instant: Instant): String {
-    return instant.toString().replace('T', ' ').removeSuffix("Z")
-}
+private fun formatDate(instant: Instant): String = instant.toString().replace('T', ' ').removeSuffix("Z")

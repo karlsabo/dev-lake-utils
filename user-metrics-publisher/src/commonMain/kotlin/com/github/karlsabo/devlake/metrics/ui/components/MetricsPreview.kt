@@ -29,24 +29,24 @@ fun MetricsPreview(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight(),
-            adapter = rememberScrollbarAdapter(scrollState)
+            adapter = rememberScrollbarAdapter(scrollState),
         )
 
         Column(
             modifier = Modifier
                 .verticalScroll(scrollState)
-                .padding(end = 12.dp)
+                .padding(end = 12.dp),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 8.dp)
+                        .padding(end = 8.dp),
                 ) {
                     TextField(
                         value = text,

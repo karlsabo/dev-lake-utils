@@ -78,11 +78,11 @@ private val ISSUE_FIELDS = """
               identifier
               title
             }
-        """.trimIndent()
+""".trimIndent()
 
 private val ISSUE_ID_FIELDS = """
             id
-        """.trimIndent()
+""".trimIndent()
 
 private val COMMENT_FIELDS = """
             id
@@ -97,7 +97,7 @@ private val COMMENT_FIELDS = """
               displayName
               email
             }
-        """.trimIndent()
+""".trimIndent()
 
 private val MILESTONE_FIELDS = """
             id
@@ -105,13 +105,15 @@ private val MILESTONE_FIELDS = """
             description
             targetDate
             progress
-        """.trimIndent()
+""".trimIndent()
 
 /**
  * Linear GraphQL API implementation of ProjectManagementApi.
  */
-class LinearRestApi(private val config: LinearApiRestConfig, private val clientOverride: HttpClient? = null) :
-    ProjectManagementApi {
+class LinearRestApi(
+    private val config: LinearApiRestConfig,
+    private val clientOverride: HttpClient? = null,
+) : ProjectManagementApi {
     @Serializable
     private data class GraphQlRequest(
         val query: String,
@@ -170,9 +172,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         return children.map { it.toProjectIssue() }
     }
 
-    override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> {
-        return fetchChildIssues(parentKey).map { it.toProjectIssue() }
-    }
+    override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> = fetchChildIssues(parentKey).map { it.toProjectIssue() }
 
     override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<ProjectComment> {
         if (maxResults <= 0) return emptyList()
@@ -208,13 +208,21 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         return comments.map { it.toProjectComment() }
     }
 
-    override suspend fun getIssuesResolved(user: User, startDate: Instant, endDate: Instant): List<ProjectIssue> {
+    override suspend fun getIssuesResolved(
+        user: User,
+        startDate: Instant,
+        endDate: Instant,
+    ): List<ProjectIssue> {
         val userId = user.linearId ?: user.id
         val filter = queryBuilder.resolvedIssuesFilter(userId, startDate, endDate)
         return fetchIssuesByFilter(filter, ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
-    override suspend fun getIssuesResolvedCount(user: User, startDate: Instant, endDate: Instant): UInt {
+    override suspend fun getIssuesResolvedCount(
+        user: User,
+        startDate: Instant,
+        endDate: Instant,
+    ): UInt {
         val userId = user.linearId ?: user.id
         val filter = queryBuilder.resolvedIssuesFilter(userId, startDate, endDate)
         return countIssuesByFilter(filter)
@@ -340,7 +348,11 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
         return children
     }
 
-    private suspend fun fetchIssuesByFilter(filter: String, selection: String, orderBy: String? = null): List<Issue> {
+    private suspend fun fetchIssuesByFilter(
+        filter: String,
+        selection: String,
+        orderBy: String? = null,
+    ): List<Issue> {
         val issues = mutableListOf<Issue>()
         var cursor: String? = null
 
@@ -425,9 +437,7 @@ class LinearRestApi(private val config: LinearApiRestConfig, private val clientO
      * Returns true if the key looks like a Linear issue identifier (e.g., "ENG-123"),
      * false if it looks like a project identifier (typically a UUID).
      */
-    private fun isIssueIdentifier(key: String): Boolean {
-        return key.contains(Regex("^[A-Za-z]+-\\d+$"))
-    }
+    private fun isIssueIdentifier(key: String): Boolean = key.contains(Regex("^[A-Za-z]+-\\d+$"))
 
     private fun authorizationHeaderValue(): String {
         if (config.token.startsWith("Bearer ")) return config.token

@@ -243,7 +243,7 @@ class EngHubNotificationPersistenceViewModelTest {
         assertTrue(notifications.isEmpty())
         assertTrue(
             api.pullRequestByUrlCalls.isEmpty(),
-            "Unsubscribed notifications should stay hidden before enrichment"
+            "Unsubscribed notifications should stay hidden before enrichment",
         )
     }
 
@@ -830,7 +830,8 @@ class EngHubNotificationPersistenceViewModelTest {
 
         assertEquals(
             "boom",
-            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message })
+            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message },
+        )
         assertTrue(store.savedThreads.value.isEmpty(), "Failed unsubscribe should not persist the thread locally")
         assertTrue(api.markedDoneThreadIds.value.isEmpty(), "Failed unsubscribe should not mark the thread done")
     }
@@ -859,7 +860,8 @@ class EngHubNotificationPersistenceViewModelTest {
 
         assertEquals(
             "persist failed",
-            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message })
+            withTimeout(2_000.milliseconds) { viewModel.actionErrorStateFlow.filterNotNull().first().message },
+        )
         withTimeout(2_000.milliseconds) {
             viewModel.notifications
                 .filterNotNull()
@@ -896,11 +898,9 @@ private fun createViewModel(
     )
 }
 
-private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> =
-    withTimeout(2_000.milliseconds) { first { it.isNotEmpty() } }
+private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> = withTimeout(2_000.milliseconds) { first { it.isNotEmpty() } }
 
-private suspend fun <T> MutableStateFlow<List<T>>.awaitSize(size: Int): List<T> =
-    withTimeout(2_000.milliseconds) { first { it.size >= size } }
+private suspend fun <T> MutableStateFlow<List<T>>.awaitSize(size: Int): List<T> = withTimeout(2_000.milliseconds) { first { it.size >= size } }
 
 private class NoOpGitWorktreeApi : GitWorktreeApi {
     override fun ensureRepository(repoPath: String, cloneUrl: String) = Unit
@@ -917,6 +917,13 @@ private class NoOpGitWorktreeApi : GitWorktreeApi {
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false
+    override fun isBranchAncestor(
+        repoPath: String,
+        baseBranch: String,
+        childBranch: String,
+    ): Boolean {
+        TODO("Not yet implemented")
+    }
 
     override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
         error("Unexpected call")
@@ -926,7 +933,11 @@ private class NoOpGitWorktreeApi : GitWorktreeApi {
 
     override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
 
-    override fun archiveWorktree(repoPath: String, worktreePath: String, force: Boolean) = Unit
+    override fun archiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        force: Boolean,
+    ) = Unit
 }
 
 private class NoOpDirectoryPicker : DirectoryPicker {
@@ -974,10 +985,10 @@ private class RecordingNotificationIgnoreStore(
     saveFailuresBeforeSuccess: List<Exception> = emptyList(),
 ) : NotificationIgnoreStore {
     private var storedIgnoredThreads = (
-            initialIgnoredThreads + initialThreadIds.map { threadId ->
-                ignoredThread(threadId = threadId, reason = NotificationIgnoreReason.UNSUBSCRIBED)
-            }
-            ).associateBy { it.threadId }.toMutableMap()
+        initialIgnoredThreads + initialThreadIds.map { threadId ->
+            ignoredThread(threadId = threadId, reason = NotificationIgnoreReason.UNSUBSCRIBED)
+        }
+        ).associateBy { it.threadId }.toMutableMap()
     private val queuedSaveFailures = saveFailuresBeforeSuccess.toMutableList()
     val savedThreads = MutableStateFlow<List<SavedThread>>(emptyList())
 
@@ -1099,15 +1110,23 @@ private class NotificationPersistenceGitHubApi(
         author: String,
     ): List<Issue> = emptyList()
 
-    override suspend fun getCheckRunsForRef(owner: String, repo: String, ref: String): CheckRunSummary {
-        return CheckRunSummary(total = 0, passed = 0, failed = 0, inProgress = 0, status = CiStatus.PENDING)
-    }
+    override suspend fun getCheckRunsForRef(
+        owner: String,
+        repo: String,
+        ref: String,
+    ): CheckRunSummary = CheckRunSummary(total = 0, passed = 0, failed = 0, inProgress = 0, status = CiStatus.PENDING)
 
-    override suspend fun getReviewSummary(owner: String, repo: String, prNumber: Int): ReviewSummary {
-        return ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
-    }
+    override suspend fun getReviewSummary(
+        owner: String,
+        repo: String,
+        prNumber: Int,
+    ): ReviewSummary = ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
 
-    override suspend fun submitReview(prApiUrl: String, event: ReviewStateValue, reviewComment: String?) {
+    override suspend fun submitReview(
+        prApiUrl: String,
+        event: ReviewStateValue,
+        reviewComment: String?,
+    ) {
         submittedReviews.value += SubmittedReview(prApiUrl, event, reviewComment)
     }
 }
@@ -1118,41 +1137,37 @@ private fun testNotification(
     subjectUrl: String?,
     title: String = "Notification $id",
     updatedAt: Instant = Clock.System.now(),
-): Notification {
-    return Notification(
-        id = id,
-        unread = true,
-        reason = "review_requested",
-        updatedAt = updatedAt,
-        lastReadAt = null,
-        subject = NotificationSubject(
-            title = title,
-            url = subjectUrl,
-            latestCommentUrl = null,
-            type = subjectType,
-        ),
-        repository = NotificationRepository(
-            id = 1L,
-            name = "test-repo",
-            fullName = "test-org/test-repo",
-            htmlUrl = "https://github.com/test-org/test-repo",
-        ),
-    )
-}
+): Notification = Notification(
+    id = id,
+    unread = true,
+    reason = "review_requested",
+    updatedAt = updatedAt,
+    lastReadAt = null,
+    subject = NotificationSubject(
+        title = title,
+        url = subjectUrl,
+        latestCommentUrl = null,
+        type = subjectType,
+    ),
+    repository = NotificationRepository(
+        id = 1L,
+        name = "test-repo",
+        fullName = "test-org/test-repo",
+        htmlUrl = "https://github.com/test-org/test-repo",
+    ),
+)
 
-private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: String): NotificationUiState {
-    return NotificationUiState(
-        notificationThreadId = threadId,
-        title = "Notification $threadId",
-        reason = "review_requested",
-        updatedAtEpochMs = 2_026_052_910_000,
-        repositoryFullName = "test-org/test-repo",
-        subjectType = "PullRequest",
-        htmlUrl = "https://github.com/test-org/test-repo/pull/1",
-        apiUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
-        isPullRequest = true,
-        pullRequestNumber = 1,
-        unread = true,
-        headRef = "feature/test",
-    )
-}
+private fun testNotificationUiState(@Suppress("SameParameterValue") threadId: String): NotificationUiState = NotificationUiState(
+    notificationThreadId = threadId,
+    title = "Notification $threadId",
+    reason = "review_requested",
+    updatedAtEpochMs = 2_026_052_910_000,
+    repositoryFullName = "test-org/test-repo",
+    subjectType = "PullRequest",
+    htmlUrl = "https://github.com/test-org/test-repo/pull/1",
+    apiUrl = "https://api.github.com/repos/test-org/test-repo/pulls/1",
+    isPullRequest = true,
+    pullRequestNumber = 1,
+    unread = true,
+    headRef = "feature/test",
+)

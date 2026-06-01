@@ -52,14 +52,14 @@ class SummaryDetailTest {
                 id = 1L,
                 title = "Test Project 1",
                 topLevelIssueIds = listOf("TEST-1", "TEST-4"),
-                isVerboseMilestones = true
+                isVerboseMilestones = true,
             ),
             Project(
                 id = 2L,
                 title = "Test Project 2",
                 topLevelIssueIds = listOf("PROJ2-1", "PROJ2-2"),
-                isVerboseMilestones = true
-            )
+                isVerboseMilestones = true,
+            ),
         )
         val users = listOf(
             User(
@@ -67,8 +67,8 @@ class SummaryDetailTest {
                 name = "Test User",
                 email = "test@example.local",
                 jiraId = "jira-user-1",
-                gitHubId = "github-user-1"
-            )
+                gitHubId = "github-user-1",
+            ),
         )
         val miscUsers = listOf(
             User(
@@ -76,8 +76,8 @@ class SummaryDetailTest {
                 name = "Misc User",
                 email = "misc@example.local",
                 jiraId = "jira-misc-1",
-                gitHubId = "github-misc-1"
-            )
+                gitHubId = "github-misc-1",
+            ),
         )
         val summaryName = "Test Summary"
         val isMiscellaneousProjectIncluded = true
@@ -94,7 +94,7 @@ class SummaryDetailTest {
             users,
             miscUsers,
             summaryName,
-            isMiscellaneousProjectIncluded
+            isMiscellaneousProjectIncluded,
         )
 
         assertNotNull(summary)
@@ -131,7 +131,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo,
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = null
+                parentKey = null,
             ),
             "TEST-2" to ProjectIssue(
                 id = "2",
@@ -146,7 +146,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(1.days),
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = "TEST-1"
+                parentKey = "TEST-1",
             ),
             "TEST-3" to ProjectIssue(
                 id = "3",
@@ -161,7 +161,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(2.days),
                 assigneeId = "jira-misc-1",
                 assigneeName = "Misc User",
-                parentKey = "TEST-1"
+                parentKey = "TEST-1",
             ),
             "TEST-5" to ProjectIssue(
                 id = "5",
@@ -176,7 +176,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(3.days),
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = "TEST-1"
+                parentKey = "TEST-1",
             ),
 
             // Test Project 1 - Epic 2 (Completed)
@@ -193,7 +193,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(1.days),
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = null
+                parentKey = null,
             ),
             "TEST-6" to ProjectIssue(
                 id = "6",
@@ -208,7 +208,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(2.days),
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = "TEST-4"
+                parentKey = "TEST-4",
             ),
             "TEST-7" to ProjectIssue(
                 id = "7",
@@ -223,7 +223,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(1.days),
                 assigneeId = "jira-misc-1",
                 assigneeName = "Misc User",
-                parentKey = "TEST-4"
+                parentKey = "TEST-4",
             ),
 
             // Test Project 2 - Epic 1 (In Progress with low completion rate)
@@ -240,7 +240,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo,
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = null
+                parentKey = null,
             ),
             "PROJ2-3" to ProjectIssue(
                 id = "103",
@@ -255,7 +255,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(2.days),
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = "PROJ2-1"
+                parentKey = "PROJ2-1",
             ),
             "PROJ2-4" to ProjectIssue(
                 id = "104",
@@ -270,7 +270,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(3.days),
                 assigneeId = "jira-misc-1",
                 assigneeName = "Misc User",
-                parentKey = "PROJ2-1"
+                parentKey = "PROJ2-1",
             ),
             "PROJ2-5" to ProjectIssue(
                 id = "105",
@@ -285,7 +285,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(4.days),
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = "PROJ2-1"
+                parentKey = "PROJ2-1",
             ),
 
             // Test Project 2 - Epic 2 (Completed the milestone)
@@ -302,7 +302,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo,
                 assigneeId = "jira-misc-1",
                 assigneeName = "Misc User",
-                parentKey = null
+                parentKey = null,
             ),
             "PROJ2-6" to ProjectIssue(
                 id = "106",
@@ -317,7 +317,7 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(1.days),
                 assigneeId = "jira-user-1",
                 assigneeName = "Test User",
-                parentKey = "PROJ2-2"
+                parentKey = "PROJ2-2",
             ),
             "PROJ2-7" to ProjectIssue(
                 id = "107",
@@ -332,55 +332,43 @@ class SummaryDetailTest {
                 createdAt = oneWeekAgo.plus(2.days),
                 assigneeId = "jira-misc-1",
                 assigneeName = "Misc User",
-                parentKey = "PROJ2-2"
-            )
+                parentKey = "PROJ2-2",
+            ),
         )
 
-        override suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue> {
-            return issueKeys.mapNotNull { mockIssues[it] }
-        }
+        override suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue> = issueKeys.mapNotNull { mockIssues[it] }
 
-        override suspend fun getChildIssues(issueKeys: List<String>): List<ProjectIssue> {
-            return mockIssues.values.filter { it.parentKey in issueKeys }.toList()
-        }
+        override suspend fun getChildIssues(issueKeys: List<String>): List<ProjectIssue> = mockIssues.values.filter { it.parentKey in issueKeys }.toList()
 
-        override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> {
-            return mockIssues.values.filter { it.parentKey == parentKey }.toList()
-        }
+        override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> = mockIssues.values.filter { it.parentKey == parentKey }.toList()
 
-        override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<ProjectComment> {
-            return List(maxResults.coerceAtMost(3)) { index ->
-                ProjectComment(
-                    id = "$index",
-                    body = "This is a test comment for $issueKey",
-                    authorId = "jira-user-1",
-                    authorName = "Test User",
-                    createdAt = now.minus((index + 1).days),
-                    updatedAt = now.minus((index + 1).days)
-                )
-            }
+        override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<ProjectComment> = List(maxResults.coerceAtMost(3)) { index ->
+            ProjectComment(
+                id = "$index",
+                body = "This is a test comment for $issueKey",
+                authorId = "jira-user-1",
+                authorName = "Test User",
+                createdAt = now.minus((index + 1).days),
+                updatedAt = now.minus((index + 1).days),
+            )
         }
 
         override suspend fun getIssuesResolved(
             user: User,
             startDate: Instant,
             endDate: Instant,
-        ): List<ProjectIssue> {
-            return mockIssues.values.filter { issue ->
-                issue.assigneeId == user.id &&
-                        issue.completedAt?.let { date ->
-                            date >= startDate && date <= endDate
-                        } ?: false
-            }.toList()
-        }
+        ): List<ProjectIssue> = mockIssues.values.filter { issue ->
+            issue.assigneeId == user.id &&
+                issue.completedAt?.let { date ->
+                    date >= startDate && date <= endDate
+                } ?: false
+        }.toList()
 
         override suspend fun getIssuesResolvedCount(
             user: User,
             startDate: Instant,
             endDate: Instant,
-        ): UInt {
-            return getIssuesResolved(user, startDate, endDate).size.toUInt()
-        }
+        ): UInt = getIssuesResolved(user, startDate, endDate).size.toUInt()
 
         override suspend fun getIssuesByFilter(filter: IssueFilter): List<ProjectIssue> {
             val completedAfter = filter.completedAfter
@@ -392,13 +380,9 @@ class SummaryDetailTest {
             }
         }
 
-        override suspend fun getMilestones(projectId: String): List<ProjectMilestone> {
-            return emptyList()
-        }
+        override suspend fun getMilestones(projectId: String): List<ProjectMilestone> = emptyList()
 
-        override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
-            return getDirectChildIssues(milestoneId)
-        }
+        override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> = getDirectChildIssues(milestoneId)
     }
 
     /**
@@ -413,7 +397,7 @@ class SummaryDetailTest {
             id = 12345,
             avatarUrl = "https://github.com/avatar.png",
             url = "https://api.github.com/users/github-user-1",
-            htmlUrl = "https://github.com/github-user-1"
+            htmlUrl = "https://github.com/github-user-1",
         )
 
         private val mockPullRequests = listOf(
@@ -436,9 +420,9 @@ class SummaryDetailTest {
                 pullRequest = PullRequest(
                     url = "https://api.github.com/repos/test-org/test-repo/pulls/1",
                     htmlUrl = "https://github.com/test-org/test-repo/pull/1",
-                    mergedAt = now.minus(1.days)
+                    mergedAt = now.minus(1.days),
                 ),
-                comments = 2
+                comments = 2,
             ),
             GitHubIssue(
                 url = "https://api.github.com/repos/test-org/test-repo/issues/2",
@@ -458,9 +442,9 @@ class SummaryDetailTest {
                 pullRequest = PullRequest(
                     url = "https://api.github.com/repos/test-org/test-repo/pulls/2",
                     htmlUrl = "https://github.com/test-org/test-repo/pull/2",
-                    mergedAt = now.minus(2.days)
+                    mergedAt = now.minus(2.days),
                 ),
-                comments = 1
+                comments = 1,
             ),
             GitHubIssue(
                 url = "https://api.github.com/repos/test-org/test-repo/issues/3",
@@ -480,9 +464,9 @@ class SummaryDetailTest {
                 pullRequest = PullRequest(
                     url = "https://api.github.com/repos/test-org/test-repo/pulls/3",
                     htmlUrl = "https://github.com/test-org/test-repo/pull/3",
-                    mergedAt = now.minus(2.days)
+                    mergedAt = now.minus(2.days),
                 ),
-                comments = 3
+                comments = 3,
             ),
             GitHubIssue(
                 url = "https://api.github.com/repos/test-org/test-repo/issues/4",
@@ -502,9 +486,9 @@ class SummaryDetailTest {
                 pullRequest = PullRequest(
                     url = "https://api.github.com/repos/test-org/test-repo/pulls/4",
                     htmlUrl = "https://github.com/test-org/test-repo/pull/4",
-                    mergedAt = now.minus(3.days)
+                    mergedAt = now.minus(3.days),
                 ),
-                comments = 1
+                comments = 1,
             ),
 
             // PRs for Test Project 2
@@ -526,9 +510,9 @@ class SummaryDetailTest {
                 pullRequest = PullRequest(
                     url = "https://api.github.com/repos/test-org/project2-repo/pulls/1",
                     htmlUrl = "https://github.com/test-org/project2-repo/pull/1",
-                    mergedAt = now.minus(1.days)
+                    mergedAt = now.minus(1.days),
                 ),
-                comments = 2
+                comments = 2,
             ),
             GitHubIssue(
                 url = "https://api.github.com/repos/test-org/project2-repo/issues/2",
@@ -548,9 +532,9 @@ class SummaryDetailTest {
                 pullRequest = PullRequest(
                     url = "https://api.github.com/repos/test-org/project2-repo/pulls/2",
                     htmlUrl = "https://github.com/test-org/project2-repo/pull/2",
-                    mergedAt = now.minus(3.days)
+                    mergedAt = now.minus(3.days),
                 ),
-                comments = 1
+                comments = 1,
             ),
             GitHubIssue(
                 url = "https://api.github.com/repos/test-org/project2-repo/issues/3",
@@ -570,10 +554,10 @@ class SummaryDetailTest {
                 pullRequest = PullRequest(
                     url = "https://api.github.com/repos/test-org/project2-repo/pulls/3",
                     htmlUrl = "https://github.com/test-org/project2-repo/pull/3",
-                    mergedAt = now.minus(4.days)
+                    mergedAt = now.minus(4.days),
                 ),
-                comments = 3
-            )
+                comments = 3,
+            ),
         )
 
         override suspend fun getMergedPullRequestCount(
@@ -581,14 +565,12 @@ class SummaryDetailTest {
             organizationIds: List<String>,
             startDate: Instant,
             endDate: Instant,
-        ): UInt {
-            return mockPullRequests.count { pr ->
-                pr.user.login == gitHubUserId &&
-                        pr.pullRequest?.mergedAt?.let { mergedAt ->
-                            mergedAt >= startDate && mergedAt <= endDate
-                        } ?: false
-            }.toUInt()
-        }
+        ): UInt = mockPullRequests.count { pr ->
+            pr.user.login == gitHubUserId &&
+                pr.pullRequest?.mergedAt?.let { mergedAt ->
+                    mergedAt >= startDate && mergedAt <= endDate
+                } ?: false
+        }.toUInt()
 
         override suspend fun getPullRequestReviewCount(
             gitHubUserId: String,
@@ -606,13 +588,11 @@ class SummaryDetailTest {
             organizationIds: List<String>,
             startDate: Instant,
             endDate: Instant,
-        ): List<GitHubIssue> {
-            return mockPullRequests.filter { pr ->
-                pr.user.login == gitHubUserId &&
-                        pr.pullRequest?.mergedAt?.let { mergedAt ->
-                            mergedAt >= startDate && mergedAt <= endDate
-                        } ?: false
-            }
+        ): List<GitHubIssue> = mockPullRequests.filter { pr ->
+            pr.user.login == gitHubUserId &&
+                pr.pullRequest?.mergedAt?.let { mergedAt ->
+                    mergedAt >= startDate && mergedAt <= endDate
+                } ?: false
         }
 
         override suspend fun searchPullRequestsByText(
@@ -620,18 +600,14 @@ class SummaryDetailTest {
             organizationIds: List<String>,
             startDateInclusive: Instant,
             endDateInclusive: Instant,
-        ): List<GitHubIssue> {
-            return mockPullRequests.filter { pr ->
-                (pr.title.contains(searchText) || pr.body?.contains(searchText) == true) &&
-                        pr.pullRequest?.mergedAt?.let { mergedAt ->
-                            mergedAt >= startDateInclusive && mergedAt <= endDateInclusive
-                        } ?: false
-            }
+        ): List<GitHubIssue> = mockPullRequests.filter { pr ->
+            (pr.title.contains(searchText) || pr.body?.contains(searchText) == true) &&
+                pr.pullRequest?.mergedAt?.let { mergedAt ->
+                    mergedAt >= startDateInclusive && mergedAt <= endDateInclusive
+                } ?: false
         }
 
-        override suspend fun listNotifications(): List<com.github.karlsabo.github.Notification> {
-            return emptyList()
-        }
+        override suspend fun listNotifications(): List<com.github.karlsabo.github.Notification> = emptyList()
 
         override suspend fun getPullRequestByUrl(url: String): PullRequest {
             TODO("Not yet implemented")
@@ -656,25 +632,19 @@ class SummaryDetailTest {
         override suspend fun getOpenPullRequestsByAuthor(
             organizationIds: List<String>,
             author: String,
-        ): List<GitHubIssue> {
-            return emptyList()
-        }
+        ): List<GitHubIssue> = emptyList()
 
         override suspend fun getCheckRunsForRef(
             owner: String,
             repo: String,
             ref: String,
-        ): com.github.karlsabo.github.CheckRunSummary {
-            return com.github.karlsabo.github.CheckRunSummary(0, 0, 0, 0, com.github.karlsabo.github.CiStatus.PENDING)
-        }
+        ): com.github.karlsabo.github.CheckRunSummary = com.github.karlsabo.github.CheckRunSummary(0, 0, 0, 0, com.github.karlsabo.github.CiStatus.PENDING)
 
         override suspend fun getReviewSummary(
             owner: String,
             repo: String,
             prNumber: Int,
-        ): com.github.karlsabo.github.ReviewSummary {
-            return com.github.karlsabo.github.ReviewSummary(0, 0, emptyList())
-        }
+        ): com.github.karlsabo.github.ReviewSummary = com.github.karlsabo.github.ReviewSummary(0, 0, emptyList())
 
         override suspend fun submitReview(
             prApiUrl: String,
@@ -705,7 +675,7 @@ class SummaryDetailTest {
                 resolvedAt = now.minus(3.days),
                 htmlUrl = "https://pagerduty.example.local/incidents/1",
                 updatedAt = now.minus(3.days).minus(10.minutes),
-                service = Service(id = "PD123")
+                service = Service(id = "PD123"),
             ),
             PagerDutyIncident(
                 id = "INCIDENT2",
@@ -720,19 +690,17 @@ class SummaryDetailTest {
                 resolvedAt = now.minus(1.days),
                 htmlUrl = "https://pagerduty.example.local/incidents/2",
                 updatedAt = now.minus(1.days),
-            )
+            ),
         )
 
         override suspend fun getServicePages(
             serviceId: String,
             startTimeInclusive: Instant,
             endTimeExclusive: Instant,
-        ): List<PagerDutyIncident> {
-            return mockIncidents.filter {
-                it.service?.id == serviceId &&
-                        it.createdAt >= startTimeInclusive &&
-                        it.createdAt < endTimeExclusive
-            }
+        ): List<PagerDutyIncident> = mockIncidents.filter {
+            it.service?.id == serviceId &&
+                it.createdAt >= startTimeInclusive &&
+                it.createdAt < endTimeExclusive
         }
     }
 }

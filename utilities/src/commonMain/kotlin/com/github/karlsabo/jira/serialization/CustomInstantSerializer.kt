@@ -22,7 +22,7 @@ fun parseOffsetDateTime(dateString: String): Instant {
     }
 
     val dateTimePart = dateString.substring(0, 23) // "2025-03-29T15:17:30.431"
-    val offsetPart = dateString.substring(23)      // "-0400"
+    val offsetPart = dateString.substring(23) // "-0400"
 
     val local = LocalDateTime.parse(dateTimePart)
 
@@ -31,7 +31,7 @@ fun parseOffsetDateTime(dateString: String): Instant {
     val totalOffsetMinutes = offsetHours * 60 + offsetMinutes.toInt()
 
     val instantEpochMillis = local.toInstant(TimeZone.UTC).toEpochMilliseconds() -
-            (totalOffsetMinutes * 60_000)
+        (totalOffsetMinutes * 60_000)
 
     return Instant.fromEpochMilliseconds(instantEpochMillis)
 }

@@ -42,8 +42,8 @@ class NotificationDatabaseMigrationTest {
                         "PullRequest",
                         "UNSUBSCRIBED",
                         1L,
-                        null
-                    )
+                        null,
+                    ),
                 ),
                 readIgnoredRows(databasePath.toString()),
             )
@@ -124,7 +124,7 @@ class NotificationDatabaseMigrationTest {
                       subject_type TEXT NOT NULL,
                       unsubscribed_at_epoch_ms INTEGER NOT NULL
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 statement.executeUpdate(
                     """
@@ -135,7 +135,7 @@ class NotificationDatabaseMigrationTest {
                       unsubscribed_at_epoch_ms
                     )
                     VALUES ('123456789', 'example-org/example-repo', 'PullRequest', 1)
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 statement.executeUpdate("PRAGMA user_version = 1")
             }
@@ -154,7 +154,7 @@ class NotificationDatabaseMigrationTest {
                       unsubscribed_at_epoch_ms INTEGER NOT NULL,
                       ignored_at_epoch_ms INTEGER
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 statement.executeUpdate(
                     """
@@ -166,7 +166,7 @@ class NotificationDatabaseMigrationTest {
                       ignored_at_epoch_ms
                     )
                     VALUES ('thread-with-ignore-timestamp', 'example-org/example-repo', 'PullRequest', 1, 2)
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 statement.executeUpdate("PRAGMA user_version = 2")
             }
@@ -185,7 +185,7 @@ class NotificationDatabaseMigrationTest {
                       ignore_reason TEXT NOT NULL,
                       ignored_at_epoch_ms INTEGER NOT NULL
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 statement.executeUpdate(
                     """
@@ -197,7 +197,7 @@ class NotificationDatabaseMigrationTest {
                       ignored_at_epoch_ms
                     )
                     VALUES ('thread-done-without-watermark', 'example-org/example-repo', 'PullRequest', 'DONE', 3)
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 statement.executeUpdate("PRAGMA user_version = 3")
             }
@@ -275,7 +275,7 @@ class NotificationDatabaseMigrationTest {
                     Files.deleteIfExists(dir)
                     return java.nio.file.FileVisitResult.CONTINUE
                 }
-            }
+            },
         )
     }
 }

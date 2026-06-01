@@ -60,15 +60,21 @@ fun extractTextFromNode(node: ContentNode): String {
         }
 
         "rule" -> {
-            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) sb.append("\n\n")
-            else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) sb.append('\n')
+            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) {
+                sb.append("\n\n")
+            } else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
+                sb.append('\n')
+            }
             sb.append("---")
             sb.append("\n\n")
         }
 
         "codeBlock" -> {
-            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) sb.append("\n\n")
-            else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) sb.append('\n')
+            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) {
+                sb.append("\n\n")
+            } else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
+                sb.append('\n')
+            }
 
             node.content?.forEach { lineNode ->
                 if (lineNode.type == "text") {
@@ -85,8 +91,11 @@ fun extractTextFromNode(node: ContentNode): String {
         }
 
         "bulletList", "orderedList" -> {
-            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) sb.append("\n\n")
-            else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) sb.append('\n')
+            if (sb.isNotEmpty() && !sb.endsWith("\n\n") && !sb.endsWith("\n")) {
+                sb.append("\n\n")
+            } else if (sb.isNotEmpty() && sb.endsWith("\n") && !sb.endsWith("\n\n")) {
+                sb.append('\n')
+            }
 
             node.content?.forEach { listItemNode ->
                 sb.append(extractTextFromNode(listItemNode))
