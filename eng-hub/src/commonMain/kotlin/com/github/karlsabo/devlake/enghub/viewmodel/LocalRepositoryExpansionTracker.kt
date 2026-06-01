@@ -23,5 +23,8 @@ internal class LocalRepositoryExpansionTracker(
         state.localRepositoryExpansionsInFlight.update { it - normalizedRepoRootPath }
     }
 
-    fun isInFlight(normalizedRepoRootPath: String): Boolean = normalizedRepoRootPath in state.localRepositoryExpansionsInFlight.value
+    fun isInFlight(normalizedRepoRootPath: String): Boolean {
+        val inFlightPaths = state.localRepositoryExpansionsInFlight.value
+        return normalizedRepoRootPath in inFlightPaths
+    }
 }

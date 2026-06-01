@@ -14,9 +14,13 @@ internal fun Map<String, IgnoredNotificationThread>.hides(
     notification: NotificationUiState,
 ): Boolean = this[notification.notificationThreadId]?.hides(notification) == true
 
-private fun IgnoredNotificationThread.hides(notification: Notification): Boolean = hides(notification.updatedAt.toEpochMilliseconds())
+private fun IgnoredNotificationThread.hides(
+    notification: Notification,
+): Boolean = hides(notification.updatedAt.toEpochMilliseconds())
 
-private fun IgnoredNotificationThread.hides(notification: NotificationUiState): Boolean = hides(notification.updatedAtEpochMs)
+private fun IgnoredNotificationThread.hides(
+    notification: NotificationUiState,
+): Boolean = hides(notification.updatedAtEpochMs)
 
 private fun IgnoredNotificationThread.hides(notificationUpdatedAtEpochMs: Long): Boolean = when (reason) {
     NotificationIgnoreReason.UNSUBSCRIBED -> true

@@ -123,7 +123,9 @@
 
 **Notes:** Do not bury callbacks in a global object; pass explicit action objects from the screen.
 
-### 7. EngHub screen state collection is extracted from rendering
+### 7. EngHub screen state collection is extracted from rendering - Done
+
+**Done** 2026-06-01
 
 **Acceptance criteria:** Given the EngHub desktop app, when a user switches between Pull Requests, Notifications, and Worktrees panes, then visible behavior is unchanged and no baseline entry remains for `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/screen/EngHubScreen.kt` or nearby EngHub UI max-line-length entries.
 

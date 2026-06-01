@@ -15,7 +15,6 @@ import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,127 +26,51 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
-import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
-import com.github.karlsabo.devlake.enghub.component.NotificationActions
-import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
-import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.component.errorDialog
-import com.github.karlsabo.devlake.enghub.component.notificationPanel
-import com.github.karlsabo.devlake.enghub.component.pullRequestPanel
-import com.github.karlsabo.devlake.enghub.component.worktreePanel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
-
-private enum class EngHubPane(
-    val label: String,
-    val icon: String,
-) {
-    PullRequests("Pull Requests", "PR"),
-    Notifications("Notifications", "🔔"),
-    Worktrees("Worktrees", "🌳"),
-}
 
 @Composable
 fun engHubScreen(viewModel: EngHubViewModel) {
-    val pullRequestsResult by viewModel.pullRequests.collectAsState()
-    val notificationsResult by viewModel.notifications.collectAsState()
-    val actionError by viewModel.actionErrorStateFlow.collectAsState()
-    val setupStatuses by viewModel.setupStatusesStateFlow.collectAsState()
-    val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
-    val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
-    val archivingLocalWorktreePaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
-    val forceArchiveWorktreeRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
     var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
+    val state = collectEngHubScreenState(viewModel, selectedPane)
+    val actions = engHubScreenActions(
+        viewModel = viewModel,
+        onPaneSelected = { selectedPane = it },
+    )
 
-    actionError?.let { error ->
-        errorDialog(message = error.message, onDismiss = { viewModel.clearActionError() })
+    state.actionError?.let { error ->
+        errorDialog(message = error.message, onDismiss = actions.onClearActionError)
     }
 
     MaterialTheme {
-        Row(modifier = Modifier.fillMaxSize()) {
-            engHubSidebar(
-                selectedPane = selectedPane,
-                onPaneSelected = { selectedPane = it },
+        engHubScreenContent(state = state, actions = actions)
+    }
+}
+
+@Composable
+private fun engHubScreenContent(
+    state: EngHubScreenState,
+    actions: EngHubScreenActions,
+) {
+    Row(modifier = Modifier.fillMaxSize()) {
+        engHubSidebar(
+            selectedPane = state.selectedPane,
+            onPaneSelected = actions.onPaneSelected,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(1.dp)
+                .background(MaterialTheme.colors.onSurface.copy(alpha = 0.12f)),
+        )
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Text(state.selectedPane.label, style = MaterialTheme.typography.h5)
+            Spacer(modifier = Modifier.size(8.dp))
+            engHubPaneContent(
+                state = state,
+                actions = actions,
+                modifier = Modifier.weight(1f),
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(MaterialTheme.colors.onSurface.copy(alpha = 0.12f)),
-            )
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Text(selectedPane.label, style = MaterialTheme.typography.h5)
-                Spacer(modifier = Modifier.size(8.dp))
-
-                when (selectedPane) {
-                    EngHubPane.PullRequests -> pullRequestPanel(
-                        pullRequestsResult = pullRequestsResult,
-                        onOpenInBrowser = { viewModel.openInBrowser(it) },
-                        onCheckoutAndOpen = { repoFullName, branch -> viewModel.checkoutAndOpen(repoFullName, branch) },
-                        setupStatusFor = { repoFullName, branch ->
-                            setupStatuses[viewModel.checkoutWorktreePath(repoFullName, branch)]
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-
-                    EngHubPane.Notifications -> notificationPanel(
-                        notificationsResult = notificationsResult,
-                        actions = NotificationActions(
-                            onOpenInBrowser = { viewModel.openInBrowser(it) },
-                            onCheckoutAndOpen = { repoFullName, branch ->
-                                viewModel.checkoutAndOpen(repoFullName, branch)
-                            },
-                            onApprove = { viewModel.approvePullRequest(it) },
-                            onSubmitReview = { notification, event, reviewComment ->
-                                viewModel.submitReview(notification, event, reviewComment)
-                            },
-                            onMarkDone = { viewModel.markNotificationDone(it) },
-                            onUnsubscribe = { viewModel.unsubscribeFromNotification(it) },
-                        ),
-                        setupStatusFor = { repoFullName, branch ->
-                            setupStatuses[viewModel.checkoutWorktreePath(repoFullName, branch)]
-                        },
-                        actingOnThreadIds = actingOnThreadIds,
-                        modifier = Modifier.weight(1f),
-                    )
-
-                    EngHubPane.Worktrees -> worktreePanel(
-                        state = WorktreePanelState(
-                            localRepositories = localRepositories,
-                            forceArchiveRequest = forceArchiveWorktreeRequest,
-                            setupStatuses = setupStatuses,
-                            archivingWorktreePaths = archivingLocalWorktreePaths,
-                        ),
-                        actions = WorktreePanelActions(
-                            onAddRepository = { viewModel.pickAndAddLocalRepository() },
-                            onToggleRepository = { viewModel.toggleLocalRepositoryExpansion(it) },
-                            worktrees = LocalWorktreeActions(
-                                onOpenWorktree = { repoRootPath, worktreePath ->
-                                    viewModel.openLocalWorktree(repoRootPath, worktreePath)
-                                },
-                                onArchiveWorktree = { repoRootPath, worktreePath ->
-                                    viewModel.archiveLocalWorktree(repoRootPath, worktreePath)
-                                },
-                                onCreateWorktree = { repoRootPath, baseWorktreePath, baseBranch, targetBranch ->
-                                    viewModel.createLocalWorktreeFromBase(
-                                        repoRootPath = repoRootPath,
-                                        baseWorktreePath = baseWorktreePath,
-                                        baseBranch = baseBranch,
-                                        targetBranch = targetBranch,
-                                    )
-                                },
-                            ),
-                            forceArchive = ForceArchiveWorktreeActions(
-                                onConfirm = { repoRootPath, worktreePath ->
-                                    viewModel.confirmForceArchiveLocalWorktree(repoRootPath, worktreePath)
-                                },
-                                onDismiss = { viewModel.dismissForceArchiveWorktreeRequest() },
-                            ),
-                        ),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
         }
     }
 }

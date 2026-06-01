@@ -3,7 +3,6 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>CyclomaticComplexMethod:UserEpicsWithIssuesDemo.kt$fun main(args: Array&lt;String&gt;): Unit</ID>
-    <ID>LongMethod:EngHubScreen.kt$@Composable fun engHubScreen(viewModel: EngHubViewModel)</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRefreshesAgainWhenSetupFailsAfterPostCreateRefreshFailure()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRefreshesRepositoryWhileSetupIsRunning()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRunsSetupAndRefreshesWhenExactTargetWorktreeAlreadyExists()</ID>
@@ -56,21 +55,12 @@
     <ID>MatchingDeclarationName:DesktopAppBootstrap.kt$DesktopAppBootstrapResult&lt;out T&gt;</ID>
     <ID>MatchingDeclarationName:UiDemo.kt$ProjectMessage</ID>
     <ID>MaxLineLength:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
-    <ID>MaxLineLength:EngHub.kt$private</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitValue(): List&lt;T&gt;</ID>
     <ID>MaxLineLength:GitCommandServiceTest.kt$GitCommandServiceTest$executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr", baseCommit), workingDirectory = null)</ID>
-    <ID>MaxLineLength:IgnoredNotificationHelpers.kt$private fun IgnoredNotificationThread.hides(notification: Notification): Boolean</ID>
-    <ID>MaxLineLength:IgnoredNotificationHelpers.kt$private fun IgnoredNotificationThread.hides(notification: NotificationUiState): Boolean</ID>
     <ID>MaxLineLength:LinearRestApi.kt$LinearRestApi$override suspend fun getDirectChildIssues(parentKey: String): List&lt;ProjectIssue&gt;</ID>
     <ID>MaxLineLength:LinearRestApi.kt$private fun missingGraphQlData(responseText: String): Nothing</ID>
-    <ID>MaxLineLength:LocalRepositoryExpansionTracker.kt$LocalRepositoryExpansionTracker$fun isInFlight(normalizedRepoRootPath: String): Boolean</ID>
     <ID>MaxLineLength:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$private</ID>
-    <ID>MaxLineLength:NotificationPolling.kt$private</ID>
-    <ID>MaxLineLength:NotificationPolling.kt$private fun NotificationProcessingResult.Processed.shouldPersistAutomaticallyDoneThread(): Boolean</ID>
-    <ID>MaxLineLength:NotificationPolling.kt$private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean</ID>
-    <ID>MaxLineLength:NotificationPolling.kt$private fun NotificationProcessingResult.Processed.wasMarkedDoneForClosedOrMergedPullRequest(): Boolean</ID>
-    <ID>MaxLineLength:NotificationPolling.kt$private fun PullRequestStatus?.isClosedOrMerged(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Instant?.isWithinStaleWarningWindow(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$private fun String.truncateForSlack(): String</ID>

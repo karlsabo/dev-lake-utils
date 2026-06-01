@@ -104,7 +104,7 @@ private fun processedNotificationFlow(
         gitHubNotificationService.processNotification(notif)
     } as? NotificationProcessingResult.Processed
     if (processed?.wasMarkedAsDone() == true) {
-        if (processed.shouldPersistAutomaticallyDoneThread()) {
+        if (processed.shouldAutoPersistDoneThread()) {
             persistence.persistAutomaticallyDoneThreadOrLog(notif)
         }
     } else {
@@ -112,7 +112,9 @@ private fun processedNotificationFlow(
     }
 }
 
-private suspend fun GitHubPullRequestReviewApi.toNotificationUiStateOrNull(notif: Notification): NotificationUiState? {
+private suspend fun GitHubPullRequestReviewApi.toNotificationUiStateOrNull(
+    notif: Notification,
+): NotificationUiState? {
     val prDetails = getNotificationPullRequestDetails(
         subjectType = notif.subject.type,
         subjectUrl = notif.subject.url,
@@ -144,14 +146,30 @@ private suspend fun GitHubPullRequestReviewApi.getNotificationPullRequestDetails
     }.rethrowCancellation().getOrNull()
 }
 
-private fun NotificationProcessingResult.Processed.shouldPersistAutomaticallyDoneThread(): Boolean = wasMarkedDoneForClosedOrMergedPullRequest() || wasMarkedDoneByAutoApprovalWorkflow()
-
-private fun NotificationProcessingResult.Processed.wasMarkedDoneForClosedOrMergedPullRequest(): Boolean = wasMarkedAsDone() && pullRequestStatus.isClosedOrMerged()
-
-private fun NotificationProcessingResult.Processed.wasMarkedDoneByAutoApprovalWorkflow(): Boolean = wasMarkedAsDone() && actions.any {
-    it is NotificationAction.ApprovedPullRequest || it is NotificationAction.SkippedApproval
+private fun NotificationProcessingResult.Processed.shouldAutoPersistDoneThread(): Boolean {
+    val wasClosedOrMerged = wasClosedOrMergedPullRequestDone()
+    return wasClosedOrMerged || wasDoneByAutoApprovalWorkflow()
 }
 
-private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean = actions.any { it is NotificationAction.MarkedAsDone }
+private fun NotificationProcessingResult.Processed.wasClosedOrMergedPullRequestDone(): Boolean {
+    val wasDone = wasMarkedAsDone()
+    return wasDone && pullRequestStatus.isClosedOrMerged()
+}
 
-private fun PullRequestStatus?.isClosedOrMerged(): Boolean = this == PullRequestStatus.CLOSED || this == PullRequestStatus.MERGED
+private fun NotificationProcessingResult.Processed.wasDoneByAutoApprovalWorkflow(): Boolean {
+    val wasDone = wasMarkedAsDone()
+    return wasDone && actions.any { action ->
+        action is NotificationAction.ApprovedPullRequest ||
+            action is NotificationAction.SkippedApproval
+    }
+}
+
+private fun NotificationProcessingResult.Processed.wasMarkedAsDone(): Boolean {
+    val markDoneAction = actions.any { action -> action is NotificationAction.MarkedAsDone }
+    return markDoneAction
+}
+
+private fun PullRequestStatus?.isClosedOrMerged(): Boolean {
+    val closedOrMergedStatuses = listOf(PullRequestStatus.CLOSED, PullRequestStatus.MERGED)
+    return this in closedOrMergedStatuses
+}
