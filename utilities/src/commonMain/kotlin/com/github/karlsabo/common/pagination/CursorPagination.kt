@@ -1,6 +1,5 @@
 package com.github.karlsabo.common.pagination
 
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -9,16 +8,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 private const val DEFAULT_CURSOR_PAGE_SIZE = 100
-
-/**
- * Result of a single page fetch in cursor-based pagination.
- */
-@Suppress("MatchingDeclarationName")
-data class CursorPageResult(
-    val nodes: JsonArray,
-    val hasNextPage: Boolean,
-    val endCursor: String?,
-)
 
 /**
  * Extracts cursor pagination info from a GraphQL response with standard pageInfo structure.

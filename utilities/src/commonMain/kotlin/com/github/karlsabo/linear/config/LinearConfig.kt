@@ -60,7 +60,6 @@ fun loadLinearConfig(configFilePath: Path): LinearApiRestConfig {
 /**
  * Saves Linear configuration to a file.
  */
-@Suppress("unused")
 fun saveLinearConfig(configPath: Path, config: LinearConfig) {
     SystemFileSystem.sink(configPath, false).buffered().use { sink ->
         sink.writeString(lenientJson.encodeToString(LinearConfig.serializer(), config))

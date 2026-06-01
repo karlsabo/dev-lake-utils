@@ -70,14 +70,21 @@ fun loadPagerDutyConfig(configFilePath: Path): PagerDutyApiRestConfig {
 /**
  * Saves PagerDuty configuration to a file.
  */
-@Suppress("unused")
 fun savePagerDutyConfig(config: PagerDutyConfig, configPath: Path) {
     SystemFileSystem.sink(configPath, false).buffered().use { sink ->
         sink.writeString(lenientJson.encodeToString(PagerDutyConfig.serializer(), config))
     }
 }
 
+private const val DEFAULT_PAGE_SIZE = 25
+private const val HTTP_SUCCESS_STATUS_MIN = 200
+private const val HTTP_SUCCESS_STATUS_MAX = 299
+
 private val logger = KotlinLogging.logger {}
+
+class PagerDutyApiException(
+    message: String,
+) : RuntimeException(message)
 
 /**
  * Implementation of the PagerDutyApi interface using REST.
@@ -110,7 +117,7 @@ class PagerDutyRestApi(
 
         val incidents = mutableListOf<PagerDutyIncident>()
         var offset = 0
-        val limit = 25
+        val limit = DEFAULT_PAGE_SIZE
         var moreItems = true
 
         while (moreItems) {
@@ -124,9 +131,9 @@ class PagerDutyRestApi(
             val status = response.status.value
             val responseText = response.bodyAsText()
             logger.debug { "PagerDuty response: ```$responseText```" }
-            if (status !in 200..299) {
+            if (status !in HTTP_SUCCESS_STATUS_MIN..HTTP_SUCCESS_STATUS_MAX) {
                 logger.error { "Failed to get PagerDuty incidents: $status" }
-                throw Exception("Failed to get PagerDuty incidents: $status")
+                throw PagerDutyApiException("Failed to get PagerDuty incidents: $status")
             }
 
             val root = lenientJson.parseToJsonElement(responseText).jsonObject

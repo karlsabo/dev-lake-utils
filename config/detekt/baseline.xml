@@ -34,9 +34,6 @@
     <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$3L</ID>
     <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$4</ID>
     <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$5</ID>
-    <ID>MagicNumber:PagerDutyRestApi.kt$PagerDutyRestApi$200</ID>
-    <ID>MagicNumber:PagerDutyRestApi.kt$PagerDutyRestApi$25</ID>
-    <ID>MagicNumber:PagerDutyRestApi.kt$PagerDutyRestApi$299</ID>
     <ID>MagicNumber:ProjectSummaryBuilder.kt$5</ID>
     <ID>MagicNumber:UserMetrics.kt$3.5</ID>
     <ID>MagicNumber:UserMetrics.kt$7</ID>
@@ -89,12 +86,10 @@
     <ID>MaxLineLength:ZapierSummaryPublisher.kt$ZapierSummaryPublisher$open suspend fun publishSummary(summary: ZapierProjectSummary): Boolean</ID>
     <ID>NestedBlockDepth:ImlExcludeFolderManager.kt$internal fun parseExcludedFolderUrls(xmlContent: String): Set&lt;String&gt;</ID>
     <ID>NestedBlockDepth:LlmSkillSyncTest.kt$LlmSkillSyncTest$private fun setupSourceDir( sourceDir: Path, skills: Map&lt;String, Map&lt;String, String&gt;&gt; = emptyMap(), agentsContent: String? = null, notesContent: String? = null, )</ID>
-    <ID>ReturnCount:DirectoryUtils.kt$fun loadUsersConfig(): UsersConfig?</ID>
     <ID>ReturnCount:ImlExcludeFolderManager.kt$fun addExcludeFoldersToIml( imlPath: Path, directoriesToExclude: List&lt;String&gt; = DEFAULT_EXCLUDE_DIRECTORIES, ): ImlUpdateResult</ID>
     <ID>ReturnCount:SerializationTools.kt$inline fun &lt;reified T&gt; loadConfig(configPath: Path, serializer: KSerializer&lt;T&gt;): T?</ID>
     <ID>SpreadOperator:ProjectSummaryBuilder.kt$(*initialPullRequests.toTypedArray())</ID>
     <ID>TooGenericExceptionCaught:DesktopAppBootstrap.kt$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:DirectoryUtils.kt$error: Exception</ID>
     <ID>TooGenericExceptionCaught:GitHubNotificationService.kt$GitHubNotificationService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MarkdownImageExtractor.kt$MarkdownImageExtractor$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SerializationTools.kt$error: Exception</ID>
@@ -102,7 +97,6 @@
     <ID>TooGenericExceptionCaught:ZapierMetricService.kt$ZapierMetricService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ZapierService.kt$ZapierService$e: Exception</ID>
     <ID>TooGenericExceptionThrown:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
-    <ID>TooGenericExceptionThrown:PagerDutyRestApi.kt$PagerDutyRestApi$throw Exception("Failed to get PagerDuty incidents: $status")</ID>
     <ID>TooGenericExceptionThrown:TextSummarizerOpenAi.kt$TextSummarizerOpenAi$throw Exception("Failed to summarize text: ${response.status.value}")</ID>
     <ID>TooGenericExceptionThrown:UserEpicsWithIssuesDemo.kt$throw Exception("No --user=username provided")</ID>
     <ID>TooGenericExceptionThrown:UserMetricPublisherApp.kt$throw Exception("User not found: $userId")</ID>

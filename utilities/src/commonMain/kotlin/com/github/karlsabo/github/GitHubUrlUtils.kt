@@ -18,15 +18,3 @@ fun extractOwnerAndRepo(apiUrl: String): Pair<String, String> {
         ?: throw IllegalArgumentException("Cannot extract owner/repo from URL: $apiUrl")
     return Pair(match.groupValues[1], match.groupValues[2])
 }
-
-/**
- * Extracts the pull request number from a GitHub API URL.
- * Example: `https://api.github.com/repos/owner/repo/pulls/123` -> `123`
- */
-@Suppress("unused")
-fun extractPrNumber(apiUrl: String): Int {
-    val regex = Regex("pulls/(\\d+)")
-    val match = regex.find(apiUrl)
-        ?: throw IllegalArgumentException("Cannot extract PR number from URL: $apiUrl")
-    return match.groupValues[1].toInt()
-}

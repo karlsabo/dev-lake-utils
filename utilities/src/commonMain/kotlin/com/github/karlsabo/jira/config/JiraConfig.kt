@@ -6,7 +6,6 @@ import io.ktor.utils.io.readText
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.writeString
 import kotlinx.serialization.Serializable
 
 /**
@@ -53,14 +52,4 @@ fun loadJiraConfig(configFilePath: Path): JiraApiRestConfig {
         ),
         config.domain,
     )
-}
-
-/**
- * Saves Jira configuration to a file.
- */
-@Suppress("unused")
-fun saveJiraConfig(configPath: Path, config: JiraConfig) {
-    SystemFileSystem.sink(configPath, false).buffered().use { sink ->
-        sink.writeString(lenientJson.encodeToString(JiraConfig.serializer(), config))
-    }
 }

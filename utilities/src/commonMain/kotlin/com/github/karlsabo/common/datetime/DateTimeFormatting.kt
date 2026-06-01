@@ -1,7 +1,6 @@
 package com.github.karlsabo.common.datetime
 
 import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -21,18 +20,6 @@ object DateTimeFormatting {
      * Formats an Instant as an ISO 8601 UTC datetime string: "YYYY-MM-DDTHH:MM:SS"
      */
     fun Instant.toIsoUtcDateTime(): String = toLocalDateTime(TimeZone.UTC).toString()
-
-    /**
-     * Converts an Instant to a LocalDate in UTC timezone.
-     */
-    @Suppress("unused")
-    fun Instant.toUtcDate(): LocalDate = toLocalDateTime(TimeZone.UTC).date
-
-    /**
-     * Converts an Instant to a LocalDate in a specified timezone.
-     */
-    @Suppress("unused")
-    fun Instant.toLocalDate(timeZone: TimeZone): LocalDate = toLocalDateTime(timeZone).date
 
     /**
      * Parses a date-only string (YYYY-MM-DD) to an Instant at midnight UTC.

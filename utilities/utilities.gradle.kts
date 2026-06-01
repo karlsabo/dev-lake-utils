@@ -10,7 +10,6 @@ abstract class VerifyNotificationMigrationBaselineTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val baselineFile: RegularFileProperty
 
-    @Suppress("unused")
     @TaskAction
     fun verify() {
         val file = baselineFile.get().asFile
