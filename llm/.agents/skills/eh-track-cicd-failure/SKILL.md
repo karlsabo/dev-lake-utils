@@ -42,7 +42,7 @@ Goal: find the linked Buildkite failure and record the cause in:
    ```
    Classify honestly: PR-caused, likely unrelated, infra, flaky, or generated metadata drift.
 
-6. Append or update this section in that file. Do not duplicate the same PR/datetime:
+6. Append or update this section in that file. New sections must go at the end of the file, never at the top. Do not duplicate the same PR/datetime:
    ```markdown
    ## PR #<number>
    ### YYYY-MM-DDTHH:mm:ssZ
