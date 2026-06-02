@@ -8,39 +8,16 @@
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRunsSetupAndRefreshesWhenExactTargetWorktreeAlreadyExists()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun forceArchiveConfirmationStartsWhileDirtyFailureRefreshIsStillRunning()</ID>
     <ID>LongMethod:SummaryDetailTest.kt$SummaryDetailTest$@Test fun testCreateSummary()</ID>
-      <ID>LongMethod:SummaryOrchestrator.kt$suspend fun createSummary( projectManagementApi: ProjectManagementApi,
-          gitHubApi: GitHubPullRequestSearchApi, gitHubOrganizationIds: List&lt;String&gt;, pagerDutyApi: PagerDutyApi?,
-          pagerDutyServiceIds: List&lt;String&gt;, textSummarizer: TextSummarizer, projects: List&lt;Project&gt;,
-          duration: Duration, users: List&lt;User&gt;, miscUsers: List&lt;User&gt;, summaryName: String,
-          isMiscellaneousProjectIncluded: Boolean, ): MultiProjectSummary
-      </ID>
     <ID>LongMethod:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest$@Test fun loadConfigurationCreatesMissingTemplatesWhenBootstrapFails()</ID>
     <ID>LongMethod:UiDemo.kt$fun main()</ID>
     <ID>LongMethod:UserEpicsWithIssuesDemo.kt$fun main(args: Array&lt;String&gt;): Unit</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun loadMetricsPreviewUsesGeneratedDependencies()</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterFailedSendAndReportsFailure()</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterThrownSendAndReportsFailure()</ID>
-      <ID>LongParameterList:ProjectSummaryBuilder.kt$( users: Set&lt;User&gt;, gitHubApi: GitHubPullRequestSearchApi,
-          gitHubOrganizationIds: List&lt;String&gt;, projectManagementApi: ProjectManagementApi, textSummarizer:
-          TextSummarizer, duration: Duration, pullRequests: Set&lt;com.github.karlsabo.github.Issue&gt;,
-          parentIssuesAreChildren: Boolean = false, )
-      </ID>
-      <ID>LongParameterList:SummaryOrchestrator.kt$( miscUsers: List&lt;User&gt;, projectManagementApi:
-          ProjectManagementApi, gitHubApi: GitHubPullRequestSearchApi, gitHubOrganizationIds: List&lt;String&gt;,
-          duration: Duration, mutex: Mutex, miscIssueSet: MutableSet&lt;ProjectIssue&gt;, miscPrSet: MutableSet&lt;com.github.karlsabo.github.Issue&gt;,
-          )
-      </ID>
-      <ID>LongParameterList:SummaryOrchestrator.kt$( projectManagementApi: ProjectManagementApi, gitHubApi:
-          GitHubPullRequestSearchApi, gitHubOrganizationIds: List&lt;String&gt;, pagerDutyApi: PagerDutyApi?,
-          pagerDutyServiceIds: List&lt;String&gt;, textSummarizer: TextSummarizer, projects: List&lt;Project&gt;,
-          duration: Duration, users: List&lt;User&gt;, miscUsers: List&lt;User&gt;, summaryName: String,
-          isMiscellaneousProjectIncluded: Boolean, )
-      </ID>
     <ID>LongParameterList:SummaryPublisherDependencies.kt$( config: SummaryPublisherConfig, loadUsersConfig: () -&gt; UsersConfig? = ::loadUsersConfig, loadLinearApiConfig: () -&gt; LinearApiRestConfig = { loadLinearConfig(linearConfigPath) }, loadGitHubApiConfig: () -&gt; GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) }, loadPagerDutyApiConfig: () -&gt; PagerDutyApiRestConfig = { loadPagerDutyConfig(pagerDutyConfigPath) }, loadTextSummarizerConfig: () -&gt; TextSummarizerOpenAiConfig = { requireNotNull(loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)) { "Text summarizer config is required" }.toTextSummarizerOpenAiConfig() }, componentFactory: SummaryPublisherComponentFactory = ::createSummaryPublisherComponent, )</ID>
     <ID>LongParameterList:SummaryPublisherDependencies.kt$( config: SummaryPublisherConfig, usersConfig: UsersConfig, linearApiConfig: LinearApiRestConfig, gitHubApiConfig: GitHubApiRestConfig, pagerDutyApiConfig: PagerDutyApiRestConfig, textSummarizerConfig: TextSummarizerOpenAiConfig, )</ID>
     <ID>LongParameterList:SummaryPublisherScreen.kt$( topLevelSummary: String, onTopLevelSummaryChange: (String) -&gt; Unit, projectSummaries: List&lt;ProjectSummaryHolder&gt;, onProjectMessageChange: (Int, String) -&gt; Unit, onProjectDelete: (Int) -&gt; Unit, publishButtonText: String, publishButtonEnabled: Boolean, isLoadingSummary: Boolean, isSendingSlackMessage: Boolean, onPublishClick: () -&gt; Unit, )</ID>
     <ID>LongParameterList:UserMetricPublisherApp.kt$( state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState, configFilePath: Path = userMetricPublisherConfigPath, loadConfig: () -&gt; UserMetricPublisherConfig = ::loadUserMetricPublisherConfig, loadDependencies: (UserMetricPublisherConfig) -&gt; UserMetricPublisherDependencies = ::loadUserMetricPublisherDependencies, configFileExists: (Path) -&gt; Boolean = SystemFileSystem::exists, saveDefaultConfig: (UserMetricPublisherConfig) -&gt; Unit = ::saveUserMetricPublisherConfig, )</ID>
-    <ID>MagicNumber:ProjectSummaryBuilder.kt$5</ID>
     <ID>MagicNumber:UserMetrics.kt$3.5</ID>
     <ID>MagicNumber:UserMetrics.kt$7</ID>
     <ID>MagicNumber:ZapierMetricService.kt$ZapierMetricService$200</ID>
@@ -78,7 +55,6 @@
     <ID>NestedBlockDepth:LlmSkillSyncTest.kt$LlmSkillSyncTest$private fun setupSourceDir( sourceDir: Path, skills: Map&lt;String, Map&lt;String, String&gt;&gt; = emptyMap(), agentsContent: String? = null, notesContent: String? = null, )</ID>
     <ID>ReturnCount:ImlExcludeFolderManager.kt$fun addExcludeFoldersToIml( imlPath: Path, directoriesToExclude: List&lt;String&gt; = DEFAULT_EXCLUDE_DIRECTORIES, ): ImlUpdateResult</ID>
     <ID>ReturnCount:SerializationTools.kt$inline fun &lt;reified T&gt; loadConfig(configPath: Path, serializer: KSerializer&lt;T&gt;): T?</ID>
-    <ID>SpreadOperator:ProjectSummaryBuilder.kt$(*initialPullRequests.toTypedArray())</ID>
     <ID>TooGenericExceptionCaught:DesktopAppBootstrap.kt$error: Exception</ID>
     <ID>TooGenericExceptionCaught:GitHubNotificationService.kt$GitHubNotificationService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MarkdownImageExtractor.kt$MarkdownImageExtractor$e: Exception</ID>

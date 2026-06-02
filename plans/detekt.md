@@ -172,7 +172,9 @@
 
 **Notes:** Test splitting should preserve names that explain behavior; do not hide assertions in overly clever helpers.
 
-### 10. Summary generation uses request objects and smaller collaborators
+### 10. Summary generation uses request objects and smaller collaborators - Done
+
+**Done** 2026-06-02
 
 **Acceptance criteria:** Given summary creation tests, when a summary is created for configured projects with miscellaneous work and PagerDuty incidents, then the resulting `MultiProjectSummary` is unchanged and no `LongMethod`, `LongParameterList`, `MagicNumber`, or `SpreadOperator` baseline entry remains for `SummaryOrchestrator.kt` or `ProjectSummaryBuilder.kt`.
 

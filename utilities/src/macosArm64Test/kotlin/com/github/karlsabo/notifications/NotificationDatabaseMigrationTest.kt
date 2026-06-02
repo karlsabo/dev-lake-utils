@@ -246,7 +246,7 @@ class NotificationDatabaseMigrationTest {
         connection.getVersion().toLong()
     }
 
-    private fun readIgnoredColumnNames(databasePath: Path): List<String> = withDatabaseConnection(databasePath) { connection ->
+    private fun readIgnoredColumnNames(path: Path): List<String> = withDatabaseConnection(path) { connection ->
         connection.withStatement("PRAGMA table_info(ignored_notification_threads)") {
             val cursor = query()
             val columnNames = mutableListOf<String>()
@@ -261,8 +261,7 @@ class NotificationDatabaseMigrationTest {
         }
     }
 
-    private fun readIgnoredRows(databasePath: Path): List<IgnoredThreadRow> =
-        withDatabaseConnection(databasePath) { connection ->
+    private fun readIgnoredRows(path: Path): List<IgnoredThreadRow> = withDatabaseConnection(path) { connection ->
         connection.withStatement(
             """
                 SELECT
