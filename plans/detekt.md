@@ -139,7 +139,9 @@
 
 **Notes:** The acceptance test is user-visible pane behavior; line wrapping alone is not the story.
 
-### 8. EngHub ViewModel tests are split by behavior
+### 8. EngHub ViewModel tests are split by behavior - Done
+
+**Done** 2026-06-01
 
 **Acceptance criteria:** Given EngHub ViewModel tests, when `./gradlew :eng-hub:allTests detekt` runs, then checkout, create-worktree, archive, and notification behavior remains covered and no `LargeClass`, `LongMethod`, `LongParameterList`, or `SameParameterValue` suppression remains in `EngHubViewModelTest.kt` or `EngHubNotificationPersistenceViewModelTest.kt`.
 
