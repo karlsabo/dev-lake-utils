@@ -160,7 +160,7 @@ private fun handleConfigurationFailure(
 }
 
 internal fun buildConfigurationErrorMessage(
-    error: Exception,
+    error: Throwable,
     configFilePath: Path = userMetricPublisherConfigPath,
 ): String = "Failed to load configuration: $error.\nCreating new configuration.\n" +
     "Please update the configuration file:\n$configFilePath."

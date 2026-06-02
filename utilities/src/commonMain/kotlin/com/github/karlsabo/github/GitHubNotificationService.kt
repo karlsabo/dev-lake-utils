@@ -1,6 +1,7 @@
 package com.github.karlsabo.github
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
@@ -96,7 +97,7 @@ class GitHubNotificationService(
         }
     }
 
-    suspend fun processNotification(notification: Notification): NotificationProcessingResult = try {
+    suspend fun processNotification(notification: Notification): NotificationProcessingResult = runCatching {
         if (notification.isPullRequest) {
             val prUrl = notification.subjectApiUrl
             if (prUrl != null) {
@@ -110,11 +111,12 @@ class GitHubNotificationService(
         } else {
             NotificationProcessingResult.Processed(notification = notification)
         }
-    } catch (e: Exception) {
-        logger.warn(e) { "Failed to process notification ${notification.id}: ${notification.subject.title}" }
+    }.getOrElse { error ->
+        error.rethrowIfCancellation()
+        logger.warn(error) { "Failed to process notification ${notification.id}: ${notification.subject.title}" }
         NotificationProcessingResult.Failed(
             notification = notification,
-            error = e.message ?: "Unknown error",
+            error = error.message ?: "Unknown error",
         )
     }
 
@@ -152,7 +154,7 @@ class GitHubNotificationService(
         notification: Notification,
         actions: MutableList<NotificationAction>,
     ) {
-        try {
+        runCatching {
             val alreadyApproved = pullRequestReviewApi.hasAnyApprovedReview(prUrl)
             if (alreadyApproved) {
                 actions.add(
@@ -169,10 +171,11 @@ class GitHubNotificationService(
                 )
             }
             markNotificationDone(notification, actions)
-        } catch (e: Exception) {
+        }.onFailure { error ->
+            error.rethrowIfCancellation()
             actions.add(
                 NotificationAction.ActionFailed(
-                    "Failed to check/approve PR ${pr.url} $title (${e.message})",
+                    "Failed to check/approve PR ${pr.url} $title (${error.message})",
                 ),
             )
         }
@@ -182,17 +185,22 @@ class GitHubNotificationService(
         notification: Notification,
         actions: MutableList<NotificationAction>,
     ) {
-        try {
+        runCatching {
             notificationApi.markNotificationAsDone(notification.id)
             actions.add(NotificationAction.MarkedAsDone("Marked notification as done"))
-        } catch (e: Exception) {
+        }.onFailure { error ->
+            error.rethrowIfCancellation()
             actions.add(
                 NotificationAction.ActionFailed(
-                    "Failed to mark notification as done (${e.message})",
+                    "Failed to mark notification as done (${error.message})",
                 ),
             )
         }
     }
+}
+
+private fun Throwable.rethrowIfCancellation() {
+    if (this is CancellationException) throw this
 }
 
 private fun defaultAutoApprovePredicate(title: String): Boolean {

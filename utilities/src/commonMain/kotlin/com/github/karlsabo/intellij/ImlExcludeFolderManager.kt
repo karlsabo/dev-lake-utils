@@ -66,6 +66,7 @@ data class ImlUpdateResult(
  * @param directoriesToExclude directory names relative to the module root
  * @return result describing what was added, already present, or could not be applied
  */
+@Suppress("unused")
 fun addExcludeFoldersToIml(
     imlPath: Path,
     directoriesToExclude: List<String> = DEFAULT_EXCLUDE_DIRECTORIES,
@@ -87,21 +88,39 @@ fun addExcludeFoldersToIml(
         }
     }
 
-    if (toAdd.isEmpty()) {
-        logger.info { "No new exclusions to add to $imlPath" }
-        return ImlUpdateResult(added = emptyList(), alreadyExcluded = alreadyExcluded, notApplied = emptyList())
+    val result = when {
+        toAdd.isEmpty() -> noNewExclusionsResult(imlPath, alreadyExcluded)
+        else -> applyExclusions(imlPath, content, toAdd, alreadyExcluded)
     }
 
+    return result
+}
+
+private fun noNewExclusionsResult(
+    imlPath: Path,
+    alreadyExcluded: List<String>,
+): ImlUpdateResult {
+    logger.info { "No new exclusions to add to $imlPath" }
+    return ImlUpdateResult(added = emptyList(), alreadyExcluded = alreadyExcluded, notApplied = emptyList())
+}
+
+private fun applyExclusions(
+    imlPath: Path,
+    content: String,
+    toAdd: List<String>,
+    alreadyExcluded: List<String>,
+): ImlUpdateResult {
     val updatedContent = insertExcludeFolders(content, toAdd)
-    if (updatedContent == null) {
+    val result = if (updatedContent == null) {
         logger.error { "Could not find </content> closing tag in $imlPath" }
-        return ImlUpdateResult(added = emptyList(), alreadyExcluded = alreadyExcluded, notApplied = toAdd)
+        ImlUpdateResult(added = emptyList(), alreadyExcluded = alreadyExcluded, notApplied = toAdd)
+    } else {
+        SystemFileSystem.sink(imlPath).buffered().use { it.writeString(updatedContent) }
+        logger.info { "Added ${toAdd.size} exclusion(s) to $imlPath: $toAdd" }
+        ImlUpdateResult(added = toAdd, alreadyExcluded = alreadyExcluded, notApplied = emptyList())
     }
 
-    SystemFileSystem.sink(imlPath).buffered().use { it.writeString(updatedContent) }
-    logger.info { "Added ${toAdd.size} exclusion(s) to $imlPath: $toAdd" }
-
-    return ImlUpdateResult(added = toAdd, alreadyExcluded = alreadyExcluded, notApplied = emptyList())
+    return result
 }
 
 /**
@@ -115,12 +134,9 @@ internal fun parseExcludedFolderUrls(xmlContent: String): Set<String> {
     try {
         while (reader.hasNext()) {
             val event = reader.next()
-            if (event == EventType.START_ELEMENT && reader.localName == EXCLUDE_FOLDER_TAG) {
-                val url = reader.getAttributeValue(null, "url")
-                if (url != null) {
-                    excluded.add(url)
-                }
-            }
+            excludedFolderUrl(event, reader.localName) {
+                reader.getAttributeValue(null, "url")
+            }?.let(excluded::add)
         }
     } finally {
         reader.close()
@@ -133,6 +149,15 @@ internal fun parseExcludedFolderUrls(xmlContent: String): Set<String> {
  * Inserts new `<excludeFolder>` entries into the raw XML text before `</content>`.
  * Returns `null` if no `</content>` tag is found.
  */
+private fun excludedFolderUrl(
+    event: EventType,
+    localName: String?,
+    readUrl: () -> String?,
+): String? = when {
+    event == EventType.START_ELEMENT && localName == EXCLUDE_FOLDER_TAG -> readUrl()
+    else -> null
+}
+
 internal fun insertExcludeFolders(xmlContent: String, directories: List<String>): String? {
     val contentCloseRegex = Regex("""\s*</content>""")
     val match = contentCloseRegex.find(xmlContent) ?: return null

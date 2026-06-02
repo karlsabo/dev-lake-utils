@@ -228,7 +228,9 @@
 
 **Notes:** Keep failure messages stable enough that current UI tests can assert useful text.
 
-### 13. Shared exception and parsing utilities use domain errors and single-exit flow
+### 13. Shared exception and parsing utilities use domain errors and single-exit flow - Done
+
+**Done** 2026-06-02
 
 **Acceptance criteria:** Given desktop bootstrap, serialization, directory loading, markdown extraction, text summarization, and IntelliJ `.iml` parsing behavior, when success and failure tests run, then behavior is unchanged except for more specific error types and no generic-exception, return-count, nested-block-depth, max-line-length, or matching-declaration baseline entries remain in the listed shared utility files.
 

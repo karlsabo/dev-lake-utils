@@ -47,24 +47,42 @@ class LlmSkillSyncTest {
         agentsContent: String? = null,
         notesContent: String? = null,
     ) {
+        writeSkillFiles(sourceDir, skills)
+        writeOptionalFile(Path(sourceDir, "AGENTS.md"), agentsContent)
+        writeOptionalFile(Path(sourceDir, "notes.md"), notesContent)
+    }
+
+    private fun writeSkillFiles(sourceDir: Path, skills: Map<String, Map<String, String>>) {
         if (skills.isNotEmpty()) {
             val skillsDir = Path(sourceDir, ".agents", "skills")
             fs.createDirectories(skillsDir)
-            for ((skillName, files) in skills) {
-                val skillDir = Path(skillsDir, skillName)
-                fs.createDirectories(skillDir)
-                for ((fileName, content) in files) {
-                    val filePath = Path(skillDir, *fileName.split("/").toTypedArray())
-                    filePath.parent?.let { fs.createDirectories(it) }
-                    writeFile(filePath, content)
-                }
-            }
+            skills.forEach { (skillName, files) -> writeSkillDirectory(skillsDir, skillName, files) }
         }
-        if (agentsContent != null) {
-            writeFile(Path(sourceDir, "AGENTS.md"), agentsContent)
-        }
-        if (notesContent != null) {
-            writeFile(Path(sourceDir, "notes.md"), notesContent)
+    }
+
+    private fun writeSkillDirectory(
+        skillsDir: Path,
+        skillName: String,
+        files: Map<String, String>,
+    ) {
+        val skillDir = Path(skillsDir, skillName)
+        fs.createDirectories(skillDir)
+        files.forEach { (fileName, content) -> writeSkillFile(skillDir, fileName, content) }
+    }
+
+    private fun writeSkillFile(
+        skillDir: Path,
+        fileName: String,
+        content: String,
+    ) {
+        val filePath = Path(skillDir, *fileName.split("/").toTypedArray())
+        filePath.parent?.let { fs.createDirectories(it) }
+        writeFile(filePath, content)
+    }
+
+    private fun writeOptionalFile(path: Path, content: String?) {
+        if (content != null) {
+            writeFile(path, content)
         }
     }
 

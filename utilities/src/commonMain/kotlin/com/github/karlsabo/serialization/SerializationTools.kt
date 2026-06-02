@@ -22,13 +22,15 @@ fun <T> saveConfig(
 }
 
 inline fun <reified T> loadConfig(configPath: Path, serializer: KSerializer<T>): T? {
-    if (!SystemFileSystem.exists(configPath)) {
-        return null
+    val loadedConfig = if (SystemFileSystem.exists(configPath)) {
+        runCatching {
+            lenientJson.decodeFromString(serializer, SystemFileSystem.source(configPath).buffered().readText())
+        }.onFailure { error ->
+            logger.error(error) { "Failed to load config: $configPath" }
+        }.getOrNull()
+    } else {
+        null
     }
-    return try {
-        lenientJson.decodeFromString(serializer, SystemFileSystem.source(configPath).buffered().readText())
-    } catch (error: Exception) {
-        logger.error(error) { "Failed to load config: $configPath" }
-        return null
-    }
+
+    return loadedConfig
 }

@@ -8,8 +8,6 @@
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun forceArchiveConfirmationStartsWhileDirtyFailureRefreshIsStillRunning()</ID>
     <ID>MagicNumber:ZapierService.kt$ZapierService$200</ID>
     <ID>MagicNumber:ZapierService.kt$ZapierService$299</ID>
-    <ID>MatchingDeclarationName:DesktopAppBootstrap.kt$DesktopAppBootstrapResult&lt;out T&gt;</ID>
-    <ID>MaxLineLength:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitValue(): List&lt;T&gt;</ID>
     <ID>MaxLineLength:LinearRestApi.kt$LinearRestApi$override suspend fun getDirectChildIssues(parentKey: String): List&lt;ProjectIssue&gt;</ID>
@@ -17,19 +15,7 @@
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Instant?.isWithinStaleWarningWindow(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$private fun String.truncateForSlack(): String</ID>
-    <ID>MaxLineLength:TextSummarizerOpenAiConfigNoSecrets.kt$fun</ID>
-    <ID>MaxLineLength:TextSummarizerOpenAiConfigNoSecrets.kt$fun loadTextSummarizerOpenAiNoSecrets(configPath: Path): TextSummarizerOpenAiConfigNoSecrets?</ID>
-    <ID>NestedBlockDepth:ImlExcludeFolderManager.kt$internal fun parseExcludedFolderUrls(xmlContent: String): Set&lt;String&gt;</ID>
-    <ID>NestedBlockDepth:LlmSkillSyncTest.kt$LlmSkillSyncTest$private fun setupSourceDir( sourceDir: Path, skills: Map&lt;String, Map&lt;String, String&gt;&gt; = emptyMap(), agentsContent: String? = null, notesContent: String? = null, )</ID>
-    <ID>ReturnCount:ImlExcludeFolderManager.kt$fun addExcludeFoldersToIml( imlPath: Path, directoriesToExclude: List&lt;String&gt; = DEFAULT_EXCLUDE_DIRECTORIES, ): ImlUpdateResult</ID>
-    <ID>ReturnCount:SerializationTools.kt$inline fun &lt;reified T&gt; loadConfig(configPath: Path, serializer: KSerializer&lt;T&gt;): T?</ID>
-    <ID>TooGenericExceptionCaught:DesktopAppBootstrap.kt$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:GitHubNotificationService.kt$GitHubNotificationService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:MarkdownImageExtractor.kt$MarkdownImageExtractor$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:SerializationTools.kt$error: Exception</ID>
     <ID>TooGenericExceptionCaught:ZapierService.kt$ZapierService$e: Exception</ID>
-    <ID>TooGenericExceptionThrown:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
-    <ID>TooGenericExceptionThrown:TextSummarizerOpenAi.kt$TextSummarizerOpenAi$throw Exception("Failed to summarize text: ${response.status.value}")</ID>
     <ID>TooManyFunctions:SlackMarkdownFormatter.kt$com.github.karlsabo.tools.formatting.SlackMarkdownFormatter.kt</ID>
   </CurrentIssues>
 </SmellBaseline>

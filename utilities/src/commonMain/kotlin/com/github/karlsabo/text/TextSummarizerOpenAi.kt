@@ -66,10 +66,15 @@ class TextSummarizerOpenAi(
             logger.debug { "OpenAI responseText: $responseText" }
 
             if (!response.status.isSuccess()) {
-                throw Exception("Failed to summarize text: ${response.status.value}")
+                throw TextSummarizerOpenAiException(
+                    "Failed to summarize text: ${response.status.value}",
+                )
             }
 
-            val openAiResponse: OpenAIResponse = lenientJson.decodeFromString(OpenAIResponse.serializer(), responseText)
+            val openAiResponse: OpenAIResponse = lenientJson.decodeFromString(
+                OpenAIResponse.serializer(),
+                responseText,
+            )
             logger.debug { "openAiResponse=$openAiResponse" }
             val summary: String = if (openAiResponse.choices != null) {
                 logger.debug { "OpenAI Choices: ${openAiResponse.choices.map { it.message?.content }}" }

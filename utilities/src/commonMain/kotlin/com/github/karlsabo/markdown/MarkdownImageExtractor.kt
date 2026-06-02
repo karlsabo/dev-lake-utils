@@ -52,23 +52,10 @@ class MarkdownImageExtractor(
         val extractedImages = mutableListOf<ExtractedImage>()
 
         for (ref in references) {
-            val extension = MarkdownParser.getExtensionForImageType(ref.imageType)
-            val imageFileName = "$baseName-${ref.referenceName}.$extension"
-            val imagePath = Path(imagesDir, imageFileName)
-
-            try {
-                val imageData = Base64.decode(ref.base64Data)
-                writeImageFile(imagePath, imageData)
-
-                val sizeBytes = imageData.size.toLong()
-                logger.info { "  Extracted: $imageFileName (${sizeBytes.formatBytes()})" }
-
-                extractedImages.add(ExtractedImage(ref.referenceName, imagePath, sizeBytes))
-
-                val relativePath = "$imagesDirectoryName/$imageFileName"
-                updatedContent = MarkdownParser.replaceBase64Reference(updatedContent, ref, relativePath)
-            } catch (e: Exception) {
-                logger.error(e) { "Error extracting image ${ref.referenceName}" }
+            val extraction = extractImageReference(ref, imagesDir, baseName, updatedContent)
+            if (extraction != null) {
+                extractedImages.add(extraction.image)
+                updatedContent = extraction.updatedContent
             }
         }
 
@@ -131,6 +118,37 @@ class MarkdownImageExtractor(
             else -> emptyList()
         }
     }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun extractImageReference(
+        ref: Base64ImageReference,
+        imagesDir: Path,
+        baseName: String,
+        content: String,
+    ): ImageReferenceExtraction? = runCatching {
+        val extension = MarkdownParser.getExtensionForImageType(ref.imageType)
+        val imageFileName = "$baseName-${ref.referenceName}.$extension"
+        val imagePath = Path(imagesDir, imageFileName)
+        val imageData = Base64.decode(ref.base64Data)
+
+        writeImageFile(imagePath, imageData)
+
+        val sizeBytes = imageData.size.toLong()
+        logger.info { "  Extracted: $imageFileName (${sizeBytes.formatBytes()})" }
+
+        val relativePath = "$imagesDirectoryName/$imageFileName"
+        ImageReferenceExtraction(
+            image = ExtractedImage(ref.referenceName, imagePath, sizeBytes),
+            updatedContent = MarkdownParser.replaceBase64Reference(content, ref, relativePath),
+        )
+    }.onFailure { error ->
+        logger.error(error) { "Error extracting image ${ref.referenceName}" }
+    }.getOrNull()
+
+    private data class ImageReferenceExtraction(
+        val image: ExtractedImage,
+        val updatedContent: String,
+    )
 
     private fun readFile(path: Path): String = fileSystem.source(path).buffered().readString()
 

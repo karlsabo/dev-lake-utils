@@ -122,7 +122,7 @@ internal fun loadConfiguration(
     configFilePath: Path,
     loadConfig: (Path) -> SummaryPublisherConfig = ::loadSummaryPublisherConfig,
     loadDependencies: (SummaryPublisherConfig) -> SummaryPublisherDependencies = ::loadSummaryPublisherDependencies,
-    buildErrorMessage: (Exception) -> String = ::buildConfigurationErrorMessage,
+    buildErrorMessage: (Throwable) -> String = ::buildConfigurationErrorMessage,
 ) {
     when (
         val result = runDesktopAppBootstrap(
@@ -157,7 +157,7 @@ internal fun loadConfiguration(
 }
 
 internal fun buildConfigurationErrorMessage(
-    error: Exception,
+    error: Throwable,
     templates: List<SummaryPublisherBootstrapTemplate> = summaryPublisherBootstrapTemplates(),
     exists: (Path) -> Boolean = SystemFileSystem::exists,
 ): String {

@@ -29,7 +29,10 @@ class DesktopLauncherService : DesktopLauncher {
         val result = executeCommand(listOf("idea", projectPath))
         if (result.exitCode != 0) {
             val detail = result.stderr.ifEmpty { result.stdout }
-            throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")
+            throw DesktopLaunchException(
+                "Failed to open IntelliJ IDEA for $projectPath " +
+                    "(exit code ${result.exitCode}): $detail",
+            )
         }
     }
 }

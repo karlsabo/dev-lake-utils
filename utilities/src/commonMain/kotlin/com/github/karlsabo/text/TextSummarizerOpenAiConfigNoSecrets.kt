@@ -13,11 +13,22 @@ data class TextSummarizerOpenAiConfigNoSecrets(
     val apiKeyFilePath: String,
 )
 
-fun TextSummarizerOpenAiConfigNoSecrets.toTextSummarizerOpenAiConfig(): TextSummarizerOpenAiConfig = TextSummarizerOpenAiConfig(
-    apiKey = SystemFileSystem.source(Path(this.apiKeyFilePath)).buffered().use { it.readText() },
-)
+fun TextSummarizerOpenAiConfigNoSecrets.toTextSummarizerOpenAiConfig(): TextSummarizerOpenAiConfig {
+    val apiKey = readOpenAiApiKey(apiKeyFilePath)
+    return TextSummarizerOpenAiConfig(apiKey = apiKey)
+}
 
-fun loadTextSummarizerOpenAiNoSecrets(configPath: Path): TextSummarizerOpenAiConfigNoSecrets? = loadConfig(configPath, TextSummarizerOpenAiConfigNoSecrets.serializer())
+private fun readOpenAiApiKey(apiKeyFilePath: String): String {
+    val apiKeyPath = Path(apiKeyFilePath)
+    return SystemFileSystem.source(apiKeyPath).buffered().use { it.readText() }
+}
+
+fun loadTextSummarizerOpenAiNoSecrets(
+    configPath: Path,
+): TextSummarizerOpenAiConfigNoSecrets? = loadConfig(
+    configPath,
+    TextSummarizerOpenAiConfigNoSecrets.serializer(),
+)
 
 fun saveTextSummarizerOpenAiNoSecrets(configPath: Path, config: TextSummarizerOpenAiConfigNoSecrets) {
     saveConfig(configPath, config, TextSummarizerOpenAiConfigNoSecrets.serializer())
