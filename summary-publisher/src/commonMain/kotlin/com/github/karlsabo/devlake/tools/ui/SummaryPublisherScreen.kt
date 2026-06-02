@@ -13,39 +13,51 @@ import com.github.karlsabo.devlake.tools.ui.components.loadingButton
 import com.github.karlsabo.devlake.tools.ui.components.projectSummaryList
 import com.github.karlsabo.devlake.tools.ui.components.summaryTextField
 
+internal data class SummaryPublisherPublishState(
+    val buttonText: String,
+    val isButtonEnabled: Boolean,
+    val isLoadingSummary: Boolean,
+    val isSendingSlackMessage: Boolean,
+)
+
+internal data class SummaryPublisherScreenState(
+    val topLevelSummary: String,
+    val projectSummaries: List<ProjectSummaryHolder>,
+    val publishState: SummaryPublisherPublishState,
+)
+
+internal data class SummaryPublisherScreenActions(
+    val onTopLevelSummaryChange: (String) -> Unit,
+    val onProjectMessageChange: (Int, String) -> Unit,
+    val onProjectDelete: (Int) -> Unit,
+    val onPublishClick: () -> Unit,
+)
+
 @Composable
-fun summaryPublisherScreen(
-    topLevelSummary: String,
-    onTopLevelSummaryChange: (String) -> Unit,
-    projectSummaries: List<ProjectSummaryHolder>,
-    onProjectMessageChange: (Int, String) -> Unit,
-    onProjectDelete: (Int) -> Unit,
-    publishButtonText: String,
-    publishButtonEnabled: Boolean,
-    isLoadingSummary: Boolean,
-    isSendingSlackMessage: Boolean,
-    onPublishClick: () -> Unit,
+internal fun summaryPublisherScreen(
+    state: SummaryPublisherScreenState,
+    actions: SummaryPublisherScreenActions,
 ) {
     MaterialTheme {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 loadingButton(
-                    text = publishButtonText,
-                    isLoading = isSendingSlackMessage,
-                    enabled = publishButtonEnabled && !isLoadingSummary,
-                    onClick = onPublishClick,
+                    text = state.publishState.buttonText,
+                    isLoading = state.publishState.isSendingSlackMessage,
+                    enabled = state.publishState.isButtonEnabled && !state.publishState.isLoadingSummary,
+                    onClick = actions.onPublishClick,
                 )
 
                 summaryTextField(
-                    value = topLevelSummary,
-                    onValueChange = onTopLevelSummaryChange,
+                    value = state.topLevelSummary,
+                    onValueChange = actions.onTopLevelSummaryChange,
                     modifier = Modifier.padding(8.dp),
                 )
 
                 projectSummaryList(
-                    summaries = projectSummaries,
-                    onMessageChange = onProjectMessageChange,
-                    onDelete = onProjectDelete,
+                    summaries = state.projectSummaries,
+                    onMessageChange = actions.onProjectMessageChange,
+                    onDelete = actions.onProjectDelete,
                     modifier = Modifier.weight(1f).padding(8.dp),
                 )
             }

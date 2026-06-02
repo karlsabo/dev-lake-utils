@@ -191,7 +191,9 @@
 
 **Notes:** Keep this as an internal API refactor unless external callers force migration.
 
-### 11. Summary publisher dependencies, UI, and tests are narrowed
+### 11. Summary publisher dependencies, UI, and tests are narrowed - Done
+
+**Done** 2026-06-02
 
 **Acceptance criteria:** Given summary publisher tests, when configuration loading and publishing flows run, then behavior is unchanged and no detekt baseline entry remains for summary publisher dependency loading, screen parameters, UI demos, or tests.
 

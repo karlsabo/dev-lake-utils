@@ -2,7 +2,9 @@ package com.github.karlsabo.devlake.tools.ui
 
 import com.github.karlsabo.devlake.tools.ProjectSummaryHolder
 import com.github.karlsabo.devlake.tools.SummaryPublisherComponent
+import com.github.karlsabo.devlake.tools.SummaryPublisherComponentInputs
 import com.github.karlsabo.devlake.tools.SummaryPublisherConfig
+import com.github.karlsabo.devlake.tools.SummaryPublisherConfigLoaders
 import com.github.karlsabo.devlake.tools.SummaryPublisherDependencies
 import com.github.karlsabo.devlake.tools.SummaryPublisherState
 import com.github.karlsabo.devlake.tools.ZapierSummaryPublisher
@@ -37,6 +39,18 @@ import kotlin.test.assertTrue
 
 private fun unexpected(): Nothing = error("unexpected call")
 
+private fun assertComponentInputs(
+    expected: SummaryPublisherComponentInputs,
+    actual: SummaryPublisherComponentInputs,
+) {
+    assertEquals(expected.config, actual.config)
+    assertSame(expected.usersConfig, actual.usersConfig)
+    assertEquals(expected.linearApiConfig, actual.linearApiConfig)
+    assertEquals(expected.gitHubApiConfig, actual.gitHubApiConfig)
+    assertEquals(expected.pagerDutyApiConfig, actual.pagerDutyApiConfig)
+    assertEquals(expected.textSummarizerConfig, actual.textSummarizerConfig)
+}
+
 class SummaryPublisherDependenciesTest {
 
     @Test
@@ -63,33 +77,26 @@ class SummaryPublisherDependenciesTest {
 
         val loadedDependencies = loadSummaryPublisherDependencies(
             config = config,
-            loadUsersConfig = { usersConfig },
-            loadLinearApiConfig = { linearApiConfig },
-            loadGitHubApiConfig = { gitHubApiConfig },
-            loadPagerDutyApiConfig = { pagerDutyApiConfig },
-            loadTextSummarizerConfig = { textSummarizerConfig },
-            componentFactory = {
-                    providedConfig,
-                    providedUsersConfig,
-                    providedLinearApiConfig,
-                    providedGitHubApiConfig,
-                    providedPagerDutyApiConfig,
-                    providedTextSummarizerConfig,
-                ->
-                assertEquals(config, providedConfig)
-                assertSame(usersConfig, providedUsersConfig)
-                assertEquals(linearApiConfig, providedLinearApiConfig)
-                assertEquals(gitHubApiConfig, providedGitHubApiConfig)
-                assertEquals(pagerDutyApiConfig, providedPagerDutyApiConfig)
-                assertEquals(textSummarizerConfig, providedTextSummarizerConfig)
-                object : SummaryPublisherComponent(
-                    providedConfig,
-                    providedUsersConfig,
-                    providedLinearApiConfig,
-                    providedGitHubApiConfig,
-                    providedPagerDutyApiConfig,
-                    providedTextSummarizerConfig,
-                ) {
+            configLoaders = SummaryPublisherConfigLoaders(
+                loadUsersConfig = { usersConfig },
+                loadLinearApiConfig = { linearApiConfig },
+                loadGitHubApiConfig = { gitHubApiConfig },
+                loadPagerDutyApiConfig = { pagerDutyApiConfig },
+                loadTextSummarizerConfig = { textSummarizerConfig },
+            ),
+            componentFactory = { providedInputs ->
+                assertComponentInputs(
+                    expected = SummaryPublisherComponentInputs(
+                        config = config,
+                        usersConfig = usersConfig,
+                        linearApiConfig = linearApiConfig,
+                        gitHubApiConfig = gitHubApiConfig,
+                        pagerDutyApiConfig = pagerDutyApiConfig,
+                        textSummarizerConfig = textSummarizerConfig,
+                    ),
+                    actual = providedInputs,
+                )
+                object : SummaryPublisherComponent(providedInputs) {
                     override val dependencies = dependencies
                 }
             },
@@ -139,74 +146,21 @@ class SummaryPublisherDependenciesTest {
     @Test
     fun loadConfigurationCreatesMissingTemplatesWhenBootstrapFails() {
         val tempDir = createTempDir()
-        val summaryConfigPath = Path(tempDir, "summary-publisher-config.json")
-        val textSummarizerPath = Path(tempDir, "text-summarizer-config.json")
-        val linearPath = Path(tempDir, "linear-config.json")
-        val gitHubPath = Path(tempDir, "github-config.json")
-        val pagerDutyPath = Path(tempDir, "pagerduty-config.json")
-        val createdPaths = mutableListOf<Path>()
+        val fixture = bootstrapFailureFixture(tempDir)
         val state = SummaryPublisherState()
 
         try {
-            val templates = listOf(
-                template(
-                    path = summaryConfigPath,
-                    message = "\nCreating new configuration.\n Please update the configuration file:\n$summaryConfigPath.",
-                    createdPaths = createdPaths,
-                ),
-                template(
-                    path = textSummarizerPath,
-                    message = "Please update the configuration file:\n$textSummarizerPath.",
-                    createdPaths = createdPaths,
-                ),
-                template(
-                    path = linearPath,
-                    message = "Please update the configuration file:\n$linearPath.",
-                    createdPaths = createdPaths,
-                ),
-                template(
-                    path = gitHubPath,
-                    message = "Please update the configuration file:\n$gitHubPath.",
-                    createdPaths = createdPaths,
-                ),
-                template(
-                    path = pagerDutyPath,
-                    message = "Please update the configuration file:\n$pagerDutyPath.",
-                    createdPaths = createdPaths,
-                ),
-            )
-
             loadConfiguration(
                 state = state,
-                configFilePath = summaryConfigPath,
-                loadConfig = { throw IllegalStateException("missing config") },
+                configFilePath = fixture.paths.summary,
+                loadConfig = { error("missing config") },
                 loadDependencies = { error("Dependencies should not load when config loading fails") },
                 buildErrorMessage = { error ->
-                    buildConfigurationErrorMessage(
-                        error = error,
-                        templates = templates,
-                    )
+                    buildConfigurationErrorMessage(error = error, templates = fixture.templates)
                 },
             )
 
-            assertEquals(false, state.isConfigLoaded)
-            assertEquals(true, state.isDisplayErrorDialog)
-            assertEquals(
-                "Failed to load configuration: java.lang.IllegalStateException: missing config." +
-                    "\nCreating new configuration.\n Please update the configuration file:\n$summaryConfigPath." +
-                    "Please update the configuration file:\n$textSummarizerPath." +
-                    "Please update the configuration file:\n$linearPath." +
-                    "Please update the configuration file:\n$gitHubPath." +
-                    "Please update the configuration file:\n$pagerDutyPath.",
-                state.errorMessage,
-            )
-            assertEquals(
-                listOf(summaryConfigPath, textSummarizerPath, linearPath, gitHubPath, pagerDutyPath),
-                createdPaths,
-            )
-            createdPaths.forEach { path ->
-                assertTrue(SystemFileSystem.exists(path))
-            }
+            assertConfigurationBootstrapFailure(state, fixture)
         } finally {
             deleteRecursively(tempDir)
         }
@@ -347,7 +301,7 @@ class SummaryPublisherDependenciesTest {
         override suspend fun publishSummary(summary: ZapierProjectSummary): Boolean {
             publishedSummaries += summary
             if (shouldThrow) {
-                throw IllegalStateException("boom")
+                error("boom")
             }
             return if (remainingResults.isEmpty()) {
                 true
@@ -474,6 +428,57 @@ class SummaryPublisherDependenciesTest {
         SystemFileSystem.delete(path, mustExist = false)
     }
 
+    private fun bootstrapFailureFixture(tempDir: Path): BootstrapFailureFixture {
+        val paths = BootstrapConfigPaths(
+            summary = Path(tempDir, "summary-publisher-config.json"),
+            textSummarizer = Path(tempDir, "text-summarizer-config.json"),
+            linear = Path(tempDir, "linear-config.json"),
+            gitHub = Path(tempDir, "github-config.json"),
+            pagerDuty = Path(tempDir, "pagerduty-config.json"),
+        )
+        val createdPaths = mutableListOf<Path>()
+        return BootstrapFailureFixture(
+            paths = paths,
+            createdPaths = createdPaths,
+            templates = paths.all.map { path ->
+                template(
+                    path = path,
+                    message = missingConfigMessage(path, isSummaryConfig = path == paths.summary),
+                    createdPaths = createdPaths,
+                )
+            },
+        )
+    }
+
+    private fun assertConfigurationBootstrapFailure(
+        state: SummaryPublisherState,
+        fixture: BootstrapFailureFixture,
+    ) {
+        assertEquals(false, state.isConfigLoaded)
+        assertEquals(true, state.isDisplayErrorDialog)
+        assertEquals(expectedBootstrapFailureMessage(fixture.paths), state.errorMessage)
+        assertEquals(fixture.paths.all, fixture.createdPaths)
+        fixture.createdPaths.forEach { path ->
+            assertTrue(SystemFileSystem.exists(path))
+        }
+    }
+
+    private fun expectedBootstrapFailureMessage(paths: BootstrapConfigPaths): String {
+        val prefix = "Failed to load configuration: java.lang.IllegalStateException: missing config."
+        return prefix + paths.all.joinToString(separator = "") { path ->
+            missingConfigMessage(path, isSummaryConfig = path == paths.summary)
+        }
+    }
+
+    private fun missingConfigMessage(path: Path, isSummaryConfig: Boolean): String {
+        val updateMessage = "Please update the configuration file:\n$path."
+        return if (isSummaryConfig) {
+            "\nCreating new configuration.\n $updateMessage"
+        } else {
+            updateMessage
+        }
+    }
+
     private fun template(
         path: Path,
         message: String,
@@ -487,6 +492,22 @@ class SummaryPublisherDependenciesTest {
                 sink.writeString("created for test")
             }
         },
+    )
+
+    private data class BootstrapConfigPaths(
+        val summary: Path,
+        val textSummarizer: Path,
+        val linear: Path,
+        val gitHub: Path,
+        val pagerDuty: Path,
+    ) {
+        val all = listOf(summary, textSummarizer, linear, gitHub, pagerDuty)
+    }
+
+    private data class BootstrapFailureFixture(
+        val paths: BootstrapConfigPaths,
+        val createdPaths: MutableList<Path>,
+        val templates: List<SummaryPublisherBootstrapTemplate>,
     )
 
     private companion object {

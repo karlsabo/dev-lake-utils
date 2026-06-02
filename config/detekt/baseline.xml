@@ -7,16 +7,10 @@
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRefreshesRepositoryWhileSetupIsRunning()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRunsSetupAndRefreshesWhenExactTargetWorktreeAlreadyExists()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun forceArchiveConfirmationStartsWhileDirtyFailureRefreshIsStillRunning()</ID>
-    <ID>LongMethod:SummaryDetailTest.kt$SummaryDetailTest$@Test fun testCreateSummary()</ID>
-    <ID>LongMethod:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest$@Test fun loadConfigurationCreatesMissingTemplatesWhenBootstrapFails()</ID>
-    <ID>LongMethod:UiDemo.kt$fun main()</ID>
     <ID>LongMethod:UserEpicsWithIssuesDemo.kt$fun main(args: Array&lt;String&gt;): Unit</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun loadMetricsPreviewUsesGeneratedDependencies()</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterFailedSendAndReportsFailure()</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterThrownSendAndReportsFailure()</ID>
-    <ID>LongParameterList:SummaryPublisherDependencies.kt$( config: SummaryPublisherConfig, loadUsersConfig: () -&gt; UsersConfig? = ::loadUsersConfig, loadLinearApiConfig: () -&gt; LinearApiRestConfig = { loadLinearConfig(linearConfigPath) }, loadGitHubApiConfig: () -&gt; GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) }, loadPagerDutyApiConfig: () -&gt; PagerDutyApiRestConfig = { loadPagerDutyConfig(pagerDutyConfigPath) }, loadTextSummarizerConfig: () -&gt; TextSummarizerOpenAiConfig = { requireNotNull(loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)) { "Text summarizer config is required" }.toTextSummarizerOpenAiConfig() }, componentFactory: SummaryPublisherComponentFactory = ::createSummaryPublisherComponent, )</ID>
-    <ID>LongParameterList:SummaryPublisherDependencies.kt$( config: SummaryPublisherConfig, usersConfig: UsersConfig, linearApiConfig: LinearApiRestConfig, gitHubApiConfig: GitHubApiRestConfig, pagerDutyApiConfig: PagerDutyApiRestConfig, textSummarizerConfig: TextSummarizerOpenAiConfig, )</ID>
-    <ID>LongParameterList:SummaryPublisherScreen.kt$( topLevelSummary: String, onTopLevelSummaryChange: (String) -&gt; Unit, projectSummaries: List&lt;ProjectSummaryHolder&gt;, onProjectMessageChange: (Int, String) -&gt; Unit, onProjectDelete: (Int) -&gt; Unit, publishButtonText: String, publishButtonEnabled: Boolean, isLoadingSummary: Boolean, isSendingSlackMessage: Boolean, onPublishClick: () -&gt; Unit, )</ID>
     <ID>LongParameterList:UserMetricPublisherApp.kt$( state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState, configFilePath: Path = userMetricPublisherConfigPath, loadConfig: () -&gt; UserMetricPublisherConfig = ::loadUserMetricPublisherConfig, loadDependencies: (UserMetricPublisherConfig) -&gt; UserMetricPublisherDependencies = ::loadUserMetricPublisherDependencies, configFileExists: (Path) -&gt; Boolean = SystemFileSystem::exists, saveDefaultConfig: (UserMetricPublisherConfig) -&gt; Unit = ::saveUserMetricPublisherConfig, )</ID>
     <ID>MagicNumber:UserMetrics.kt$3.5</ID>
     <ID>MagicNumber:UserMetrics.kt$7</ID>
@@ -25,7 +19,6 @@
     <ID>MagicNumber:ZapierService.kt$ZapierService$200</ID>
     <ID>MagicNumber:ZapierService.kt$ZapierService$299</ID>
     <ID>MatchingDeclarationName:DesktopAppBootstrap.kt$DesktopAppBootstrapResult&lt;out T&gt;</ID>
-    <ID>MatchingDeclarationName:UiDemo.kt$ProjectMessage</ID>
     <ID>MaxLineLength:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitValue(): List&lt;T&gt;</ID>
@@ -34,13 +27,6 @@
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Instant?.isWithinStaleWarningWindow(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$private fun String.truncateForSlack(): String</ID>
-    <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.GitHubApiMock$)</ID>
-    <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend</ID>
-    <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend fun getChildIssues(issueKeys: List&lt;String&gt;): List&lt;ProjectIssue&gt;</ID>
-    <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend fun getDirectChildIssues(parentKey: String): List&lt;ProjectIssue&gt;</ID>
-    <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend fun getIssues(issueKeys: List&lt;String&gt;): List&lt;ProjectIssue&gt;</ID>
-    <ID>MaxLineLength:SummaryDetailTest.kt$SummaryDetailTest.ProjectManagementApiMock$override suspend fun getMilestoneIssues(milestoneId: String): List&lt;ProjectIssue&gt;</ID>
-    <ID>MaxLineLength:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest$message = "\nCreating new configuration.\n Please update the configuration file:\n$summaryConfigPath."</ID>
     <ID>MaxLineLength:TextSummarizerOpenAiConfigNoSecrets.kt$fun</ID>
     <ID>MaxLineLength:TextSummarizerOpenAiConfigNoSecrets.kt$fun loadTextSummarizerOpenAiNoSecrets(configPath: Path): TextSummarizerOpenAiConfigNoSecrets?</ID>
     <ID>MaxLineLength:UserEpicsWithIssuesDemo.kt$*</ID>
@@ -50,7 +36,6 @@
     <ID>MaxLineLength:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$componentFactory</ID>
     <ID>MaxLineLength:UserMetrics.kt$appendLine("• *Year to Date:* `$pullRequestsYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")</ID>
     <ID>MaxLineLength:UserMetrics.kt$appendLine("• *Year to date:* `$issuesClosedYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")</ID>
-    <ID>MaxLineLength:ZapierSummaryPublisher.kt$ZapierSummaryPublisher$open suspend fun publishSummary(summary: ZapierProjectSummary): Boolean</ID>
     <ID>NestedBlockDepth:ImlExcludeFolderManager.kt$internal fun parseExcludedFolderUrls(xmlContent: String): Set&lt;String&gt;</ID>
     <ID>NestedBlockDepth:LlmSkillSyncTest.kt$LlmSkillSyncTest$private fun setupSourceDir( sourceDir: Path, skills: Map&lt;String, Map&lt;String, String&gt;&gt; = emptyMap(), agentsContent: String? = null, notesContent: String? = null, )</ID>
     <ID>ReturnCount:ImlExcludeFolderManager.kt$fun addExcludeFoldersToIml( imlPath: Path, directoriesToExclude: List&lt;String&gt; = DEFAULT_EXCLUDE_DIRECTORIES, ): ImlUpdateResult</ID>
@@ -67,7 +52,6 @@
     <ID>TooGenericExceptionThrown:UserEpicsWithIssuesDemo.kt$throw Exception("No --user=username provided")</ID>
     <ID>TooGenericExceptionThrown:UserMetricPublisherApp.kt$throw Exception("User not found: $userId")</ID>
     <ID>TooManyFunctions:SlackMarkdownFormatter.kt$com.github.karlsabo.tools.formatting.SlackMarkdownFormatter.kt</ID>
-    <ID>UseCheckOrError:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest.RecordingZapierSummaryPublisher$throw IllegalStateException("boom")</ID>
     <ID>UseCheckOrError:UserMetricPublisherDependenciesTest.kt$ThrowingMessagePublisher$throw IllegalStateException("boom")</ID>
   </CurrentIssues>
 </SmellBaseline>

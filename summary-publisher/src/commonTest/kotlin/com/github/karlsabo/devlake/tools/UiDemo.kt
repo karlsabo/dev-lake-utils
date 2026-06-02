@@ -9,11 +9,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,14 +28,14 @@ import androidx.compose.ui.window.rememberWindowState
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-data class ProjectMessage(
-    val id: Uuid,
-    val text: String,
-)
-
 fun main() = application {
+    uiDemoWindow(onCloseRequest = ::exitApplication)
+}
+
+@Composable
+private fun uiDemoWindow(onCloseRequest: () -> Unit) {
     Window(
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = onCloseRequest,
         title = "UI Demo",
         visible = true,
         state = rememberWindowState(
@@ -44,65 +44,101 @@ fun main() = application {
             position = WindowPosition(Alignment.Center),
         ),
     ) {
-        var zapierJson by remember { mutableStateOf("Loading summary") }
-        rememberScrollState()
-        var projectMessages by remember {
-            mutableStateOf(
-                mutableListOf(
-                    ProjectMessage(Uuid.random(), "Project A"),
-                    ProjectMessage(Uuid.random(), "Project B"),
-                ),
-            )
-        }
-
         MaterialTheme {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Button(
-                    onClick = { println("helo moto") },
-                    modifier = Modifier.padding(8.dp),
-                ) {
-                    Text("Hello")
-                }
-                TextField(
-                    value = zapierJson,
-                    onValueChange = { zapierJson = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                )
-
-                LazyColumn {
-                    itemsIndexed(
-                        items = projectMessages,
-                        key = { _, item -> item.id }, // the key is the unique ID!
-                    ) { index, project ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            TextField(
-                                value = project.text,
-                                onValueChange = { newValue ->
-                                    projectMessages = projectMessages.toMutableList().also {
-                                        it[index] = it[index].copy(text = newValue)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                            Button(
-                                onClick = {
-                                    projectMessages = projectMessages.toMutableList().also { it.removeAt(index) }
-                                },
-                                modifier = Modifier.padding(start = 8.dp),
-                            ) {
-                                Text("Delete")
-                            }
-                        }
-                    }
-                }
-            }
+            uiDemoContent()
         }
     }
 }
+
+@Composable
+private fun uiDemoContent() {
+    var zapierJson by remember { mutableStateOf("Loading summary") }
+    var projectMessages by remember { mutableStateOf(initialProjectMessages()) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        demoButton()
+        TextField(
+            value = zapierJson,
+            onValueChange = { zapierJson = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+        )
+        projectMessagesEditor(
+            projectMessages = projectMessages,
+            onProjectMessagesChange = { projectMessages = it },
+        )
+    }
+}
+
+@Composable
+private fun demoButton() {
+    Button(
+        onClick = { println("helo moto") },
+        modifier = Modifier.padding(8.dp),
+    ) {
+        Text("Hello")
+    }
+}
+
+@Composable
+private fun projectMessagesEditor(
+    projectMessages: List<ProjectMessage>,
+    onProjectMessagesChange: (List<ProjectMessage>) -> Unit,
+) {
+    LazyColumn {
+        itemsIndexed(
+            items = projectMessages,
+            key = { _, item -> item.id },
+        ) { index, project ->
+            projectMessageRow(
+                project = project,
+                onTextChange = { newValue ->
+                    onProjectMessagesChange(
+                        projectMessages.replaceAt(index, project.copy(text = newValue)),
+                    )
+                },
+                onDelete = {
+                    onProjectMessagesChange(projectMessages.withoutIndex(index))
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun projectMessageRow(
+    project: ProjectMessage,
+    onTextChange: (String) -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextField(
+            value = project.text,
+            onValueChange = onTextChange,
+            modifier = Modifier.weight(1f),
+        )
+        Button(
+            onClick = onDelete,
+            modifier = Modifier.padding(start = 8.dp),
+        ) {
+            Text("Delete")
+        }
+    }
+}
+
+private fun initialProjectMessages() = listOf(
+    ProjectMessage(Uuid.random(), "Project A"),
+    ProjectMessage(Uuid.random(), "Project B"),
+)
+
+private fun List<ProjectMessage>.replaceAt(index: Int, value: ProjectMessage) = toMutableList().also {
+    it[index] = value
+}
+
+private fun List<ProjectMessage>.withoutIndex(index: Int) = toMutableList().also { it.removeAt(index) }

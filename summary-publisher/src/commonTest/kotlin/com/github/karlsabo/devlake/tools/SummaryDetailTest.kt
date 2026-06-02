@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.tools
 
+import com.github.karlsabo.dto.MultiProjectSummary
 import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.dto.toSlackMarkup
@@ -43,69 +44,37 @@ class SummaryDetailTest {
 
     @Test
     fun testCreateSummary() = runBlocking {
-        val projectManagementApi = ProjectManagementApiMock()
-        val gitHubApi = GitHubApiMock()
-        val pagerDutyApi = PagerDutyApiMock()
-        val textSummarizer = TextSummarizerFake()
-
-        val gitHubOrganizationIds = listOf("test-org")
-        val pagerDutyServiceIds = listOf("PD123")
-        val projects = listOf(
-            Project(
-                id = 1L,
-                title = "Test Project 1",
-                topLevelIssueIds = listOf("TEST-1", "TEST-4"),
-                isVerboseMilestones = true,
-            ),
-            Project(
-                id = 2L,
-                title = "Test Project 2",
-                topLevelIssueIds = listOf("PROJ2-1", "PROJ2-2"),
-                isVerboseMilestones = true,
-            ),
-        )
-        val users = listOf(
-            User(
-                id = "user1",
-                name = "Test User",
-                email = "test@example.local",
-                jiraId = "jira-user-1",
-                gitHubId = "github-user-1",
-            ),
-        )
-        val miscUsers = listOf(
-            User(
-                id = "misc-user1",
-                name = "Misc User",
-                email = "misc@example.local",
-                jiraId = "jira-misc-1",
-                gitHubId = "github-misc-1",
-            ),
-        )
         val summaryName = "Test Summary"
-        val isMiscellaneousProjectIncluded = true
 
-        val summary = createSummary(
-            CreateSummaryRequest(
-                sources = SummarySources(
-                    projectManagementApi = projectManagementApi,
-                    gitHubApi = gitHubApi,
-                    gitHubOrganizationIds = gitHubOrganizationIds,
-                    pagerDutyApi = pagerDutyApi,
-                    pagerDutyServiceIds = pagerDutyServiceIds,
-                    textSummarizer = textSummarizer,
-                ),
-                projects = projects,
-                duration = 7.days,
-                users = users,
-                miscUsers = miscUsers,
-                options = SummaryOptions(
-                    summaryName = summaryName,
-                    isMiscellaneousProjectIncluded = isMiscellaneousProjectIncluded,
-                ),
-            ),
-        )
+        val summary = createSummary(summaryRequest(summaryName))
 
+        assertSummaryCreated(summary, summaryName)
+    }
+
+    @Suppress("SameParameterValue")
+    private fun summaryRequest(summaryName: String) = CreateSummaryRequest(
+        sources = SummarySources(
+            projectManagementApi = ProjectManagementApiMock(),
+            gitHubApi = GitHubApiMock(),
+            gitHubOrganizationIds = listOf("test-org"),
+            pagerDutyApi = PagerDutyApiMock(),
+            pagerDutyServiceIds = listOf("PD123"),
+            textSummarizer = TextSummarizerFake(),
+        ),
+        projects = testProjects(),
+        duration = 7.days,
+        users = testUsers(),
+        miscUsers = testMiscUsers(),
+        options = SummaryOptions(
+            summaryName = summaryName,
+            isMiscellaneousProjectIncluded = true,
+        ),
+    )
+
+    private fun assertSummaryCreated(
+        summary: MultiProjectSummary,
+        @Suppress("SameParameterValue") summaryName: String,
+    ) {
         assertNotNull(summary)
         assertEquals(summaryName, summary.summaryName)
         assertTrue(summary.projectSummaries.isNotEmpty())
@@ -120,6 +89,41 @@ class SummaryDetailTest {
         assertNotNull(summary.pagerDutyAlerts)
         assertTrue(summary.pagerDutyAlerts!!.isNotEmpty())
     }
+
+    private fun testProjects() = listOf(
+        Project(
+            id = 1L,
+            title = "Test Project 1",
+            topLevelIssueIds = listOf("TEST-1", "TEST-4"),
+            isVerboseMilestones = true,
+        ),
+        Project(
+            id = 2L,
+            title = "Test Project 2",
+            topLevelIssueIds = listOf("PROJ2-1", "PROJ2-2"),
+            isVerboseMilestones = true,
+        ),
+    )
+
+    private fun testUsers() = listOf(
+        User(
+            id = "user1",
+            name = "Test User",
+            email = "test@example.local",
+            jiraId = "jira-user-1",
+            gitHubId = "github-user-1",
+        ),
+    )
+
+    private fun testMiscUsers() = listOf(
+        User(
+            id = "misc-user1",
+            name = "Misc User",
+            email = "misc@example.local",
+            jiraId = "jira-misc-1",
+            gitHubId = "github-misc-1",
+        ),
+    )
 
     private class ProjectManagementApiMock : ProjectManagementApi {
         private val now = Clock.System.now()
@@ -345,13 +349,25 @@ class SummaryDetailTest {
             ),
         )
 
-        override suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue> = issueKeys.mapNotNull { mockIssues[it] }
+        override suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue> {
+            val issuesByKey = mockIssues
+            return issueKeys.mapNotNull { issuesByKey[it] }
+        }
 
-        override suspend fun getChildIssues(issueKeys: List<String>): List<ProjectIssue> = mockIssues.values.filter { it.parentKey in issueKeys }.toList()
+        override suspend fun getChildIssues(issueKeys: List<String>): List<ProjectIssue> {
+            val issues = mockIssues.values
+            return issues.filter { it.parentKey in issueKeys }.toList()
+        }
 
-        override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> = mockIssues.values.filter { it.parentKey == parentKey }.toList()
+        override suspend fun getDirectChildIssues(parentKey: String): List<ProjectIssue> {
+            val issues = mockIssues.values
+            return issues.filter { it.parentKey == parentKey }.toList()
+        }
 
-        override suspend fun getRecentComments(issueKey: String, maxResults: Int): List<ProjectComment> = List(maxResults.coerceAtMost(3)) { index ->
+        override suspend fun getRecentComments(
+            issueKey: String,
+            maxResults: Int,
+        ): List<ProjectComment> = List(maxResults.coerceAtMost(3)) { index ->
             ProjectComment(
                 id = "$index",
                 body = "This is a test comment for $issueKey",
@@ -391,7 +407,10 @@ class SummaryDetailTest {
 
         override suspend fun getMilestones(projectId: String): List<ProjectMilestone> = emptyList()
 
-        override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> = getDirectChildIssues(milestoneId)
+        override suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
+            val milestoneKey = milestoneId
+            return getDirectChildIssues(milestoneKey)
+        }
     }
 
     /**
@@ -647,7 +666,13 @@ class SummaryDetailTest {
             owner: String,
             repo: String,
             ref: String,
-        ): com.github.karlsabo.github.CheckRunSummary = com.github.karlsabo.github.CheckRunSummary(0, 0, 0, 0, com.github.karlsabo.github.CiStatus.PENDING)
+        ): com.github.karlsabo.github.CheckRunSummary = com.github.karlsabo.github.CheckRunSummary(
+            total = 0,
+            passed = 0,
+            failed = 0,
+            inProgress = 0,
+            status = com.github.karlsabo.github.CiStatus.PENDING,
+        )
 
         override suspend fun getReviewSummary(
             owner: String,

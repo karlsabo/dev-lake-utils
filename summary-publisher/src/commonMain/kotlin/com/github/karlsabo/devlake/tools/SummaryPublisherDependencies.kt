@@ -63,63 +63,84 @@ interface SummaryPublisherBindings {
     ): TextSummarizer = TextSummarizerOpenAi(textSummarizerConfig)
 }
 
+data class SummaryPublisherComponentInputs(
+    val config: SummaryPublisherConfig,
+    val usersConfig: UsersConfig,
+    val linearApiConfig: LinearApiRestConfig,
+    val gitHubApiConfig: GitHubApiRestConfig,
+    val pagerDutyApiConfig: PagerDutyApiRestConfig,
+    val textSummarizerConfig: TextSummarizerOpenAiConfig,
+)
+
 @MergeComponent(SummaryPublisherScope::class)
 @SingleIn(SummaryPublisherScope::class)
 abstract class SummaryPublisherComponent(
-    @get:Provides val config: SummaryPublisherConfig,
-    @get:Provides val usersConfig: UsersConfig,
-    @get:Provides val linearApiConfig: LinearApiRestConfig,
-    @get:Provides val gitHubApiConfig: GitHubApiRestConfig,
-    @get:Provides val pagerDutyApiConfig: PagerDutyApiRestConfig,
-    @get:Provides val textSummarizerConfig: TextSummarizerOpenAiConfig,
+    @get:Provides val inputs: SummaryPublisherComponentInputs,
 ) {
+    @Provides
+    fun provideConfig(): SummaryPublisherConfig = inputs.config
+
+    @Provides
+    fun provideUsersConfig(): UsersConfig = inputs.usersConfig
+
+    @Provides
+    fun provideLinearApiConfig(): LinearApiRestConfig = inputs.linearApiConfig
+
+    @Provides
+    fun provideGitHubApiConfig(): GitHubApiRestConfig = inputs.gitHubApiConfig
+
+    @Provides
+    fun providePagerDutyApiConfig(): PagerDutyApiRestConfig = inputs.pagerDutyApiConfig
+
+    @Provides
+    fun provideTextSummarizerConfig(): TextSummarizerOpenAiConfig = inputs.textSummarizerConfig
+
     abstract val dependencies: SummaryPublisherDependencies
 }
 
 @CreateComponent
-expect fun createSummaryPublisherComponent(
-    config: SummaryPublisherConfig,
-    usersConfig: UsersConfig,
-    linearApiConfig: LinearApiRestConfig,
-    gitHubApiConfig: GitHubApiRestConfig,
-    pagerDutyApiConfig: PagerDutyApiRestConfig,
-    textSummarizerConfig: TextSummarizerOpenAiConfig,
-): SummaryPublisherComponent
+expect fun createSummaryPublisherComponent(inputs: SummaryPublisherComponentInputs): SummaryPublisherComponent
 
-internal typealias SummaryPublisherComponentFactory = (
-    SummaryPublisherConfig,
-    UsersConfig,
-    LinearApiRestConfig,
-    GitHubApiRestConfig,
-    PagerDutyApiRestConfig,
-    TextSummarizerOpenAiConfig,
-) -> SummaryPublisherComponent
+internal fun interface SummaryPublisherComponentFactory {
+    fun create(inputs: SummaryPublisherComponentInputs): SummaryPublisherComponent
+}
+
+internal data class SummaryPublisherConfigLoaders(
+    val loadUsersConfig: () -> UsersConfig?,
+    val loadLinearApiConfig: () -> LinearApiRestConfig,
+    val loadGitHubApiConfig: () -> GitHubApiRestConfig,
+    val loadPagerDutyApiConfig: () -> PagerDutyApiRestConfig,
+    val loadTextSummarizerConfig: () -> TextSummarizerOpenAiConfig,
+) {
+    companion object {
+        fun defaults() = SummaryPublisherConfigLoaders(
+            loadUsersConfig = ::loadUsersConfig,
+            loadLinearApiConfig = { loadLinearConfig(linearConfigPath) },
+            loadGitHubApiConfig = { loadGitHubConfig(gitHubConfigPath) },
+            loadPagerDutyApiConfig = { loadPagerDutyConfig(pagerDutyConfigPath) },
+            loadTextSummarizerConfig = {
+                requireNotNull(loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)) {
+                    "Text summarizer config is required"
+                }.toTextSummarizerOpenAiConfig()
+            },
+        )
+    }
+}
 
 internal fun loadSummaryPublisherDependencies(
     config: SummaryPublisherConfig,
-    loadUsersConfig: () -> UsersConfig? = ::loadUsersConfig,
-    loadLinearApiConfig: () -> LinearApiRestConfig = { loadLinearConfig(linearConfigPath) },
-    loadGitHubApiConfig: () -> GitHubApiRestConfig = { loadGitHubConfig(gitHubConfigPath) },
-    loadPagerDutyApiConfig: () -> PagerDutyApiRestConfig = { loadPagerDutyConfig(pagerDutyConfigPath) },
-    loadTextSummarizerConfig: () -> TextSummarizerOpenAiConfig = {
-        requireNotNull(loadTextSummarizerOpenAiNoSecrets(textSummarizerConfigPath)) {
-            "Text summarizer config is required"
-        }.toTextSummarizerOpenAiConfig()
-    },
-    componentFactory: SummaryPublisherComponentFactory = ::createSummaryPublisherComponent,
+    configLoaders: SummaryPublisherConfigLoaders = SummaryPublisherConfigLoaders.defaults(),
+    componentFactory: SummaryPublisherComponentFactory =
+        SummaryPublisherComponentFactory(::createSummaryPublisherComponent),
 ): SummaryPublisherDependencies {
-    val usersConfig = requireNotNull(loadUsersConfig()) { "Users config is required" }
-    val linearApiConfig = loadLinearApiConfig()
-    val gitHubApiConfig = loadGitHubApiConfig()
-    val pagerDutyApiConfig = loadPagerDutyApiConfig()
-    val textSummarizerConfig = loadTextSummarizerConfig()
+    val inputs = SummaryPublisherComponentInputs(
+        config = config,
+        usersConfig = requireNotNull(configLoaders.loadUsersConfig()) { "Users config is required" },
+        linearApiConfig = configLoaders.loadLinearApiConfig(),
+        gitHubApiConfig = configLoaders.loadGitHubApiConfig(),
+        pagerDutyApiConfig = configLoaders.loadPagerDutyApiConfig(),
+        textSummarizerConfig = configLoaders.loadTextSummarizerConfig(),
+    )
 
-    return componentFactory(
-        config,
-        usersConfig,
-        linearApiConfig,
-        gitHubApiConfig,
-        pagerDutyApiConfig,
-        textSummarizerConfig,
-    ).dependencies
+    return componentFactory.create(inputs).dependencies
 }

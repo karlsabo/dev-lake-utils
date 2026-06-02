@@ -93,20 +93,26 @@ fun summaryPublisherApp(
         ),
     ) {
         summaryPublisherScreen(
-            topLevelSummary = state.topLevelSummary,
-            onTopLevelSummaryChange = { state.topLevelSummary = it },
-            projectSummaries = state.projectSummaries,
-            onProjectMessageChange = state::updateProjectMessage,
-            onProjectDelete = state::removeProject,
-            publishButtonText = state.publishButtonText,
-            publishButtonEnabled = state.publishButtonEnabled,
-            isLoadingSummary = state.isLoadingSummary,
-            isSendingSlackMessage = state.isSendingSlackMessage,
-            onPublishClick = {
-                scope.launch {
-                    publishSummary(state)
-                }
-            },
+            state = SummaryPublisherScreenState(
+                topLevelSummary = state.topLevelSummary,
+                projectSummaries = state.projectSummaries,
+                publishState = SummaryPublisherPublishState(
+                    buttonText = state.publishButtonText,
+                    isButtonEnabled = state.publishButtonEnabled,
+                    isLoadingSummary = state.isLoadingSummary,
+                    isSendingSlackMessage = state.isSendingSlackMessage,
+                ),
+            ),
+            actions = SummaryPublisherScreenActions(
+                onTopLevelSummaryChange = { state.topLevelSummary = it },
+                onProjectMessageChange = state::updateProjectMessage,
+                onProjectDelete = state::removeProject,
+                onPublishClick = {
+                    scope.launch {
+                        publishSummary(state)
+                    }
+                },
+            ),
         )
     }
 }
