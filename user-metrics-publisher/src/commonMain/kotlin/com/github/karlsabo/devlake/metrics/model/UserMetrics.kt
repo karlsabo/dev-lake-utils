@@ -8,6 +8,10 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import com.github.karlsabo.github.Issue as GitHubIssue
 
+private const val DAYS_PER_WEEK = 7
+private const val EXPECTED_WEEKLY_CONTRIBUTIONS = 3.5
+private const val EXPECTED_WEEKLY_CONTRIBUTIONS_LABEL = "3-4 per week"
+
 @Serializable
 data class UserMetrics(
     val userId: String,
@@ -25,12 +29,24 @@ fun UserMetrics.toSlackMarkdown(): String {
     return buildString {
         appendLine("📌 *Merged PRs*")
         appendLine("• *Past week:* `${pullRequestsPastWeek.size}`")
-        appendLine("• *Year to Date:* `$pullRequestsYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")
+        appendLine(
+            yearToDateExpectationLine(
+                label = "Year to Date",
+                count = pullRequestsYearToDateCount,
+                weeksThisYear = weeksThisYear,
+            ),
+        )
         appendLine("• *PRs Reviewed YTD:* `$prReviewCountYtd`")
         appendLine()
         appendLine("📌 *Issues Closed*")
         appendLine("• *Past week:* `${issuesClosedLastWeek.size}`")
-        appendLine("• *Year to date:* `$issuesClosedYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")
+        appendLine(
+            yearToDateExpectationLine(
+                label = "Year to date",
+                count = issuesClosedYearToDateCount,
+                weeksThisYear = weeksThisYear,
+            ),
+        )
         appendLine("\n━━━━━━━━━━━━━━━━━━")
         appendLine()
         appendLine("🔍 *Details:*")
@@ -46,9 +62,18 @@ fun UserMetrics.toSlackMarkdown(): String {
     }
 }
 
+private fun yearToDateExpectationLine(
+    label: String,
+    count: UInt,
+    weeksThisYear: Int,
+): String {
+    val expectedCount = (weeksThisYear * EXPECTED_WEEKLY_CONTRIBUTIONS).toInt()
+    return "• *$label:* `$count`. _Expectation ~$expectedCount ($EXPECTED_WEEKLY_CONTRIBUTIONS_LABEL)_"
+}
+
 private fun weeksElapsedThisYear(): Int {
     val now = System.now()
     val startOfYear = now.toLocalDateTime(TimeZone.currentSystemDefault())
         .run { Instant.parse("$year-01-01T00:00:00Z") }
-    return ((now - startOfYear).inWholeDays / 7).toInt()
+    return ((now - startOfYear).inWholeDays / DAYS_PER_WEEK).toInt()
 }

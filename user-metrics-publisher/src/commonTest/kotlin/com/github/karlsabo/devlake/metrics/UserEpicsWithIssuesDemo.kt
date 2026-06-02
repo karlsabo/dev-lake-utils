@@ -15,121 +15,157 @@ import kotlinx.datetime.toInstant
 import kotlin.math.min
 import kotlin.time.measureTime
 
-/**
- * Demo that pulls all the epics that a user contributed to from Jira and lists the issues they completed under each epic.
- *
- * 1. Find all issues a user was the assignee of
- * 2. Keep a set of all the issues that had children (Epics)
- * 3. For each epic, find all issues under it
- * 4. Calculate statistics (tickets completed by user/total tickets in epic, percentage)
- * 5. Print out the epics and their issues with statistics
- */
-fun main(args: Array<String>): Unit = runBlocking {
-    val userId =
-        args.find { it.startsWith("--user=") }?.substringAfter("=") ?: throw Exception("No --user=username provided")
+private const val START_YEAR = 2025
+private const val DESCRIPTION_TRUNCATE_THRESHOLD = 100
+private const val DESCRIPTION_MAX_LENGTH = 200
+private const val PERCENTAGE_SCALE = 100
 
+private class UserEpicsWithIssuesDemoArgumentException(
+    message: String,
+) : IllegalArgumentException(message)
+
+fun main(args: Array<String>): Unit = runBlocking {
+    val userId = parseUserId(args)
     val jiraApi = JiraRestApi(loadJiraConfig(jiraConfigPath))
 
     println("Finding epics and their issues for user: $userId")
 
     val executionTime = measureTime {
-        val startDate = LocalDateTime(2025, 1, 1, 0, 0, 0).toInstant(TimeZone.UTC)
-        val userIssues = jiraApi.getIssuesResolved(
-            User(id = userId, name = userId, jiraId = userId),
-            startDate,
-            Clock.System.now(),
-        )
-        println("Found ${userIssues.size} issues assigned to user")
-
-        if (userIssues.isEmpty()) {
-            println("No issues found for user $userId")
-            return@measureTime
-        }
-
-        val allParentIssues = mutableSetOf<ProjectIssue>()
-        val processedIssueKeys = mutableSetOf<String>()
-
-        fun findAllParentIssues(issues: List<ProjectIssue>) {
-            val parentIssueKeys = issues
-                .mapNotNull { it.parentKey }
-                .filter { it !in processedIssueKeys }
-                .distinct()
-
-            if (parentIssueKeys.isEmpty()) return
-
-            processedIssueKeys.addAll(parentIssueKeys)
-
-            val parentIssues = runBlocking { jiraApi.getIssues(parentIssueKeys) }
-
-            allParentIssues.addAll(parentIssues)
-
-            findAllParentIssues(parentIssues)
-        }
-
-        findAllParentIssues(userIssues)
-
-        val parents =
-            allParentIssues.filter { !it.isIssueOrBug() }.sortedBy { it.completedAt ?: it.createdAt }
-
-        println("# Parents the user contributed to:")
-
-        if (parents.isEmpty()) {
-            println("No parents found for this user")
-        } else {
-            val userIssuesByParentKey = userIssues.groupBy { it.parentKey }
-
-            parents.sortedBy { it.issueType }.forEach { epic ->
-                val type = epic.issueType ?: "Unknown"
-                val title = epic.title ?: "Untitled"
-                val key = epic.key
-                val date = epic.completedAt ?: epic.createdAt
-
-                // Get all issues under this epic
-                val allChildIssues = jiraApi.getChildIssues(listOf(key))
-                    .filter { it.isIssueOrBug() }
-
-                // Get completed issues under this epic
-                val completedChildIssues = allChildIssues.filter { it.isCompleted() }
-
-                // Get user's completed issues under this epic
-                val userCompletedIssues = userIssuesByParentKey[epic.key] ?: emptyList()
-
-                // Calculate statistics
-                val userCompletedCount = userCompletedIssues.size
-                val totalCompletedCount = completedChildIssues.size
-                val percentageByUser = if (totalCompletedCount > 0) {
-                    (userCompletedCount.toDouble() / totalCompletedCount.toDouble() * 100).toInt()
-                } else {
-                    0
-                }
-
-                if (userCompletedCount == 0) return@forEach
-
-                println("* [$type] ($key) $date $title ")
-                println("  * $userCompletedCount/$totalCompletedCount $percentageByUser%")
-
-                // Print user's completed issues under this epic
-                userCompletedIssues.forEach { issue ->
-                    issue.completedAt?.takeIf { it >= startDate } ?: return@forEach
-                    println("  * ${issue.key} - ${issue.title ?: "Untitled"}")
-                    issue.description.let { description ->
-                        // Truncate description if it's too long
-                        val truncatedDescription = if ((description?.length ?: 0) > 100) {
-                            description?.substring(0, min(200, description.length)) + "..."
-                        } else {
-                            description
-                        }
-                        println("    * Details:")
-                        println("      `````")
-                        truncatedDescription?.split(Regex("""\R+"""))?.forEach {
-                            println("      $it")
-                        }
-                        println("      `````")
-                    }
-                }
-            }
-        }
+        printContributedParents(userId, jiraApi)
     }
 
     println("\nExecution time: $executionTime")
+}
+
+private fun parseUserId(args: Array<String>): String = args.find { it.startsWith("--user=") }
+    ?.substringAfter("=")
+    ?: throw UserEpicsWithIssuesDemoArgumentException("No --user=username provided")
+
+private suspend fun printContributedParents(userId: String, jiraApi: JiraRestApi) {
+    val startDate = LocalDateTime(START_YEAR, 1, 1, 0, 0, 0).toInstant(TimeZone.UTC)
+    val userIssues = jiraApi.getIssuesResolved(
+        User(id = userId, name = userId, jiraId = userId),
+        startDate,
+        Clock.System.now(),
+    )
+    println("Found ${userIssues.size} issues assigned to user")
+
+    if (userIssues.isEmpty()) {
+        println("No issues found for user $userId")
+        return
+    }
+
+    val parents = loadParentIssues(jiraApi, userIssues)
+    println("# Parents the user contributed to:")
+    printParents(jiraApi, parents, userIssues.groupBy { it.parentKey }, startDate)
+}
+
+private suspend fun loadParentIssues(
+    jiraApi: JiraRestApi,
+    userIssues: List<ProjectIssue>,
+): List<ProjectIssue> {
+    val allParentIssues = mutableSetOf<ProjectIssue>()
+    val processedIssueKeys = mutableSetOf<String>()
+    var parentIssueKeys = nextParentIssueKeys(userIssues, processedIssueKeys)
+
+    while (parentIssueKeys.isNotEmpty()) {
+        processedIssueKeys.addAll(parentIssueKeys)
+        val parentIssues = jiraApi.getIssues(parentIssueKeys)
+        allParentIssues.addAll(parentIssues)
+        parentIssueKeys = nextParentIssueKeys(parentIssues, processedIssueKeys)
+    }
+
+    return allParentIssues
+        .filter { !it.isIssueOrBug() }
+        .sortedBy { it.completedAt ?: it.createdAt }
+}
+
+private fun nextParentIssueKeys(
+    issues: List<ProjectIssue>,
+    processedIssueKeys: Set<String>,
+): List<String> = issues
+    .mapNotNull { it.parentKey }
+    .filter { it !in processedIssueKeys }
+    .distinct()
+
+private suspend fun printParents(
+    jiraApi: JiraRestApi,
+    parents: List<ProjectIssue>,
+    userIssuesByParentKey: Map<String?, List<ProjectIssue>>,
+    startDate: kotlinx.datetime.Instant,
+) {
+    if (parents.isEmpty()) {
+        println("No parents found for this user")
+        return
+    }
+
+    parents.sortedBy { it.issueType }.forEach { parentIssue ->
+        val contribution = parentContribution(jiraApi, parentIssue, userIssuesByParentKey)
+        if (contribution.userCompletedIssues.isEmpty()) return@forEach
+
+        val type = parentIssue.issueType ?: "Unknown"
+        val title = parentIssue.title ?: "Untitled"
+        val date = parentIssue.completedAt ?: parentIssue.createdAt
+        println("* [$type] (${parentIssue.key}) $date $title ")
+        println(contribution.summaryLine())
+
+        contribution.userCompletedIssues.forEach { issue ->
+            printCompletedIssue(issue, startDate)
+        }
+    }
+}
+
+private suspend fun parentContribution(
+    jiraApi: JiraRestApi,
+    parentIssue: ProjectIssue,
+    userIssuesByParentKey: Map<String?, List<ProjectIssue>>,
+): ParentContribution {
+    val allChildIssues = jiraApi.getChildIssues(listOf(parentIssue.key))
+        .filter { it.isIssueOrBug() }
+    val totalCompletedCount = allChildIssues.count { it.isCompleted() }
+    val userCompletedIssues = userIssuesByParentKey[parentIssue.key] ?: emptyList()
+    val percentageByUser = if (totalCompletedCount > 0) {
+        (userCompletedIssues.size.toDouble() / totalCompletedCount.toDouble() * PERCENTAGE_SCALE).toInt()
+    } else {
+        0
+    }
+
+    return ParentContribution(
+        userCompletedIssues = userCompletedIssues,
+        totalCompletedCount = totalCompletedCount,
+        percentageByUser = percentageByUser,
+    )
+}
+
+private data class ParentContribution(
+    val userCompletedIssues: List<ProjectIssue>,
+    val totalCompletedCount: Int,
+    val percentageByUser: Int,
+) {
+    val userCompletedCount: Int = userCompletedIssues.size
+
+    fun summaryLine(): String = "  * $userCompletedCount/$totalCompletedCount $percentageByUser%"
+}
+
+private fun printCompletedIssue(issue: ProjectIssue, startDate: kotlinx.datetime.Instant) {
+    issue.completedAt?.takeIf { it >= startDate } ?: return
+    println("  * ${issue.key} - ${issue.title ?: "Untitled"}")
+    printDescription(issue.description)
+}
+
+private fun printDescription(description: String?) {
+    val truncatedDescription = description?.let {
+        if (it.length > DESCRIPTION_TRUNCATE_THRESHOLD) {
+            it.substring(0, min(DESCRIPTION_MAX_LENGTH, it.length)) + "..."
+        } else {
+            it
+        }
+    }
+
+    println("    * Details:")
+    println("      `````")
+    truncatedDescription?.split(Regex("""\R+"""))?.forEach {
+        println("      $it")
+    }
+    println("      `````")
 }

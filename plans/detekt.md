@@ -209,7 +209,9 @@
 
 **Notes:** State/action objects are useful here because they map directly to UI behavior and reduce Compose churn.
 
-### 12. User metrics publisher app, model, services, demo, and tests pass detekt
+### 12. User metrics publisher app, model, services, demo, and tests pass detekt - Done
+
+**Done** 2026-06-02
 
 **Acceptance criteria:** Given user metrics publisher tests, when metrics are loaded, previewed, published, and publish failures occur, then behavior is unchanged and no baseline entry remains for the user metrics publisher module.
 

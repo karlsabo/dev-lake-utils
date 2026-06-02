@@ -6,5 +6,8 @@ import me.tatarka.inject.annotations.Inject
 open class UserMetricMessagePublisherService @Inject constructor(
     private val config: UserMetricPublisherConfig,
 ) {
-    open suspend fun publishMessage(message: SlackMessage): Boolean = ZapierMetricService.sendMessage(message, config.zapierMetricUrl)
+    open suspend fun publishMessage(message: SlackMessage): Boolean {
+        val zapierUrl = config.zapierMetricUrl
+        return ZapierMetricService.sendMessage(message, zapierUrl)
+    }
 }

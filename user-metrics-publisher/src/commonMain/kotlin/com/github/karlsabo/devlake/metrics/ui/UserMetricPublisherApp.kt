@@ -10,6 +10,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.UserMetricPublisherDependencies
+import com.github.karlsabo.devlake.metrics.UserMetricPublisherState
 import com.github.karlsabo.devlake.metrics.loadUserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.loadUserMetricPublisherDependencies
 import com.github.karlsabo.devlake.metrics.model.toSlackMarkdown
@@ -27,7 +28,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import kotlin.time.measureTime
+import kotlin.time.measureTimedValue
 
 private val logger = KotlinLogging.logger {}
 
@@ -77,60 +78,85 @@ fun userMetricPublisherApp(onExitApplication: () -> Unit) {
     }
 }
 
-internal fun loadConfiguration(
-    state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState,
-    configFilePath: Path = userMetricPublisherConfigPath,
-    loadConfig: () -> UserMetricPublisherConfig = ::loadUserMetricPublisherConfig,
-    loadDependencies: (UserMetricPublisherConfig) -> UserMetricPublisherDependencies =
+internal data class UserMetricPublisherRuntime(
+    val configFilePath: Path = userMetricPublisherConfigPath,
+    val loadConfig: () -> UserMetricPublisherConfig = ::loadUserMetricPublisherConfig,
+    val loadDependencies: (UserMetricPublisherConfig) -> UserMetricPublisherDependencies =
         ::loadUserMetricPublisherDependencies,
-    configFileExists: (Path) -> Boolean = SystemFileSystem::exists,
-    saveDefaultConfig: (UserMetricPublisherConfig) -> Unit = ::saveUserMetricPublisherConfig,
+    val configFileStore: UserMetricPublisherConfigFileStore = UserMetricPublisherConfigFileStore(),
+)
+
+internal data class UserMetricPublisherConfigFileStore(
+    val exists: (Path) -> Boolean = SystemFileSystem::exists,
+    val saveDefault: (UserMetricPublisherConfig) -> Unit = ::saveUserMetricPublisherConfig,
+)
+
+internal class UserMetricPublisherUserNotFoundException(
+    userId: String,
+) : IllegalStateException("User not found: $userId")
+
+internal fun loadConfiguration(
+    state: UserMetricPublisherState,
+    runtime: UserMetricPublisherRuntime = UserMetricPublisherRuntime(),
 ) {
     when (
         val result = runDesktopAppBootstrap(
             logger = logger,
-            description = "configuration $configFilePath",
-            load = loadConfig,
+            description = "configuration ${runtime.configFilePath}",
+            load = runtime.loadConfig,
             buildErrorMessage = { error ->
                 buildConfigurationErrorMessage(
                     error = error,
-                    configFilePath = configFilePath,
+                    configFilePath = runtime.configFilePath,
                 )
             },
         )
     ) {
-        is DesktopAppBootstrapResult.Loaded -> {
-            logger.info { "Loading configuration dependencies" }
-            try {
-                state.config = result.value
-                state.dependencies = loadDependencies(result.value)
-                state.errorMessage = ""
-                state.isDisplayErrorDialog = false
-                state.isLoadingConfig = false
-                logger.info { "Config = ${state.config}" }
-            } catch (error: Exception) {
-                state.dependencies = null
-                state.errorMessage = buildDependenciesErrorMessage(
-                    error = error,
-                    configFilePath = configFilePath,
-                )
-                logger.error(error) { state.errorMessage }
-                state.isDisplayErrorDialog = true
-                state.isLoadingConfig = false
-            }
-        }
-
-        is DesktopAppBootstrapResult.Failed -> {
-            state.dependencies = null
-            state.errorMessage = result.errorMessage
-            logger.error { state.errorMessage }
-            if (!configFileExists(configFilePath)) {
-                saveDefaultConfig(UserMetricPublisherConfig())
-            }
-            state.isDisplayErrorDialog = true
-            state.isLoadingConfig = false
-        }
+        is DesktopAppBootstrapResult.Loaded -> loadDependencies(state, result.value, runtime)
+        is DesktopAppBootstrapResult.Failed -> handleConfigurationFailure(state, result, runtime)
     }
+}
+
+private fun loadDependencies(
+    state: UserMetricPublisherState,
+    config: UserMetricPublisherConfig,
+    runtime: UserMetricPublisherRuntime,
+) {
+    logger.info { "Loading configuration dependencies" }
+    state.config = config
+    runCatching {
+        runtime.loadDependencies(config)
+    }.onSuccess { dependencies ->
+        state.dependencies = dependencies
+        state.errorMessage = ""
+        state.isDisplayErrorDialog = false
+        state.isLoadingConfig = false
+        logger.info { "Config = ${state.config}" }
+    }.onFailure { error ->
+        state.dependencies = null
+        state.errorMessage = buildDependenciesErrorMessage(
+            error = error,
+            configFilePath = runtime.configFilePath,
+        )
+        logger.error(error) { state.errorMessage }
+        state.isDisplayErrorDialog = true
+        state.isLoadingConfig = false
+    }
+}
+
+private fun handleConfigurationFailure(
+    state: UserMetricPublisherState,
+    result: DesktopAppBootstrapResult.Failed,
+    runtime: UserMetricPublisherRuntime,
+) {
+    state.dependencies = null
+    state.errorMessage = result.errorMessage
+    logger.error { state.errorMessage }
+    if (!runtime.configFileStore.exists(runtime.configFilePath)) {
+        runtime.configFileStore.saveDefault(UserMetricPublisherConfig())
+    }
+    state.isDisplayErrorDialog = true
+    state.isLoadingConfig = false
 }
 
 internal fun buildConfigurationErrorMessage(
@@ -140,32 +166,30 @@ internal fun buildConfigurationErrorMessage(
     "Please update the configuration file:\n$configFilePath."
 
 internal fun buildDependenciesErrorMessage(
-    error: Exception,
+    error: Throwable,
     configFilePath: Path = userMetricPublisherConfigPath,
 ): String = "Failed to load dependencies: $error.\n" +
     "Please update the configuration file:\n$configFilePath."
 
-internal suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState) {
+internal suspend fun loadMetrics(state: UserMetricPublisherState) {
     logger.info { "Loading metrics" }
     val dependencies = state.dependencies ?: return
 
     state.metrics = kotlinx.coroutines.coroutineScope {
         state.config.userIds.map { userId ->
             async(Dispatchers.IO) {
-                lateinit var userMetrics: com.github.karlsabo.devlake.metrics.model.UserMetrics
-                measureTime {
-                    val user = dependencies.usersConfig.users.firstOrNull { it.id == userId }
-                        ?: throw Exception("User not found: $userId")
-                    userMetrics = dependencies.metricsService.createUserMetrics(
+                val user = dependencies.usersConfig.users.firstOrNull { it.id == userId }
+                    ?: throw UserMetricPublisherUserNotFoundException(userId)
+                measureTimedValue {
+                    dependencies.metricsService.createUserMetrics(
                         user,
                         state.config.organizationIds,
                         dependencies.projectManagementApi,
                         dependencies.gitHubApi,
                     )
                 }.also {
-                    logger.debug { "Time to load metrics for $userId: $it" }
-                }
-                userMetrics
+                    logger.debug { "Time to load metrics for $userId: ${it.duration}" }
+                }.value
             }
         }
     }.awaitAll()
@@ -183,7 +207,7 @@ internal suspend fun loadMetrics(state: com.github.karlsabo.devlake.metrics.User
     logger.info { "Metrics loaded" }
 }
 
-internal suspend fun publishMetrics(state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState) {
+internal suspend fun publishMetrics(state: UserMetricPublisherState) {
     logger.info { "Publishing metrics" }
     val messagePublisherService = requireNotNull(state.dependencies?.messagePublisherService) {
         "User metric publisher dependencies must be loaded before publishing metrics"
@@ -195,10 +219,7 @@ internal suspend fun publishMetrics(state: com.github.karlsabo.devlake.metrics.U
     state.metrics.forEach { metric ->
         val message = SlackMessage(
             userEmail = metric.email,
-            message = "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n" +
-                metric.toSlackMarkdown() +
-                "\n" +
-                state.config.metricInformationPostfix,
+            message = buildMetricMessage(metric, state.config.metricInformationPostfix),
         )
         val publishSucceeded = runCatching {
             messagePublisherService.publishMessage(message)
@@ -211,3 +232,11 @@ internal suspend fun publishMetrics(state: com.github.karlsabo.devlake.metrics.U
 
     state.onPublishCompleted(success)
 }
+
+internal fun buildMetricMessage(
+    metric: com.github.karlsabo.devlake.metrics.model.UserMetrics,
+    metricInformationPostfix: String,
+): String = "📢 *Weekly PR & Issue Summary* 🚀 (${metric.userId})\n" +
+    metric.toSlackMarkdown() +
+    "\n" +
+    metricInformationPostfix

@@ -2,20 +2,10 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>CyclomaticComplexMethod:UserEpicsWithIssuesDemo.kt$fun main(args: Array&lt;String&gt;): Unit</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRefreshesAgainWhenSetupFailsAfterPostCreateRefreshFailure()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRefreshesRepositoryWhileSetupIsRunning()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun createLocalWorktreeFromBaseRunsSetupAndRefreshesWhenExactTargetWorktreeAlreadyExists()</ID>
     <ID>LongMethod:EngHubViewModelTest.kt$EngHubViewModelTest$@Test fun forceArchiveConfirmationStartsWhileDirtyFailureRefreshIsStillRunning()</ID>
-    <ID>LongMethod:UserEpicsWithIssuesDemo.kt$fun main(args: Array&lt;String&gt;): Unit</ID>
-    <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun loadMetricsPreviewUsesGeneratedDependencies()</ID>
-    <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterFailedSendAndReportsFailure()</ID>
-    <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterThrownSendAndReportsFailure()</ID>
-    <ID>LongParameterList:UserMetricPublisherApp.kt$( state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState, configFilePath: Path = userMetricPublisherConfigPath, loadConfig: () -&gt; UserMetricPublisherConfig = ::loadUserMetricPublisherConfig, loadDependencies: (UserMetricPublisherConfig) -&gt; UserMetricPublisherDependencies = ::loadUserMetricPublisherDependencies, configFileExists: (Path) -&gt; Boolean = SystemFileSystem::exists, saveDefaultConfig: (UserMetricPublisherConfig) -&gt; Unit = ::saveUserMetricPublisherConfig, )</ID>
-    <ID>MagicNumber:UserMetrics.kt$3.5</ID>
-    <ID>MagicNumber:UserMetrics.kt$7</ID>
-    <ID>MagicNumber:ZapierMetricService.kt$ZapierMetricService$200</ID>
-    <ID>MagicNumber:ZapierMetricService.kt$ZapierMetricService$299</ID>
     <ID>MagicNumber:ZapierService.kt$ZapierService$200</ID>
     <ID>MagicNumber:ZapierService.kt$ZapierService$299</ID>
     <ID>MatchingDeclarationName:DesktopAppBootstrap.kt$DesktopAppBootstrapResult&lt;out T&gt;</ID>
@@ -29,13 +19,6 @@
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$private fun String.truncateForSlack(): String</ID>
     <ID>MaxLineLength:TextSummarizerOpenAiConfigNoSecrets.kt$fun</ID>
     <ID>MaxLineLength:TextSummarizerOpenAiConfigNoSecrets.kt$fun loadTextSummarizerOpenAiNoSecrets(configPath: Path): TextSummarizerOpenAiConfigNoSecrets?</ID>
-    <ID>MaxLineLength:UserEpicsWithIssuesDemo.kt$*</ID>
-    <ID>MaxLineLength:UserMetricMessagePublisherService.kt$UserMetricMessagePublisherService$open suspend fun publishMessage(message: SlackMessage): Boolean</ID>
-    <ID>MaxLineLength:UserMetricPublisherDependenciesTest.kt$NoOpGitHubApi$override suspend fun getOpenPullRequestsByAuthor(organizationIds: List&lt;String&gt;, author: String): List&lt;Issue&gt;</ID>
-    <ID>MaxLineLength:UserMetricPublisherDependenciesTest.kt$RecordingMessagePublisherService$constructor</ID>
-    <ID>MaxLineLength:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$componentFactory</ID>
-    <ID>MaxLineLength:UserMetrics.kt$appendLine("• *Year to Date:* `$pullRequestsYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")</ID>
-    <ID>MaxLineLength:UserMetrics.kt$appendLine("• *Year to date:* `$issuesClosedYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")</ID>
     <ID>NestedBlockDepth:ImlExcludeFolderManager.kt$internal fun parseExcludedFolderUrls(xmlContent: String): Set&lt;String&gt;</ID>
     <ID>NestedBlockDepth:LlmSkillSyncTest.kt$LlmSkillSyncTest$private fun setupSourceDir( sourceDir: Path, skills: Map&lt;String, Map&lt;String, String&gt;&gt; = emptyMap(), agentsContent: String? = null, notesContent: String? = null, )</ID>
     <ID>ReturnCount:ImlExcludeFolderManager.kt$fun addExcludeFoldersToIml( imlPath: Path, directoriesToExclude: List&lt;String&gt; = DEFAULT_EXCLUDE_DIRECTORIES, ): ImlUpdateResult</ID>
@@ -44,14 +27,9 @@
     <ID>TooGenericExceptionCaught:GitHubNotificationService.kt$GitHubNotificationService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MarkdownImageExtractor.kt$MarkdownImageExtractor$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SerializationTools.kt$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:UserMetricPublisherApp.kt$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:ZapierMetricService.kt$ZapierMetricService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ZapierService.kt$ZapierService$e: Exception</ID>
     <ID>TooGenericExceptionThrown:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
     <ID>TooGenericExceptionThrown:TextSummarizerOpenAi.kt$TextSummarizerOpenAi$throw Exception("Failed to summarize text: ${response.status.value}")</ID>
-    <ID>TooGenericExceptionThrown:UserEpicsWithIssuesDemo.kt$throw Exception("No --user=username provided")</ID>
-    <ID>TooGenericExceptionThrown:UserMetricPublisherApp.kt$throw Exception("User not found: $userId")</ID>
     <ID>TooManyFunctions:SlackMarkdownFormatter.kt$com.github.karlsabo.tools.formatting.SlackMarkdownFormatter.kt</ID>
-    <ID>UseCheckOrError:UserMetricPublisherDependenciesTest.kt$ThrowingMessagePublisher$throw IllegalStateException("boom")</ID>
   </CurrentIssues>
 </SmellBaseline>
