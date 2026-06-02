@@ -180,7 +180,10 @@ class GitCommandServiceTest {
         removeTempDir(worktreeDir)
         try {
             val baseCommit = initRepoWithCommit(repoDir)
-            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr", baseCommit), workingDirectory = null)
+            executeCommand(
+                listOf("git", "-C", repoDir, "branch", "feature/base-pr", baseCommit),
+                workingDirectory = null,
+            )
             executeCommand(listOf("sh", "-c", "echo mainline > $repoDir/mainline.txt"), workingDirectory = null)
             executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
             executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "mainline"), workingDirectory = null)

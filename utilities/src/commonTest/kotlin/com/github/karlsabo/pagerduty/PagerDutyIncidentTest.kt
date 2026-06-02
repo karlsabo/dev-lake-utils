@@ -11,7 +11,7 @@ class PagerDutyIncidentTest {
 
     @Test
     fun testPagerDutyIncidentDeserialization() {
-        val incident = lenientJson.decodeFromString<PagerDutyIncident>(pagerDutyIncidentJson)
+        val incident = lenientJson.decodeFromString<PagerDutyIncident>(PAGER_DUTY_INCIDENT_JSON)
 
         assertIncidentFields(incident)
         assertIncidentService(incident)
@@ -43,7 +43,7 @@ private fun assertIncidentService(incident: PagerDutyIncident) {
     assertEquals("https://example.pagerduty.com/service-directory/ABC123", incident.service.htmlUrl)
 }
 
-private const val pagerDutyIncidentJson = """
+private const val PAGER_DUTY_INCIDENT_JSON = """
 {
     "incident_number": 123456,
     "title": "Service Response Alert",

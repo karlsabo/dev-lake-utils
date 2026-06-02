@@ -12,20 +12,43 @@ import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+private const val TEST_DATABASE_FILE_NAME = "eng-hub-notifications.db"
+private const val VERSION_1_THREAD_ID = "123456789"
+private const val VERSION_2_THREAD_ID = "thread-with-ignore-timestamp"
+private const val VERSION_3_THREAD_ID = "thread-done-without-watermark"
+private const val REPOSITORY_FULL_NAME = "example-org/example-repo"
+private const val SUBJECT_TYPE = "PullRequest"
+private const val UNSUBSCRIBED_REASON = "UNSUBSCRIBED"
+private const val DONE_REASON = "DONE"
+private const val SCHEMA_VERSION_1 = 1
+private const val SCHEMA_VERSION_2 = 2
+private const val SCHEMA_VERSION_3 = 3
+private const val VERSION_1_UNSUBSCRIBED_AT_EPOCH_MS = 1L
+private const val VERSION_2_UNSUBSCRIBED_AT_EPOCH_MS = 1L
+private const val VERSION_2_IGNORED_AT_EPOCH_MS = 2L
+private const val VERSION_3_IGNORED_AT_EPOCH_MS = 3L
+private const val TABLE_INFO_NAME_COLUMN_INDEX = 1
+private const val THREAD_ID_COLUMN_INDEX = 0
+private const val REPOSITORY_FULL_NAME_COLUMN_INDEX = 1
+private const val SUBJECT_TYPE_COLUMN_INDEX = 2
+private const val IGNORE_REASON_COLUMN_INDEX = 3
+private const val IGNORED_AT_EPOCH_MS_COLUMN_INDEX = 4
+private const val NOTIFICATION_UPDATED_AT_EPOCH_MS_COLUMN_INDEX = 5
+
 class NotificationDatabaseMigrationTest {
 
     @Test
     fun upgradesVersion1DatabaseAndPreservesUnsubscribedRowsAsIgnoredRows() {
         val testDir = createNotificationStoreTestDir()
-        val databasePath = Path(testDir, "eng-hub-notifications.db")
+        val databasePath = Path(testDir, TEST_DATABASE_FILE_NAME)
 
         try {
             createSchemaVersion1Fixture(databasePath)
-            assertEquals(1L, readUserVersion(databasePath))
+            assertEquals(SCHEMA_VERSION_1.toLong(), readUserVersion(databasePath))
 
             val store = SqlDelightNotificationIgnoreStore(databasePath = databasePath.toString())
 
-            assertEquals(setOf("123456789"), store.listIgnoredThreadIds())
+            assertEquals(setOf(VERSION_1_THREAD_ID), store.listIgnoredThreadIds())
             assertEquals(NotificationDatabase.Schema.version, readUserVersion(databasePath))
             assertEquals(
                 listOf(
@@ -41,11 +64,11 @@ class NotificationDatabaseMigrationTest {
             assertEquals(
                 listOf(
                     IgnoredThreadRow(
-                        "123456789",
-                        "example-org/example-repo",
-                        "PullRequest",
-                        "UNSUBSCRIBED",
-                        1L,
+                        VERSION_1_THREAD_ID,
+                        REPOSITORY_FULL_NAME,
+                        SUBJECT_TYPE,
+                        UNSUBSCRIBED_REASON,
+                        VERSION_1_UNSUBSCRIBED_AT_EPOCH_MS,
                         null,
                     ),
                 ),
@@ -59,24 +82,24 @@ class NotificationDatabaseMigrationTest {
     @Test
     fun upgradesVersion2DatabaseAndPreservesIgnoredTimestampWhenPresent() {
         val testDir = createNotificationStoreTestDir()
-        val databasePath = Path(testDir, "eng-hub-notifications.db")
+        val databasePath = Path(testDir, TEST_DATABASE_FILE_NAME)
 
         try {
             createSchemaVersion2Fixture(databasePath)
-            assertEquals(2L, readUserVersion(databasePath))
+            assertEquals(SCHEMA_VERSION_2.toLong(), readUserVersion(databasePath))
 
             val store = SqlDelightNotificationIgnoreStore(databasePath = databasePath.toString())
 
-            assertEquals(setOf("thread-with-ignore-timestamp"), store.listIgnoredThreadIds())
+            assertEquals(setOf(VERSION_2_THREAD_ID), store.listIgnoredThreadIds())
             assertEquals(NotificationDatabase.Schema.version, readUserVersion(databasePath))
             assertEquals(
                 listOf(
                     IgnoredThreadRow(
-                        "thread-with-ignore-timestamp",
-                        "example-org/example-repo",
-                        "PullRequest",
-                        "UNSUBSCRIBED",
-                        2L,
+                        VERSION_2_THREAD_ID,
+                        REPOSITORY_FULL_NAME,
+                        SUBJECT_TYPE,
+                        UNSUBSCRIBED_REASON,
+                        VERSION_2_IGNORED_AT_EPOCH_MS,
                         null,
                     ),
                 ),
@@ -90,22 +113,22 @@ class NotificationDatabaseMigrationTest {
     @Test
     fun upgradesVersion3DatabaseAndAddsNullableNotificationUpdatedAtWatermark() {
         val testDir = createNotificationStoreTestDir()
-        val databasePath = Path(testDir, "eng-hub-notifications.db")
+        val databasePath = Path(testDir, TEST_DATABASE_FILE_NAME)
 
         try {
             createSchemaVersion3Fixture(databasePath)
-            assertEquals(3L, readUserVersion(databasePath))
+            assertEquals(SCHEMA_VERSION_3.toLong(), readUserVersion(databasePath))
 
             val store = SqlDelightNotificationIgnoreStore(databasePath = databasePath.toString())
 
             assertEquals(
                 listOf(
                     IgnoredNotificationThread(
-                        threadId = "thread-done-without-watermark",
-                        repositoryFullName = "example-org/example-repo",
-                        subjectType = "PullRequest",
+                        threadId = VERSION_3_THREAD_ID,
+                        repositoryFullName = REPOSITORY_FULL_NAME,
+                        subjectType = SUBJECT_TYPE,
                         reason = NotificationIgnoreReason.DONE,
-                        ignoredAtEpochMs = 3L,
+                        ignoredAtEpochMs = VERSION_3_IGNORED_AT_EPOCH_MS,
                         notificationUpdatedAtEpochMs = null,
                     ),
                 ),
@@ -137,10 +160,15 @@ class NotificationDatabaseMigrationTest {
                   subject_type,
                   unsubscribed_at_epoch_ms
                 )
-                VALUES ('123456789', 'example-org/example-repo', 'PullRequest', 1)
+                VALUES (
+                  '$VERSION_1_THREAD_ID',
+                  '$REPOSITORY_FULL_NAME',
+                  '$SUBJECT_TYPE',
+                  $VERSION_1_UNSUBSCRIBED_AT_EPOCH_MS
+                )
                 """.trimIndent(),
             )
-            connection.setVersion(1)
+            connection.setVersion(SCHEMA_VERSION_1)
         }
     }
 
@@ -166,10 +194,16 @@ class NotificationDatabaseMigrationTest {
                   unsubscribed_at_epoch_ms,
                   ignored_at_epoch_ms
                 )
-                VALUES ('thread-with-ignore-timestamp', 'example-org/example-repo', 'PullRequest', 1, 2)
+                VALUES (
+                  '$VERSION_2_THREAD_ID',
+                  '$REPOSITORY_FULL_NAME',
+                  '$SUBJECT_TYPE',
+                  $VERSION_2_UNSUBSCRIBED_AT_EPOCH_MS,
+                  $VERSION_2_IGNORED_AT_EPOCH_MS
+                )
                 """.trimIndent(),
             )
-            connection.setVersion(2)
+            connection.setVersion(SCHEMA_VERSION_2)
         }
     }
 
@@ -195,10 +229,16 @@ class NotificationDatabaseMigrationTest {
                   ignore_reason,
                   ignored_at_epoch_ms
                 )
-                VALUES ('thread-done-without-watermark', 'example-org/example-repo', 'PullRequest', 'DONE', 3)
+                VALUES (
+                  '$VERSION_3_THREAD_ID',
+                  '$REPOSITORY_FULL_NAME',
+                  '$SUBJECT_TYPE',
+                  '$DONE_REASON',
+                  $VERSION_3_IGNORED_AT_EPOCH_MS
+                )
                 """.trimIndent(),
             )
-            connection.setVersion(3)
+            connection.setVersion(SCHEMA_VERSION_3)
         }
     }
 
@@ -212,7 +252,7 @@ class NotificationDatabaseMigrationTest {
             val columnNames = mutableListOf<String>()
             try {
                 while (cursor.next()) {
-                    columnNames += cursor.getString(1)
+                    columnNames += cursor.getString(TABLE_INFO_NAME_COLUMN_INDEX)
                 }
                 columnNames
             } finally {
@@ -221,7 +261,8 @@ class NotificationDatabaseMigrationTest {
         }
     }
 
-    private fun readIgnoredRows(databasePath: Path): List<IgnoredThreadRow> = withDatabaseConnection(databasePath) { connection ->
+    private fun readIgnoredRows(databasePath: Path): List<IgnoredThreadRow> =
+        withDatabaseConnection(databasePath) { connection ->
         connection.withStatement(
             """
                 SELECT
@@ -240,12 +281,14 @@ class NotificationDatabaseMigrationTest {
             try {
                 while (cursor.next()) {
                     rows += IgnoredThreadRow(
-                        threadId = cursor.getString(0),
-                        repositoryFullName = cursor.getString(1),
-                        subjectType = cursor.getString(2),
-                        ignoreReason = cursor.getString(3),
-                        ignoredAtEpochMs = cursor.getLong(4),
-                        notificationUpdatedAtEpochMs = cursor.getNullableLong(5),
+                        threadId = cursor.getString(THREAD_ID_COLUMN_INDEX),
+                        repositoryFullName = cursor.getString(REPOSITORY_FULL_NAME_COLUMN_INDEX),
+                        subjectType = cursor.getString(SUBJECT_TYPE_COLUMN_INDEX),
+                        ignoreReason = cursor.getString(IGNORE_REASON_COLUMN_INDEX),
+                        ignoredAtEpochMs = cursor.getLong(IGNORED_AT_EPOCH_MS_COLUMN_INDEX),
+                        notificationUpdatedAtEpochMs = cursor.getNullableLong(
+                            NOTIFICATION_UPDATED_AT_EPOCH_MS_COLUMN_INDEX,
+                        ),
                     )
                 }
                 rows
@@ -256,7 +299,10 @@ class NotificationDatabaseMigrationTest {
     }
 }
 
-private fun <T> withDatabaseConnection(databasePath: Path, block: (co.touchlab.sqliter.DatabaseConnection) -> T): T {
+private fun <T> withDatabaseConnection(
+    databasePath: Path,
+    block: (co.touchlab.sqliter.DatabaseConnection) -> T,
+): T {
     val databaseManager =
         createDatabaseManager(
             DatabaseConfiguration(

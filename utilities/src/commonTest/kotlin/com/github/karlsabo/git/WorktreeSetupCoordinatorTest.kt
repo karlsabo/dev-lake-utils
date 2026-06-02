@@ -70,9 +70,13 @@ private class FakeGitWorktreeApi : GitWorktreeApi {
         childBranch: String,
     ): Boolean = error("isBranchAncestor is not used by WorktreeSetupCoordinator")
 
-    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees = error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
+    }
 
-    override fun listWorktrees(repoPath: String): List<Worktree> = error("listWorktrees is not used by WorktreeSetupCoordinator")
+    override fun listWorktrees(repoPath: String): List<Worktree> {
+        error("listWorktrees is not used by WorktreeSetupCoordinator")
+    }
 
     override fun removeWorktree(worktreePath: String, force: Boolean) {
         error("removeWorktree is not used by WorktreeSetupCoordinator")
@@ -150,9 +154,13 @@ private class SerializingFakeGitWorktreeApi : GitWorktreeApi {
         childBranch: String,
     ): Boolean = error("isBranchAncestor is not used by WorktreeSetupCoordinator")
 
-    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees = error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        error("resolveRepositoryRoot is not used by WorktreeSetupCoordinator")
+    }
 
-    override fun listWorktrees(repoPath: String): List<Worktree> = error("listWorktrees is not used by WorktreeSetupCoordinator")
+    override fun listWorktrees(repoPath: String): List<Worktree> {
+        error("listWorktrees is not used by WorktreeSetupCoordinator")
+    }
 
     override fun removeWorktree(worktreePath: String, force: Boolean) {
         error("removeWorktree is not used by WorktreeSetupCoordinator")
@@ -202,6 +210,71 @@ private class PerPathBlockingSetupRunner : WorktreeSetupCommandRunner {
     }
 
     suspend fun calls(): Int = stateMutex.withLock { setupCallCount }
+}
+
+private class RepositorySerializationFixture {
+    val repoPath = "/repos/dev-lake-utils"
+    val firstWorktreePath = buildWorktreePath(repoPath, "feature/first")
+    val secondWorktreePath = buildWorktreePath(repoPath, "feature/second")
+    val git = SerializingFakeGitWorktreeApi()
+    val setupRunner = PerPathBlockingSetupRunner()
+
+    private val cloneUrl = "https://github.com/karlsabo/dev-lake-utils.git"
+    private val setupScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    val coordinator = WorktreeSetupCoordinator(
+        gitWorktreeApi = git,
+        setupCommandRunner = setupRunner,
+        scope = setupScope,
+    )
+    val firstRequest = setupRequest(firstWorktreePath, "feature/first", "echo first")
+    val secondRequest = setupRequest(secondWorktreePath, "feature/second", "echo second")
+
+    private fun setupRequest(
+        worktreePath: WorktreePath,
+        branch: String,
+        setupCommand: String,
+    ): WorktreeSetupRequest = WorktreeSetupRequest(
+        repoPath = repoPath,
+        worktreePath = worktreePath,
+        cloneUrl = cloneUrl,
+        branch = branch,
+        setupShell = "/bin/sh",
+        setupCommands = listOf(setupCommand),
+    )
+
+    suspend fun awaitFirstRepositoryEnsureBlocked() {
+        withTimeout(1_000.milliseconds) { git.firstRepositoryEnsureStarted.await() }
+        delay(100.milliseconds)
+    }
+
+    suspend fun releaseRepositoryEnsureAndAwaitSetups() {
+        git.releaseFirstRepositoryEnsure.complete(Unit)
+        withTimeout(1_000.milliseconds) { setupRunner.awaitStarted(firstWorktreePath) }
+        withTimeout(1_000.milliseconds) { setupRunner.awaitStarted(secondWorktreePath) }
+    }
+
+    suspend fun completeSetups() {
+        setupRunner.complete(firstWorktreePath)
+        setupRunner.complete(secondWorktreePath)
+    }
+
+    suspend fun cleanup() {
+        git.releaseFirstRepositoryEnsure.complete(Unit)
+        completeSetups()
+        setupScope.cancel()
+    }
+}
+
+private fun assertWaitingForRepository(fixture: RepositorySerializationFixture) {
+    assertEquals(
+        WorktreeSetupStatus.WAITING_FOR_REPOSITORY,
+        fixture.coordinator.statuses.value[fixture.firstWorktreePath],
+    )
+    assertEquals(
+        WorktreeSetupStatus.WAITING_FOR_REPOSITORY,
+        fixture.coordinator.statuses.value[fixture.secondWorktreePath],
+    )
 }
 
 class WorktreeSetupCoordinatorTest {
@@ -365,76 +438,39 @@ class WorktreeSetupCoordinatorTest {
 
     @Test
     fun repositoryEnsureIsSerializedPerRepoWhileDifferentWorktreesProceedIndependently() = runBlocking {
-        val repoPath = "/repos/dev-lake-utils"
-        val cloneUrl = "https://github.com/karlsabo/dev-lake-utils.git"
-        val firstBranch = "feature/first"
-        val secondBranch = "feature/second"
-        val firstWorktreePath = buildWorktreePath(repoPath, firstBranch)
-        val secondWorktreePath = buildWorktreePath(repoPath, secondBranch)
-        val git = SerializingFakeGitWorktreeApi()
-        val setupRunner = PerPathBlockingSetupRunner()
-        val setupScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val coordinator = WorktreeSetupCoordinator(
-            gitWorktreeApi = git,
-            setupCommandRunner = setupRunner,
-            scope = setupScope,
-        )
-        val firstRequest = WorktreeSetupRequest(
-            repoPath = repoPath,
-            worktreePath = firstWorktreePath,
-            cloneUrl = cloneUrl,
-            branch = firstBranch,
-            setupShell = "/bin/sh",
-            setupCommands = listOf("echo first"),
-        )
-        val secondRequest = WorktreeSetupRequest(
-            repoPath = repoPath,
-            worktreePath = secondWorktreePath,
-            cloneUrl = cloneUrl,
-            branch = secondBranch,
-            setupShell = "/bin/sh",
-            setupCommands = listOf("echo second"),
-        )
+        val fixture = RepositorySerializationFixture()
 
         try {
-            val first = coordinator.setup(firstRequest)
-            val second = coordinator.setup(secondRequest)
-            withTimeout(1_000.milliseconds) { git.firstRepositoryEnsureStarted.await() }
-            delay(100.milliseconds)
+            val first = fixture.coordinator.setup(fixture.firstRequest)
+            val second = fixture.coordinator.setup(fixture.secondRequest)
+            fixture.awaitFirstRepositoryEnsureBlocked()
 
-            assertEquals(1, git.repositoryEnsureCalls())
-            assertEquals(1, git.maxConcurrentRepositoryEnsures())
-            assertEquals(
-                WorktreeSetupStatus.WAITING_FOR_REPOSITORY,
-                coordinator.statuses.value[firstWorktreePath],
-            )
-            assertEquals(
-                WorktreeSetupStatus.WAITING_FOR_REPOSITORY,
-                coordinator.statuses.value[secondWorktreePath],
-            )
+            assertEquals(1, fixture.git.repositoryEnsureCalls())
+            assertEquals(1, fixture.git.maxConcurrentRepositoryEnsures())
+            assertWaitingForRepository(fixture)
 
-            git.releaseFirstRepositoryEnsure.complete(Unit)
-            withTimeout(1_000.milliseconds) { setupRunner.awaitStarted(firstWorktreePath) }
-            withTimeout(1_000.milliseconds) { setupRunner.awaitStarted(secondWorktreePath) }
+            fixture.releaseRepositoryEnsureAndAwaitSetups()
 
             assertFalse(first.isCompleted)
             assertFalse(second.isCompleted)
-            assertEquals(2, git.repositoryEnsureCalls())
-            assertEquals(1, git.maxConcurrentRepositoryEnsures())
-            assertEquals(2, git.worktreeEnsureCalls())
-            assertEquals(2, setupRunner.calls())
+            assertEquals(2, fixture.git.repositoryEnsureCalls())
+            assertEquals(1, fixture.git.maxConcurrentRepositoryEnsures())
+            assertEquals(2, fixture.git.worktreeEnsureCalls())
+            assertEquals(2, fixture.setupRunner.calls())
 
-            setupRunner.complete(firstWorktreePath)
-            setupRunner.complete(secondWorktreePath)
+            fixture.completeSetups()
 
-            assertEquals(firstWorktreePath, withTimeout(1_000.milliseconds) { first.await() }.worktreePath)
-            assertEquals(secondWorktreePath, withTimeout(1_000.milliseconds) { second.await() }.worktreePath)
-            assertTrue(coordinator.statuses.value.isEmpty())
+            assertEquals(
+                fixture.firstWorktreePath,
+                withTimeout(1_000.milliseconds) { first.await() }.worktreePath,
+            )
+            assertEquals(
+                fixture.secondWorktreePath,
+                withTimeout(1_000.milliseconds) { second.await() }.worktreePath,
+            )
+            assertTrue(fixture.coordinator.statuses.value.isEmpty())
         } finally {
-            git.releaseFirstRepositoryEnsure.complete(Unit)
-            setupRunner.complete(firstWorktreePath)
-            setupRunner.complete(secondWorktreePath)
-            setupScope.cancel()
+            fixture.cleanup()
         }
     }
 

@@ -20,7 +20,6 @@
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun loadMetricsPreviewUsesGeneratedDependencies()</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterFailedSendAndReportsFailure()</ID>
     <ID>LongMethod:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$@Test fun publishMetricsContinuesAfterThrownSendAndReportsFailure()</ID>
-    <ID>LongMethod:WorktreeSetupCoordinatorTest.kt$WorktreeSetupCoordinatorTest$@Test fun repositoryEnsureIsSerializedPerRepoWhileDifferentWorktreesProceedIndependently()</ID>
       <ID>LongParameterList:ProjectSummaryBuilder.kt$( users: Set&lt;User&gt;, gitHubApi: GitHubPullRequestSearchApi,
           gitHubOrganizationIds: List&lt;String&gt;, projectManagementApi: ProjectManagementApi, textSummarizer:
           TextSummarizer, duration: Duration, pullRequests: Set&lt;com.github.karlsabo.github.Issue&gt;,
@@ -41,10 +40,6 @@
     <ID>LongParameterList:SummaryPublisherDependencies.kt$( config: SummaryPublisherConfig, usersConfig: UsersConfig, linearApiConfig: LinearApiRestConfig, gitHubApiConfig: GitHubApiRestConfig, pagerDutyApiConfig: PagerDutyApiRestConfig, textSummarizerConfig: TextSummarizerOpenAiConfig, )</ID>
     <ID>LongParameterList:SummaryPublisherScreen.kt$( topLevelSummary: String, onTopLevelSummaryChange: (String) -&gt; Unit, projectSummaries: List&lt;ProjectSummaryHolder&gt;, onProjectMessageChange: (Int, String) -&gt; Unit, onProjectDelete: (Int) -&gt; Unit, publishButtonText: String, publishButtonEnabled: Boolean, isLoadingSummary: Boolean, isSendingSlackMessage: Boolean, onPublishClick: () -&gt; Unit, )</ID>
     <ID>LongParameterList:UserMetricPublisherApp.kt$( state: com.github.karlsabo.devlake.metrics.UserMetricPublisherState, configFilePath: Path = userMetricPublisherConfigPath, loadConfig: () -&gt; UserMetricPublisherConfig = ::loadUserMetricPublisherConfig, loadDependencies: (UserMetricPublisherConfig) -&gt; UserMetricPublisherDependencies = ::loadUserMetricPublisherDependencies, configFileExists: (Path) -&gt; Boolean = SystemFileSystem::exists, saveDefaultConfig: (UserMetricPublisherConfig) -&gt; Unit = ::saveUserMetricPublisherConfig, )</ID>
-    <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$3</ID>
-    <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$3L</ID>
-    <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$4</ID>
-    <ID>MagicNumber:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$5</ID>
     <ID>MagicNumber:ProjectSummaryBuilder.kt$5</ID>
     <ID>MagicNumber:UserMetrics.kt$3.5</ID>
     <ID>MagicNumber:UserMetrics.kt$7</ID>
@@ -57,10 +52,8 @@
     <ID>MaxLineLength:DesktopLauncherService.kt$DesktopLauncherService$throw RuntimeException("Failed to open IntelliJ IDEA for $projectPath (exit code ${result.exitCode}): $detail")</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private</ID>
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitValue(): List&lt;T&gt;</ID>
-    <ID>MaxLineLength:GitCommandServiceTest.kt$GitCommandServiceTest$executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr", baseCommit), workingDirectory = null)</ID>
     <ID>MaxLineLength:LinearRestApi.kt$LinearRestApi$override suspend fun getDirectChildIssues(parentKey: String): List&lt;ProjectIssue&gt;</ID>
     <ID>MaxLineLength:LinearRestApi.kt$private fun missingGraphQlData(responseText: String): Nothing</ID>
-    <ID>MaxLineLength:NotificationDatabaseMigrationTest.kt$NotificationDatabaseMigrationTest$private</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Instant?.isWithinStaleWarningWindow(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean</ID>
     <ID>MaxLineLength:SlackMilestoneFormatting.kt$private fun String.truncateForSlack(): String</ID>
@@ -80,10 +73,6 @@
     <ID>MaxLineLength:UserMetricPublisherDependenciesTest.kt$UserMetricPublisherDependenciesTest$componentFactory</ID>
     <ID>MaxLineLength:UserMetrics.kt$appendLine("• *Year to Date:* `$pullRequestsYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")</ID>
     <ID>MaxLineLength:UserMetrics.kt$appendLine("• *Year to date:* `$issuesClosedYearToDateCount`. _Expectation ~${(weeksThisYear * 3.5).toInt()} (3-4 per week)_")</ID>
-    <ID>MaxLineLength:WorktreeSetupCoordinatorTest.kt$FakeGitWorktreeApi$override fun listWorktrees(repoPath: String): List&lt;Worktree&gt;</ID>
-    <ID>MaxLineLength:WorktreeSetupCoordinatorTest.kt$FakeGitWorktreeApi$override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees</ID>
-    <ID>MaxLineLength:WorktreeSetupCoordinatorTest.kt$SerializingFakeGitWorktreeApi$override fun listWorktrees(repoPath: String): List&lt;Worktree&gt;</ID>
-    <ID>MaxLineLength:WorktreeSetupCoordinatorTest.kt$SerializingFakeGitWorktreeApi$override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees</ID>
     <ID>MaxLineLength:ZapierSummaryPublisher.kt$ZapierSummaryPublisher$open suspend fun publishSummary(summary: ZapierProjectSummary): Boolean</ID>
     <ID>NestedBlockDepth:ImlExcludeFolderManager.kt$internal fun parseExcludedFolderUrls(xmlContent: String): Set&lt;String&gt;</ID>
     <ID>NestedBlockDepth:LlmSkillSyncTest.kt$LlmSkillSyncTest$private fun setupSourceDir( sourceDir: Path, skills: Map&lt;String, Map&lt;String, String&gt;&gt; = emptyMap(), agentsContent: String? = null, notesContent: String? = null, )</ID>
@@ -102,7 +91,6 @@
     <ID>TooGenericExceptionThrown:UserEpicsWithIssuesDemo.kt$throw Exception("No --user=username provided")</ID>
     <ID>TooGenericExceptionThrown:UserMetricPublisherApp.kt$throw Exception("User not found: $userId")</ID>
     <ID>TooManyFunctions:SlackMarkdownFormatter.kt$com.github.karlsabo.tools.formatting.SlackMarkdownFormatter.kt</ID>
-    <ID>TopLevelPropertyNaming:PagerDutyIncidentTest.kt$private const val pagerDutyIncidentJson = """ { "incident_number": 123456, "title": "Service Response Alert", "description": "Service Response Alert", "created_at": "2025-07-21T21:00:26Z", "updated_at": "2025-07-21T21:24:50Z", "status": "resolved", "incident_key": null, "service": { "id": "ABC123", "type": "service_reference", "summary": "API Service", "self": "https://api.example.local/services/ABC123", "html_url": "https://example.pagerduty.com/service-directory/ABC123" }, "assignments": [], "assigned_via": "escalation_policy", "last_status_change_at": "2025-07-21T21:24:50Z", "resolved_at": "2025-07-21T21:24:50Z", "first_trigger_log_entry": { "id": "LOG123456", "type": "trigger_log_entry_reference", "summary": "Triggered through the API.", "self": "https://api.example.local/log_entries/LOG123456", "html_url": "https://example.pagerduty.com/incidents/INC123456/log_entries/LOG123456" }, "alert_counts": { "all": 1, "triggered": 0, "resolved": 1 }, "is_mergeable": true, "incident_type": { "name": "incident_default" }, "escalation_policy": { "id": "ESC123", "type": "escalation_policy_reference", "summary": "Standard Escalation", "self": "https://api.example.local/escalation_policies/ESC123", "html_url": "https://example.pagerduty.com/escalation_policies/ESC123" }, "teams": [ { "id": "TEAM123", "type": "team_reference", "summary": "Engineering Team", "self": "https://api.example.local/teams/TEAM123", "html_url": "https://example.pagerduty.com/teams/TEAM123" } ], "pending_actions": [], "acknowledgements": [], "basic_alert_grouping": null, "alert_grouping": null, "last_status_change_by": { "id": "USER123", "type": "user_reference", "summary": "John Smith", "self": "https://api.example.local/users/USER123", "html_url": "https://example.pagerduty.com/users/USER123" }, "priority": null, "resolve_reason": null, "incidents_responders": [], "responder_requests": [], "subscriber_requests": [], "urgency": "high", "id": "INC123456", "type": "incident", "summary": "[#123456] Service Response Alert", "self": "https://api.example.local/incidents/INC123456", "html_url": "https://example.pagerduty.com/incidents/INC123456" } """</ID>
     <ID>UseCheckOrError:SummaryPublisherDependenciesTest.kt$SummaryPublisherDependenciesTest.RecordingZapierSummaryPublisher$throw IllegalStateException("boom")</ID>
     <ID>UseCheckOrError:UserMetricPublisherDependenciesTest.kt$ThrowingMessagePublisher$throw IllegalStateException("boom")</ID>
   </CurrentIssues>

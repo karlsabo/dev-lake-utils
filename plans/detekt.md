@@ -156,7 +156,7 @@
 
 **Notes:** Avoid one giant shared fixture object; prefer small builders local to each test class.
 
-### 9. Git and migration tests are split and fixture constants are named
+### 9. Git and migration tests are split and fixture constants are named (Finished 2026-06-02) - Done
 
 **Acceptance criteria:** Given utility tests, when `./gradlew :utilities:allTests detekt` runs, then git worktree behavior and notification database migration behavior are still covered and no large-class, long-method, magic-number, max-line-length, or top-level-property-naming baseline entry remains for utility tests.
 
