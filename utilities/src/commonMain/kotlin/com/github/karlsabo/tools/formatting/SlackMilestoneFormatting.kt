@@ -18,11 +18,15 @@ internal fun Milestone.header(complete: String): String {
     return "*$complete<${issue.url}|${issue.title}>: $assignee*"
 }
 
-internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean =
-    issue.completedAt?.let { it < recentActivityCutoff() } == true
+internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean {
+    val completedAt = issue.completedAt
+    return completedAt?.let { it < recentActivityCutoff() } == true
+}
 
-internal fun Instant?.isWithinStaleWarningWindow(): Boolean =
-    this != null && minus(STALE_DUE_DATE_WARNING_DAYS.days) < Clock.System.now()
+internal fun Instant?.isWithinStaleWarningWindow(): Boolean {
+    val dueDate = this
+    return dueDate != null && dueDate.minus(STALE_DUE_DATE_WARNING_DAYS.days) < Clock.System.now()
+}
 
 internal fun Milestone.latestStatus(): MilestoneStatus? {
     val lastIssue = issues.sortedByDescending { it.completedAt }.firstOrNull()

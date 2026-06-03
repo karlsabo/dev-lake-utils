@@ -60,6 +60,7 @@ private fun StringBuilder.appendMilestoneStatusWarning(summary: ProjectSummary, 
 
     when {
         milestone.issue.dueDate == null -> appendMissingDueDateWarning(summary, milestone)
+
         status?.isRecent == false && milestone.issue.dueDate.isWithinStaleWarningWindow() -> {
             appendStaleActivityWarning(summary, milestone)
         }

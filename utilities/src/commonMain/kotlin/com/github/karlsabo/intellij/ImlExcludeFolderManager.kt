@@ -66,7 +66,6 @@ data class ImlUpdateResult(
  * @param directoriesToExclude directory names relative to the module root
  * @return result describing what was added, already present, or could not be applied
  */
-@Suppress("unused")
 fun addExcludeFoldersToIml(
     imlPath: Path,
     directoriesToExclude: List<String> = DEFAULT_EXCLUDE_DIRECTORIES,

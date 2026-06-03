@@ -30,9 +30,7 @@ private class CancellingMarkDoneNotificationApi(
 ) : GitHubNotificationApi {
     override suspend fun listNotifications(): List<Notification> = emptyList()
 
-    override suspend fun markNotificationAsDone(threadId: String) {
-        throw cancellation
-    }
+    override suspend fun markNotificationAsDone(threadId: String): Unit = throw cancellation
 
     override suspend fun unsubscribeFromNotification(threadId: String) = error("Unexpected unsubscribe")
 }

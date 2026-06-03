@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub
 import androidx.compose.ui.window.application
 import java.awt.BasicStroke
 import java.awt.Color
+import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.Taskbar
 import java.awt.geom.Ellipse2D
@@ -13,6 +14,73 @@ import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
 
 private const val DOCK_ICON_SIZE = 256
+private const val ICON_GRID_UNITS = 32.0
+private const val ICON_MARGIN_UNITS = 1.0
+private const val ICON_BODY_SIZE_UNITS = 30.0
+private const val ICON_CORNER_ARC_UNITS = 12.0
+private const val BORDER_STROKE_WIDTH_UNITS = 1.0
+private const val LINE_STROKE_WIDTH_UNITS = 2.0
+private const val BASELINE_START_X_UNITS = 6.0
+private const val BASELINE_Y_UNITS = 22.0
+private const val BASELINE_END_X_UNITS = 26.0
+private const val BAR_WIDTH_UNITS = 2.0
+private const val WINDOW_DOT_Y_UNITS = 7.0
+private const val WINDOW_DOT_RADIUS_UNITS = 1.5
+private const val DATA_POINT_RADIUS_UNITS = 1.4
+private const val CLOSE_DOT_X_UNITS = 7.0
+private const val MINIMIZE_DOT_X_UNITS = 11.0
+private const val ZOOM_DOT_X_UNITS = 15.0
+private const val FIRST_BAR_X_UNITS = 9.0
+private const val FIRST_BAR_Y_UNITS = 22.0
+private const val FIRST_BAR_HEIGHT_UNITS = 4.0
+private const val SECOND_BAR_X_UNITS = 13.0
+private const val SECOND_BAR_Y_UNITS = 21.0
+private const val SECOND_BAR_HEIGHT_UNITS = 5.0
+private const val THIRD_BAR_X_UNITS = 17.0
+private const val THIRD_BAR_Y_UNITS = 20.0
+private const val THIRD_BAR_HEIGHT_UNITS = 6.0
+private const val FOURTH_BAR_X_UNITS = 21.0
+private const val FOURTH_BAR_Y_UNITS = 19.0
+private const val FOURTH_BAR_HEIGHT_UNITS = 7.0
+private const val FIRST_CHART_X_UNITS = 7.0
+private const val FIRST_CHART_Y_UNITS = 20.0
+private const val SECOND_CHART_X_UNITS = 12.0
+private const val SECOND_CHART_Y_UNITS = 17.0
+private const val THIRD_CHART_X_UNITS = 17.0
+private const val THIRD_CHART_Y_UNITS = 18.0
+private const val FOURTH_CHART_X_UNITS = 22.0
+private const val FOURTH_CHART_Y_UNITS = 14.0
+private const val FIFTH_CHART_X_UNITS = 25.0
+private const val FIFTH_CHART_Y_UNITS = 12.0
+private const val BACKGROUND_RGB = 0x1E232D
+private const val BORDER_RGB = 0x46505F
+private const val CLOSE_DOT_RGB = 0xFF5F55
+private const val MINIMIZE_DOT_RGB = 0xFFBE3C
+private const val SUCCESS_RGB = 0x3CC878
+private const val BASELINE_ARGB = 0x2EFFFFFF
+private const val CHART_LINE_RGB = 0x50A0FF
+private const val DATA_POINT_RGB = 0xF5F7FA
+
+private val windowDots = listOf(
+    IconDot(CLOSE_DOT_X_UNITS, WINDOW_DOT_Y_UNITS, Color(CLOSE_DOT_RGB)),
+    IconDot(MINIMIZE_DOT_X_UNITS, WINDOW_DOT_Y_UNITS, Color(MINIMIZE_DOT_RGB)),
+    IconDot(ZOOM_DOT_X_UNITS, WINDOW_DOT_Y_UNITS, Color(SUCCESS_RGB)),
+)
+
+private val bars = listOf(
+    IconBar(FIRST_BAR_X_UNITS, FIRST_BAR_Y_UNITS, FIRST_BAR_HEIGHT_UNITS),
+    IconBar(SECOND_BAR_X_UNITS, SECOND_BAR_Y_UNITS, SECOND_BAR_HEIGHT_UNITS),
+    IconBar(THIRD_BAR_X_UNITS, THIRD_BAR_Y_UNITS, THIRD_BAR_HEIGHT_UNITS),
+    IconBar(FOURTH_BAR_X_UNITS, FOURTH_BAR_Y_UNITS, FOURTH_BAR_HEIGHT_UNITS),
+)
+
+private val chartPoints = listOf(
+    IconPoint(FIRST_CHART_X_UNITS, FIRST_CHART_Y_UNITS),
+    IconPoint(SECOND_CHART_X_UNITS, SECOND_CHART_Y_UNITS),
+    IconPoint(THIRD_CHART_X_UNITS, THIRD_CHART_Y_UNITS),
+    IconPoint(FOURTH_CHART_X_UNITS, FOURTH_CHART_Y_UNITS),
+    IconPoint(FIFTH_CHART_X_UNITS, FIFTH_CHART_Y_UNITS),
+)
 
 fun main() {
     System.setProperty("apple.awt.application.name", ENG_HUB_DISPLAY_NAME)
@@ -34,7 +102,7 @@ private fun setDockIcon() {
             return
         }
 
-        taskbar.iconImage = renderAppIcon(DOCK_ICON_SIZE)
+        taskbar.iconImage = renderAppIcon()
         System.err.println("Dock icon: set successfully")
     } catch (error: UnsupportedOperationException) {
         System.err.println("Dock icon: failed - ${error.message}")
@@ -43,60 +111,124 @@ private fun setDockIcon() {
     }
 }
 
-@Suppress("MagicNumber")
-private fun renderAppIcon(@Suppress("SameParameterValue") size: Int): BufferedImage {
-    val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
-    val g = img.createGraphics()
-    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-    g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
+private fun renderAppIcon(): BufferedImage {
+    val image = BufferedImage(DOCK_ICON_SIZE, DOCK_ICON_SIZE, BufferedImage.TYPE_INT_ARGB)
+    val graphics = image.createGraphics()
+    val unit = DOCK_ICON_SIZE / ICON_GRID_UNITS
 
-    val s = size / 32.0
+    graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+    graphics.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
+    graphics.drawIconBackground(unit)
+    graphics.drawWindowDots(unit)
+    graphics.drawBaseline(unit)
+    graphics.drawBars(unit)
+    graphics.drawChart(unit)
+    graphics.dispose()
 
-    // Background
-    g.color = Color(0x1E, 0x23, 0x2D)
-    g.fill(RoundRectangle2D.Double(1 * s, 1 * s, 30 * s, 30 * s, 12 * s, 12 * s))
-    g.color = Color(0x46, 0x50, 0x5F)
-    g.stroke = BasicStroke(s.toFloat())
-    g.draw(RoundRectangle2D.Double(1 * s, 1 * s, 30 * s, 30 * s, 12 * s, 12 * s))
-
-    // Window dots
-    g.color = Color(0xFF, 0x5F, 0x55)
-    g.fill(Ellipse2D.Double((7 - 1.5) * s, (7 - 1.5) * s, 3 * s, 3 * s))
-    g.color = Color(0xFF, 0xBE, 0x3C)
-    g.fill(Ellipse2D.Double((11 - 1.5) * s, (7 - 1.5) * s, 3 * s, 3 * s))
-    g.color = Color(0x3C, 0xC8, 0x78)
-    g.fill(Ellipse2D.Double((15 - 1.5) * s, (7 - 1.5) * s, 3 * s, 3 * s))
-
-    // Baseline
-    g.color = Color(255, 255, 255, 46)
-    g.stroke = BasicStroke(s.toFloat())
-    g.draw(Line2D.Double(6 * s, 22 * s, 26 * s, 22 * s))
-
-    // Bars
-    g.color = Color(0x3C, 0xC8, 0x78)
-    g.fill(Rectangle2D.Double(9 * s, 22 * s, 2 * s, 4 * s))
-    g.fill(Rectangle2D.Double(13 * s, 21 * s, 2 * s, 5 * s))
-    g.fill(Rectangle2D.Double(17 * s, 20 * s, 2 * s, 6 * s))
-    g.fill(Rectangle2D.Double(21 * s, 19 * s, 2 * s, 7 * s))
-
-    // Line chart
-    g.color = Color(0x50, 0xA0, 0xFF)
-    g.stroke = BasicStroke((2 * s).toFloat(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-    val path = GeneralPath()
-    path.moveTo(7 * s, 20 * s)
-    path.lineTo(12 * s, 17 * s)
-    path.lineTo(17 * s, 18 * s)
-    path.lineTo(22 * s, 14 * s)
-    path.lineTo(25 * s, 12 * s)
-    g.draw(path)
-
-    // Data points
-    g.color = Color(0xF5, 0xF7, 0xFA)
-    for ((px, py) in listOf(7 to 20, 12 to 17, 17 to 18, 22 to 14, 25 to 12)) {
-        val r = 1.4 * s
-        g.fill(Ellipse2D.Double(px * s - r, py * s - r, r * 2, r * 2))
-    }
-
-    g.dispose()
-    return img
+    return image
 }
+
+private fun Graphics2D.drawIconBackground(unit: Double) {
+    val body = RoundRectangle2D.Double(
+        ICON_MARGIN_UNITS * unit,
+        ICON_MARGIN_UNITS * unit,
+        ICON_BODY_SIZE_UNITS * unit,
+        ICON_BODY_SIZE_UNITS * unit,
+        ICON_CORNER_ARC_UNITS * unit,
+        ICON_CORNER_ARC_UNITS * unit,
+    )
+
+    color = Color(BACKGROUND_RGB)
+    fill(body)
+    color = Color(BORDER_RGB)
+    stroke = BasicStroke((BORDER_STROKE_WIDTH_UNITS * unit).toFloat())
+    draw(body)
+}
+
+private fun Graphics2D.drawWindowDots(unit: Double) {
+    windowDots.forEach { dot ->
+        color = dot.color
+        fill(circle(dot.centerXUnits, dot.centerYUnits, WINDOW_DOT_RADIUS_UNITS, unit))
+    }
+}
+
+private fun Graphics2D.drawBaseline(unit: Double) {
+    color = Color(BASELINE_ARGB, true)
+    stroke = BasicStroke((BORDER_STROKE_WIDTH_UNITS * unit).toFloat())
+    draw(
+        Line2D.Double(
+            BASELINE_START_X_UNITS * unit,
+            BASELINE_Y_UNITS * unit,
+            BASELINE_END_X_UNITS * unit,
+            BASELINE_Y_UNITS * unit,
+        ),
+    )
+}
+
+private fun Graphics2D.drawBars(unit: Double) {
+    color = Color(SUCCESS_RGB)
+    bars.forEach { bar ->
+        fill(
+            Rectangle2D.Double(
+                bar.xUnits * unit,
+                bar.yUnits * unit,
+                BAR_WIDTH_UNITS * unit,
+                bar.heightUnits * unit,
+            ),
+        )
+    }
+}
+
+private fun Graphics2D.drawChart(unit: Double) {
+    color = Color(CHART_LINE_RGB)
+    stroke = BasicStroke(
+        (LINE_STROKE_WIDTH_UNITS * unit).toFloat(),
+        BasicStroke.CAP_ROUND,
+        BasicStroke.JOIN_ROUND,
+    )
+    draw(chartPath(unit))
+
+    color = Color(DATA_POINT_RGB)
+    chartPoints.forEach { point ->
+        fill(circle(point.xUnits, point.yUnits, DATA_POINT_RADIUS_UNITS, unit))
+    }
+}
+
+private fun chartPath(unit: Double): GeneralPath {
+    val path = GeneralPath()
+    val firstPoint = chartPoints.first()
+    path.moveTo(firstPoint.xUnits * unit, firstPoint.yUnits * unit)
+    chartPoints.drop(1).forEach { point ->
+        path.lineTo(point.xUnits * unit, point.yUnits * unit)
+    }
+    return path
+}
+
+private fun circle(
+    centerXUnits: Double,
+    centerYUnits: Double,
+    radiusUnits: Double,
+    unit: Double,
+) = Ellipse2D.Double(
+    centerXUnits * unit - radiusUnits * unit,
+    centerYUnits * unit - radiusUnits * unit,
+    radiusUnits * LINE_STROKE_WIDTH_UNITS * unit,
+    radiusUnits * LINE_STROKE_WIDTH_UNITS * unit,
+)
+
+private data class IconDot(
+    val centerXUnits: Double,
+    val centerYUnits: Double,
+    val color: Color,
+)
+
+private data class IconBar(
+    val xUnits: Double,
+    val yUnits: Double,
+    val heightUnits: Double,
+)
+
+private data class IconPoint(
+    val xUnits: Double,
+    val yUnits: Double,
+)

@@ -5,9 +5,9 @@
 **Context**:
 
 - Detekt is wired at the root in `dev-lake-utils.gradle.kts`; it scans root Gradle scripts, `buildSrc`, all subproject build files, and all subproject `src` trees.
-- `dev-lake-utils.gradle.kts` currently points detekt at `config/detekt/baseline.xml`, so CI can pass while 109 current issues remain hidden.
-- `config/detekt/baseline.xml` contains 109 current issues. Biggest groups: `MaxLineLength` (41), `LongMethod` (17), `MagicNumber` (14), `LongParameterList` (10), `TooGenericExceptionCaught` (8), `TooGenericExceptionThrown` (5), plus smaller `ReturnCount`, `MatchingDeclarationName`, `NestedBlockDepth`, `TooManyFunctions`, `UseCheckOrError`, `CyclomaticComplexMethod`, `SpreadOperator`, and `TopLevelPropertyNaming` entries.
-- There are 40 inline suppressions found by `rg '@Suppress|@file:Suppress|Suppress\('`, including `TooManyFunctions`, `LargeClass`, `LongParameterList`, `MagicNumber`, `MatchingDeclarationName`, `SameParameterValue`, and `unused`.
+- Detekt no longer references `config/detekt/baseline.xml`; final verification runs without a committed baseline.
+- Before cleanup, `config/detekt/baseline.xml` contained 109 current issues. Biggest groups: `MaxLineLength` (41), `LongMethod` (17), `MagicNumber` (14), `LongParameterList` (10), `TooGenericExceptionCaught` (8), `TooGenericExceptionThrown` (5), plus smaller `ReturnCount`, `MatchingDeclarationName`, `NestedBlockDepth`, `TooManyFunctions`, `UseCheckOrError`, `CyclomaticComplexMethod`, `SpreadOperator`, and `TopLevelPropertyNaming` entries.
+- Before cleanup, there were 40 inline suppressions found by `rg '@Suppress|@file:Suppress|Suppress\('`, including `TooManyFunctions`, `LargeClass`, `LongParameterList`, `MagicNumber`, `MatchingDeclarationName`, `SameParameterValue`, and `unused`.
 - `README.md` documents `./gradlew detekt` and `./gradlew check` as the verification path. The final state should keep that path, not weaken it.
 - Trade-off: slice by code ownership/behavior, not by detekt rule. Rule-by-rule PRs would touch unrelated product areas in one PR and create more merge conflict risk.
 
@@ -275,7 +275,9 @@
 
 **Notes:** This is intentionally isolated because icon drawing magic numbers are noisy and easy to conflict with UI refactors.
 
-### 16. Final no-baseline verification
+### 16. Final no-baseline verification - Done
+
+**Done** 2026-06-03
 
 **Acceptance criteria:** Given all prior stories are merged, when a developer runs `rg '@Suppress|@file:Suppress|Suppress\(' --glob '!build/**' --glob '!**/.gradle/**' --glob '!plans/**' --glob '!*.md'`, `./gradlew detekt`, and `./gradlew check`, then the grep finds no suppressions and both Gradle commands pass without `config/detekt/baseline.xml` being referenced.
 

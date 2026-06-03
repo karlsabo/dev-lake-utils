@@ -34,6 +34,8 @@ import kotlin.time.Duration.Companion.minutes
 import com.github.karlsabo.github.Issue as GitHubIssue
 import com.github.karlsabo.github.User as GitHubUser
 
+private const val TEST_SUMMARY_NAME = "Test Summary"
+
 private val logger = KotlinLogging.logger {}
 
 /**
@@ -44,15 +46,12 @@ class SummaryDetailTest {
 
     @Test
     fun testCreateSummary() = runBlocking {
-        val summaryName = "Test Summary"
+        val summary = createSummary(summaryRequest())
 
-        val summary = createSummary(summaryRequest(summaryName))
-
-        assertSummaryCreated(summary, summaryName)
+        assertSummaryCreated(summary)
     }
 
-    @Suppress("SameParameterValue")
-    private fun summaryRequest(summaryName: String) = CreateSummaryRequest(
+    private fun summaryRequest() = CreateSummaryRequest(
         sources = SummarySources(
             projectManagementApi = ProjectManagementApiMock(),
             gitHubApi = GitHubApiMock(),
@@ -66,17 +65,14 @@ class SummaryDetailTest {
         users = testUsers(),
         miscUsers = testMiscUsers(),
         options = SummaryOptions(
-            summaryName = summaryName,
+            summaryName = TEST_SUMMARY_NAME,
             isMiscellaneousProjectIncluded = true,
         ),
     )
 
-    private fun assertSummaryCreated(
-        summary: MultiProjectSummary,
-        @Suppress("SameParameterValue") summaryName: String,
-    ) {
+    private fun assertSummaryCreated(summary: MultiProjectSummary) {
         assertNotNull(summary)
-        assertEquals(summaryName, summary.summaryName)
+        assertEquals(TEST_SUMMARY_NAME, summary.summaryName)
         assertTrue(summary.projectSummaries.isNotEmpty())
 
         logger.info { "Summary:\n${summary.toSlackMarkup()}" }

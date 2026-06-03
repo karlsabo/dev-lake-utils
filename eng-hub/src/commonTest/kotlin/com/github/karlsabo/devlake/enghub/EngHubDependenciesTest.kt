@@ -177,7 +177,10 @@ private data class EnsureWorktreeCall(
     val branch: String,
 )
 
-private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> = withTimeout(2_000.milliseconds) { first { it.isNotEmpty() } }
+private suspend fun <T> MutableStateFlow<List<T>>.awaitValue(): List<T> {
+    val values = this
+    return withTimeout(2_000.milliseconds) { values.first { it.isNotEmpty() } }
+}
 
 private class RecordingGitWorktreeApi : GitWorktreeApi {
     val ensureRepositoryCalls = MutableStateFlow<List<EnsureRepositoryCall>>(emptyList())

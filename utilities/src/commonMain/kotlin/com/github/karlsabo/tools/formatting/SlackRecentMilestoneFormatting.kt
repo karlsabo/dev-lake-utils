@@ -18,7 +18,9 @@ internal fun StringBuilder.appendRecentCompletedMilestones(milestones: Set<Miles
     milestoneLines.forEach { appendLine(it) }
 }
 
-private fun Milestone.wasCompletedWithinRecentWindow(): Boolean =
-    issue.completedAt?.let { it >= recentActivityCutoff() } == true
+private fun Milestone.wasCompletedWithinRecentWindow(): Boolean {
+    val completedAt = issue.completedAt
+    return completedAt?.let { it >= recentActivityCutoff() } == true
+}
 
 private fun Milestone.completedMilestoneLine(): String = "*✅ <${issue.url}|${issue.title}>*"

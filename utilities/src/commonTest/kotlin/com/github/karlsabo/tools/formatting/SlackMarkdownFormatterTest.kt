@@ -3,13 +3,13 @@ package com.github.karlsabo.tools.formatting
 import com.github.karlsabo.dto.Project
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.github.Issue
-import com.github.karlsabo.github.User as GitHubUser
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.tools.model.Milestone
 import com.github.karlsabo.tools.model.ProjectSummary
 import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.github.karlsabo.github.User as GitHubUser
 
 class SlackMarkdownFormatterTest {
     @Test

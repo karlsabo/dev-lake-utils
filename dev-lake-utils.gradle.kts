@@ -25,7 +25,6 @@ val detektSourceRoots = files(
 
 detekt {
     source.setFrom(detektSourceRoots)
-    baseline = file("config/detekt/baseline.xml")
 }
 
 tasks.withType<Detekt>().configureEach {
