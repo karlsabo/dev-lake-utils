@@ -9,18 +9,20 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.days
 
 private const val CHANGE_CHARACTER_LIMIT = 200
-private const val RECENT_ACTIVITY_DAYS = 14
 private const val STALE_DUE_DATE_WARNING_DAYS = 90
 private const val EASTERN_TIME_ZONE = "America/New_York"
+private const val TRUNCATION_INDICATOR = "..."
 
 internal fun Milestone.header(complete: String): String {
     val assignee = issue.assigneeName ?: "No assignee"
     return "*$complete<${issue.url}|${issue.title}>: $assignee*"
 }
 
-internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean = issue.completedAt?.let { it < Clock.System.now().minus(RECENT_ACTIVITY_DAYS.days) } == true
+internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean =
+    issue.completedAt?.let { it < recentActivityCutoff() } == true
 
-internal fun Instant?.isWithinStaleWarningWindow(): Boolean = this != null && minus(STALE_DUE_DATE_WARNING_DAYS.days) < Clock.System.now()
+internal fun Instant?.isWithinStaleWarningWindow(): Boolean =
+    this != null && minus(STALE_DUE_DATE_WARNING_DAYS.days) < Clock.System.now()
 
 internal fun Milestone.latestStatus(): MilestoneStatus? {
     val lastIssue = issues.sortedByDescending { it.completedAt }.firstOrNull()
@@ -42,7 +44,7 @@ private fun Instant.isAfter(other: Instant?): Boolean = other == null || this > 
 internal sealed interface MilestoneStatus {
     val date: Instant
     val isRecent: Boolean
-        get() = date >= Clock.System.now().minus(RECENT_ACTIVITY_DAYS.days)
+        get() = date >= recentActivityCutoff()
 
     fun format(): String
 
@@ -72,4 +74,7 @@ internal sealed interface MilestoneStatus {
 
 private fun Instant.toEasternDate() = toLocalDateTime(TimeZone.of(EASTERN_TIME_ZONE)).date
 
-private fun String.truncateForSlack(): String = take(CHANGE_CHARACTER_LIMIT) + if (length > CHANGE_CHARACTER_LIMIT) "..." else ""
+private fun String.truncateForSlack(): String {
+    val suffix = if (length > CHANGE_CHARACTER_LIMIT) TRUNCATION_INDICATOR else ""
+    return take(CHANGE_CHARACTER_LIMIT) + suffix
+}

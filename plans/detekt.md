@@ -245,7 +245,9 @@
 
 **Notes:** Do not convert every exception to one mega `DevLakeException`; specific boundary errors make failures easier to handle.
 
-### 14. Slack and formatting helpers are made small and constant-driven
+### 14. Slack and formatting helpers are made small and constant-driven - Done
+
+**Done** 2026-06-03
 
 **Acceptance criteria:** Given Slack output tests or golden examples, when milestone, summary, and metrics Slack text is generated, then output remains intentional and no detekt baseline entry remains for Slack/formatting helper files.
 

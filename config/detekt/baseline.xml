@@ -12,10 +12,6 @@
     <ID>MaxLineLength:EngHubDependenciesTest.kt$private suspend fun &lt;T&gt; MutableStateFlow&lt;List&lt;T&gt;&gt;.awaitValue(): List&lt;T&gt;</ID>
     <ID>MaxLineLength:LinearRestApi.kt$LinearRestApi$override suspend fun getDirectChildIssues(parentKey: String): List&lt;ProjectIssue&gt;</ID>
     <ID>MaxLineLength:LinearRestApi.kt$private fun missingGraphQlData(responseText: String): Nothing</ID>
-    <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Instant?.isWithinStaleWarningWindow(): Boolean</ID>
-    <ID>MaxLineLength:SlackMilestoneFormatting.kt$internal fun Milestone.wasCompletedBeforeRecentWindow(): Boolean</ID>
-    <ID>MaxLineLength:SlackMilestoneFormatting.kt$private fun String.truncateForSlack(): String</ID>
     <ID>TooGenericExceptionCaught:ZapierService.kt$ZapierService$e: Exception</ID>
-    <ID>TooManyFunctions:SlackMarkdownFormatter.kt$com.github.karlsabo.tools.formatting.SlackMarkdownFormatter.kt</ID>
   </CurrentIssues>
 </SmellBaseline>
