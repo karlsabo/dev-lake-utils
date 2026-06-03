@@ -115,7 +115,7 @@ Use failures from source PR Buildkite checks or synthetic Trunk PR Buildkite che
 
 If only the `Trunk Merge Queue` check failed and no Buildkite/synthetic evidence exists: report the Trunk failure; do not edit. In persistent mode, sleep/refetch until evidence or a clear dequeue state appears; do not re-submit while unclear.
 
-Read/follow `eh-track-cicd-failure`. For Trunk MQ failures, record under the source PR, include synthetic PR/build URL, and classify against the source PR diff. Let it update `${PLANNING_MARKDOWN_DIR}/cicd-failed.md`; read the source PR entry before deciding.
+Read/follow the skill `eh-track-cicd-failure`. For Trunk MQ failures, record under the source PR, include synthetic PR/build URL, and classify against the source PR diff. Let it update `${PLANNING_MARKDOWN_DIR}/cicd-failed.md`; read the source PR entry before deciding.
 
 Only edit for:
 
