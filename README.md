@@ -25,7 +25,10 @@
     * Should have PR information if there's a PR connected to the branch
         * Should have menu options to open the PR in the web
   * Should have shortcut style buttons, open, and archive, use emojis to keep it small
-* [ ] Find large code files, plan out splitting them up.
+* [ ] When archiving a worktree, don't prompt, move it into some archiving bucket, delayed by 60 seconds or so, with a cancel archive button.
+  * Play a nice animation that moves it into a recycle bin in the bottom right of the screen, then you can click that bin and undo (stop the archive) withing 60 seconds. If archiving already began, grey out the button and have a hover text helper that says it's being removed. If there's a remote branch or some other way to recover it we should support that.
+* [ ] Add a way to create a worktree from a remote branch
+* [ ] Need a quick way to archive worktrees. Branches that aren't mine, branches that have been merged to origin/main or master.
 * [ ] Have the GH API for getting notifications return each page as it loads one, so maybe use a kotlinx coroutine channel. that way the UI is more responsive and doesn't have to wait for all notifications to load before it can start displaying some.
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
