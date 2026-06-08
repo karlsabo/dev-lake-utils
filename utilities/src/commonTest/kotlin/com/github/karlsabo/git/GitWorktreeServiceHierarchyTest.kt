@@ -2,8 +2,84 @@ package com.github.karlsabo.git
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class GitWorktreeServiceHierarchyTest {
+    @Test
+    fun inferDefaultBranchRef_usesCurrentBranchUpstreamRemoteDefaultWhenAvailable() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        fake.currentBranchUpstreamRemoteAction = { "upstream" }
+        fake.remoteDefaultBranchRefAction = { _, remote ->
+            check(remote == "upstream") { "origin fallback should not be used when upstream default is available" }
+            "upstream/HEAD"
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val defaultBranchRef = service.inferDefaultBranchRef(repoPath)
+
+        assertEquals("upstream/HEAD", defaultBranchRef)
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("currentBranchUpstreamRemote", listOf(repoPath)),
+                FakeGitCommandApi.Call("remoteDefaultBranchRef", listOf(repoPath, "upstream")),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun inferDefaultBranchRef_fallsBackToOriginHeadWhenUpstreamDefaultIsUnavailable() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        fake.currentBranchUpstreamRemoteAction = { "upstream" }
+        fake.remoteDefaultBranchRefAction = { _, remote ->
+            when (remote) {
+                "upstream" -> null
+                "origin" -> "origin/HEAD"
+                else -> error("unexpected remote $remote")
+            }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val defaultBranchRef = service.inferDefaultBranchRef(repoPath)
+
+        assertEquals("origin/HEAD", defaultBranchRef)
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("currentBranchUpstreamRemote", listOf(repoPath)),
+                FakeGitCommandApi.Call("remoteDefaultBranchRef", listOf(repoPath, "upstream")),
+                FakeGitCommandApi.Call("remoteDefaultBranchRef", listOf(repoPath, "origin")),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun inferDefaultBranchRef_returnsControlledAbsenceWhenDiscoveryFails() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        fake.currentBranchUpstreamRemoteAction = {
+            throw GitCommandException(
+                command = listOf("git", "branch", "--show-current"),
+                exitCode = 128,
+                gitOutput = "fatal: not a git repository",
+            )
+        }
+        fake.remoteDefaultBranchRefAction = { _, _ ->
+            throw GitCommandException(
+                command = listOf("git", "rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD"),
+                exitCode = 1,
+                gitOutput = "",
+            )
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val defaultBranchRef = service.inferDefaultBranchRef(repoPath)
+
+        assertNull(defaultBranchRef)
+    }
+
     @Test
     fun inferWorktreeParentBranches_selectsNearestAncestorAmongVisibleWorktrees() {
         val fake = FakeGitCommandApi()
@@ -40,6 +116,41 @@ class GitWorktreeServiceHierarchyTest {
             ),
             parents,
         )
+    }
+
+    @Test
+    fun inferWorktreeParentBranches_keepsVisibleParentWhenDefaultRefPointsAtSameCommit() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        fake.worktreeListResult = """
+            worktree /repos/dev-lake-utils
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree /repos/dev-lake-utils-feature-child
+            HEAD def456
+            branch refs/heads/feature/child
+        """.trimIndent()
+        fake.remoteDefaultBranchRefAction = { _, remote ->
+            when (remote) {
+                "origin" -> "origin/HEAD"
+                else -> null
+            }
+        }
+        fake.isAncestorAction = { _, ancestorRef, descendantRef ->
+            when (ancestorRef to descendantRef) {
+                "refs/heads/main" to "refs/heads/feature/child" -> true
+                "origin/HEAD" to "refs/heads/feature/child" -> true
+                "refs/heads/main" to "origin/HEAD" -> true
+                "origin/HEAD" to "refs/heads/main" -> true
+                else -> false
+            }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val parents = service.inferWorktreeParentBranches(repoPath)
+
+        assertEquals(mapOf("feature/child" to "main"), parents)
     }
 
     @Test

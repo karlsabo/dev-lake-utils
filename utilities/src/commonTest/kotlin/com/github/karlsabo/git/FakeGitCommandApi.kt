@@ -13,6 +13,8 @@ internal class FakeGitCommandApi : GitCommandApi {
     var isGitRepositoryResult: Boolean = true
     var fetchAction: (String, String, Array<out String>) -> Unit = { _, _, _ -> }
     var remoteBranchExistsAction: (String, String, String) -> Boolean = { _, _, _ -> false }
+    var currentBranchUpstreamRemoteAction: (String) -> String? = { null }
+    var remoteDefaultBranchRefAction: (String, String) -> String? = { _, _ -> null }
     var isAncestorAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var worktreeAddAction: (String, String, String) -> Unit = { _, _, _ -> }
     var worktreeAddNewBranchAction: (String, String, String, String) -> Unit = { _, _, _, _ -> }
@@ -49,6 +51,16 @@ internal class FakeGitCommandApi : GitCommandApi {
     ): Boolean {
         calls.add(Call("remoteBranchExists", listOf(repoPath, branch, remote)))
         return remoteBranchExistsAction(repoPath, branch, remote)
+    }
+
+    override fun currentBranchUpstreamRemote(repoPath: String): String? {
+        calls.add(Call("currentBranchUpstreamRemote", listOf(repoPath)))
+        return currentBranchUpstreamRemoteAction(repoPath)
+    }
+
+    override fun remoteDefaultBranchRef(repoPath: String, remote: String): String? {
+        calls.add(Call("remoteDefaultBranchRef", listOf(repoPath, remote)))
+        return remoteDefaultBranchRefAction(repoPath, remote)
     }
 
     override fun isAncestor(

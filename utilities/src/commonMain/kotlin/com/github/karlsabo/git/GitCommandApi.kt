@@ -18,6 +18,13 @@ interface GitRemoteCommandApi {
         branch: String,
         remote: String = "origin",
     ): Boolean
+
+    fun currentBranchUpstreamRemote(repoPath: String): String?
+
+    fun remoteDefaultBranchRef(
+        repoPath: String,
+        remote: String = "origin",
+    ): String?
 }
 
 interface GitAncestryCommandApi {

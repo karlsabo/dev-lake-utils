@@ -86,6 +86,33 @@ private class GitRemoteCommandService(
             else -> throwGitCommandException(command, result)
         }
     }
+
+    override fun currentBranchUpstreamRemote(repoPath: String): String? {
+        val currentBranch = commandRunner.run(gitRepoCommand(repoPath, "branch", "--show-current"))
+            .takeIf { it.isNotBlank() }
+            ?: return null
+        val command = gitRepoCommand(repoPath, "config", "--get", "branch.$currentBranch.remote")
+        val result = commandRunner.runForResult(command)
+        return when (result.exitCode) {
+            0 -> result.stdout.trim().takeIf { it.isNotBlank() }
+            1 -> null
+            else -> throwGitCommandException(command, result)
+        }
+    }
+
+    override fun remoteDefaultBranchRef(
+        repoPath: String,
+        remote: String,
+    ): String? {
+        require(remote.isNotBlank()) { "remote must not be blank" }
+        val command = gitRepoCommand(repoPath, "rev-parse", "--verify", "--quiet", "refs/remotes/$remote/HEAD")
+        val result = commandRunner.runForResult(command)
+        return when (result.exitCode) {
+            0 -> "$remote/HEAD"
+            1 -> null
+            else -> throwGitCommandException(command, result)
+        }
+    }
 }
 
 private class GitAncestryCommandService(

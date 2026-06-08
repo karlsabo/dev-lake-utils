@@ -129,6 +129,38 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun currentBranchUpstreamRemote_readsConfiguredTrackingRemote() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            service.clone(originDir, cloneDir)
+
+            assertEquals("origin", service.currentBranchUpstreamRemote(cloneDir))
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
+        }
+    }
+
+    @Test
+    fun remoteDefaultBranchRef_returnsRemoteHeadWhenAvailable() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            service.clone(originDir, cloneDir)
+
+            assertEquals("origin/HEAD", service.remoteDefaultBranchRef(cloneDir, "origin"))
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
+        }
+    }
+
+    @Test
     fun isAncestor_reportsMergeBaseIsAncestorSemantics() {
         val repoDir = createTempDir("repo")
         try {

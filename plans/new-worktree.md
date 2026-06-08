@@ -258,7 +258,9 @@ Relevant current code:
 
 **Scope:** Add the ambiguity/no-parent rule only. Treat missing or failed ancestry data the same as no unambiguous parent so existing flat rendering remains available. Do not render hierarchy.
 
-### 17. Infer the default branch reference for hierarchy roots
+### 17. Infer the default branch reference for hierarchy roots - Done
+
+**Done** 2026 06 08
 
 **Acceptance criteria:** Given the current branch has upstream remote `upstream`, when Eng Hub needs a default branch reference, then it uses that remote default if available and falls back to `origin/HEAD`.
 

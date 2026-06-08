@@ -17,6 +17,7 @@ interface GitWorktreeApi {
     ): Boolean
     fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees
     fun listWorktrees(repoPath: String): List<Worktree>
+    fun inferDefaultBranchRef(repoPath: String): String?
     fun inferWorktreeParentBranches(repoPath: String): Map<String, String>
     fun removeWorktree(worktreePath: String, force: Boolean = false)
     fun archiveWorktree(
