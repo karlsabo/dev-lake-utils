@@ -78,6 +78,10 @@ private class FakeGitWorktreeApi : GitWorktreeApi {
         error("listWorktrees is not used by WorktreeSetupCoordinator")
     }
 
+    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> {
+        error("inferWorktreeParentBranches is not used by WorktreeSetupCoordinator")
+    }
+
     override fun removeWorktree(worktreePath: String, force: Boolean) {
         error("removeWorktree is not used by WorktreeSetupCoordinator")
     }
@@ -160,6 +164,10 @@ private class SerializingFakeGitWorktreeApi : GitWorktreeApi {
 
     override fun listWorktrees(repoPath: String): List<Worktree> {
         error("listWorktrees is not used by WorktreeSetupCoordinator")
+    }
+
+    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> {
+        error("inferWorktreeParentBranches is not used by WorktreeSetupCoordinator")
     }
 
     override fun removeWorktree(worktreePath: String, force: Boolean) {

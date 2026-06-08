@@ -509,6 +509,8 @@ class RecordingGitWorktreeApi(
         return responses.worktreesForRepoPath?.invoke(repoPath) ?: worktreesByRepoPath.getValue(repoPath)
     }
 
+    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> = emptyMap()
+
     override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
 
     override fun archiveWorktree(

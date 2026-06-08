@@ -97,6 +97,8 @@ class NoOpGitWorktreeApi : GitWorktreeApi {
 
     override fun listWorktrees(repoPath: String) = emptyList<com.github.karlsabo.git.Worktree>()
 
+    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> = emptyMap()
+
     override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
 
     override fun archiveWorktree(

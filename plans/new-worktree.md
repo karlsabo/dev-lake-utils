@@ -232,7 +232,9 @@ Relevant current code:
 
 **Scope:** Add `merge-base --is-ancestor`-style behavior only. Do not render hierarchy or add override prompts.
 
-### 15. Infer nearest unambiguous parent among visible worktrees
+### 15. Infer nearest unambiguous parent among visible worktrees - Done
+
+**Done** 2026 06 04
 
 **Acceptance criteria:** Given visible worktrees `main`, `feature/base-pr`, and `feature/stacked-pr`, when parent candidates are evaluated, then `feature/base-pr` is selected as parent when it is the nearest unambiguous ancestor of `feature/stacked-pr`.
 
