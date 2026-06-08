@@ -273,7 +273,9 @@ Relevant current code:
 
 **Scope:** Add default-branch discovery only. If discovery fails, return a controlled absence/fallback result that callers can use to keep worktrees flat instead of throwing during polling/rendering. Do not add repository-row creation or hierarchy rendering.
 
-### 18. Log fetch failures while using local refs
+### 18. Log fetch failures while using local refs - Done
+
+**Done** 2026 06 08
 
 **Acceptance criteria:** Given remote/default branch fetch fails before an ancestry or hierarchy check, when Eng Hub continues with local refs, then it logs a warning and does not block the user flow.
 
