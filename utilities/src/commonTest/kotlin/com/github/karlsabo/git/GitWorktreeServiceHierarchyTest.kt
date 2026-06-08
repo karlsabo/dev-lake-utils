@@ -43,6 +43,50 @@ class GitWorktreeServiceHierarchyTest {
     }
 
     @Test
+    fun inferWorktreeParentBranches_leavesAmbiguousNearestAncestorWithoutParent() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        fake.worktreeListResult = """
+            worktree /repos/dev-lake-utils
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree /repos/dev-lake-utils-feature-base-a
+            HEAD def456
+            branch refs/heads/feature/base-a
+
+            worktree /repos/dev-lake-utils-feature-base-b
+            HEAD ghi789
+            branch refs/heads/feature/base-b
+
+            worktree /repos/dev-lake-utils-feature-stacked-pr
+            HEAD jkl012
+            branch refs/heads/feature/stacked-pr
+        """.trimIndent()
+        fake.isAncestorAction = { _, ancestorRef, descendantRef ->
+            when (ancestorRef to descendantRef) {
+                "refs/heads/main" to "refs/heads/feature/base-a" -> true
+                "refs/heads/main" to "refs/heads/feature/base-b" -> true
+                "refs/heads/main" to "refs/heads/feature/stacked-pr" -> true
+                "refs/heads/feature/base-a" to "refs/heads/feature/stacked-pr" -> true
+                "refs/heads/feature/base-b" to "refs/heads/feature/stacked-pr" -> true
+                else -> false
+            }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val parents = service.inferWorktreeParentBranches(repoPath)
+
+        assertEquals(
+            mapOf(
+                "feature/base-a" to "main",
+                "feature/base-b" to "main",
+            ),
+            parents,
+        )
+    }
+
+    @Test
     fun inferWorktreeParentBranches_ancestryFailureLeavesAffectedWorktreeWithoutParent() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"

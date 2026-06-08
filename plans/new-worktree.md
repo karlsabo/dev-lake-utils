@@ -245,7 +245,9 @@ Relevant current code:
 
 **Scope:** Return parent mapping for visible local worktree branches. Git/ancestry failures should produce no parent assignment for the affected worktree rather than failing the whole list. Do not change UI state or rendering.
 
-### 16. Show ambiguous or unparented worktrees flat in inferred hierarchy data
+### 16. Show ambiguous or unparented worktrees flat in inferred hierarchy data - Done
+
+**Done** 2026 06 08
 
 **Acceptance criteria:** Given two equally-near ancestor candidates for `feature/stacked-pr`, when hierarchy is inferred, then `feature/stacked-pr` has no parent assignment.
 
