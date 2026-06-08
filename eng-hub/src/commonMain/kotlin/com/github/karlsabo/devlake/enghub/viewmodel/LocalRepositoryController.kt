@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
-import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.GitWorktreeApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -121,7 +120,7 @@ internal class LocalRepositoryController(
                 .withPreservedWorktrees(
                     previousRepositories = repositories,
                     updatedRootPath = rootPath,
-                    updatedWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(rootPath),
+                    updatedWorktrees = gitWorktreeApi.toLocalWorktreeUiStates(rootPath, repositoryWorktrees.worktrees),
                     expandUpdatedRepository = true,
                 )
         }

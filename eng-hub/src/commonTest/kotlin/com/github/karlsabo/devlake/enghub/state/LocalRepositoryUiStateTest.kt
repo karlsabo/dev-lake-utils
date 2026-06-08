@@ -4,6 +4,7 @@ import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.Worktree
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class LocalRepositoryUiStateTest {
 
@@ -52,5 +53,34 @@ class LocalRepositoryUiStateTest {
 
         assertEquals(listOf(false, true), uiStates.map { it.isDirty })
         assertEquals(listOf(true, false), uiStates.map { it.isRoot })
+    }
+
+    @Test
+    fun mapsInferredWorktreeParentBranches() {
+        val uiStates = listOf(
+            Worktree(path = "/repo-base", branch = "feature/base-pr", commitHash = "abc123"),
+            Worktree(path = "/repo-stacked", branch = "feature/stacked-pr", commitHash = "def456"),
+        ).toLocalWorktreeUiStates(
+            repositoryRootPath = "/repo",
+            parentBranchesByChildBranch = mapOf("feature/stacked-pr" to "feature/base-pr"),
+        )
+
+        val repository = LocalRepositoryUiState(name = "repo", path = "/repo", worktrees = uiStates)
+
+        assertNull(repository.worktrees.single { it.branch == "feature/base-pr" }.parentBranch)
+        assertEquals(
+            "feature/base-pr",
+            repository.worktrees.single { it.branch == "feature/stacked-pr" }.parentBranch,
+        )
+    }
+
+    @Test
+    fun omitsParentBranchWhenHierarchyIsNotSupplied() {
+        val uiStates = listOf(
+            Worktree(path = "/repo", branch = "main", commitHash = "abc123"),
+            Worktree(path = "/repo-feature", branch = "feature/x", commitHash = "def456"),
+        ).toLocalWorktreeUiStates("/repo")
+
+        assertEquals(listOf(null, null), uiStates.map { it.parentBranch })
     }
 }

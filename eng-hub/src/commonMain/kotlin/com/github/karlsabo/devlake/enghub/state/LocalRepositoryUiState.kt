@@ -15,6 +15,7 @@ data class LocalWorktreeUiState(
     val path: String,
     val isDirty: Boolean = false,
     val isRoot: Boolean = false,
+    val parentBranch: String? = null,
 )
 
 data class ForceArchiveWorktreeUiState(
@@ -37,14 +38,19 @@ fun List<LocalRepositoryConfig>.toLocalRepositoryUiStates(): List<LocalRepositor
     )
     .toList()
 
-fun List<Worktree>.toLocalWorktreeUiStates(repositoryRootPath: String): List<LocalWorktreeUiState> {
+fun List<Worktree>.toLocalWorktreeUiStates(
+    repositoryRootPath: String,
+    parentBranchesByChildBranch: Map<String, String> = emptyMap(),
+): List<LocalWorktreeUiState> {
     val normalizedRepositoryRootPath = repositoryRootPath.normalizedLocalPath()
+    val visibleBranches = map { it.branch }.filterTo(mutableSetOf()) { it.isNotBlank() }
     return map { worktree ->
         LocalWorktreeUiState(
             branch = worktree.branch.ifBlank { "(detached)" },
             path = worktree.path,
             isDirty = worktree.isDirty,
             isRoot = worktree.path.normalizedLocalPath() == normalizedRepositoryRootPath,
+            parentBranch = parentBranchesByChildBranch[worktree.branch]?.takeIf { it in visibleBranches },
         )
     }
 }

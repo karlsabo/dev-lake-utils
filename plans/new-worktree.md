@@ -286,7 +286,9 @@ Relevant current code:
 
 **Scope:** Add console/log warning only. Do not add a user-visible notification.
 
-### 19. Add hierarchical worktree UI state without changing rendering
+### 19. Add hierarchical worktree UI state without changing rendering - Done
+
+**Done** 2026 06 08
 
 **Acceptance criteria:** Given an inferred parent mapping where `feature/stacked-pr` is a child of `feature/base-pr`, when worktrees are converted to UI state, then the relationship is represented in `LocalRepositoryUiState`.
 
