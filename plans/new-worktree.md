@@ -313,7 +313,9 @@ Relevant current code:
 
 **Scope:** Render one nested child level using already-supplied UI state. If hierarchy data is empty or incomplete, render the current flat list. Do not add rebase indicators/actions or new git calls.
 
-### 21. Add repository-row `Create worktree` menu action
+### 21. Add repository-row `Create worktree` menu action - Done
+
+**Done** 2026 06 09
 
 **Acceptance criteria:** Given a configured repository row, when the user opens its action menu, then `Create worktree` is available.
 

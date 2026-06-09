@@ -5,6 +5,10 @@ import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
+internal enum class RepositoryMenuAction {
+    CreateWorktree,
+}
+
 internal enum class WorktreeMenuAction {
     Open,
     CreateWorktree,
@@ -59,6 +63,12 @@ internal fun visibleWorktreeRows(worktrees: List<LocalWorktreeUiState>): List<Vi
 private fun List<LocalWorktreeUiState>.asFlatRows(): List<VisibleWorktreeRow> = map { worktree ->
     VisibleWorktreeRow(worktree = worktree, nestingDepth = 0)
 }
+
+internal fun visibleRepositoryMenuActions(repository: LocalRepositoryUiState): List<RepositoryMenuAction> = buildList {
+    if (repository.path.isNotBlank()) add(RepositoryMenuAction.CreateWorktree)
+}
+
+internal fun isRepositoryCreateWorktreeEnabled(): Boolean = false
 
 internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<WorktreeMenuAction> = buildList {
     add(WorktreeMenuAction.Open)

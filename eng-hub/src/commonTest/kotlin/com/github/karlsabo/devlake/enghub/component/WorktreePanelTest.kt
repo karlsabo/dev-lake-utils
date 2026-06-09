@@ -1,6 +1,7 @@
 package com.github.karlsabo.devlake.enghub.component
 
 import androidx.compose.ui.text.TextRange
+import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.git.WorktreeBranchNameValidator
 import com.github.karlsabo.git.WorktreeSetupStatus
@@ -46,6 +47,24 @@ class WorktreePanelTest {
 
         assertEquals(listOf("feature/stacked-pr", "main"), rows.map { it.worktree.branch })
         assertEquals(listOf(0, 0), rows.map { it.nestingDepth })
+    }
+
+    @Test
+    fun repositoryMenuExposesCreateWorktreeForConfiguredRepository() {
+        val repository = LocalRepositoryUiState(
+            name = "dev-lake-utils",
+            path = "/repos/dev-lake-utils",
+        )
+
+        assertEquals(
+            listOf(RepositoryMenuAction.CreateWorktree),
+            visibleRepositoryMenuActions(repository),
+        )
+    }
+
+    @Test
+    fun repositoryCreateWorktreeActionIsDisabledUntilBaseResolutionIsImplemented() {
+        assertFalse(isRepositoryCreateWorktreeEnabled())
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,11 +9,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.Card
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -71,8 +78,46 @@ private fun localRepositoryHeader(
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = repository.name,
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.subtitle1,
         )
+        localRepositoryActionMenu(repository)
+    }
+}
+
+@Composable
+private fun localRepositoryActionMenu(repository: LocalRepositoryUiState) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(
+            onClick = { menuExpanded = true },
+            modifier = Modifier
+                .size(32.dp)
+                .semantics { contentDescription = "Repository actions for ${repository.name}" },
+        ) {
+            Text(text = "⋮", style = MaterialTheme.typography.button)
+        }
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+        ) {
+            visibleRepositoryMenuActions(repository).forEach { action ->
+                localRepositoryMenuItem(action)
+            }
+        }
+    }
+}
+
+@Composable
+private fun localRepositoryMenuItem(action: RepositoryMenuAction) {
+    when (action) {
+        RepositoryMenuAction.CreateWorktree -> DropdownMenuItem(
+            onClick = {},
+            enabled = isRepositoryCreateWorktreeEnabled(),
+        ) {
+            Text("Create worktree")
+        }
     }
 }
 
