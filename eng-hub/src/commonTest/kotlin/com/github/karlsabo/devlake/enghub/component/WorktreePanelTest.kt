@@ -12,6 +12,43 @@ import kotlin.test.assertTrue
 class WorktreePanelTest {
 
     @Test
+    fun visibleWorktreeRowsNestOneChildLevelUnderParent() {
+        val base = LocalWorktreeUiState(
+            branch = "feature/base-pr",
+            path = "/repos/dev-lake-utils-feature-base-pr",
+        )
+        val stacked = LocalWorktreeUiState(
+            branch = "feature/stacked-pr",
+            path = "/repos/dev-lake-utils-feature-stacked-pr",
+            parentBranch = "feature/base-pr",
+        )
+
+        val rows = visibleWorktreeRows(listOf(stacked, base))
+
+        assertEquals(listOf("feature/base-pr", "feature/stacked-pr"), rows.map { it.worktree.branch })
+        assertEquals(listOf(0, 1), rows.map { it.nestingDepth })
+    }
+
+    @Test
+    fun visibleWorktreeRowsFallBackToFlatListWhenParentIsMissing() {
+        val stacked = LocalWorktreeUiState(
+            branch = "feature/stacked-pr",
+            path = "/repos/dev-lake-utils-feature-stacked-pr",
+            parentBranch = "feature/base-pr",
+        )
+        val main = LocalWorktreeUiState(
+            branch = "main",
+            path = "/repos/dev-lake-utils",
+            isRoot = true,
+        )
+
+        val rows = visibleWorktreeRows(listOf(stacked, main))
+
+        assertEquals(listOf("feature/stacked-pr", "main"), rows.map { it.worktree.branch })
+        assertEquals(listOf(0, 0), rows.map { it.nestingDepth })
+    }
+
+    @Test
     fun rootWorktreeMenuExposesCreateWorktreeButNotArchive() {
         val worktree = LocalWorktreeUiState(
             branch = "main",

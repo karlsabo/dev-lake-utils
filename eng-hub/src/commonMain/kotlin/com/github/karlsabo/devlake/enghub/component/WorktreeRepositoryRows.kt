@@ -85,7 +85,8 @@ private fun localWorktreeRows(
 ) {
     if (state.repository.isExpanded && state.repository.worktrees.isNotEmpty()) {
         Spacer(modifier = Modifier.size(8.dp))
-        state.repository.worktrees.forEach { worktree ->
+        visibleWorktreeRows(state.repository.worktrees).forEach { row ->
+            val worktree = row.worktree
             val normalizedWorktreePath = worktree.path.normalizedWorktreePath()
             key(normalizedWorktreePath) {
                 localWorktreeRow(
@@ -93,6 +94,7 @@ private fun localWorktreeRows(
                         worktree = worktree,
                         setupStatus = state.setupStatuses[WorktreePath(normalizedWorktreePath)],
                         isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
+                        nestingDepth = row.nestingDepth,
                     ),
                     onOpen = { panelActions.worktrees.onOpenWorktree(state.repository.path, worktree.path) },
                     onArchive = { onArchiveRequested(PendingArchive(state.repository.path, worktree.path)) },

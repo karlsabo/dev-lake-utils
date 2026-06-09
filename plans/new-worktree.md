@@ -300,7 +300,9 @@ Relevant current code:
 
 **Scope:** Add data shape/state plumbing only. New fields must have defaults/backward-compatible constructors so existing UI rendering and tests continue to compile and behave flat when no hierarchy is supplied. Do not visually nest rows.
 
-### 20. Render one nested child level in the Worktrees pane
+### 20. Render one nested child level in the Worktrees pane - Done
+
+**Done** 2026 06 09
 
 **Acceptance criteria:** Given UI state where `feature/stacked-pr` is a child of `feature/base-pr`, when the Worktrees pane renders, then the child row appears indented under the parent row.
 

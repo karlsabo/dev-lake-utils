@@ -47,7 +47,7 @@ internal fun localWorktreeRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width((16 + 24 * state.nestingDepth.coerceIn(0, 1)).dp))
         worktreeDirtyIndicator(state.worktree)
         Spacer(modifier = Modifier.width(8.dp))
         Text(

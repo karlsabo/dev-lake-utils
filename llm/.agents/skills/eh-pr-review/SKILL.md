@@ -9,7 +9,9 @@ allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Exp
 
 You are conducting a review of a git merge request. Never give ad hoc review findings: always write the planned comments document, run the subagent pass, re-read the document, then summarize. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
 
-Keep comments terse, concise, and scoped. Prefer a conversational review voice: "Did you consider that...", "I believe...", "What about...". Avoid commands and heavy phrasing ("must", "should", "please fix", "before exposing"). Use "we" for shared ownership when needed, but do not force it into natural question openers.
+Keep comments terse, concise, and scoped. Make them sound like a thoughtful teammate, not a lint rule or generated template. Prefer natural, conversational wording and only use question-led phrasing when it fits the concern. Avoid commands and heavy phrasing ("must", "please fix", "before exposing"), and avoid canned openers repeated across comments ("Did you consider...", "Should this..."). Use "we" for shared ownership when needed, but do not force it into unnatural question openers.
+
+Before keeping any comment, run a human-voice check: would this sound normal if pasted into Slack by a senior engineer? If it sounds robotic, rewrite it shorter and more directly. Prefer concrete wording tied to the code path, for example: "If Statsig errors here, do we want to fall back to `False` to keep the v3 path safe?" over "Should this return False if Statsig raises? The docstring says this MUST default..."
 
 ## Workflow
 
@@ -103,7 +105,7 @@ Review the Pull Request comments document at ${PLANNING_MARKDOWN_DIR}/pr-{number
 1. Remove or rewrite comments that are weak, speculative, redundant, not actionable, or not well-supported by the PR.
 2. Keep the tone constructive, but be skeptical about whether each comment should really be posted.
 3. Ensure the `Overall PR Comment` is terse, neutral, and does not repeat what is already covered by inline comments. Prefer a short opener like "Couple of things to look at:" when there are comments.
-4. Rewrite inline comments into the user's preferred style: question-led, non-commanding, no "please fix", no overstatement.
+4. Rewrite inline comments into the user's preferred style: human, specific, non-commanding, no "please fix", no overstatement. Use question-led phrasing only when it reads naturally; avoid robotic/canned sentence shapes.
 5. Preserve the existing document structure and section headings.
 
 In your final response, state whether you changed the file and briefly summarize the changes.
@@ -172,7 +174,11 @@ When the user says they're ready (e.g., "looks good," "post it," "create the rev
 - Be constructive, not nitpicky, every comment should help the author
 - Prioritize bugs over style, a bug matters more than a naming nit
 - Start inline comments with the concern, not the prescription
-- Prefer "Did you consider that..." for risks and "I believe..." when the conclusion depends on surrounding routing/config
+- "Did you consider..." or "Should this..." are options, not defaults.
+- Prefer comments that sound like normal engineering feedback: specific, plainspoken, and tied to the code path.
+- Avoid restating obvious text from nearby code/docstrings unless it is necessary to explain the risk.
+- Good pattern: "If X happens here, do we want Y as the fallback?" Bad pattern: "Should this do Y? The docstring says... there does not appear..."
+- Prefer "I believe..." only when the conclusion depends on surrounding routing/config and the uncertainty matters.
 - Avoid asking for an exact implementation unless the fix is obvious and low-risk
 - Reference principles by name (DRY, Orthogonality, etc.) only when it materially clarifies the comment
 - If the PR is clean and well-written, say so, don't manufacture comments
