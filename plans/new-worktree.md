@@ -326,7 +326,9 @@ Relevant current code:
 
 **Scope:** Add repository-row action only. Until base resolution is implemented, the action must be disabled, no-op safely, or show a controlled unsupported message; it must not throw. Do not resolve base, submit dialog, or create a worktree.
 
-### 22. Resolve repository-row create base to the inferred default branch
+### 22. Resolve repository-row create base to the inferred default branch - Done
+
+**Done** 2026 06 10
 
 **Acceptance criteria:** Given a configured repository row, when create-worktree is requested from that row, then the ViewModel requests a base ref from default-branch inference.
 

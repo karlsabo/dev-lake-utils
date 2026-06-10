@@ -409,6 +409,8 @@ data class CreateBranchWorktreeCall(
 data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
+    val defaultBranchRefsByRepoPath: Map<String, String?> = emptyMap(),
+    val inferDefaultBranchRefFailure: RuntimeException? = null,
     val listWorktreesFailure: RuntimeException? = null,
     val archiveWorktreeFailure: RuntimeException? = null,
 )
@@ -457,6 +459,7 @@ class RecordingGitWorktreeApi(
     val ensureRepositoryCalls = mutableListOf<Pair<String, String>>()
     val ensureWorktreeCalls = mutableListOf<Pair<String, String>>()
     val createBranchWorktreeCalls = mutableListOf<CreateBranchWorktreeCall>()
+    val inferDefaultBranchRefCalls = mutableListOf<String>()
     val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
     val archiveWorktreeForceValues = mutableListOf<Boolean>()
     private val worktreesByRepoPath = responses.worktreesByRepoPath
@@ -509,7 +512,11 @@ class RecordingGitWorktreeApi(
         return responses.worktreesForRepoPath?.invoke(repoPath) ?: worktreesByRepoPath.getValue(repoPath)
     }
 
-    override fun inferDefaultBranchRef(repoPath: String): String? = null
+    override fun inferDefaultBranchRef(repoPath: String): String? {
+        inferDefaultBranchRefCalls += repoPath
+        responses.inferDefaultBranchRefFailure?.let { throw it }
+        return responses.defaultBranchRefsByRepoPath[repoPath]
+    }
 
     override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> = emptyMap()
 

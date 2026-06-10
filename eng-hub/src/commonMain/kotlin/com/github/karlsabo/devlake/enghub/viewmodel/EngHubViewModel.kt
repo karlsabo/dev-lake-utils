@@ -86,6 +86,9 @@ class EngHubViewModel(
     internal val lastCreateLocalWorktreeFromBaseRequestStateFlow:
         StateFlow<CreateLocalWorktreeFromBaseRequest?> =
         state.lastCreateLocalWorktreeFromBaseRequest.asStateFlow()
+    internal val lastCreateLocalWorktreeFromRepositoryRequestStateFlow:
+        StateFlow<CreateLocalWorktreeFromRepositoryRequest?> =
+        state.lastCreateLocalWorktreeFromRepositoryRequest.asStateFlow()
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.archivingLocalWorktreePaths.asStateFlow()
     val forceArchiveWorktreeRequestStateFlow: StateFlow<ForceArchiveWorktreeUiState?> =
@@ -128,6 +131,9 @@ class EngHubViewModel(
     internal val requestCheckoutSetup: (String, String) -> WorktreeSetupHandle =
         checkoutController::requestCheckoutSetup
     val checkoutWorktreePath: (String, String) -> WorktreePath = checkoutController::checkoutWorktreePath
+    fun requestCreateLocalWorktreeFromRepository(repoRootPath: String) =
+        localWorktreeCreateController.requestCreateLocalWorktreeFromRepository(repoRootPath)
+
     fun createLocalWorktreeFromBase(
         repoRootPath: String,
         baseWorktreePath: String,

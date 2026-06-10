@@ -19,6 +19,25 @@ internal class LocalWorktreeCreateController(
     private val localRepositories: LocalRepositoryController,
     private val errorReporter: ActionErrorReporter,
 ) {
+    fun requestCreateLocalWorktreeFromRepository(repoRootPath: String) {
+        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        logger.info { "Create local worktree requested for repository $normalizedRepoRootPath" }
+        state.lastCreateLocalWorktreeFromRepositoryRequest.value = null
+
+        viewModel.viewModelScope.launch(Dispatchers.IO) {
+            runCatching { resolveCreateLocalWorktreeRepositoryBase(normalizedRepoRootPath) }
+                .rethrowCancellation()
+                .onSuccess { request -> state.lastCreateLocalWorktreeFromRepositoryRequest.value = request }
+                .onFailure { failure ->
+                    val message = failure.message ?: "Failed to resolve default branch for worktree creation"
+                    logger.error(failure) {
+                        "Failed to resolve create local worktree base for repository $normalizedRepoRootPath"
+                    }
+                    errorReporter.enqueueActionError(message)
+                }
+        }
+    }
+
     fun createLocalWorktreeFromBase(
         repoRootPath: String,
         baseWorktreePath: String,
@@ -41,6 +60,21 @@ internal class LocalWorktreeCreateController(
                 .onFailure { failure -> handleCreateFailure(request, refresh, failure) }
             refresh.refreshAfterSuccessIfNeeded()
         }
+    }
+
+    private fun resolveCreateLocalWorktreeRepositoryBase(
+        normalizedRepoRootPath: String,
+    ): CreateLocalWorktreeFromRepositoryRequest {
+        require(normalizedRepoRootPath.isNotEmpty()) { "Repository root path is required" }
+        val baseRef = worktreeServices.gitWorktreeApi.inferDefaultBranchRef(normalizedRepoRootPath)
+        require(!baseRef.isNullOrBlank()) {
+            "Could not infer default branch for $normalizedRepoRootPath"
+        }
+        return CreateLocalWorktreeFromRepositoryRequest(
+            repoRootPath = normalizedRepoRootPath,
+            baseWorktreePath = normalizedRepoRootPath,
+            baseBranch = baseRef,
+        )
     }
 
     private suspend fun createLocalWorktree(
