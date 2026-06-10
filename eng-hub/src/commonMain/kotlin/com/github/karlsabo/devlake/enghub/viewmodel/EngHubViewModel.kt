@@ -134,6 +134,9 @@ class EngHubViewModel(
     fun requestCreateLocalWorktreeFromRepository(repoRootPath: String) =
         localWorktreeCreateController.requestCreateLocalWorktreeFromRepository(repoRootPath)
 
+    fun clearCreateLocalWorktreeFromRepositoryRequest() =
+        localWorktreeCreateController.clearCreateLocalWorktreeFromRepositoryRequest()
+
     fun createLocalWorktreeFromBase(
         repoRootPath: String,
         baseWorktreePath: String,

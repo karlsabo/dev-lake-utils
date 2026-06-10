@@ -68,7 +68,11 @@ internal fun visibleRepositoryMenuActions(repository: LocalRepositoryUiState): L
     if (repository.path.isNotBlank()) add(RepositoryMenuAction.CreateWorktree)
 }
 
-internal fun isRepositoryCreateWorktreeEnabled(): Boolean = false
+internal fun isRepositoryCreateWorktreeEnabled(
+    repository: LocalRepositoryUiState,
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+): Boolean = repository.path.isNotBlank() && setupStatus == null && !isArchiving
 
 internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<WorktreeMenuAction> = buildList {
     add(WorktreeMenuAction.Open)

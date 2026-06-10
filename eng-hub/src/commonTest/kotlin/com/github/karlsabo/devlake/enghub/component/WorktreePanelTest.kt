@@ -63,8 +63,51 @@ class WorktreePanelTest {
     }
 
     @Test
-    fun repositoryCreateWorktreeActionIsDisabledUntilBaseResolutionIsImplemented() {
-        assertFalse(isRepositoryCreateWorktreeEnabled())
+    fun repositoryCreateWorktreeActionIsEnabledWhenRepositoryBaseIsIdle() {
+        val repository = LocalRepositoryUiState(
+            name = "dev-lake-utils",
+            path = "/repos/dev-lake-utils",
+        )
+
+        assertTrue(
+            isRepositoryCreateWorktreeEnabled(
+                repository = repository,
+                setupStatus = null,
+                isArchiving = false,
+            ),
+        )
+    }
+
+    @Test
+    fun repositoryCreateWorktreeActionIsDisabledWhileBaseSetupIsInProgress() {
+        val repository = LocalRepositoryUiState(
+            name = "dev-lake-utils",
+            path = "/repos/dev-lake-utils",
+        )
+
+        assertFalse(
+            isRepositoryCreateWorktreeEnabled(
+                repository = repository,
+                setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
+                isArchiving = false,
+            ),
+        )
+    }
+
+    @Test
+    fun repositoryCreateWorktreeActionIsDisabledWhileBaseArchiveIsInProgress() {
+        val repository = LocalRepositoryUiState(
+            name = "dev-lake-utils",
+            path = "/repos/dev-lake-utils",
+        )
+
+        assertFalse(
+            isRepositoryCreateWorktreeEnabled(
+                repository = repository,
+                setupStatus = null,
+                isArchiving = true,
+            ),
+        )
     }
 
     @Test
@@ -117,6 +160,23 @@ class WorktreePanelTest {
             createWorktreeDialogState(
                 repoRootPath = "/repos/dev-lake-utils",
                 worktree = worktree,
+            ),
+        )
+    }
+
+    @Test
+    fun repositoryCreateWorktreeDialogUsesDefaultBranchBaseAndEmptyTargetBranch() {
+        assertEquals(
+            PendingCreateWorktree(
+                repoRootPath = "/repos/dev-lake-utils",
+                baseWorktreePath = "/repos/dev-lake-utils",
+                baseBranch = "main",
+                targetBranch = "",
+            ),
+            createRepositoryWorktreeDialogState(
+                repoRootPath = "/repos/dev-lake-utils",
+                baseWorktreePath = "/repos/dev-lake-utils",
+                baseBranch = "main",
             ),
         )
     }

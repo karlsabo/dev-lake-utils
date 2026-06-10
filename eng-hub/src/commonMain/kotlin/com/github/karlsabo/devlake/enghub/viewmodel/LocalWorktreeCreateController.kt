@@ -38,6 +38,10 @@ internal class LocalWorktreeCreateController(
         }
     }
 
+    fun clearCreateLocalWorktreeFromRepositoryRequest() {
+        state.lastCreateLocalWorktreeFromRepositoryRequest.value = null
+    }
+
     fun createLocalWorktreeFromBase(
         repoRootPath: String,
         baseWorktreePath: String,

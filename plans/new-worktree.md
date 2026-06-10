@@ -339,7 +339,9 @@ Relevant current code:
 
 **Scope:** Base selection only. Failure to infer a default branch should be reported as a caught action error and leave the dialog/action flow dismissible. Do not create/setup or change dialog rendering.
 
-### 23. Create and set up from repository-row default branch
+### 23. Create and set up from repository-row default branch - Done
+
+**Done** 2026 06 10
 
 **Acceptance criteria:** Given a configured repository row whose inferred default base is `main`, when the user enters `feature/new-dashboard`, then Eng Hub creates `feature/new-dashboard` from `main`, runs setup, and refreshes the repository row.
 

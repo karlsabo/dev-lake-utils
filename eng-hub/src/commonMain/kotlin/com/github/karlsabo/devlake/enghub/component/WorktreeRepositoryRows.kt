@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.git.WorktreePath
+import com.github.karlsabo.git.WorktreeSetupStatus
 
 @Composable
 internal fun localRepositoryRow(
@@ -41,8 +42,9 @@ internal fun localRepositoryRow(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             localRepositoryHeader(
-                repository = state.repository,
+                state = state,
                 onToggleRepository = { panelActions.onToggleRepository(state.repository.path) },
+                onCreateWorktreeFromRepository = { panelActions.onCreateWorktreeFromRepository(state.repository.path) },
             )
             Text(text = state.repository.path, style = MaterialTheme.typography.caption)
             localWorktreeRows(
@@ -57,9 +59,14 @@ internal fun localRepositoryRow(
 
 @Composable
 private fun localRepositoryHeader(
-    repository: LocalRepositoryUiState,
+    state: WorktreeRowsState,
     onToggleRepository: () -> Unit,
+    onCreateWorktreeFromRepository: () -> Unit,
 ) {
+    val repository = state.repository
+    val normalizedRepositoryPath = repository.normalizedPathOrNull()
+    val repositoryStatus = normalizedRepositoryPath?.let { state.setupStatuses[WorktreePath(it)] }
+    val isRepositoryArchiving = normalizedRepositoryPath != null && normalizedRepositoryPath in state.archivingWorktreePaths
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -81,12 +88,22 @@ private fun localRepositoryHeader(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.subtitle1,
         )
-        localRepositoryActionMenu(repository)
+        localRepositoryActionMenu(
+            repository = repository,
+            setupStatus = repositoryStatus,
+            isArchiving = isRepositoryArchiving,
+            onCreateWorktreeFromRepository = onCreateWorktreeFromRepository,
+        )
     }
 }
 
 @Composable
-private fun localRepositoryActionMenu(repository: LocalRepositoryUiState) {
+private fun localRepositoryActionMenu(
+    repository: LocalRepositoryUiState,
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+    onCreateWorktreeFromRepository: () -> Unit,
+) {
     var menuExpanded by remember { mutableStateOf(false) }
 
     Box {
@@ -103,18 +120,33 @@ private fun localRepositoryActionMenu(repository: LocalRepositoryUiState) {
             onDismissRequest = { menuExpanded = false },
         ) {
             visibleRepositoryMenuActions(repository).forEach { action ->
-                localRepositoryMenuItem(action)
+                localRepositoryMenuItem(
+                    action = action,
+                    repository = repository,
+                    setupStatus = setupStatus,
+                    isArchiving = isArchiving,
+                    onCreateWorktreeFromRepository = {
+                        menuExpanded = false
+                        onCreateWorktreeFromRepository()
+                    },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun localRepositoryMenuItem(action: RepositoryMenuAction) {
+private fun localRepositoryMenuItem(
+    action: RepositoryMenuAction,
+    repository: LocalRepositoryUiState,
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+    onCreateWorktreeFromRepository: () -> Unit,
+) {
     when (action) {
         RepositoryMenuAction.CreateWorktree -> DropdownMenuItem(
-            onClick = {},
-            enabled = isRepositoryCreateWorktreeEnabled(),
+            onClick = onCreateWorktreeFromRepository,
+            enabled = isRepositoryCreateWorktreeEnabled(repository, setupStatus, isArchiving),
         ) {
             Text("Create worktree")
         }
@@ -157,5 +189,7 @@ private fun repositoryToggleDescription(repository: LocalRepositoryUiState): Str
 } else {
     "Expand ${repository.name}"
 }
+
+private fun LocalRepositoryUiState.normalizedPathOrNull(): String? = path.normalizedWorktreePath().takeIf { it.isNotEmpty() }
 
 private fun String.normalizedWorktreePath(): String = trim().trimEnd('/', '\\')

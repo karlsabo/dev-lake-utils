@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
+import com.github.karlsabo.devlake.enghub.component.createRepositoryWorktreeDialogState
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
@@ -64,6 +65,7 @@ internal fun collectEngHubScreenState(
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
     val archivingPaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
     val forceArchiveRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
+    val repositoryCreateWorktreeRequest by viewModel.lastCreateLocalWorktreeFromRepositoryRequestStateFlow.collectAsState()
 
     return EngHubScreenState(
         selectedPane = selectedPane,
@@ -82,6 +84,13 @@ internal fun collectEngHubScreenState(
             forceArchiveRequest = forceArchiveRequest,
             setupStatuses = setupStatuses,
             archivingWorktreePaths = archivingPaths,
+            repositoryCreateWorktreeRequest = repositoryCreateWorktreeRequest?.let { request ->
+                createRepositoryWorktreeDialogState(
+                    repoRootPath = request.repoRootPath,
+                    baseWorktreePath = request.baseWorktreePath,
+                    baseBranch = request.baseBranch,
+                )
+            },
         ),
     )
 }
@@ -112,6 +121,8 @@ internal fun engHubScreenActions(
     worktrees = WorktreePanelActions(
         onAddRepository = viewModel.pickAndAddLocalRepository,
         onToggleRepository = viewModel.toggleLocalRepositoryExpansion,
+        onCreateWorktreeFromRepository = viewModel::requestCreateLocalWorktreeFromRepository,
+        onRepositoryCreateWorktreeRequestHandled = viewModel::clearCreateLocalWorktreeFromRepositoryRequest,
         worktrees = LocalWorktreeActions(
             onOpenWorktree = viewModel.openLocalWorktree,
             onArchiveWorktree = viewModel.archiveLocalWorktree,

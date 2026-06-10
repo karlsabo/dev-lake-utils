@@ -12,6 +12,7 @@ import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,13 @@ internal fun worktreePanel(
 ) {
     var pendingArchive by remember { mutableStateOf<PendingArchive?>(null) }
     var pendingCreateWorktree by remember { mutableStateOf<PendingCreateWorktree?>(null) }
+
+    LaunchedEffect(state.repositoryCreateWorktreeRequest) {
+        state.repositoryCreateWorktreeRequest?.let { request ->
+            pendingCreateWorktree = request
+            actions.onRepositoryCreateWorktreeRequestHandled()
+        }
+    }
 
     worktreeDialogHost(
         state = WorktreeDialogState(

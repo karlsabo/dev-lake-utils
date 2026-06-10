@@ -18,11 +18,14 @@ internal data class WorktreePanelState(
     val forceArchiveRequest: ForceArchiveWorktreeUiState?,
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
+    val repositoryCreateWorktreeRequest: PendingCreateWorktree? = null,
 )
 
 internal data class WorktreePanelActions(
     val onAddRepository: () -> Unit,
     val onToggleRepository: (String) -> Unit,
+    val onCreateWorktreeFromRepository: (String) -> Unit,
+    val onRepositoryCreateWorktreeRequestHandled: () -> Unit,
     val worktrees: LocalWorktreeActions,
     val forceArchive: ForceArchiveWorktreeActions,
 )
@@ -53,10 +56,20 @@ internal data class PendingArchive(
 internal fun createWorktreeDialogState(
     repoRootPath: String,
     worktree: LocalWorktreeUiState,
-): PendingCreateWorktree = PendingCreateWorktree(
+): PendingCreateWorktree = createRepositoryWorktreeDialogState(
     repoRootPath = repoRootPath,
     baseWorktreePath = worktree.path,
     baseBranch = worktree.branch,
+)
+
+internal fun createRepositoryWorktreeDialogState(
+    repoRootPath: String,
+    baseWorktreePath: String,
+    baseBranch: String,
+): PendingCreateWorktree = PendingCreateWorktree(
+    repoRootPath = repoRootPath,
+    baseWorktreePath = baseWorktreePath,
+    baseBranch = baseBranch,
 )
 
 internal fun submitCreateWorktreeDialog(
