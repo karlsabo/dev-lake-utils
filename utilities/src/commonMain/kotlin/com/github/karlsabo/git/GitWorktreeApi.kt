@@ -9,6 +9,9 @@ interface GitWorktreeApi {
         baseBranch: String,
         targetBranch: String,
     ): String
+    fun planBranchWorktreeCreation(repoPath: String, targetBranch: String): BranchWorktreeCreationPlan {
+        throw UnsupportedOperationException("planBranchWorktreeCreation is not implemented")
+    }
     fun worktreeExists(repoPath: String, branch: String): Boolean
     fun isBranchAncestor(
         repoPath: String,
@@ -32,3 +35,23 @@ data class RepositoryWorktrees(
     val selectedWorktreePath: String,
     val worktrees: List<Worktree>,
 )
+
+sealed interface BranchWorktreeCreationPlan {
+    val targetBranch: String
+    val worktreePath: String
+
+    data class CreateNewBranch(
+        override val targetBranch: String,
+        override val worktreePath: String,
+    ) : BranchWorktreeCreationPlan
+
+    data class UseExistingLocalBranch(
+        override val targetBranch: String,
+        override val worktreePath: String,
+    ) : BranchWorktreeCreationPlan
+
+    data class ReuseExistingWorktree(
+        override val targetBranch: String,
+        override val worktreePath: String,
+    ) : BranchWorktreeCreationPlan
+}

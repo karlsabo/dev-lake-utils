@@ -27,6 +27,13 @@ interface GitRemoteCommandApi {
     ): String?
 }
 
+interface GitBranchCommandApi {
+    fun localBranchExists(
+        repoPath: String,
+        branch: String,
+    ): Boolean
+}
+
 interface GitAncestryCommandApi {
     fun isAncestor(
         repoPath: String,
@@ -70,6 +77,7 @@ interface GitRawCommandExecutor {
 interface GitCommandApi :
     GitRepositoryCommandApi,
     GitRemoteCommandApi,
+    GitBranchCommandApi,
     GitAncestryCommandApi,
     GitWorktreeCommandApi,
     GitWorkingTreeCommandApi,

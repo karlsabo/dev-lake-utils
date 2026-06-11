@@ -354,7 +354,9 @@ Relevant current code:
 
 **Scope:** Reuse the dialog/create path from worktree-row creation. Creation/setup/default-branch failures must be caught and reported without breaking existing Worktrees pane behavior. Do not add custom base selection or custom target path.
 
-### 24. Detect local branch existence without a worktree
+### 24. Detect local branch existence without a worktree - Done
+
+**Done** 2026 06 11
 
 **Acceptance criteria:** Given local branch `feature/stacked-pr` exists and no exact target worktree exists, when creation is requested, then Eng Hub detects the existing branch before creating a new branch.
 

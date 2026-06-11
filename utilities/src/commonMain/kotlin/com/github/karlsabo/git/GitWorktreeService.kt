@@ -45,6 +45,11 @@ class GitWorktreeService(
         targetBranch: String,
     ): String = creator.createBranchWorktree(repoPath, baseWorktreePath, baseBranch, targetBranch)
 
+    override fun planBranchWorktreeCreation(
+        repoPath: String,
+        targetBranch: String,
+    ): BranchWorktreeCreationPlan = creator.planBranchWorktreeCreation(repoPath, targetBranch)
+
     override fun worktreeExists(repoPath: String, branch: String): Boolean = creator.worktreeExists(repoPath, branch)
 
     override fun isBranchAncestor(
@@ -187,19 +192,47 @@ private class GitWorktreeCreator(
     ): String {
         require(baseWorktreePath.isNotBlank()) { "baseWorktreePath must not be blank" }
         branchValidator.validate(baseBranch)
+        return when (val plan = planBranchWorktreeCreation(repoPath, targetBranch)) {
+            is BranchWorktreeCreationPlan.ReuseExistingWorktree -> {
+                logger.info { "Worktree already exists at ${plan.worktreePath} for branch $targetBranch" }
+                plan.worktreePath
+            }
+
+            is BranchWorktreeCreationPlan.UseExistingLocalBranch -> throw GitWorktreeException(
+                "Local branch $targetBranch already exists without a worktree at ${plan.worktreePath}.",
+            )
+
+            is BranchWorktreeCreationPlan.CreateNewBranch -> {
+                addNewBranchWorktree(baseWorktreePath, targetBranch, plan.worktreePath, baseBranch)
+                logger.info { "Created worktree at ${plan.worktreePath} for branch $targetBranch from $baseBranch" }
+                plan.worktreePath
+            }
+        }
+    }
+
+    fun planBranchWorktreeCreation(repoPath: String, targetBranch: String): BranchWorktreeCreationPlan {
         branchValidator.validate(targetBranch)
         val worktreePath = buildWorktreePath(repoPath, targetBranch).value
         val existingWorktrees = lister.listWorktreeEntries(repoPath)
 
         failIfBranchCheckedOutElsewhere(existingWorktrees, targetBranch, worktreePath)
         if (exactTargetWorktreeExists(existingWorktrees, targetBranch, worktreePath)) {
-            logger.info { "Worktree already exists at $worktreePath for branch $targetBranch" }
-            return worktreePath
+            return BranchWorktreeCreationPlan.ReuseExistingWorktree(
+                targetBranch = targetBranch,
+                worktreePath = worktreePath,
+            )
+        }
+        if (localBranchExists(repoPath, targetBranch)) {
+            return BranchWorktreeCreationPlan.UseExistingLocalBranch(
+                targetBranch = targetBranch,
+                worktreePath = worktreePath,
+            )
         }
         failIfRemoteBranchExists(repoPath, targetBranch)
-        addNewBranchWorktree(baseWorktreePath, targetBranch, worktreePath, baseBranch)
-        logger.info { "Created worktree at $worktreePath for branch $targetBranch from $baseBranch" }
-        return worktreePath
+        return BranchWorktreeCreationPlan.CreateNewBranch(
+            targetBranch = targetBranch,
+            worktreePath = worktreePath,
+        )
     }
 
     fun worktreeExists(repoPath: String, branch: String): Boolean {
@@ -252,6 +285,12 @@ private class GitWorktreeCreator(
         worktreePath: String,
     ): Boolean = worktrees.any { worktree ->
         worktree.path == worktreePath && worktree.branch == targetBranch
+    }
+
+    private fun localBranchExists(repoPath: String, targetBranch: String): Boolean = try {
+        gitCommandApi.localBranchExists(repoPath, targetBranch)
+    } catch (e: GitCommandException) {
+        throw GitWorktreeException("Failed to check local branch $targetBranch: ${e.gitOutput}", e)
     }
 
     private fun failIfRemoteBranchExists(repoPath: String, targetBranch: String) {

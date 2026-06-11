@@ -13,6 +13,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var isGitRepositoryResult: Boolean = true
     var fetchAction: (String, String, Array<out String>) -> Unit = { _, _, _ -> }
     var remoteBranchExistsAction: (String, String, String) -> Boolean = { _, _, _ -> false }
+    var localBranchExistsAction: (String, String) -> Boolean = { _, _ -> false }
     var currentBranchUpstreamRemoteAction: (String) -> String? = { null }
     var remoteDefaultBranchRefAction: (String, String) -> String? = { _, _ -> null }
     var isAncestorAction: (String, String, String) -> Boolean = { _, _, _ -> false }
@@ -51,6 +52,14 @@ internal class FakeGitCommandApi : GitCommandApi {
     ): Boolean {
         calls.add(Call("remoteBranchExists", listOf(repoPath, branch, remote)))
         return remoteBranchExistsAction(repoPath, branch, remote)
+    }
+
+    override fun localBranchExists(
+        repoPath: String,
+        branch: String,
+    ): Boolean {
+        calls.add(Call("localBranchExists", listOf(repoPath, branch)))
+        return localBranchExistsAction(repoPath, branch)
     }
 
     override fun currentBranchUpstreamRemote(repoPath: String): String? {

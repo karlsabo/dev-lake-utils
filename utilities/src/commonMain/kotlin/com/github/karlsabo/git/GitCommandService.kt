@@ -13,6 +13,7 @@ private class DefaultGitCommandApi(
 ) : GitCommandApi,
     GitRepositoryCommandApi by GitRepositoryCommandService(commandRunner),
     GitRemoteCommandApi by GitRemoteCommandService(commandRunner),
+    GitBranchCommandApi by GitBranchCommandService(commandRunner),
     GitAncestryCommandApi by GitAncestryCommandService(commandRunner),
     GitWorktreeCommandApi by GitWorktreeCommandService(commandRunner),
     GitWorkingTreeCommandApi by GitWorkingTreeCommandService(commandRunner),
@@ -110,6 +111,23 @@ private class GitRemoteCommandService(
         return when (result.exitCode) {
             0 -> "$remote/HEAD"
             1 -> null
+            else -> throwGitCommandException(command, result)
+        }
+    }
+}
+
+private class GitBranchCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitBranchCommandApi {
+    override fun localBranchExists(
+        repoPath: String,
+        branch: String,
+    ): Boolean {
+        val command = gitRepoCommand(repoPath, "show-ref", "--verify", "--quiet", "refs/heads/$branch")
+        val result = commandRunner.runForResult(command)
+        return when (result.exitCode) {
+            0 -> true
+            1 -> false
             else -> throwGitCommandException(command, result)
         }
     }

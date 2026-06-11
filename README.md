@@ -59,6 +59,8 @@
   * Add a settings option that allows it to run automatically
 * [ ] Add a UI menu option to upgrade agent harnesses (claude code, codex, pi, goose, etc)
     * Add a settings option that allows it to run automatically
+    * Also add auto install, detect OS and install type, so npm i (skip -g since that requires root on linux).
+      * brew, dnf, etc.
 * [ ] Create native executables
 * [ ] Consider consolidating into a single configuration file
 * [ ] Add a UI panel for showing tickets assigned to the user
