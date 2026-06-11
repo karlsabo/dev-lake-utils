@@ -369,7 +369,9 @@ Relevant current code:
 
 **Scope:** Detection only. Expose enough typed utility result data for later stories to choose between `worktree add -b <new-branch> <path> <base>` and `worktree add <path> <existing-branch>`, but do not validate ancestry or add override UI.
 
-### 25. Block existing target branch when ancestry check fails
+### 25. Block existing target branch when ancestry check fails - Done
+
+**Done** 2026 06 11
 
 **Acceptance criteria:** Given existing branch `feature/stacked-pr` is not descended from selected base `feature/base-pr`, when creation is requested, then Eng Hub shows an error and does not create/setup the worktree.
 

@@ -120,6 +120,7 @@ class GitWorktreeServiceCreateTest {
             branch refs/heads/main
         """.trimIndent()
         fake.localBranchExistsAction = { _, _ -> true }
+        fake.isAncestorAction = { _, _, _ -> true }
         val service = GitWorktreeService(fake)
 
         val ex = assertFailsWith<GitWorktreeException> {
@@ -141,6 +142,59 @@ class GitWorktreeServiceCreateTest {
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", targetBranch)),
                 FakeGitCommandApi.Call("worktreeList", listOf(repoPath)),
                 FakeGitCommandApi.Call("localBranchExists", listOf(repoPath, targetBranch)),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature/base-pr")),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", targetBranch)),
+                FakeGitCommandApi.Call(
+                    "isAncestor",
+                    listOf(repoPath, "refs/heads/feature/base-pr", "refs/heads/feature/stacked-pr"),
+                ),
+            ),
+            fake.calls,
+        )
+        assertTrue(fake.calls.none { it.method == "remoteBranchExists" })
+        assertTrue(fake.calls.none { it.method == "worktreeAddNewBranch" })
+    }
+
+    @Test
+    fun createBranchWorktree_existingLocalBranchWithoutWorktreeFailsWhenTargetIsNotDescendedFromBase() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        val targetBranch = "feature/stacked-pr"
+        fake.worktreeListResult = """
+            worktree /repos/dev-lake-utils
+            HEAD abc123
+            branch refs/heads/main
+        """.trimIndent()
+        fake.localBranchExistsAction = { _, _ -> true }
+        fake.isAncestorAction = { _, _, _ -> false }
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.createBranchWorktree(
+                repoPath,
+                "/repos/dev-lake-utils-feature-base-pr",
+                "feature/base-pr",
+                targetBranch,
+            )
+        }
+
+        assertEquals(
+            "Existing branch feature/stacked-pr is not descended from selected base feature/base-pr. " +
+                "Choose a different branch or start from the correct base.",
+            ex.message,
+        )
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature/base-pr")),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", targetBranch)),
+                FakeGitCommandApi.Call("worktreeList", listOf(repoPath)),
+                FakeGitCommandApi.Call("localBranchExists", listOf(repoPath, targetBranch)),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", "feature/base-pr")),
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", targetBranch)),
+                FakeGitCommandApi.Call(
+                    "isAncestor",
+                    listOf(repoPath, "refs/heads/feature/base-pr", "refs/heads/feature/stacked-pr"),
+                ),
             ),
             fake.calls,
         )

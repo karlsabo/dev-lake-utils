@@ -222,6 +222,46 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
     }
 
     @Test
+    fun createLocalWorktreeFromBaseShowsExistingBranchAncestryError() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onCreateBranchWorktree = { _, _, _, _ ->
+                    throw GitWorktreeException(
+                        "Existing branch feature/stacked-pr is not descended from selected base feature/base-pr. " +
+                            "Choose a different branch or start from the correct base.",
+                    )
+                },
+            ),
+        )
+        val viewModel = createWorktreeSetupViewModel(
+            gitWorktreeApi = api,
+            setupRunner = setupRunner,
+            setupCommands = listOf("should not run"),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+
+        assertEquals(
+            "Existing branch feature/stacked-pr is not descended from selected base feature/base-pr. " +
+                "Choose a different branch or start from the correct base.",
+            actionError?.message,
+        )
+        assertEquals(0, setupRunner.calls())
+    }
+
+    @Test
     fun createLocalWorktreeFromBaseShowsRemoteBranchConflictError() = runBlocking {
         val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
         val targetBranch = "feature/stacked-pr"
