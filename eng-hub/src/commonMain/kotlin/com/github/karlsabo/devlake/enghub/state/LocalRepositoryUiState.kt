@@ -16,6 +16,7 @@ data class LocalWorktreeUiState(
     val isDirty: Boolean = false,
     val isRoot: Boolean = false,
     val parentBranch: String? = null,
+    val baseCommitHash: String? = null,
 )
 
 data class ForceArchiveWorktreeUiState(
@@ -45,12 +46,14 @@ fun List<Worktree>.toLocalWorktreeUiStates(
     val normalizedRepositoryRootPath = repositoryRootPath.normalizedLocalPath()
     val visibleBranches = map { it.branch }.filterTo(mutableSetOf()) { it.isNotBlank() }
     return map { worktree ->
+        val branch = worktree.branch.ifBlank { "(detached)" }
         LocalWorktreeUiState(
-            branch = worktree.branch.ifBlank { "(detached)" },
+            branch = branch,
             path = worktree.path,
             isDirty = worktree.isDirty,
             isRoot = worktree.path.normalizedLocalPath() == normalizedRepositoryRootPath,
             parentBranch = parentBranchesByChildBranch[worktree.branch]?.takeIf { it in visibleBranches },
+            baseCommitHash = worktree.commitHash.takeIf { worktree.branch.isBlank() },
         )
     }
 }

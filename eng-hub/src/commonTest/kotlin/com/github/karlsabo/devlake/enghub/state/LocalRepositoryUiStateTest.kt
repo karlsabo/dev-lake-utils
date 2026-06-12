@@ -56,6 +56,21 @@ class LocalRepositoryUiStateTest {
     }
 
     @Test
+    fun mapsDetachedWorktreeDisplayBranchAndBaseCommitHash() {
+        val uiStates = listOf(
+            Worktree(path = "/repo-detached", branch = "", commitHash = "abc123"),
+            Worktree(path = "/repo-main", branch = "main", commitHash = "def456"),
+        ).toLocalWorktreeUiStates("/repo")
+
+        val detachedWorktree = uiStates.single { it.path == "/repo-detached" }
+        val branchWorktree = uiStates.single { it.path == "/repo-main" }
+
+        assertEquals("(detached)", detachedWorktree.branch)
+        assertEquals("abc123", detachedWorktree.baseCommitHash)
+        assertNull(branchWorktree.baseCommitHash)
+    }
+
+    @Test
     fun mapsInferredWorktreeParentBranches() {
         val uiStates = listOf(
             Worktree(path = "/repo-base", branch = "feature/base-pr", commitHash = "abc123"),

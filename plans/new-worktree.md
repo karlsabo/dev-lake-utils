@@ -401,7 +401,9 @@ Relevant current code:
 
 **Scope:** Add confirmation override flow and the typed utility path for creating/reusing a worktree from an existing local branch without `-b` (`git worktree add <path> <existing-branch>`). Catch/report failures; do not store hierarchy metadata.
 
-### 27. Carry detached commit hash into worktree UI state
+### 27. Carry detached commit hash into worktree UI state - Done
+
+**Done** 2026 06 12
 
 **Acceptance criteria:** Given a detached worktree at commit `abc123`, when worktrees are mapped to UI state, then the row still displays `(detached)` and also retains `abc123` as the base commit value.
 
