@@ -34,29 +34,32 @@ internal data class VisibleWorktreeRow(
 )
 
 internal fun visibleWorktreeRows(worktrees: List<LocalWorktreeUiState>): List<VisibleWorktreeRow> {
-    val parentBranches = worktrees.mapNotNull { it.parentBranch }
-    if (parentBranches.isEmpty()) return worktrees.asFlatRows()
-
-    val branchCounts = worktrees.groupingBy { it.branch }.eachCount()
-    if (parentBranches.any { branchCounts[it] != 1 }) return worktrees.asFlatRows()
-
-    val parentBranchByBranch = worktrees.associate { it.branch to it.parentBranch }
-    if (worktrees.any { worktree -> worktree.parentBranch?.let { parentBranchByBranch[it] != null } == true }) {
-        return worktrees.asFlatRows()
+    val visibleRows = if (worktrees.hasValidParentBranchNesting()) {
+        worktrees.asNestedRows()
+    } else {
+        worktrees.asFlatRows()
     }
+    return visibleRows
+}
 
-    val childrenByParentBranch = worktrees
-        .filter { it.parentBranch != null }
-        .groupBy { it.parentBranch }
+private fun List<LocalWorktreeUiState>.hasValidParentBranchNesting(): Boolean {
+    val parentBranches = mapNotNull { it.parentBranch }
+    val branchCounts = groupingBy { it.branch }.eachCount()
+    val parentBranchByBranch = associate { it.branch to it.parentBranch }
+    return parentBranches.isNotEmpty() &&
+        parentBranches.all { branchCounts[it] == 1 } &&
+        none { worktree -> worktree.parentBranch?.let { parentBranchByBranch[it] != null } == true }
+}
+
+private fun List<LocalWorktreeUiState>.asNestedRows(): List<VisibleWorktreeRow> {
+    val childrenByParentBranch = filter { it.parentBranch != null }.groupBy { it.parentBranch }
     return buildList {
-        worktrees
-            .filter { it.parentBranch == null }
-            .forEach { worktree ->
-                add(VisibleWorktreeRow(worktree = worktree, nestingDepth = 0))
-                childrenByParentBranch[worktree.branch].orEmpty().forEach { child ->
-                    add(VisibleWorktreeRow(worktree = child, nestingDepth = 1))
-                }
+        this@asNestedRows.filter { it.parentBranch == null }.forEach { worktree ->
+            add(VisibleWorktreeRow(worktree = worktree, nestingDepth = 0))
+            childrenByParentBranch[worktree.branch].orEmpty().forEach { child ->
+                add(VisibleWorktreeRow(worktree = child, nestingDepth = 1))
             }
+        }
     }
 }
 

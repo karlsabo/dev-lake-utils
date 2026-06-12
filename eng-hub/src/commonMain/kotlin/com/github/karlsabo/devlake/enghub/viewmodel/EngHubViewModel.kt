@@ -89,6 +89,9 @@ class EngHubViewModel(
     internal val lastCreateLocalWorktreeFromRepositoryRequestStateFlow:
         StateFlow<CreateLocalWorktreeFromRepositoryRequest?> =
         state.lastCreateLocalWorktreeFromRepositoryRequest.asStateFlow()
+    internal val useUnrelatedExistingBranchConfirmationRequestStateFlow:
+        StateFlow<UseUnrelatedExistingBranchConfirmationRequest?> =
+        state.useUnrelatedExistingBranchConfirmationRequest.asStateFlow()
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.archivingLocalWorktreePaths.asStateFlow()
     val forceArchiveWorktreeRequestStateFlow: StateFlow<ForceArchiveWorktreeUiState?> =
@@ -131,11 +134,13 @@ class EngHubViewModel(
     internal val requestCheckoutSetup: (String, String) -> WorktreeSetupHandle =
         checkoutController::requestCheckoutSetup
     val checkoutWorktreePath: (String, String) -> WorktreePath = checkoutController::checkoutWorktreePath
-    fun requestCreateLocalWorktreeFromRepository(repoRootPath: String) =
+    fun requestCreateLocalWorktreeFromRepository(repoRootPath: String) {
         localWorktreeCreateController.requestCreateLocalWorktreeFromRepository(repoRootPath)
+    }
 
-    fun clearCreateLocalWorktreeFromRepositoryRequest() =
+    fun clearCreateLocalWorktreeFromRepositoryRequest() {
         localWorktreeCreateController.clearCreateLocalWorktreeFromRepositoryRequest()
+    }
 
     fun createLocalWorktreeFromBase(
         repoRootPath: String,
@@ -148,6 +153,15 @@ class EngHubViewModel(
         baseBranch = baseBranch,
         targetBranch = targetBranch,
     )
+
+    internal fun confirmUseUnrelatedExistingBranch(request: UseUnrelatedExistingBranchConfirmationRequest) {
+        localWorktreeCreateController.confirmUseUnrelatedExistingBranch(request)
+    }
+
+    internal fun dismissUseUnrelatedExistingBranchConfirmation() {
+        localWorktreeCreateController.dismissUseUnrelatedExistingBranchConfirmation()
+    }
+
     val openLocalWorktree: (String, String) -> Unit = existingWorktreeController::openLocalWorktree
 
     internal val requestExistingWorktreeSetup: (String, String) -> WorktreeSetupHandle =

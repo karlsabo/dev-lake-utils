@@ -29,6 +29,14 @@ internal data class CreateLocalWorktreeFromBaseRequest(
     val baseWorktreePath: String,
     val baseBranch: String,
     val targetBranch: String,
+    val allowUnrelatedExistingBranch: Boolean = false,
+)
+
+internal data class UseUnrelatedExistingBranchConfirmationRequest(
+    val repoRootPath: String,
+    val baseWorktreePath: String,
+    val baseBranch: String,
+    val targetBranch: String,
 )
 
 internal data class CreateLocalWorktreeFromRepositoryRequest(
@@ -56,6 +64,8 @@ internal class EngHubViewModelState(
         MutableStateFlow<CreateLocalWorktreeFromBaseRequest?>(null)
     val lastCreateLocalWorktreeFromRepositoryRequest =
         MutableStateFlow<CreateLocalWorktreeFromRepositoryRequest?>(null)
+    val useUnrelatedExistingBranchConfirmationRequest =
+        MutableStateFlow<UseUnrelatedExistingBranchConfirmationRequest?>(null)
     val localRepositoryExpansionsInFlight = MutableStateFlow<Set<String>>(emptySet())
     val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val forceArchiveWorktreeRequest = MutableStateFlow<ForceArchiveWorktreeUiState?>(null)

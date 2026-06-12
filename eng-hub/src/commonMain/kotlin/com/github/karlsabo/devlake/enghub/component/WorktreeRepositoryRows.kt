@@ -66,7 +66,8 @@ private fun localRepositoryHeader(
     val repository = state.repository
     val normalizedRepositoryPath = repository.normalizedPathOrNull()
     val repositoryStatus = normalizedRepositoryPath?.let { state.setupStatuses[WorktreePath(it)] }
-    val isRepositoryArchiving = normalizedRepositoryPath != null && normalizedRepositoryPath in state.archivingWorktreePaths
+    val isRepositoryArchiving = normalizedRepositoryPath != null &&
+        normalizedRepositoryPath in state.archivingWorktreePaths
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -190,6 +191,9 @@ private fun repositoryToggleDescription(repository: LocalRepositoryUiState): Str
     "Expand ${repository.name}"
 }
 
-private fun LocalRepositoryUiState.normalizedPathOrNull(): String? = path.normalizedWorktreePath().takeIf { it.isNotEmpty() }
+private fun LocalRepositoryUiState.normalizedPathOrNull(): String? {
+    val normalizedPath = path.normalizedWorktreePath()
+    return normalizedPath.takeIf { it.isNotEmpty() }
+}
 
 private fun String.normalizedWorktreePath(): String = trim().trimEnd('/', '\\')

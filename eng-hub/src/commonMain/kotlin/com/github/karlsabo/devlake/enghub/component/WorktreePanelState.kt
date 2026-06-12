@@ -19,6 +19,7 @@ internal data class WorktreePanelState(
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
     val repositoryCreateWorktreeRequest: PendingCreateWorktree? = null,
+    val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch? = null,
 )
 
 internal data class WorktreePanelActions(
@@ -26,6 +27,8 @@ internal data class WorktreePanelActions(
     val onToggleRepository: (String) -> Unit,
     val onCreateWorktreeFromRepository: (String) -> Unit,
     val onRepositoryCreateWorktreeRequestHandled: () -> Unit,
+    val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
+    val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val worktrees: LocalWorktreeActions,
     val forceArchive: ForceArchiveWorktreeActions,
 )
@@ -46,6 +49,13 @@ internal data class PendingCreateWorktree(
     val baseWorktreePath: String,
     val baseBranch: String,
     val targetBranch: String = "",
+)
+
+internal data class PendingUseUnrelatedExistingBranch(
+    val repoRootPath: String,
+    val baseWorktreePath: String,
+    val baseBranch: String,
+    val targetBranch: String,
 )
 
 internal data class PendingArchive(
@@ -77,4 +87,15 @@ internal fun submitCreateWorktreeDialog(
     onCreateWorktree: CreateWorktreeCallback,
 ) {
     onCreateWorktree(state.repoRootPath, state.baseWorktreePath, state.baseBranch, state.targetBranch)
+}
+
+internal fun confirmUseUnrelatedExistingBranchDialog(
+    state: PendingUseUnrelatedExistingBranch,
+    onConfirm: (PendingUseUnrelatedExistingBranch) -> Unit,
+) {
+    onConfirm(state)
+}
+
+internal fun dismissUseUnrelatedExistingBranchDialog(onDismiss: () -> Unit) {
+    onDismiss()
 }

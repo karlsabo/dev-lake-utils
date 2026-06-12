@@ -25,6 +25,10 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
 
+private const val WORKTREE_ROW_BASE_INDENT_DP = 16
+private const val WORKTREE_ROW_CHILD_INDENT_DP = 24
+private const val WORKTREE_ROW_MAX_NESTING_DEPTH = 1
+
 private data class LocalWorktreeRowActions(
     val onOpen: () -> Unit,
     val onArchive: () -> Unit,
@@ -47,7 +51,9 @@ internal fun localWorktreeRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(modifier = Modifier.width((16 + 24 * state.nestingDepth.coerceIn(0, 1)).dp))
+        val indent = WORKTREE_ROW_BASE_INDENT_DP +
+            WORKTREE_ROW_CHILD_INDENT_DP * state.nestingDepth.coerceIn(0, WORKTREE_ROW_MAX_NESTING_DEPTH)
+        Spacer(modifier = Modifier.width(indent.dp))
         worktreeDirtyIndicator(state.worktree)
         Spacer(modifier = Modifier.width(8.dp))
         Text(

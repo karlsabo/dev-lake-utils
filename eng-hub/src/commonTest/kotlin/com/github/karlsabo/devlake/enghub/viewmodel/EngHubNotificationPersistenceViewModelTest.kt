@@ -78,6 +78,7 @@ class NoOpGitWorktreeApi : GitWorktreeApi {
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
+        allowUnrelatedExistingBranch: Boolean,
     ): String {
         error("Unexpected call")
     }

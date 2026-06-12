@@ -30,6 +30,7 @@ private class FakeGitWorktreeApi : GitWorktreeApi {
     lateinit var expectedBaseWorktreePath: String
     lateinit var expectedBaseBranch: String
     lateinit var expectedTargetBranch: String
+    var expectedAllowUnrelatedExistingBranch: Boolean = false
     var ensuredWorktreePath: WorktreePath? = null
     var createdBranchWorktreePath: WorktreePath? = null
     var onCreateBranchWorktree: () -> Unit = {}
@@ -52,11 +53,13 @@ private class FakeGitWorktreeApi : GitWorktreeApi {
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
+        allowUnrelatedExistingBranch: Boolean,
     ): String {
         assertEquals(expectedRepoPath, repoPath)
         assertEquals(expectedBaseWorktreePath, baseWorktreePath)
         assertEquals(expectedBaseBranch, baseBranch)
         assertEquals(expectedTargetBranch, targetBranch)
+        assertEquals(expectedAllowUnrelatedExistingBranch, allowUnrelatedExistingBranch)
         createBranchWorktreeCalls += 1
         onCreateBranchWorktree()
         return requireNotNull(createdBranchWorktreePath).value
@@ -150,6 +153,7 @@ private class SerializingFakeGitWorktreeApi : GitWorktreeApi {
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
+        allowUnrelatedExistingBranch: Boolean,
     ): String {
         error("createBranchWorktree is not used by WorktreeSetupCoordinator")
     }

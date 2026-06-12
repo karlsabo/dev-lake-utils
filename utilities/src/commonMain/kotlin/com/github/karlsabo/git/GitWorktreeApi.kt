@@ -1,27 +1,46 @@
 package com.github.karlsabo.git
 
-interface GitWorktreeApi {
+interface GitWorktreeApi :
+    GitRepositoryApi,
+    GitWorktreeCreationApi,
+    GitWorktreeDiscoveryApi,
+    GitWorktreeArchiveApi
+
+interface GitRepositoryApi {
     fun ensureRepository(repoPath: String, cloneUrl: String)
+    fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees
+}
+
+interface GitWorktreeCreationApi {
     fun ensureWorktree(repoPath: String, branch: String): String
     fun createBranchWorktree(
         repoPath: String,
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
+        allowUnrelatedExistingBranch: Boolean = false,
     ): String
-    fun planBranchWorktreeCreation(repoPath: String, targetBranch: String): BranchWorktreeCreationPlan {
-        throw UnsupportedOperationException("planBranchWorktreeCreation is not implemented")
-    }
+    fun planBranchWorktreeCreation(
+        repoPath: String,
+        targetBranch: String,
+    ): BranchWorktreeCreationPlan = throw UnsupportedOperationException(
+        "planBranchWorktreeCreation is not implemented",
+    )
     fun worktreeExists(repoPath: String, branch: String): Boolean
     fun isBranchAncestor(
         repoPath: String,
         baseBranch: String,
         childBranch: String,
     ): Boolean
-    fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees
+}
+
+interface GitWorktreeDiscoveryApi {
     fun listWorktrees(repoPath: String): List<Worktree>
     fun inferDefaultBranchRef(repoPath: String): String?
     fun inferWorktreeParentBranches(repoPath: String): Map<String, String>
+}
+
+interface GitWorktreeArchiveApi {
     fun removeWorktree(worktreePath: String, force: Boolean = false)
     fun archiveWorktree(
         repoPath: String,

@@ -54,7 +54,7 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target -> buildWorktreePath(DEV_LAKE_ROOT, target).value },
+                onCreateBranchWorktree = { _, _, _, target, _ -> buildWorktreePath(DEV_LAKE_ROOT, target).value },
             ),
         )
         val viewModel = createWorktreeSetupViewModel(
@@ -117,7 +117,7 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
                 ),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, _ -> targetWorktreePath.value },
+                onCreateBranchWorktree = { _, _, _, _, _ -> targetWorktreePath.value },
             ),
         )
         val viewModel = createWorktreeSetupViewModel(
@@ -173,7 +173,7 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
                 worktreesForRepoPath = { currentWorktrees },
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target ->
+                onCreateBranchWorktree = { _, _, _, target, _ ->
                     currentWorktrees = currentWorktrees + targetWorktree
                     buildWorktreePath(DEV_LAKE_ROOT, target).value
                 },
@@ -234,7 +234,7 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
                 worktreesForRepoPath = { currentWorktrees },
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target ->
+                onCreateBranchWorktree = { _, _, _, target, _ ->
                     currentWorktrees = currentWorktrees + targetWorktree
                     buildWorktreePath(DEV_LAKE_ROOT, target).value
                 },
@@ -288,7 +288,7 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
                 worktreesForRepoPath = { currentWorktrees },
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target ->
+                onCreateBranchWorktree = { _, _, _, target, _ ->
                     currentWorktrees = currentWorktrees + targetWorktree
                     buildWorktreePath(DEV_LAKE_ROOT, target).value
                 },

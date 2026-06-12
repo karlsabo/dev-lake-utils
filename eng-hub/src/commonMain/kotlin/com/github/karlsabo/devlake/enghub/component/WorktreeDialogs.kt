@@ -35,6 +35,7 @@ import org.jetbrains.compose.resources.painterResource
 internal data class WorktreeDialogState(
     val pendingArchive: PendingArchive?,
     val pendingCreateWorktree: PendingCreateWorktree?,
+    val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch?,
     val forceArchiveRequest: ForceArchiveWorktreeUiState?,
 )
 
@@ -43,6 +44,8 @@ internal data class WorktreeDialogActions(
     val onPendingCreateWorktreeChange: (PendingCreateWorktree?) -> Unit,
     val onArchiveWorktree: (PendingArchive) -> Unit,
     val onCreateWorktree: (PendingCreateWorktree) -> Unit,
+    val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
+    val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val forceArchive: ForceArchiveWorktreeActions,
 )
 
@@ -89,6 +92,18 @@ internal fun worktreeDialogHost(
         )
     }
 
+    state.useUnrelatedExistingBranchConfirmationRequest?.let { request ->
+        useUnrelatedExistingBranchConfirmationDialog(
+            request = request,
+            onConfirm = {
+                confirmUseUnrelatedExistingBranchDialog(request, actions.onConfirmUseUnrelatedExistingBranch)
+            },
+            onDismiss = {
+                dismissUseUnrelatedExistingBranchDialog(actions.onDismissUseUnrelatedExistingBranchConfirmation)
+            },
+        )
+    }
+
     state.pendingCreateWorktree?.let { createWorktree ->
         createWorktreeDialog(
             state = createWorktree,
@@ -101,6 +116,50 @@ internal fun worktreeDialogHost(
             },
             onDismiss = { actions.onPendingCreateWorktreeChange(null) },
         )
+    }
+}
+
+@Composable
+private fun useUnrelatedExistingBranchConfirmationDialog(
+    request: PendingUseUnrelatedExistingBranch,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DialogWindow(
+        onCloseRequest = onDismiss,
+        title = "Use Existing Branch?",
+        icon = painterResource(Res.drawable.icon),
+        visible = true,
+    ) {
+        MaterialTheme {
+            Surface {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                ) {
+                    Text(text = "Use existing branch?", style = MaterialTheme.typography.h6)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Existing branch ${request.targetBranch} is not descended from " +
+                            "selected base ${request.baseBranch}.",
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Continue to create or reuse a worktree for ${request.targetBranch}?")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row {
+                        Button(onClick = onConfirm) {
+                            Text("Continue")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

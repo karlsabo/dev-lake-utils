@@ -41,6 +41,7 @@ internal fun worktreePanel(
         state = WorktreeDialogState(
             pendingArchive = pendingArchive,
             pendingCreateWorktree = pendingCreateWorktree,
+            useUnrelatedExistingBranchConfirmationRequest = state.useUnrelatedExistingBranchConfirmationRequest,
             forceArchiveRequest = state.forceArchiveRequest,
         ),
         actions = WorktreeDialogActions(
@@ -52,6 +53,8 @@ internal fun worktreePanel(
             onCreateWorktree = { request ->
                 submitCreateWorktreeDialog(request, actions.worktrees.onCreateWorktree)
             },
+            onConfirmUseUnrelatedExistingBranch = actions.onConfirmUseUnrelatedExistingBranch,
+            onDismissUseUnrelatedExistingBranchConfirmation = actions.onDismissUseUnrelatedExistingBranchConfirmation,
             forceArchive = actions.forceArchive,
         ),
     )

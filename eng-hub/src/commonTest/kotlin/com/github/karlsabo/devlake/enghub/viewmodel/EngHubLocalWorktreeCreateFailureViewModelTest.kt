@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.git.ExistingTargetBranchAncestryException
 import com.github.karlsabo.git.GitWorktreeException
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.buildWorktreePath
@@ -29,7 +30,7 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
                 worktreesForRepoPath = { currentWorktrees },
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target ->
+                onCreateBranchWorktree = { _, _, _, target, _ ->
                     currentWorktrees = currentWorktrees + targetWorktree
                     buildWorktreePath(DEV_LAKE_ROOT, target).value
                 },
@@ -90,7 +91,7 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
                 },
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target ->
+                onCreateBranchWorktree = { _, _, _, target, _ ->
                     currentWorktrees = currentWorktrees + targetWorktree
                     buildWorktreePath(DEV_LAKE_ROOT, target).value
                 },
@@ -141,7 +142,7 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target -> buildWorktreePath(DEV_LAKE_ROOT, target).value },
+                onCreateBranchWorktree = { _, _, _, target, _ -> buildWorktreePath(DEV_LAKE_ROOT, target).value },
             ),
         )
         val viewModel = createWorktreeSetupViewModel(
@@ -189,7 +190,7 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, _ ->
+                onCreateBranchWorktree = { _, _, _, _, _ ->
                     throw GitWorktreeException(
                         "Branch feature/stacked-pr is already checked out elsewhere at " +
                             "/repos/dev-lake-utils-feature-stacked-pr-existing. Choose a different branch name.",
@@ -222,25 +223,25 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
     }
 
     @Test
-    fun createLocalWorktreeFromBaseShowsExistingBranchAncestryError() = runBlocking {
+    fun createLocalWorktreeFromBaseAsksForConfirmationWhenExistingBranchIsUnrelated() = runBlocking {
         val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
         val targetBranch = "feature/stacked-pr"
         val setupRunner = BlockingCoordinatorSetupRunner()
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, _ ->
-                    throw GitWorktreeException(
-                        "Existing branch feature/stacked-pr is not descended from selected base feature/base-pr. " +
-                            "Choose a different branch or start from the correct base.",
-                    )
+                onCreateBranchWorktree = { _, _, baseBranch, target, allowUnrelated ->
+                    if (!allowUnrelated) {
+                        throw ExistingTargetBranchAncestryException(baseBranch = baseBranch, targetBranch = target)
+                    }
+                    buildWorktreePath(DEV_LAKE_ROOT, target).value
                 },
             ),
         )
         val viewModel = createWorktreeSetupViewModel(
             gitWorktreeApi = api,
             setupRunner = setupRunner,
-            setupCommands = listOf("should not run"),
+            setupCommands = listOf("setup unrelated existing branch"),
         )
 
         viewModel.createLocalWorktreeFromBase(
@@ -249,16 +250,84 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
             baseBranch = "feature/base-pr",
             targetBranch = targetBranch,
         )
-        val actionError = withTimeout(2_000.milliseconds) {
-            viewModel.actionErrorStateFlow.first { it != null }
+        val confirmation = withTimeout(2_000.milliseconds) {
+            viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.first { it != null }
         }
 
         assertEquals(
-            "Existing branch feature/stacked-pr is not descended from selected base feature/base-pr. " +
-                "Choose a different branch or start from the correct base.",
-            actionError?.message,
+            UseUnrelatedExistingBranchConfirmationRequest(
+                repoRootPath = DEV_LAKE_ROOT,
+                baseWorktreePath = baseWorktreePath,
+                baseBranch = "feature/base-pr",
+                targetBranch = targetBranch,
+            ),
+            confirmation,
         )
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
         assertEquals(0, setupRunner.calls())
+    }
+
+    @Test
+    fun confirmUseUnrelatedExistingBranchCreatesExistingBranchWorktreeAndRunsSetup() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onCreateBranchWorktree = { _, _, baseBranch, target, allowUnrelated ->
+                    if (!allowUnrelated) {
+                        throw ExistingTargetBranchAncestryException(baseBranch = baseBranch, targetBranch = target)
+                    }
+                    targetWorktreePath.value
+                },
+            ),
+        )
+        val viewModel = createWorktreeSetupViewModel(
+            gitWorktreeApi = api,
+            setupRunner = setupRunner,
+            setupCommands = listOf("setup unrelated existing branch"),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        val confirmation = withTimeout(2_000.milliseconds) {
+            viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.first { it != null }
+        }
+
+        viewModel.confirmUseUnrelatedExistingBranch(requireNotNull(confirmation))
+        withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(targetWorktreePath) }
+
+        assertEquals(null, viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.value)
+        assertEquals(
+            listOf(
+                CreateBranchWorktreeCall(
+                    repoPath = DEV_LAKE_ROOT,
+                    baseWorktreePath = baseWorktreePath,
+                    baseBranch = "feature/base-pr",
+                    targetBranch = targetBranch,
+                ),
+                CreateBranchWorktreeCall(
+                    repoPath = DEV_LAKE_ROOT,
+                    baseWorktreePath = baseWorktreePath,
+                    baseBranch = "feature/base-pr",
+                    targetBranch = targetBranch,
+                    allowUnrelatedExistingBranch = true,
+                ),
+            ),
+            api.createBranchWorktreeCalls,
+        )
+        assertEquals(
+            listOf("setup unrelated existing branch"),
+            setupRunner.requestFor(targetWorktreePath)?.setupCommands,
+        )
+
+        setupRunner.complete(targetWorktreePath)
     }
 
     @Test
@@ -269,7 +338,7 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, _ ->
+                onCreateBranchWorktree = { _, _, _, _, _ ->
                     throw GitWorktreeException(
                         "Remote branch origin/feature/stacked-pr already exists. Choose a different branch name.",
                     )
@@ -308,7 +377,7 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, _ -> throw IllegalStateException("git worktree add failed") },
+                onCreateBranchWorktree = { _, _, _, _, _ -> throw IllegalStateException("git worktree add failed") },
             ),
         )
         val viewModel = createWorktreeSetupViewModel(

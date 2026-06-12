@@ -383,7 +383,9 @@ Relevant current code:
 
 **Scope:** Best-effort ancestry check failure blocks. Do not add override confirmation.
 
-### 26. Ask for confirmation to use an unrelated existing branch
+### 26. Ask for confirmation to use an unrelated existing branch - Done
+
+**Done** 2026 06 12
 
 **Acceptance criteria:** Given ancestry validation fails for existing branch `feature/stacked-pr`, when the user chooses to continue, then Eng Hub proceeds to create/reuse the worktree for that existing branch and run setup.
 

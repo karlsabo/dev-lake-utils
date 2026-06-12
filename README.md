@@ -13,6 +13,8 @@
 
 # TODO
 
+* [ ] Upgrade to Kotlin 2.3.21
+  * Deep research all dependent versions and upgrade them
 * [ ] Clicking open on a notification takes you to the PR, not to what GitHub wants to take you to such as a new commit or comment.
 * [ ] Copy .idea folder from the base/root repo. Or come up with a copy script to call as part of the setup procedure.
 * [ ] Fix detekt to support Compose: https://detekt.dev/docs/introduction/compose/
@@ -30,11 +32,16 @@
   * Play a nice animation that moves it into a recycle bin in the bottom right of the screen, then you can click that bin and undo (stop the archive) withing 60 seconds. If archiving already began, grey out the button and have a hover text helper that says it's being removed. If there's a remote branch or some other way to recover it we should support that.
 * [ ] Add a way to create a worktree from a remote branch
 * [ ] Need a quick way to archive worktrees. Branches that aren't mine, branches that have been merged to origin/main or master.
+* [ ] Add a menu pane. So three dots in top left corner that launches a 'window' with a search for all the actions you can take.
+  * Add a mock entry for now that just pops a new window that says hello world
+* [ ] Need a settings UI/UX.
+  * Add it to the menu popup to launch a settings UI
+  * The Settings should have options for everything in the com.github.karlsabo.devlake.enghub.EngHubConfig
+  * We should display this settings/config on a fresh launch that doesn't have a config file yet
 * [ ] Have the GH API for getting notifications return each page as it loads one, so maybe use a kotlinx coroutine channel. that way the UI is more responsive and doesn't have to wait for all notifications to load before it can start displaying some.
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
-* [ ] Add linter to Gradle, formatting, etc.
 * [ ] When setting up worktrees, do we have to disable all setup buttons? It would be great to set up multiple worktrees at a time.
 * [ ] Add information log in the app, like app notifications, so we can see what has happened, when a worktree is created, archived, etc.
 * [ ] Add the ability to put worktrees into categories
@@ -55,7 +62,6 @@
 * [ ] Add a queued status for PRs so we know if it's waying in a merge queue, maybe give the position in the queue too.
 * [ ] Clicking "Setup" greys out all Setup buttons, it should only do it for the current task
 * [ ] Add a UI menu option to sync skills
-    * Maybe a searchable menu that pops up, like JB Fleet had with cmd+k
   * Add a settings option that allows it to run automatically
 * [ ] Add a UI menu option to upgrade agent harnesses (claude code, codex, pi, goose, etc)
     * Add a settings option that allows it to run automatically

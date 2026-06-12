@@ -213,6 +213,30 @@ class WorktreePanelTest {
     }
 
     @Test
+    fun confirmingUseUnrelatedExistingBranchDialogCallsBoundaryWithOriginalRequest() {
+        val confirmations = mutableListOf<PendingUseUnrelatedExistingBranch>()
+        val request = PendingUseUnrelatedExistingBranch(
+            repoRootPath = "/repos/dev-lake-utils",
+            baseWorktreePath = "/repos/dev-lake-utils-feature-base-pr",
+            baseBranch = "feature/base-pr",
+            targetBranch = "feature/stacked-pr",
+        )
+
+        confirmUseUnrelatedExistingBranchDialog(request) { confirmations += it }
+
+        assertEquals(listOf(request), confirmations)
+    }
+
+    @Test
+    fun dismissingUseUnrelatedExistingBranchDialogCallsDismissBoundary() {
+        var dismissCount = 0
+
+        dismissUseUnrelatedExistingBranchDialog { dismissCount += 1 }
+
+        assertEquals(1, dismissCount)
+    }
+
+    @Test
     fun createWorktreeActionIsDisabledWhileSetupIsInProgress() {
         val worktree = LocalWorktreeUiState(
             branch = "feature/base-pr",

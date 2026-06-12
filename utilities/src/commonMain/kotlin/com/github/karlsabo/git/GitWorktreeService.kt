@@ -10,32 +10,88 @@ private fun logGitWorktreeWarning(message: String, cause: Throwable) {
     logger.warn(cause) { message }
 }
 
-class GitWorktreeException(
+open class GitWorktreeException(
     message: String,
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
 
-class GitWorktreeService(
-    gitCommandApi: GitCommandApi = GitCommandService(),
-    deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
-    branchNameValidator: WorktreeBranchNameValidator = WorktreeBranchNameValidator { branch ->
-        gitCommandApi.isValidBranchRefFormat(branch)
-    },
-    logWarning: (message: String, cause: Throwable) -> Unit = ::logGitWorktreeWarning,
-) : GitWorktreeApi {
-    private val branchValidator = GitWorktreeBranchValidator(branchNameValidator)
-    private val lister = GitWorktreeLister(gitCommandApi)
-    private val repoResolver = GitRepositoryResolver(gitCommandApi, lister)
-    private val ancestryChecker = GitBranchAncestryChecker(gitCommandApi, branchValidator)
-    private val creator = GitWorktreeCreator(gitCommandApi, lister, branchValidator, ancestryChecker)
-    private val defaultBranchRefResolver = GitDefaultBranchRefResolver(gitCommandApi)
-    private val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
-    private val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
+class ExistingTargetBranchAncestryException(
+    val baseBranch: String,
+    val targetBranch: String,
+) : GitWorktreeException(existingTargetBranchAncestryFailureMessage(baseBranch, targetBranch))
 
+class GitWorktreeService private constructor(
+    parts: GitWorktreeServiceParts,
+) : GitWorktreeApi,
+    GitRepositoryApi by parts.repositoryApi,
+    GitWorktreeCreationApi by parts.creationApi,
+    GitWorktreeDiscoveryApi by parts.discoveryApi,
+    GitWorktreeArchiveApi by parts.archiveApi {
+    constructor(
+        gitCommandApi: GitCommandApi = GitCommandService(),
+        deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
+        branchNameValidator: WorktreeBranchNameValidator = WorktreeBranchNameValidator { branch ->
+            gitCommandApi.isValidBranchRefFormat(branch)
+        },
+        logWarning: (message: String, cause: Throwable) -> Unit = ::logGitWorktreeWarning,
+    ) : this(
+        buildGitWorktreeServiceParts(
+            gitCommandApi = gitCommandApi,
+            deleteCheckoutDirectory = deleteCheckoutDirectory,
+            branchNameValidator = branchNameValidator,
+            logWarning = logWarning,
+        ),
+    )
+}
+
+private data class GitWorktreeServiceParts(
+    val repositoryApi: GitRepositoryApi,
+    val creationApi: GitWorktreeCreationApi,
+    val discoveryApi: GitWorktreeDiscoveryApi,
+    val archiveApi: GitWorktreeArchiveApi,
+)
+
+private fun buildGitWorktreeServiceParts(
+    gitCommandApi: GitCommandApi,
+    deleteCheckoutDirectory: (String) -> Unit,
+    branchNameValidator: WorktreeBranchNameValidator,
+    logWarning: (message: String, cause: Throwable) -> Unit,
+): GitWorktreeServiceParts {
+    val branchValidator = GitWorktreeBranchValidator(branchNameValidator)
+    val lister = GitWorktreeLister(gitCommandApi)
+    val repoResolver = GitRepositoryResolver(gitCommandApi, lister)
+    val ancestryChecker = GitBranchAncestryChecker(gitCommandApi, branchValidator)
+    val planner = GitWorktreeBranchPlanner(gitCommandApi, lister, branchValidator)
+    val creator = GitWorktreeCreator(gitCommandApi, branchValidator, planner, ancestryChecker)
+    val defaultBranchRefResolver = GitDefaultBranchRefResolver(gitCommandApi)
+    val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
+    val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
+
+    return GitWorktreeServiceParts(
+        repositoryApi = GitRepositoryService(repoResolver),
+        creationApi = GitWorktreeCreationService(creator, ancestryChecker),
+        discoveryApi = GitWorktreeDiscoveryService(lister, defaultBranchRefResolver, parentInferer),
+        archiveApi = GitWorktreeArchiveService(archiver),
+    )
+}
+
+private class GitRepositoryService(
+    private val resolver: GitRepositoryResolver,
+) : GitRepositoryApi {
     override fun ensureRepository(repoPath: String, cloneUrl: String) {
-        repoResolver.ensureRepository(repoPath, cloneUrl)
+        resolver.ensureRepository(repoPath, cloneUrl)
     }
 
+    override fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        val repositoryRoot = resolver.resolveRepositoryRoot(selectedPath)
+        return repositoryRoot
+    }
+}
+
+private class GitWorktreeCreationService(
+    private val creator: GitWorktreeCreator,
+    private val ancestryChecker: GitBranchAncestryChecker,
+) : GitWorktreeCreationApi {
     override fun ensureWorktree(repoPath: String, branch: String): String = creator.ensureWorktree(repoPath, branch)
 
     override fun createBranchWorktree(
@@ -43,7 +99,14 @@ class GitWorktreeService(
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
-    ): String = creator.createBranchWorktree(repoPath, baseWorktreePath, baseBranch, targetBranch)
+        allowUnrelatedExistingBranch: Boolean,
+    ): String = creator.createBranchWorktree(
+        repoPath = repoPath,
+        baseWorktreePath = baseWorktreePath,
+        baseBranch = baseBranch,
+        targetBranch = targetBranch,
+        allowUnrelatedExistingBranch = allowUnrelatedExistingBranch,
+    )
 
     override fun planBranchWorktreeCreation(
         repoPath: String,
@@ -57,17 +120,26 @@ class GitWorktreeService(
         baseBranch: String,
         childBranch: String,
     ): Boolean = ancestryChecker.isBranchAncestor(repoPath, baseBranch, childBranch)
+}
 
-    override fun resolveRepositoryRoot(
-        selectedPath: String,
-    ): RepositoryWorktrees = repoResolver.resolveRepositoryRoot(selectedPath)
-
+private class GitWorktreeDiscoveryService(
+    private val lister: GitWorktreeLister,
+    private val defaultRefs: GitDefaultBranchRefResolver,
+    private val parents: GitWorktreeParentInferer,
+) : GitWorktreeDiscoveryApi {
     override fun listWorktrees(repoPath: String): List<Worktree> = lister.listWorktrees(repoPath)
 
-    override fun inferDefaultBranchRef(repoPath: String): String? = defaultBranchRefResolver.inferDefaultBranchRef(repoPath)
+    override fun inferDefaultBranchRef(repoPath: String): String? = defaultRefs.inferDefaultBranchRef(repoPath)
 
-    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> = parentInferer.inferParentBranches(repoPath)
+    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> {
+        val parentBranches = parents.inferParentBranches(repoPath)
+        return parentBranches
+    }
+}
 
+private class GitWorktreeArchiveService(
+    private val archiver: GitWorktreeArchiver,
+) : GitWorktreeArchiveApi {
     override fun removeWorktree(worktreePath: String, force: Boolean) {
         archiver.removeWorktree(worktreePath, force)
     }
@@ -167,14 +239,14 @@ private class GitRepositoryResolver(
 
 private class GitWorktreeCreator(
     private val gitCommandApi: GitCommandApi,
-    private val lister: GitWorktreeLister,
     private val branchValidator: GitWorktreeBranchValidator,
+    private val planner: GitWorktreeBranchPlanner,
     private val ancestryChecker: GitBranchAncestryChecker,
 ) {
     fun ensureWorktree(repoPath: String, branch: String): String {
         branchValidator.validate(branch)
         val worktreePath = buildWorktreePath(repoPath, branch).value
-        if (lister.listWorktreeEntries(repoPath).any { it.path == worktreePath }) {
+        if (planner.worktreeExists(repoPath, branch)) {
             logger.info { "Worktree already exists at $worktreePath" }
             return worktreePath
         }
@@ -190,6 +262,7 @@ private class GitWorktreeCreator(
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
+        allowUnrelatedExistingBranch: Boolean,
     ): String {
         require(baseWorktreePath.isNotBlank()) { "baseWorktreePath must not be blank" }
         branchValidator.validate(baseBranch)
@@ -199,49 +272,54 @@ private class GitWorktreeCreator(
                 plan.worktreePath
             }
 
-            is BranchWorktreeCreationPlan.UseExistingLocalBranch -> {
-                failIfExistingTargetBranchIsNotDescendedFromBase(repoPath, baseBranch, targetBranch)
-                throw GitWorktreeException(
-                    "Local branch $targetBranch already exists without a worktree at ${plan.worktreePath}.",
-                )
-            }
+            is BranchWorktreeCreationPlan.UseExistingLocalBranch -> createExistingBranchWorktree(
+                repoPath = repoPath,
+                baseBranch = baseBranch,
+                targetBranch = targetBranch,
+                allowUnrelatedExistingBranch = allowUnrelatedExistingBranch,
+                plan = plan,
+            )
 
-            is BranchWorktreeCreationPlan.CreateNewBranch -> {
-                addNewBranchWorktree(baseWorktreePath, targetBranch, plan.worktreePath, baseBranch)
-                logger.info { "Created worktree at ${plan.worktreePath} for branch $targetBranch from $baseBranch" }
-                plan.worktreePath
-            }
+            is BranchWorktreeCreationPlan.CreateNewBranch -> createNewBranchWorktree(
+                baseWorktreePath = baseWorktreePath,
+                baseBranch = baseBranch,
+                targetBranch = targetBranch,
+                plan = plan,
+            )
         }
     }
 
-    fun planBranchWorktreeCreation(repoPath: String, targetBranch: String): BranchWorktreeCreationPlan {
-        branchValidator.validate(targetBranch)
-        val worktreePath = buildWorktreePath(repoPath, targetBranch).value
-        val existingWorktrees = lister.listWorktreeEntries(repoPath)
+    fun planBranchWorktreeCreation(
+        repoPath: String,
+        targetBranch: String,
+    ): BranchWorktreeCreationPlan = planner.planBranchWorktreeCreation(repoPath, targetBranch)
 
-        failIfBranchCheckedOutElsewhere(existingWorktrees, targetBranch, worktreePath)
-        if (exactTargetWorktreeExists(existingWorktrees, targetBranch, worktreePath)) {
-            return BranchWorktreeCreationPlan.ReuseExistingWorktree(
-                targetBranch = targetBranch,
-                worktreePath = worktreePath,
-            )
+    fun worktreeExists(repoPath: String, branch: String): Boolean = planner.worktreeExists(repoPath, branch)
+
+    private fun createExistingBranchWorktree(
+        repoPath: String,
+        baseBranch: String,
+        targetBranch: String,
+        allowUnrelatedExistingBranch: Boolean,
+        plan: BranchWorktreeCreationPlan.UseExistingLocalBranch,
+    ): String {
+        if (!allowUnrelatedExistingBranch && !ancestryChecker.isBranchAncestor(repoPath, baseBranch, targetBranch)) {
+            throw ExistingTargetBranchAncestryException(baseBranch = baseBranch, targetBranch = targetBranch)
         }
-        if (localBranchExists(repoPath, targetBranch)) {
-            return BranchWorktreeCreationPlan.UseExistingLocalBranch(
-                targetBranch = targetBranch,
-                worktreePath = worktreePath,
-            )
-        }
-        failIfRemoteBranchExists(repoPath, targetBranch)
-        return BranchWorktreeCreationPlan.CreateNewBranch(
-            targetBranch = targetBranch,
-            worktreePath = worktreePath,
-        )
+        addExistingBranchWorktree(repoPath, targetBranch, plan.worktreePath)
+        logger.info { "Created worktree at ${plan.worktreePath} for existing branch $targetBranch" }
+        return plan.worktreePath
     }
 
-    fun worktreeExists(repoPath: String, branch: String): Boolean {
-        val worktreePath = buildWorktreePath(repoPath, branch).value
-        return lister.listWorktreeEntries(repoPath).any { it.path == worktreePath }
+    private fun createNewBranchWorktree(
+        baseWorktreePath: String,
+        baseBranch: String,
+        targetBranch: String,
+        plan: BranchWorktreeCreationPlan.CreateNewBranch,
+    ): String {
+        addNewBranchWorktree(baseWorktreePath, targetBranch, plan.worktreePath, baseBranch)
+        logger.info { "Created worktree at ${plan.worktreePath} for branch $targetBranch from $baseBranch" }
+        return plan.worktreePath
     }
 
     private fun fetchBranchBestEffort(repoPath: String, branch: String) {
@@ -265,6 +343,79 @@ private class GitWorktreeCreator(
                 e,
             )
         }
+    }
+
+    private fun addNewBranchWorktree(
+        baseWorktreePath: String,
+        targetBranch: String,
+        worktreePath: String,
+        baseBranch: String,
+    ) {
+        try {
+            gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseBranch)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to create worktree at $worktreePath for branch $targetBranch from $baseBranch: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+
+    private fun addExistingBranchWorktree(
+        repoPath: String,
+        targetBranch: String,
+        worktreePath: String,
+    ) {
+        try {
+            gitCommandApi.worktreeAdd(repoPath, worktreePath, targetBranch)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to create worktree at $worktreePath for existing branch $targetBranch: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+}
+
+private class GitWorktreeBranchPlanner(
+    private val gitCommandApi: GitCommandApi,
+    private val lister: GitWorktreeLister,
+    private val branchValidator: GitWorktreeBranchValidator,
+) {
+    fun planBranchWorktreeCreation(repoPath: String, targetBranch: String): BranchWorktreeCreationPlan {
+        branchValidator.validate(targetBranch)
+        val worktreePath = buildWorktreePath(repoPath, targetBranch).value
+        val existingWorktrees = lister.listWorktreeEntries(repoPath)
+
+        failIfBranchCheckedOutElsewhere(existingWorktrees, targetBranch, worktreePath)
+        return when {
+            exactTargetWorktreeExists(existingWorktrees, targetBranch, worktreePath) -> {
+                BranchWorktreeCreationPlan.ReuseExistingWorktree(
+                    targetBranch = targetBranch,
+                    worktreePath = worktreePath,
+                )
+            }
+
+            localBranchExists(repoPath, targetBranch) -> {
+                BranchWorktreeCreationPlan.UseExistingLocalBranch(
+                    targetBranch = targetBranch,
+                    worktreePath = worktreePath,
+                )
+            }
+
+            else -> {
+                failIfRemoteBranchExists(repoPath, targetBranch)
+                BranchWorktreeCreationPlan.CreateNewBranch(
+                    targetBranch = targetBranch,
+                    worktreePath = worktreePath,
+                )
+            }
+        }
+    }
+
+    fun worktreeExists(repoPath: String, branch: String): Boolean {
+        val worktreePath = buildWorktreePath(repoPath, branch).value
+        return lister.listWorktreeEntries(repoPath).any { it.path == worktreePath }
     }
 
     private fun failIfBranchCheckedOutElsewhere(
@@ -297,16 +448,6 @@ private class GitWorktreeCreator(
         throw GitWorktreeException("Failed to check local branch $targetBranch: ${e.gitOutput}", e)
     }
 
-    private fun failIfExistingTargetBranchIsNotDescendedFromBase(
-        repoPath: String,
-        baseBranch: String,
-        targetBranch: String,
-    ) {
-        if (!ancestryChecker.isBranchAncestor(repoPath, baseBranch, targetBranch)) {
-            throw GitWorktreeException(existingTargetBranchAncestryFailureMessage(baseBranch, targetBranch))
-        }
-    }
-
     private fun failIfRemoteBranchExists(repoPath: String, targetBranch: String) {
         val exists = try {
             gitCommandApi.remoteBranchExists(repoPath, targetBranch, remote = "origin")
@@ -319,27 +460,13 @@ private class GitWorktreeCreator(
             )
         }
     }
-
-    private fun addNewBranchWorktree(
-        baseWorktreePath: String,
-        targetBranch: String,
-        worktreePath: String,
-        baseBranch: String,
-    ) {
-        try {
-            gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseBranch)
-        } catch (e: GitCommandException) {
-            throw GitWorktreeException(
-                "Failed to create worktree at $worktreePath for branch $targetBranch from $baseBranch: ${e.gitOutput}",
-                e,
-            )
-        }
-    }
 }
 
-private fun existingTargetBranchAncestryFailureMessage(baseBranch: String, targetBranch: String): String =
-    "Existing branch $targetBranch is not descended from selected base $baseBranch. " +
-        "Choose a different branch or start from the correct base."
+private fun existingTargetBranchAncestryFailureMessage(
+    baseBranch: String,
+    targetBranch: String,
+): String = "Existing branch $targetBranch is not descended from selected base $baseBranch. " +
+    "Choose a different branch or start from the correct base."
 
 private class GitBranchAncestryChecker(
     private val gitCommandApi: GitCommandApi,
@@ -353,13 +480,19 @@ private class GitBranchAncestryChecker(
         branchValidator.validate(baseBranch)
         branchValidator.validate(childBranch)
         return try {
-            gitCommandApi.isAncestor(repoPath, "refs/heads/$baseBranch", "refs/heads/$childBranch")
+            gitCommandApi.isAncestor(repoPath, baseBranch.toAncestryRef(), childBranch.toAncestryRef())
         } catch (e: GitCommandException) {
             throw GitWorktreeException(
                 "Failed to check whether $baseBranch is an ancestor of $childBranch: ${e.gitOutput}",
                 e,
             )
         }
+    }
+
+    private fun String.toAncestryRef(): String = when {
+        startsWith("refs/") -> this
+        endsWith("/HEAD") -> this
+        else -> "refs/heads/$this"
     }
 }
 
@@ -438,35 +571,65 @@ private class GitWorktreeParentInferer(
         defaultBranchRef: String?,
     ): String? {
         val childRef = "refs/heads/$childBranch"
-        val candidates = visibleBranches
-            .filter { it != childBranch }
-            .map { GitWorktreeParentCandidate(branch = it, ref = "refs/heads/$it") }
-            .plus(defaultBranchRef?.let { GitWorktreeParentCandidate(branch = null, ref = it) })
-            .filterNotNull()
+        return parentCandidates(childBranch, visibleBranches, defaultBranchRef)
+            .ancestorCandidatesOrNull(repoPath, childRef)
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { ancestors -> dropDefaultRefDuplicates(repoPath, ancestors) }
+            ?.let { uniqueAncestors -> nearestAncestorsOrNull(repoPath, uniqueAncestors) }
+            ?.singleOrNull()
+            ?.branch
+    }
+
+    private fun parentCandidates(
+        childBranch: String,
+        visibleBranches: List<String>,
+        defaultBranchRef: String?,
+    ): List<GitWorktreeParentCandidate> = visibleBranches
+        .filter { it != childBranch }
+        .map { GitWorktreeParentCandidate(branch = it, ref = "refs/heads/$it") }
+        .plus(defaultBranchRef?.let { GitWorktreeParentCandidate(branch = null, ref = it) })
+        .filterNotNull()
+
+    private fun List<GitWorktreeParentCandidate>.ancestorCandidatesOrNull(
+        repoPath: String,
+        childRef: String,
+    ): List<GitWorktreeParentCandidate>? {
         val ancestors = mutableListOf<GitWorktreeParentCandidate>()
-        candidates.forEach { candidate ->
-            val isAncestor = isAncestor(repoPath, candidate.ref, childRef) ?: return null
-            if (isAncestor) ancestors += candidate
+        var hasFailure = false
+        forEach { candidate ->
+            when (isAncestor(repoPath, candidate.ref, childRef)) {
+                null -> hasFailure = true
+                true -> ancestors += candidate
+                false -> Unit
+            }
         }
-        if (ancestors.isEmpty()) return null
+        return if (hasFailure) null else ancestors
+    }
 
-        val uniqueAncestors = dropDefaultRefDuplicates(repoPath, ancestors) ?: return null
-
+    private fun nearestAncestorsOrNull(
+        repoPath: String,
+        uniqueAncestors: List<GitWorktreeParentCandidate>,
+    ): List<GitWorktreeParentCandidate>? {
         val nearestAncestors = mutableListOf<GitWorktreeParentCandidate>()
-        for (candidate in uniqueAncestors) {
+        var hasFailure = false
+        uniqueAncestors.forEach { candidate ->
             var hasNearerAncestor = false
             for (other in uniqueAncestors) {
                 if (other == candidate) continue
-                val otherIsDescendant = isAncestor(repoPath, candidate.ref, other.ref) ?: return null
-                if (otherIsDescendant) {
-                    hasNearerAncestor = true
-                    break
+                when (isAncestor(repoPath, candidate.ref, other.ref)) {
+                    null -> hasFailure = true
+
+                    true -> {
+                        hasNearerAncestor = true
+                        break
+                    }
+
+                    false -> Unit
                 }
             }
             if (!hasNearerAncestor) nearestAncestors += candidate
         }
-
-        return nearestAncestors.singleOrNull()?.branch
+        return if (hasFailure) null else nearestAncestors
     }
 
     private fun dropDefaultRefDuplicates(
@@ -490,13 +653,20 @@ private class GitWorktreeParentInferer(
         candidate: GitWorktreeParentCandidate,
         ancestors: List<GitWorktreeParentCandidate>,
     ): Boolean? {
-        for (other in ancestors) {
-            if (other.branch == null) continue
-            val candidateMatchesOther = isAncestor(repoPath, candidate.ref, other.ref) ?: return null
-            val otherMatchesCandidate = isAncestor(repoPath, other.ref, candidate.ref) ?: return null
-            if (candidateMatchesOther && otherMatchesCandidate) return true
-        }
-        return false
+        var hasEquivalent = false
+        var hasFailure = false
+        ancestors
+            .filter { other -> other.branch != null }
+            .forEach { other ->
+                val candidateMatchesOther = isAncestor(repoPath, candidate.ref, other.ref)
+                val otherMatchesCandidate = isAncestor(repoPath, other.ref, candidate.ref)
+                if (candidateMatchesOther == null || otherMatchesCandidate == null) {
+                    hasFailure = true
+                } else if (candidateMatchesOther && otherMatchesCandidate) {
+                    hasEquivalent = true
+                }
+            }
+        return if (hasFailure) null else hasEquivalent
     }
 
     private fun fetchRemoteBestEffort(repoPath: String, remote: String) {

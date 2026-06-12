@@ -6,13 +6,15 @@ import androidx.compose.runtime.getValue
 import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
-import com.github.karlsabo.devlake.enghub.component.createRepositoryWorktreeDialogState
+import com.github.karlsabo.devlake.enghub.component.PendingUseUnrelatedExistingBranch
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
+import com.github.karlsabo.devlake.enghub.component.createRepositoryWorktreeDialogState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.ActionErrorUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
+import com.github.karlsabo.devlake.enghub.viewmodel.UseUnrelatedExistingBranchConfirmationRequest
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
@@ -65,7 +67,10 @@ internal fun collectEngHubScreenState(
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
     val archivingPaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
     val forceArchiveRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
-    val repositoryCreateWorktreeRequest by viewModel.lastCreateLocalWorktreeFromRepositoryRequestStateFlow.collectAsState()
+    val repositoryCreateWorktreeRequest by
+        viewModel.lastCreateLocalWorktreeFromRepositoryRequestStateFlow.collectAsState()
+    val useUnrelatedExistingBranchRequest by
+        viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.collectAsState()
 
     return EngHubScreenState(
         selectedPane = selectedPane,
@@ -91,6 +96,7 @@ internal fun collectEngHubScreenState(
                     baseBranch = request.baseBranch,
                 )
             },
+            useUnrelatedExistingBranchConfirmationRequest = useUnrelatedExistingBranchRequest?.toPendingConfirmation(),
         ),
     )
 }
@@ -123,6 +129,10 @@ internal fun engHubScreenActions(
         onToggleRepository = viewModel.toggleLocalRepositoryExpansion,
         onCreateWorktreeFromRepository = viewModel::requestCreateLocalWorktreeFromRepository,
         onRepositoryCreateWorktreeRequestHandled = viewModel::clearCreateLocalWorktreeFromRepositoryRequest,
+        onConfirmUseUnrelatedExistingBranch = { request ->
+            viewModel.confirmUseUnrelatedExistingBranch(request.toViewModelRequest())
+        },
+        onDismissUseUnrelatedExistingBranchConfirmation = viewModel::dismissUseUnrelatedExistingBranchConfirmation,
         worktrees = LocalWorktreeActions(
             onOpenWorktree = viewModel.openLocalWorktree,
             onArchiveWorktree = viewModel.archiveLocalWorktree,
@@ -141,3 +151,23 @@ internal fun engHubScreenActions(
         ),
     ),
 )
+
+private fun UseUnrelatedExistingBranchConfirmationRequest.toPendingConfirmation(): PendingUseUnrelatedExistingBranch {
+    val pendingRequest = PendingUseUnrelatedExistingBranch(
+        repoRootPath = repoRootPath,
+        baseWorktreePath = baseWorktreePath,
+        baseBranch = baseBranch,
+        targetBranch = targetBranch,
+    )
+    return pendingRequest
+}
+
+private fun PendingUseUnrelatedExistingBranch.toViewModelRequest(): UseUnrelatedExistingBranchConfirmationRequest {
+    val viewModelRequest = UseUnrelatedExistingBranchConfirmationRequest(
+        repoRootPath = repoRootPath,
+        baseWorktreePath = baseWorktreePath,
+        baseBranch = baseBranch,
+        targetBranch = targetBranch,
+    )
+    return viewModelRequest
+}

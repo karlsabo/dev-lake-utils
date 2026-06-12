@@ -25,6 +25,7 @@ data class WorktreeSetupRequest(
     val baseWorktreePath: String? = null,
     val baseBranch: String? = null,
     val targetBranch: String? = null,
+    val allowUnrelatedExistingBranch: Boolean = false,
     val setupShell: String = "",
     val setupCommands: List<String> = emptyList(),
 ) {
@@ -41,6 +42,9 @@ data class WorktreeSetupRequest(
         }
         require(cloneUrl == null || branchCreationFieldCount == 0) {
             "repository/worktree setup and branch worktree creation are mutually exclusive"
+        }
+        require(!allowUnrelatedExistingBranch || branchCreationFieldCount == BRANCH_WORKTREE_FIELD_COUNT) {
+            "allowUnrelatedExistingBranch requires branch worktree creation fields"
         }
         cloneUrl?.let { require(it.isNotBlank()) { "cloneUrl must not be blank" } }
         branch?.let { require(it.isNotBlank()) { "branch must not be blank" } }
@@ -220,6 +224,7 @@ class WorktreeSetupCoordinator private constructor(
                     baseWorktreePath = requireNotNull(request.baseWorktreePath),
                     baseBranch = requireNotNull(request.baseBranch),
                     targetBranch = requireNotNull(request.targetBranch),
+                    allowUnrelatedExistingBranch = request.allowUnrelatedExistingBranch,
                 ),
             )
             if (createdPath != request.worktreePath) {
