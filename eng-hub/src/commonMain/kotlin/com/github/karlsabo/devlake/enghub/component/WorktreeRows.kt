@@ -5,6 +5,8 @@ import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
+private const val DETACHED = "(detached)"
+
 internal enum class RepositoryMenuAction {
     CreateWorktree,
 }
@@ -87,14 +89,11 @@ internal fun isWorktreeCreateEnabled(
     worktree: LocalWorktreeUiState,
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
-): Boolean = setupStatus == null && !isArchiving && worktree.hasCreateWorktreeBase()
+): Boolean = setupStatus == null && !isArchiving && worktree.hasCreatableBase()
 
 internal fun isWorktreeArchiveEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
 ): Boolean = setupStatus == null && !isArchiving
 
-private fun LocalWorktreeUiState.hasCreateWorktreeBase(): Boolean =
-    !isDetachedDisplayBranch() || !baseCommitHash.isNullOrBlank()
-
-private fun LocalWorktreeUiState.isDetachedDisplayBranch(): Boolean = branch == "(detached)"
+private fun LocalWorktreeUiState.hasCreatableBase(): Boolean = branch != DETACHED || !baseCommitHash.isNullOrBlank()

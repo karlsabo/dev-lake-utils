@@ -69,7 +69,7 @@ private fun buildGitWorktreeServiceParts(
 
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
-        creationApi = GitWorktreeCreationService(creator, ancestryChecker),
+        creationApi = GitWorktreeCreationService(creator, planner, ancestryChecker),
         discoveryApi = GitWorktreeDiscoveryService(lister, defaultBranchRefResolver, parentInferer),
         archiveApi = GitWorktreeArchiveService(archiver),
     )
@@ -90,6 +90,7 @@ private class GitRepositoryService(
 
 private class GitWorktreeCreationService(
     private val creator: GitWorktreeCreator,
+    private val planner: GitWorktreeBranchPlanner,
     private val ancestryChecker: GitBranchAncestryChecker,
 ) : GitWorktreeCreationApi {
     override fun ensureWorktree(repoPath: String, branch: String): String = creator.ensureWorktree(repoPath, branch)
@@ -125,7 +126,7 @@ private class GitWorktreeCreationService(
         targetBranch: String,
     ): BranchWorktreeCreationPlan = creator.planBranchWorktreeCreation(repoPath, targetBranch)
 
-    override fun worktreeExists(repoPath: String, branch: String): Boolean = creator.worktreeExists(repoPath, branch)
+    override fun worktreeExists(repoPath: String, branch: String): Boolean = planner.worktreeExists(repoPath, branch)
 
     override fun isBranchAncestor(
         repoPath: String,
@@ -333,8 +334,6 @@ private class GitWorktreeCreator(
         targetBranch: String,
     ): BranchWorktreeCreationPlan = planner.planBranchWorktreeCreation(repoPath, targetBranch)
 
-    fun worktreeExists(repoPath: String, branch: String): Boolean = planner.worktreeExists(repoPath, branch)
-
     private fun createExistingBranchWorktree(
         repoPath: String,
         baseBranch: String,
@@ -394,7 +393,8 @@ private class GitWorktreeCreator(
             gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseCommitIsh)
         } catch (e: GitCommandException) {
             throw GitWorktreeException(
-                "Failed to create worktree at $worktreePath for branch $targetBranch from $baseCommitIsh: ${e.gitOutput}",
+                "Failed to create worktree at $worktreePath for branch $targetBranch " +
+                    "from $baseCommitIsh: ${e.gitOutput}",
                 e,
             )
         }

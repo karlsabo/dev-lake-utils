@@ -166,8 +166,6 @@ class EngHubViewModel(
 
     val openLocalWorktree: (String, String) -> Unit = existingWorktreeController::openLocalWorktree
 
-    internal val requestExistingWorktreeSetup: (String, String) -> WorktreeSetupHandle =
-        existingWorktreeController::requestExistingWorktreeSetup
     val archiveLocalWorktree: (String, String) -> Unit = archiveController::archiveLocalWorktree
     val confirmForceArchiveLocalWorktree: (String, String) -> Unit =
         archiveController::confirmForceArchiveLocalWorktree
