@@ -165,6 +165,29 @@ class WorktreePanelTest {
     }
 
     @Test
+    fun createWorktreeDialogCarriesDetachedBaseCommitHash() {
+        val worktree = LocalWorktreeUiState(
+            branch = "(detached)",
+            path = "/repos/dev-lake-utils-detached",
+            baseCommitHash = "abc123",
+        )
+
+        assertEquals(
+            PendingCreateWorktree(
+                repoRootPath = "/repos/dev-lake-utils",
+                baseWorktreePath = "/repos/dev-lake-utils-detached",
+                baseBranch = "(detached)",
+                baseCommitIsh = "abc123",
+                targetBranch = "",
+            ),
+            createWorktreeDialogState(
+                repoRootPath = "/repos/dev-lake-utils",
+                worktree = worktree,
+            ),
+        )
+    }
+
+    @Test
     fun repositoryCreateWorktreeDialogUsesDefaultBranchBaseAndEmptyTargetBranch() {
         assertEquals(
             PendingCreateWorktree(
@@ -264,7 +287,24 @@ class WorktreePanelTest {
     }
 
     @Test
-    fun createWorktreeActionIsDisabledForDetachedWorktree() {
+    fun createWorktreeActionIsEnabledForDetachedWorktreeWithBaseCommitHash() {
+        val worktree = LocalWorktreeUiState(
+            branch = "(detached)",
+            path = "/repos/dev-lake-utils-detached",
+            baseCommitHash = "abc123",
+        )
+
+        assertTrue(
+            isWorktreeCreateEnabled(
+                worktree = worktree,
+                setupStatus = null,
+                isArchiving = false,
+            ),
+        )
+    }
+
+    @Test
+    fun createWorktreeActionIsDisabledForDetachedWorktreeWithoutBaseCommitHash() {
         val worktree = LocalWorktreeUiState(
             branch = "(detached)",
             path = "/repos/dev-lake-utils-detached",
@@ -354,6 +394,50 @@ class WorktreePanelTest {
         )
         assertFalse(validation.isCheckingGitRefFormat)
         assertFalse(isCreateWorktreeConfirmEnabled(validation))
+    }
+
+    @Test
+    fun createWorktreeDialogDisablesCreateForTargetBranchMatchingDetachedBaseCommitIsh() {
+        val validation = startCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
+            targetBranch = "abc123",
+            branchNameValidator = WorktreeBranchNameValidator {
+                error(
+                    "git check should not run when target branch matches the detached base commit-ish",
+                )
+            },
+            baseCommitIsh = "abc123",
+        )
+
+        assertEquals(
+            "Target branch must differ from the base commit-ish",
+            createWorktreeTargetBranchValidationMessage(
+                targetBranch = "abc123",
+                validation = validation,
+            ),
+        )
+        assertFalse(validation.isCheckingGitRefFormat)
+        assertFalse(isCreateWorktreeConfirmEnabled(validation))
+    }
+
+    @Test
+    fun createWorktreeDialogAllowsDetachedTargetBranchMatchingBaseBranchLabel() {
+        val validation = finishCreateWorktreeTargetBranchValidation(
+            baseBranch = "feature/base-pr",
+            targetBranch = "feature/base-pr",
+            branchNameValidator = WorktreeBranchNameValidator { true },
+            baseCommitIsh = "abc123",
+        )
+
+        assertEquals(
+            null,
+            createWorktreeTargetBranchValidationMessage(
+                targetBranch = "feature/base-pr",
+                validation = validation,
+            ),
+        )
+        assertFalse(validation.isCheckingGitRefFormat)
+        assertTrue(isCreateWorktreeConfirmEnabled(validation))
     }
 
     @Test

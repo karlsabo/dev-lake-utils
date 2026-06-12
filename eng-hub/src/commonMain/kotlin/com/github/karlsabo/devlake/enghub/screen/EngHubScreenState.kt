@@ -142,6 +142,7 @@ internal fun engHubScreenActions(
                     baseWorktreePath = request.baseWorktreePath,
                     baseBranch = request.baseBranch,
                     targetBranch = request.targetBranch,
+                    baseCommitIsh = request.baseCommitIsh,
                 )
             },
         ),

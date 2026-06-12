@@ -87,11 +87,14 @@ internal fun isWorktreeCreateEnabled(
     worktree: LocalWorktreeUiState,
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
-): Boolean = setupStatus == null && !isArchiving && !worktree.isDetachedDisplayBranch()
+): Boolean = setupStatus == null && !isArchiving && worktree.hasCreateWorktreeBase()
 
 internal fun isWorktreeArchiveEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
 ): Boolean = setupStatus == null && !isArchiving
+
+private fun LocalWorktreeUiState.hasCreateWorktreeBase(): Boolean =
+    !isDetachedDisplayBranch() || !baseCommitHash.isNullOrBlank()
 
 private fun LocalWorktreeUiState.isDetachedDisplayBranch(): Boolean = branch == "(detached)"

@@ -147,11 +147,13 @@ class EngHubViewModel(
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
+        baseCommitIsh: String? = null,
     ) = localWorktreeCreateController.createLocalWorktreeFromBase(
         repoRootPath = repoRootPath,
         baseWorktreePath = baseWorktreePath,
         baseBranch = baseBranch,
         targetBranch = targetBranch,
+        baseCommitIsh = baseCommitIsh,
     )
 
     internal fun confirmUseUnrelatedExistingBranch(request: UseUnrelatedExistingBranchConfirmationRequest) {

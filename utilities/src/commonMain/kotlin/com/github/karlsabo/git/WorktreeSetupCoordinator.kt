@@ -15,8 +15,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-private const val BRANCH_WORKTREE_FIELD_COUNT = 3
-
 data class WorktreeSetupRequest(
     val repoPath: String,
     val worktreePath: WorktreePath,
@@ -24,6 +22,7 @@ data class WorktreeSetupRequest(
     val branch: String? = null,
     val baseWorktreePath: String? = null,
     val baseBranch: String? = null,
+    val baseCommitIsh: String? = null,
     val targetBranch: String? = null,
     val allowUnrelatedExistingBranch: Boolean = false,
     val setupShell: String = "",
@@ -35,21 +34,29 @@ data class WorktreeSetupRequest(
             "cloneUrl and branch must both be provided for repository/worktree setup, " +
                 "or both omitted for an existing worktree"
         }
-        val branchCreationFieldCount = listOf(baseWorktreePath, baseBranch, targetBranch).count { it != null }
-        require(branchCreationFieldCount == 0 || branchCreationFieldCount == BRANCH_WORKTREE_FIELD_COUNT) {
-            "baseWorktreePath, baseBranch, and targetBranch must all be provided " +
+        val hasBranchCreationFields = baseWorktreePath != null ||
+            baseBranch != null ||
+            baseCommitIsh != null ||
+            targetBranch != null
+        val hasCompleteBranchCreationFields = baseWorktreePath != null &&
+            targetBranch != null &&
+            listOfNotNull(baseBranch, baseCommitIsh).size == 1
+        require(!hasBranchCreationFields || hasCompleteBranchCreationFields) {
+            "baseWorktreePath, targetBranch, and exactly one of baseBranch or baseCommitIsh must be provided " +
                 "for branch worktree creation, or all omitted"
         }
-        require(cloneUrl == null || branchCreationFieldCount == 0) {
+        require(cloneUrl == null || !hasBranchCreationFields) {
             "repository/worktree setup and branch worktree creation are mutually exclusive"
         }
-        require(!allowUnrelatedExistingBranch || branchCreationFieldCount == BRANCH_WORKTREE_FIELD_COUNT) {
-            "allowUnrelatedExistingBranch requires branch worktree creation fields"
+        val hasBranchBasedCreationFields = baseWorktreePath != null && baseBranch != null && targetBranch != null
+        require(!allowUnrelatedExistingBranch || hasBranchBasedCreationFields) {
+            "allowUnrelatedExistingBranch requires branch-based worktree creation fields"
         }
         cloneUrl?.let { require(it.isNotBlank()) { "cloneUrl must not be blank" } }
         branch?.let { require(it.isNotBlank()) { "branch must not be blank" } }
         baseWorktreePath?.let { require(it.isNotBlank()) { "baseWorktreePath must not be blank" } }
         baseBranch?.let { require(it.isNotBlank()) { "baseBranch must not be blank" } }
+        baseCommitIsh?.let { require(it.isNotBlank()) { "baseCommitIsh must not be blank" } }
         targetBranch?.let { require(it.isNotBlank()) { "targetBranch must not be blank" } }
         if (setupCommands.isNotEmpty()) {
             require(setupShell.isNotBlank()) { "setupShell must not be blank when setupCommands are provided" }
@@ -58,6 +65,7 @@ data class WorktreeSetupRequest(
 
     internal val shouldEnsureRepositoryAndWorktree: Boolean = cloneUrl != null
     internal val shouldCreateBranchWorktree: Boolean = baseWorktreePath != null
+    internal val shouldCreateBranchWorktreeFromCommitIsh: Boolean = baseCommitIsh != null
 }
 
 data class WorktreeSetupResult(
@@ -219,13 +227,22 @@ class WorktreeSetupCoordinator private constructor(
         } else if (request.shouldCreateBranchWorktree) {
             setStatus(request.worktreePath, WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE)
             val createdPath = WorktreePath(
-                gitWorktreeApi.createBranchWorktree(
-                    repoPath = request.repoPath,
-                    baseWorktreePath = requireNotNull(request.baseWorktreePath),
-                    baseBranch = requireNotNull(request.baseBranch),
-                    targetBranch = requireNotNull(request.targetBranch),
-                    allowUnrelatedExistingBranch = request.allowUnrelatedExistingBranch,
-                ),
+                if (request.shouldCreateBranchWorktreeFromCommitIsh) {
+                    gitWorktreeApi.createBranchWorktreeFromCommitIsh(
+                        repoPath = request.repoPath,
+                        baseWorktreePath = requireNotNull(request.baseWorktreePath),
+                        baseCommitIsh = requireNotNull(request.baseCommitIsh),
+                        targetBranch = requireNotNull(request.targetBranch),
+                    )
+                } else {
+                    gitWorktreeApi.createBranchWorktree(
+                        repoPath = request.repoPath,
+                        baseWorktreePath = requireNotNull(request.baseWorktreePath),
+                        baseBranch = requireNotNull(request.baseBranch),
+                        targetBranch = requireNotNull(request.targetBranch),
+                        allowUnrelatedExistingBranch = request.allowUnrelatedExistingBranch,
+                    )
+                },
             )
             if (createdPath != request.worktreePath) {
                 throw WorktreeSetupException(

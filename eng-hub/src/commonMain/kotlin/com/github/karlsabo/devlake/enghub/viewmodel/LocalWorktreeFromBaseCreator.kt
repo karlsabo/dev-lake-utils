@@ -23,8 +23,8 @@ internal class LocalWorktreeFromBaseCreator(
     fun createLocalWorktreeFromBase(request: CreateLocalWorktreeFromBaseRequest) {
         logger.info {
             "Create local worktree requested for ${request.repoRootPath} " +
-                "base=${request.baseBranch} target=${request.targetBranch} " +
-                "allowUnrelatedExistingBranch=${request.allowUnrelatedExistingBranch}"
+                "base=${request.baseBranch} baseCommitIsh=${request.baseCommitIsh} " +
+                "target=${request.targetBranch} allowUnrelatedExistingBranch=${request.allowUnrelatedExistingBranch}"
         }
         state.lastCreateLocalWorktreeFromBaseRequest.value = request
         if (!request.allowUnrelatedExistingBranch) {
@@ -99,6 +99,7 @@ internal class LocalWorktreeFromBaseCreator(
             baseWorktreePath = normalizedBaseWorktreePath,
             baseBranch = request.baseBranch,
             targetBranch = request.targetBranch,
+            baseCommitIsh = request.baseCommitIsh,
         )
 
         val worktreePath = buildWorktreePath(normalizedRepoRootPath, request.targetBranch)
@@ -106,7 +107,8 @@ internal class LocalWorktreeFromBaseCreator(
             repoPath = normalizedRepoRootPath,
             worktreePath = worktreePath,
             baseWorktreePath = normalizedBaseWorktreePath,
-            baseBranch = request.baseBranch,
+            baseBranch = request.baseBranch.takeIf { request.baseCommitIsh == null },
+            baseCommitIsh = request.baseCommitIsh,
             targetBranch = request.targetBranch,
             allowUnrelatedExistingBranch = request.allowUnrelatedExistingBranch,
             setupShell = state.currentConfig.setupShell,
@@ -126,14 +128,21 @@ internal class LocalWorktreeFromBaseCreator(
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
+        baseCommitIsh: String?,
     ) {
         require(repoRootPath.isNotEmpty()) { "Repository root path is required" }
         require(baseWorktreePath.isNotEmpty()) { "Base worktree path is required" }
-        require(baseBranch != targetBranch) { "Target branch must differ from the base branch" }
+        require(baseBranch.isNotBlank()) { "Base branch label is required" }
+        baseCommitIsh?.let { commitIsh ->
+            require(commitIsh.isNotBlank()) { "Base commit-ish is required" }
+            require(commitIsh != targetBranch) { "Target branch must differ from the base commit-ish" }
+        } ?: require(baseBranch != targetBranch) { "Target branch must differ from the base branch" }
 
         val branchNameValidator = WorktreeBranchNameValidator()
-        val baseBranchValidation = branchNameValidator.validate(baseBranch)
-        require(baseBranchValidation.isValid) { "Invalid base branch: ${baseBranchValidation.message}" }
+        if (baseCommitIsh == null) {
+            val baseBranchValidation = branchNameValidator.validate(baseBranch)
+            require(baseBranchValidation.isValid) { "Invalid base branch: ${baseBranchValidation.message}" }
+        }
         val targetBranchValidation = branchNameValidator.validate(targetBranch)
         require(targetBranchValidation.isValid) { "Invalid target branch: ${targetBranchValidation.message}" }
     }

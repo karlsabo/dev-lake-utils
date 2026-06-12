@@ -211,14 +211,19 @@ private fun rememberCreateWorktreeDialogModel(
     onTargetBranchChange: (String) -> Unit,
 ): CreateWorktreeDialogModel {
     val branchNameValidator = remember { WorktreeBranchNameValidator() }
-    var targetBranchInput by remember(state.repoRootPath, state.baseWorktreePath, state.baseBranch) {
+    var targetBranchInput by remember(
+        state.repoRootPath,
+        state.baseWorktreePath,
+        state.baseBranch,
+        state.baseCommitIsh,
+    ) {
         mutableStateOf(createTargetBranchInputValue(state.targetBranch))
     }
-    var targetBranchValidation by remember(state.baseBranch, state.targetBranch) {
+    var targetBranchValidation by remember(state.baseBranch, state.baseCommitIsh, state.targetBranch) {
         mutableStateOf(startValidation(state, branchNameValidator))
     }
 
-    LaunchedEffect(state.baseBranch, state.targetBranch) {
+    LaunchedEffect(state.baseBranch, state.baseCommitIsh, state.targetBranch) {
         if (targetBranchValidation.isCheckingGitRefFormat) {
             targetBranchValidation = finishValidationOnIo(state, branchNameValidator)
         }
@@ -241,6 +246,7 @@ private fun startValidation(
     baseBranch = state.baseBranch,
     targetBranch = state.targetBranch,
     branchNameValidator = branchNameValidator,
+    baseCommitIsh = state.baseCommitIsh,
 )
 
 private suspend fun finishValidationOnIo(
@@ -251,6 +257,7 @@ private suspend fun finishValidationOnIo(
         baseBranch = state.baseBranch,
         targetBranch = state.targetBranch,
         branchNameValidator = branchNameValidator,
+        baseCommitIsh = state.baseCommitIsh,
     )
 }
 
@@ -267,7 +274,7 @@ private fun createWorktreeDialogContent(
     ) {
         Text(text = "Create Worktree", style = MaterialTheme.typography.h6)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "Base: ${state.request.baseBranch}")
+        Text(text = "Base: ${state.request.baseCommitIsh ?: state.request.baseBranch}")
         Spacer(modifier = Modifier.height(12.dp))
         createWorktreeTargetBranchField(state, actions.onTargetBranchInputChange)
         Spacer(modifier = Modifier.height(16.dp))

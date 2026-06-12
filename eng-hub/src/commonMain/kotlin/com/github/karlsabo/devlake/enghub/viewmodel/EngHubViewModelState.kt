@@ -29,6 +29,7 @@ internal data class CreateLocalWorktreeFromBaseRequest(
     val baseWorktreePath: String,
     val baseBranch: String,
     val targetBranch: String,
+    val baseCommitIsh: String? = null,
     val allowUnrelatedExistingBranch: Boolean = false,
 )
 

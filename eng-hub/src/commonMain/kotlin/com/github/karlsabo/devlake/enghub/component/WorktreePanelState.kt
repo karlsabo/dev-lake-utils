@@ -43,6 +43,7 @@ internal data class PendingCreateWorktree(
     val repoRootPath: String,
     val baseWorktreePath: String,
     val baseBranch: String,
+    val baseCommitIsh: String? = null,
     val targetBranch: String = "",
 )
 
@@ -61,10 +62,11 @@ internal data class PendingArchive(
 internal fun createWorktreeDialogState(
     repoRootPath: String,
     worktree: LocalWorktreeUiState,
-): PendingCreateWorktree = createRepositoryWorktreeDialogState(
+): PendingCreateWorktree = PendingCreateWorktree(
     repoRootPath = repoRootPath,
     baseWorktreePath = worktree.path,
     baseBranch = worktree.branch,
+    baseCommitIsh = worktree.baseCommitHash,
 )
 
 internal fun createRepositoryWorktreeDialogState(

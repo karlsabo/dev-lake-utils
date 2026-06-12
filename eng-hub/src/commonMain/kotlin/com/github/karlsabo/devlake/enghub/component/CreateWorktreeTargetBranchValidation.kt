@@ -9,21 +9,26 @@ internal data class CreateWorktreeTargetBranchValidation(
     val result: WorktreeBranchNameValidationResult,
     val isCheckingGitRefFormat: Boolean,
     val targetBranchMatchesBase: Boolean = false,
+    val targetBranchMatchesBaseMessage: String = TARGET_BRANCH_MATCHES_BASE_BRANCH_MESSAGE,
 )
 
-private const val TARGET_BRANCH_MATCHES_BASE_MESSAGE = "Target branch must differ from the base branch"
+private const val TARGET_BRANCH_MATCHES_BASE_BRANCH_MESSAGE = "Target branch must differ from the base branch"
+private const val TARGET_BRANCH_MATCHES_BASE_COMMIT_ISH_MESSAGE = "Target branch must differ from the base commit-ish"
 
 internal fun startCreateWorktreeTargetBranchValidation(
     baseBranch: String,
     targetBranch: String,
     branchNameValidator: WorktreeBranchNameValidator,
+    baseCommitIsh: String? = null,
 ): CreateWorktreeTargetBranchValidation {
     val localValidation = branchNameValidator.validateWithoutGitRefFormatCheck(targetBranch)
-    val targetBranchMatchesBase = targetBranchMatchesBase(baseBranch, targetBranch)
+    val baseComparison = createBaseComparison(baseBranch, baseCommitIsh)
+    val targetBranchMatchesBase = targetBranchMatchesBase(baseComparison.ref, targetBranch)
     return CreateWorktreeTargetBranchValidation(
         result = localValidation,
         isCheckingGitRefFormat = localValidation.isValid && !targetBranchMatchesBase,
         targetBranchMatchesBase = targetBranchMatchesBase,
+        targetBranchMatchesBaseMessage = baseComparison.matchMessage,
     )
 }
 
@@ -31,9 +36,11 @@ internal fun finishCreateWorktreeTargetBranchValidation(
     baseBranch: String,
     targetBranch: String,
     branchNameValidator: WorktreeBranchNameValidator,
+    baseCommitIsh: String? = null,
 ): CreateWorktreeTargetBranchValidation {
     val localValidation = branchNameValidator.validateWithoutGitRefFormatCheck(targetBranch)
-    val targetBranchMatchesBase = targetBranchMatchesBase(baseBranch, targetBranch)
+    val baseComparison = createBaseComparison(baseBranch, baseCommitIsh)
+    val targetBranchMatchesBase = targetBranchMatchesBase(baseComparison.ref, targetBranch)
     return CreateWorktreeTargetBranchValidation(
         result = validateGitRefFormatWhenNeeded(
             localValidation = localValidation,
@@ -43,6 +50,7 @@ internal fun finishCreateWorktreeTargetBranchValidation(
         ),
         isCheckingGitRefFormat = false,
         targetBranchMatchesBase = targetBranchMatchesBase,
+        targetBranchMatchesBaseMessage = baseComparison.matchMessage,
     )
 }
 
@@ -63,7 +71,7 @@ internal fun createWorktreeTargetBranchValidationMessage(
 ): String? = when {
     targetBranch.isEmpty() -> null
     validation.isCheckingGitRefFormat -> null
-    validation.targetBranchMatchesBase -> TARGET_BRANCH_MATCHES_BASE_MESSAGE
+    validation.targetBranchMatchesBase -> validation.targetBranchMatchesBaseMessage
     else -> validation.result.message
 }
 
@@ -78,7 +86,21 @@ internal fun createTargetBranchInputValue(targetBranch: String): TextFieldValue 
     selection = TextRange(targetBranch.length),
 )
 
-private fun targetBranchMatchesBase(
+private data class BaseComparison(
+    val ref: String,
+    val matchMessage: String,
+)
+
+private fun createBaseComparison(
     baseBranch: String,
+    baseCommitIsh: String?,
+): BaseComparison = if (baseCommitIsh == null) {
+    BaseComparison(baseBranch, TARGET_BRANCH_MATCHES_BASE_BRANCH_MESSAGE)
+} else {
+    BaseComparison(baseCommitIsh, TARGET_BRANCH_MATCHES_BASE_COMMIT_ISH_MESSAGE)
+}
+
+private fun targetBranchMatchesBase(
+    baseRef: String,
     targetBranch: String,
-): Boolean = targetBranch.isNotEmpty() && targetBranch == baseBranch
+): Boolean = targetBranch.isNotEmpty() && targetBranch == baseRef

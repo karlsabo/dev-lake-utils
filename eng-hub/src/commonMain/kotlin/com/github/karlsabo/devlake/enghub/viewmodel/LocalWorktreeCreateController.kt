@@ -48,6 +48,7 @@ internal class LocalWorktreeCreateController(
         baseWorktreePath: String,
         baseBranch: String,
         targetBranch: String,
+        baseCommitIsh: String? = null,
     ) {
         fromBaseCreator.createLocalWorktreeFromBase(
             request = CreateLocalWorktreeFromBaseRequest(
@@ -55,6 +56,7 @@ internal class LocalWorktreeCreateController(
                 baseWorktreePath = baseWorktreePath,
                 baseBranch = baseBranch,
                 targetBranch = targetBranch,
+                baseCommitIsh = baseCommitIsh,
             ),
         )
     }

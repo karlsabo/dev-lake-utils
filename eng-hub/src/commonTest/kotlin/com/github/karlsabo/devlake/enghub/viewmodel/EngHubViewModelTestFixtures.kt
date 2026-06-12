@@ -407,6 +407,13 @@ data class CreateBranchWorktreeCall(
     val allowUnrelatedExistingBranch: Boolean = false,
 )
 
+data class CreateBranchWorktreeFromCommitIshCall(
+    val repoPath: String,
+    val baseWorktreePath: String,
+    val baseCommitIsh: String,
+    val targetBranch: String,
+)
+
 data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
@@ -420,6 +427,9 @@ data class RecordingGitWorktreeApiCallbacks(
     val onListWorktrees: (String) -> Unit = {},
     val onArchiveWorktree: (String, String, Boolean) -> Unit = { _, _, _ -> },
     val onCreateBranchWorktree: (CreateBranchWorktreeCall) -> String = {
+        error("Unexpected call")
+    },
+    val onCreateBranchWorktreeFromCommitIsh: (CreateBranchWorktreeFromCommitIshCall) -> String = {
         error("Unexpected call")
     },
 )
@@ -460,6 +470,7 @@ class RecordingGitWorktreeApi(
     val ensureRepositoryCalls = mutableListOf<Pair<String, String>>()
     val ensureWorktreeCalls = mutableListOf<Pair<String, String>>()
     val createBranchWorktreeCalls = mutableListOf<CreateBranchWorktreeCall>()
+    val createBranchWorktreeFromCommitIshCalls = mutableListOf<CreateBranchWorktreeFromCommitIshCall>()
     val inferDefaultBranchRefCalls = mutableListOf<String>()
     val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
     val archiveWorktreeForceValues = mutableListOf<Boolean>()
@@ -493,6 +504,22 @@ class RecordingGitWorktreeApi(
         )
         createBranchWorktreeCalls += call
         return callbacks.onCreateBranchWorktree(call)
+    }
+
+    override fun createBranchWorktreeFromCommitIsh(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseCommitIsh: String,
+        targetBranch: String,
+    ): String {
+        val call = CreateBranchWorktreeFromCommitIshCall(
+            repoPath = repoPath,
+            baseWorktreePath = baseWorktreePath,
+            baseCommitIsh = baseCommitIsh,
+            targetBranch = targetBranch,
+        )
+        createBranchWorktreeFromCommitIshCalls += call
+        return callbacks.onCreateBranchWorktreeFromCommitIsh(call)
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false

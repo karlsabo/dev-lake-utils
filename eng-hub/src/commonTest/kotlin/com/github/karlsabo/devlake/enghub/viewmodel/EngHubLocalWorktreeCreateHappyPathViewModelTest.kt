@@ -99,6 +99,64 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
     }
 
     @Test
+    fun createLocalWorktreeFromDetachedBaseCreatesFromCommitIshAndStartsConfiguredSetup() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-detached"
+        val baseCommitIsh = "abc123"
+        val targetBranch = "feature/from-detached"
+        val targetWorktreePath = buildWorktreePath(DEV_LAKE_ROOT, targetBranch)
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = emptyMap(),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onCreateBranchWorktreeFromCommitIsh = { request ->
+                    buildWorktreePath(DEV_LAKE_ROOT, request.targetBranch).value
+                },
+            ),
+        )
+        val viewModel = createWorktreeSetupViewModel(
+            gitWorktreeApi = api,
+            setupRunner = setupRunner,
+            setupCommands = listOf("setup detached-based worktree"),
+        )
+
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "(detached)",
+            targetBranch = targetBranch,
+            baseCommitIsh = baseCommitIsh,
+        )
+        withTimeout(2_000.milliseconds) { setupRunner.awaitStarted(targetWorktreePath) }
+
+        assertEquals(
+            listOf(
+                CreateBranchWorktreeFromCommitIshCall(
+                    repoPath = DEV_LAKE_ROOT,
+                    baseWorktreePath = baseWorktreePath,
+                    baseCommitIsh = baseCommitIsh,
+                    targetBranch = targetBranch,
+                ),
+            ),
+            api.createBranchWorktreeFromCommitIshCalls,
+        )
+        assertEquals(emptyList(), api.createBranchWorktreeCalls)
+        assertEquals(
+            WorktreeSetupStatus.RUNNING_SETUP_COMMANDS,
+            viewModel.setupStatusesStateFlow.value[targetWorktreePath],
+        )
+        assertEquals(
+            listOf("setup detached-based worktree"),
+            setupRunner.requestFor(targetWorktreePath)?.setupCommands,
+        )
+
+        setupRunner.complete(targetWorktreePath)
+        withTimeout(2_000.milliseconds) {
+            viewModel.setupStatusesStateFlow.first { targetWorktreePath !in it }
+        }
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
     fun createLocalWorktreeFromBaseRunsSetupAndRefreshesWhenExactTargetWorktreeAlreadyExists() = runBlocking {
         val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
         val targetBranch = "feature/stacked-pr"

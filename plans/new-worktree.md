@@ -429,7 +429,9 @@ Relevant current code:
 
 **Scope:** Git utility support for commit-ish base. Do not add UI wiring or detached hierarchy display.
 
-### 29. Wire detached-row create action to the commit-ish base
+### 29. Wire detached-row create action to the commit-ish base - Done
+
+**Done** 2026 06 12
 
 **Acceptance criteria:** Given a visible detached worktree at commit `abc123`, when the user creates branch `feature/from-detached`, then Eng Hub creates from `abc123` and runs setup commands.
 
