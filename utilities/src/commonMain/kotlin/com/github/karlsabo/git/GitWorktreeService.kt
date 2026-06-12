@@ -108,6 +108,18 @@ private class GitWorktreeCreationService(
         allowUnrelatedExistingBranch = allowUnrelatedExistingBranch,
     )
 
+    override fun createBranchWorktreeFromCommitIsh(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseCommitIsh: String,
+        targetBranch: String,
+    ): String = creator.createBranchWorktreeFromCommitIsh(
+        repoPath = repoPath,
+        baseWorktreePath = baseWorktreePath,
+        baseCommitIsh = baseCommitIsh,
+        targetBranch = targetBranch,
+    )
+
     override fun planBranchWorktreeCreation(
         repoPath: String,
         targetBranch: String,
@@ -282,7 +294,34 @@ private class GitWorktreeCreator(
 
             is BranchWorktreeCreationPlan.CreateNewBranch -> createNewBranchWorktree(
                 baseWorktreePath = baseWorktreePath,
-                baseBranch = baseBranch,
+                baseCommitIsh = baseBranch,
+                targetBranch = targetBranch,
+                plan = plan,
+            )
+        }
+    }
+
+    fun createBranchWorktreeFromCommitIsh(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseCommitIsh: String,
+        targetBranch: String,
+    ): String {
+        require(baseWorktreePath.isNotBlank()) { "baseWorktreePath must not be blank" }
+        require(baseCommitIsh.isNotBlank()) { "baseCommitIsh must not be blank" }
+        return when (val plan = planBranchWorktreeCreation(repoPath, targetBranch)) {
+            is BranchWorktreeCreationPlan.ReuseExistingWorktree -> {
+                logger.info { "Worktree already exists at ${plan.worktreePath} for branch $targetBranch" }
+                plan.worktreePath
+            }
+
+            is BranchWorktreeCreationPlan.UseExistingLocalBranch -> throw GitWorktreeException(
+                "Local branch $targetBranch already exists. Choose a different branch name.",
+            )
+
+            is BranchWorktreeCreationPlan.CreateNewBranch -> createNewBranchWorktree(
+                baseWorktreePath = baseWorktreePath,
+                baseCommitIsh = baseCommitIsh,
                 targetBranch = targetBranch,
                 plan = plan,
             )
@@ -313,12 +352,12 @@ private class GitWorktreeCreator(
 
     private fun createNewBranchWorktree(
         baseWorktreePath: String,
-        baseBranch: String,
+        baseCommitIsh: String,
         targetBranch: String,
         plan: BranchWorktreeCreationPlan.CreateNewBranch,
     ): String {
-        addNewBranchWorktree(baseWorktreePath, targetBranch, plan.worktreePath, baseBranch)
-        logger.info { "Created worktree at ${plan.worktreePath} for branch $targetBranch from $baseBranch" }
+        addNewBranchWorktree(baseWorktreePath, targetBranch, plan.worktreePath, baseCommitIsh)
+        logger.info { "Created worktree at ${plan.worktreePath} for branch $targetBranch from $baseCommitIsh" }
         return plan.worktreePath
     }
 
@@ -349,13 +388,13 @@ private class GitWorktreeCreator(
         baseWorktreePath: String,
         targetBranch: String,
         worktreePath: String,
-        baseBranch: String,
+        baseCommitIsh: String,
     ) {
         try {
-            gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseBranch)
+            gitCommandApi.worktreeAddNewBranch(baseWorktreePath, targetBranch, worktreePath, baseCommitIsh)
         } catch (e: GitCommandException) {
             throw GitWorktreeException(
-                "Failed to create worktree at $worktreePath for branch $targetBranch from $baseBranch: ${e.gitOutput}",
+                "Failed to create worktree at $worktreePath for branch $targetBranch from $baseCommitIsh: ${e.gitOutput}",
                 e,
             )
         }

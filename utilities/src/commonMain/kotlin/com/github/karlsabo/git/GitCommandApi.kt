@@ -53,7 +53,7 @@ interface GitWorktreeCommandApi {
         repoPath: String,
         newBranch: String,
         path: String,
-        baseBranch: String,
+        baseCommitIsh: String,
     )
 
     fun worktreeList(repoPath: String): String

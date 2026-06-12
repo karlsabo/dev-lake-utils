@@ -20,6 +20,14 @@ interface GitWorktreeCreationApi {
         targetBranch: String,
         allowUnrelatedExistingBranch: Boolean = false,
     ): String
+    fun createBranchWorktreeFromCommitIsh(
+        repoPath: String,
+        baseWorktreePath: String,
+        baseCommitIsh: String,
+        targetBranch: String,
+    ): String = throw UnsupportedOperationException(
+        "createBranchWorktreeFromCommitIsh is not implemented",
+    )
     fun planBranchWorktreeCreation(
         repoPath: String,
         targetBranch: String,

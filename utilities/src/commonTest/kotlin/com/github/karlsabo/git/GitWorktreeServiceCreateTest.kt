@@ -39,6 +39,42 @@ class GitWorktreeServiceCreateTest {
     }
 
     @Test
+    fun createBranchWorktreeFromCommitIsh_createsDerivedPathFromCommitIshBase() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/dev-lake-utils"
+        val baseWorktreePath = "/repos/dev-lake-utils-detached"
+        val baseCommitIsh = "abc123"
+        val targetBranch = "feature/from-detached"
+        val expectedWorktreePath = buildWorktreePath(repoPath, targetBranch).value
+        val service = GitWorktreeService(fake)
+
+        val result = service.createBranchWorktreeFromCommitIsh(
+            repoPath = repoPath,
+            baseWorktreePath = baseWorktreePath,
+            baseCommitIsh = baseCommitIsh,
+            targetBranch = targetBranch,
+        )
+
+        assertEquals(expectedWorktreePath, result)
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call(
+                    "worktreeAddNewBranch",
+                    listOf(baseWorktreePath, targetBranch, expectedWorktreePath, baseCommitIsh),
+                ),
+            ),
+            fake.calls.filter { it.method == "worktreeAddNewBranch" },
+        )
+        assertTrue(fake.calls.none { it.method == "fetch" })
+        assertTrue(fake.calls.none { it.method == "worktreeAdd" })
+        assertTrue(
+            fake.calls.none {
+                it == FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", baseCommitIsh))
+            },
+        )
+    }
+
+    @Test
     fun createBranchWorktree_exactExistingTargetWorktreeReturnsPathWithoutCreating() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"

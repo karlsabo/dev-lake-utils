@@ -414,7 +414,9 @@ Relevant current code:
 
 **Scope:** State only. Retain backward-compatible display as `(detached)` while carrying the commit separately; do not create from detached base.
 
-### 28. Create a branch worktree from a commit-ish base
+### 28. Create a branch worktree from a commit-ish base - Done
+
+**Done** 2026 06 12
 
 **Acceptance criteria:** Given base commit `abc123`, when target `feature/from-detached` is requested, then git runs `worktree add -b feature/from-detached <path> abc123`.
 

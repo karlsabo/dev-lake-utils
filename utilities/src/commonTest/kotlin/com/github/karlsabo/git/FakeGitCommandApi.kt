@@ -11,7 +11,7 @@ internal class FakeGitCommandApi : GitCommandApi {
         val repoPath: String,
         val newBranch: String,
         val path: String,
-        val baseBranch: String,
+        val baseCommitIsh: String,
     )
 
     val calls = mutableListOf<Call>()
@@ -101,15 +101,15 @@ internal class FakeGitCommandApi : GitCommandApi {
         repoPath: String,
         newBranch: String,
         path: String,
-        baseBranch: String,
+        baseCommitIsh: String,
     ) {
-        calls.add(Call("worktreeAddNewBranch", listOf(repoPath, newBranch, path, baseBranch)))
+        calls.add(Call("worktreeAddNewBranch", listOf(repoPath, newBranch, path, baseCommitIsh)))
         worktreeAddNewBranchAction(
             WorktreeAddNewBranchCall(
                 repoPath = repoPath,
                 newBranch = newBranch,
                 path = path,
-                baseBranch = baseBranch,
+                baseCommitIsh = baseCommitIsh,
             ),
         )
     }

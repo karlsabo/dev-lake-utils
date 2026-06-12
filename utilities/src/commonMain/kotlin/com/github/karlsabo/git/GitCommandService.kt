@@ -166,9 +166,9 @@ private class GitWorktreeCommandService(
         repoPath: String,
         newBranch: String,
         path: String,
-        baseBranch: String,
+        baseCommitIsh: String,
     ) {
-        commandRunner.run(gitRepoCommand(repoPath, "worktree", "add", "-b", newBranch, path, baseBranch))
+        commandRunner.run(gitRepoCommand(repoPath, "worktree", "add", "-b", newBranch, path, baseCommitIsh))
     }
 
     override fun worktreeList(repoPath: String): String = commandRunner.run(
