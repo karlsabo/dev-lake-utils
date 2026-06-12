@@ -130,7 +130,7 @@ private fun repositoryDefaultWorktreeCreateFixture(): RepositoryDefaultWorktreeC
             worktreesForRepoPath = { currentWorktrees },
         ),
         callbacks = RecordingGitWorktreeApiCallbacks(
-            onCreateBranchWorktree = { _, _, _, _, _ ->
+            onCreateBranchWorktree = {
                 currentWorktrees = currentWorktrees + targetWorktree
                 targetWorktreePath.value
             },

@@ -7,6 +7,13 @@ internal class FakeGitCommandApi : GitCommandApi {
         val args: List<String> = emptyList(),
     )
 
+    data class WorktreeAddNewBranchCall(
+        val repoPath: String,
+        val newBranch: String,
+        val path: String,
+        val baseBranch: String,
+    )
+
     val calls = mutableListOf<Call>()
 
     var cloneAction: (String, String) -> Unit = { _, _ -> }
@@ -18,7 +25,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var remoteDefaultBranchRefAction: (String, String) -> String? = { _, _ -> null }
     var isAncestorAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var worktreeAddAction: (String, String, String) -> Unit = { _, _, _ -> }
-    var worktreeAddNewBranchAction: (String, String, String, String) -> Unit = { _, _, _, _ -> }
+    var worktreeAddNewBranchAction: (WorktreeAddNewBranchCall) -> Unit = {}
     var worktreeListResult: String = ""
     var worktreeListAction: (String) -> String = { worktreeListResult }
     var worktreeRemoveAction: (String, String) -> Unit = { _, _ -> }
@@ -97,7 +104,14 @@ internal class FakeGitCommandApi : GitCommandApi {
         baseBranch: String,
     ) {
         calls.add(Call("worktreeAddNewBranch", listOf(repoPath, newBranch, path, baseBranch)))
-        worktreeAddNewBranchAction(repoPath, newBranch, path, baseBranch)
+        worktreeAddNewBranchAction(
+            WorktreeAddNewBranchCall(
+                repoPath = repoPath,
+                newBranch = newBranch,
+                path = path,
+                baseBranch = baseBranch,
+            ),
+        )
     }
 
     override fun worktreeList(repoPath: String): String {

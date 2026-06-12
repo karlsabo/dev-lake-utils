@@ -54,7 +54,7 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
         val api = RecordingGitWorktreeApi(
             repositoryWorktreesBySelectedPath = emptyMap(),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target, _ -> buildWorktreePath(DEV_LAKE_ROOT, target).value },
+                onCreateBranchWorktree = { request -> buildWorktreePath(DEV_LAKE_ROOT, request.targetBranch).value },
             ),
         )
         val viewModel = createWorktreeSetupViewModel(
@@ -117,7 +117,7 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
                 ),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, _, _ -> targetWorktreePath.value },
+                onCreateBranchWorktree = { targetWorktreePath.value },
             ),
         )
         val viewModel = createWorktreeSetupViewModel(
@@ -173,9 +173,9 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
                 worktreesForRepoPath = { currentWorktrees },
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target, _ ->
+                onCreateBranchWorktree = { request ->
                     currentWorktrees = currentWorktrees + targetWorktree
-                    buildWorktreePath(DEV_LAKE_ROOT, target).value
+                    buildWorktreePath(DEV_LAKE_ROOT, request.targetBranch).value
                 },
             ),
         )
@@ -234,9 +234,9 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
                 worktreesForRepoPath = { currentWorktrees },
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target, _ ->
+                onCreateBranchWorktree = { request ->
                     currentWorktrees = currentWorktrees + targetWorktree
-                    buildWorktreePath(DEV_LAKE_ROOT, target).value
+                    buildWorktreePath(DEV_LAKE_ROOT, request.targetBranch).value
                 },
             ),
         )
@@ -288,9 +288,9 @@ class EngHubLocalWorktreeCreateHappyPathViewModelTest {
                 worktreesForRepoPath = { currentWorktrees },
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onCreateBranchWorktree = { _, _, _, target, _ ->
+                onCreateBranchWorktree = { request ->
                     currentWorktrees = currentWorktrees + targetWorktree
-                    buildWorktreePath(DEV_LAKE_ROOT, target).value
+                    buildWorktreePath(DEV_LAKE_ROOT, request.targetBranch).value
                 },
             ),
         )

@@ -136,12 +136,12 @@ internal fun engHubScreenActions(
         worktrees = LocalWorktreeActions(
             onOpenWorktree = viewModel.openLocalWorktree,
             onArchiveWorktree = viewModel.archiveLocalWorktree,
-            onCreateWorktree = { repoRootPath, baseWorktreePath, baseBranch, targetBranch ->
+            onCreateWorktree = { request ->
                 viewModel.createLocalWorktreeFromBase(
-                    repoRootPath = repoRootPath,
-                    baseWorktreePath = baseWorktreePath,
-                    baseBranch = baseBranch,
-                    targetBranch = targetBranch,
+                    repoRootPath = request.repoRootPath,
+                    baseWorktreePath = request.baseWorktreePath,
+                    baseBranch = request.baseBranch,
+                    targetBranch = request.targetBranch,
                 )
             },
         ),

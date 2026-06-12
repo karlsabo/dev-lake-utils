@@ -419,7 +419,7 @@ data class RecordingGitWorktreeApiResponses(
 data class RecordingGitWorktreeApiCallbacks(
     val onListWorktrees: (String) -> Unit = {},
     val onArchiveWorktree: (String, String, Boolean) -> Unit = { _, _, _ -> },
-    val onCreateBranchWorktree: (String, String, String, String, Boolean) -> String = { _, _, _, _, _ ->
+    val onCreateBranchWorktree: (CreateBranchWorktreeCall) -> String = {
         error("Unexpected call")
     },
 )
@@ -484,20 +484,15 @@ class RecordingGitWorktreeApi(
         targetBranch: String,
         allowUnrelatedExistingBranch: Boolean,
     ): String {
-        createBranchWorktreeCalls += CreateBranchWorktreeCall(
+        val call = CreateBranchWorktreeCall(
             repoPath = repoPath,
             baseWorktreePath = baseWorktreePath,
             baseBranch = baseBranch,
             targetBranch = targetBranch,
             allowUnrelatedExistingBranch = allowUnrelatedExistingBranch,
         )
-        return callbacks.onCreateBranchWorktree(
-            repoPath,
-            baseWorktreePath,
-            baseBranch,
-            targetBranch,
-            allowUnrelatedExistingBranch,
-        )
+        createBranchWorktreeCalls += call
+        return callbacks.onCreateBranchWorktree(call)
     }
 
     override fun worktreeExists(repoPath: String, branch: String): Boolean = false

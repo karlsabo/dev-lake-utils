@@ -200,13 +200,8 @@ class WorktreePanelTest {
             targetBranch = "feature/stacked-pr",
         )
 
-        submitCreateWorktreeDialog(state) { repoRootPath, baseWorktreePath, baseBranch, targetBranch ->
-            submissions += PendingCreateWorktree(
-                repoRootPath = repoRootPath,
-                baseWorktreePath = baseWorktreePath,
-                baseBranch = baseBranch,
-                targetBranch = targetBranch,
-            )
+        submitCreateWorktreeDialog(state) { request ->
+            submissions += request
         }
 
         assertEquals(listOf(state), submissions)

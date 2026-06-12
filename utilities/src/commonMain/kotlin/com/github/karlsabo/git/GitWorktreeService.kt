@@ -613,24 +613,27 @@ private class GitWorktreeParentInferer(
         val nearestAncestors = mutableListOf<GitWorktreeParentCandidate>()
         var hasFailure = false
         uniqueAncestors.forEach { candidate ->
-            var hasNearerAncestor = false
-            for (other in uniqueAncestors) {
-                if (other == candidate) continue
-                when (isAncestor(repoPath, candidate.ref, other.ref)) {
-                    null -> hasFailure = true
-
-                    true -> {
-                        hasNearerAncestor = true
-                        break
-                    }
-
-                    false -> Unit
-                }
+            when (candidate.hasNearerAncestorOrNull(repoPath, uniqueAncestors)) {
+                null -> hasFailure = true
+                true -> Unit
+                false -> nearestAncestors += candidate
             }
-            if (!hasNearerAncestor) nearestAncestors += candidate
         }
         return if (hasFailure) null else nearestAncestors
     }
+
+    private fun GitWorktreeParentCandidate.hasNearerAncestorOrNull(
+        repoPath: String,
+        uniqueAncestors: List<GitWorktreeParentCandidate>,
+    ): Boolean? = uniqueAncestors
+        .asSequence()
+        .filter { it != this }
+        .fold(false as Boolean?) { result, other ->
+            when (result) {
+                null, true -> result
+                false -> isAncestor(repoPath, ref, other.ref)
+            }
+        }
 
     private fun dropDefaultRefDuplicates(
         repoPath: String,

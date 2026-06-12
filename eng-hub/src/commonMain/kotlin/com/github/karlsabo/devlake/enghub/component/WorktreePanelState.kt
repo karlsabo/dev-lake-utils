@@ -6,12 +6,7 @@ import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
-internal typealias CreateWorktreeCallback = (
-    repoRootPath: String,
-    baseWorktreePath: String,
-    baseBranch: String,
-    targetBranch: String,
-) -> Unit
+internal typealias CreateWorktreeCallback = (PendingCreateWorktree) -> Unit
 
 internal data class WorktreePanelState(
     val localRepositories: List<LocalRepositoryUiState>,
@@ -86,7 +81,7 @@ internal fun submitCreateWorktreeDialog(
     state: PendingCreateWorktree,
     onCreateWorktree: CreateWorktreeCallback,
 ) {
-    onCreateWorktree(state.repoRootPath, state.baseWorktreePath, state.baseBranch, state.targetBranch)
+    onCreateWorktree(state)
 }
 
 internal fun confirmUseUnrelatedExistingBranchDialog(

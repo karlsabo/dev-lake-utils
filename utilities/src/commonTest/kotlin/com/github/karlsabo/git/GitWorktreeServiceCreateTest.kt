@@ -394,7 +394,7 @@ class GitWorktreeServiceCreateTest {
     @Test
     fun createBranchWorktree_worktreeAddFailure_throwsWorktreeException() {
         val fake = FakeGitCommandApi()
-        fake.worktreeAddNewBranchAction = { _, _, _, _ ->
+        fake.worktreeAddNewBranchAction = {
             throw GitCommandException(
                 command = listOf("git", "worktree", "add", "-b"),
                 exitCode = 128,
