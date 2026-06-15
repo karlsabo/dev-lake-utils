@@ -24,6 +24,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var currentBranchUpstreamRemoteAction: (String) -> String? = { null }
     var remoteDefaultBranchRefAction: (String, String) -> String? = { _, _ -> null }
     var isAncestorAction: (String, String, String) -> Boolean = { _, _, _ -> false }
+    var hasCommitsNotContainedInAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var worktreeAddAction: (String, String, String) -> Unit = { _, _, _ -> }
     var worktreeAddNewBranchAction: (WorktreeAddNewBranchCall) -> Unit = {}
     var worktreeListResult: String = ""
@@ -86,6 +87,15 @@ internal class FakeGitCommandApi : GitCommandApi {
     ): Boolean {
         calls.add(Call("isAncestor", listOf(repoPath, ancestorRef, descendantRef)))
         return isAncestorAction(repoPath, ancestorRef, descendantRef)
+    }
+
+    override fun hasCommitsNotContainedIn(
+        repoPath: String,
+        sourceRef: String,
+        containingRef: String,
+    ): Boolean {
+        calls.add(Call("hasCommitsNotContainedIn", listOf(repoPath, sourceRef, containingRef)))
+        return hasCommitsNotContainedInAction(repoPath, sourceRef, containingRef)
     }
 
     override fun worktreeAdd(

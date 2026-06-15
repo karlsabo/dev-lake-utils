@@ -444,7 +444,9 @@ Relevant current code:
 
 **Scope:** Support detached worktree as base commit. Use the retained commit hash as the base; never pass the display label `(detached)` to git. Detached-base children still display flat under default/root.
 
-### 30. Compute parent-has-new-commits in git utilities
+### 30. Compute parent-has-new-commits in git utilities - Done
+
+**Done** 2026 06 15
 
 **Acceptance criteria:** Given parent `feature/base-pr` has commits not contained in child `feature/stacked-pr`, when checked, then utilities return `needsRebase=true`.
 

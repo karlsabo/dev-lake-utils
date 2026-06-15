@@ -40,6 +40,12 @@ interface GitAncestryCommandApi {
         ancestorRef: String,
         descendantRef: String,
     ): Boolean
+
+    fun hasCommitsNotContainedIn(
+        repoPath: String,
+        sourceRef: String,
+        containingRef: String,
+    ): Boolean
 }
 
 interface GitWorktreeCommandApi {

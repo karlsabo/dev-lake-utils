@@ -46,6 +46,13 @@ interface GitWorktreeDiscoveryApi {
     fun listWorktrees(repoPath: String): List<Worktree>
     fun inferDefaultBranchRef(repoPath: String): String?
     fun inferWorktreeParentBranches(repoPath: String): Map<String, String>
+    fun branchNeedsRebase(
+        repoPath: String,
+        parentBranch: String,
+        childBranch: String,
+    ): Boolean = throw UnsupportedOperationException(
+        "branchNeedsRebase is not implemented",
+    )
 }
 
 interface GitWorktreeArchiveApi {

@@ -196,6 +196,33 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun hasCommitsNotContainedIn_reportsWhetherSourceHasCommitsOutsideContainingRef() {
+        val repoDir = createTempDir("repo")
+        try {
+            initRepoWithCommit(repoDir)
+            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr"), workingDirectory = null)
+            executeCommand(
+                listOf("git", "-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr"),
+                workingDirectory = null,
+            )
+            executeCommand(listOf("sh", "-c", "echo child > $repoDir/child.txt"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "child"), workingDirectory = null)
+
+            assertFalse(service.hasCommitsNotContainedIn(repoDir, "feature/base-pr", "feature/stacked-pr"))
+
+            executeCommand(listOf("git", "-C", repoDir, "checkout", "feature/base-pr"), workingDirectory = null)
+            executeCommand(listOf("sh", "-c", "echo parent > $repoDir/parent.txt"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "parent"), workingDirectory = null)
+
+            assertTrue(service.hasCommitsNotContainedIn(repoDir, "feature/base-pr", "feature/stacked-pr"))
+        } finally {
+            removeTempDir(repoDir)
+        }
+    }
+
+    @Test
     fun worktree_addListRemove_lifecycle() {
         val repoDir = createTempDir("repo")
         val worktreeDir = createTempDir("wt")

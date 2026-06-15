@@ -70,7 +70,12 @@ private fun buildGitWorktreeServiceParts(
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
         creationApi = GitWorktreeCreationService(creator, planner, ancestryChecker),
-        discoveryApi = GitWorktreeDiscoveryService(lister, defaultBranchRefResolver, parentInferer),
+        discoveryApi = GitWorktreeDiscoveryService(
+            lister,
+            defaultBranchRefResolver,
+            parentInferer,
+            ancestryChecker,
+        ),
         archiveApi = GitWorktreeArchiveService(archiver),
     )
 }
@@ -139,6 +144,7 @@ private class GitWorktreeDiscoveryService(
     private val lister: GitWorktreeLister,
     private val defaultRefs: GitDefaultBranchRefResolver,
     private val parents: GitWorktreeParentInferer,
+    private val ancestryChecker: GitBranchAncestryChecker,
 ) : GitWorktreeDiscoveryApi {
     override fun listWorktrees(repoPath: String): List<Worktree> = lister.listWorktrees(repoPath)
 
@@ -148,6 +154,12 @@ private class GitWorktreeDiscoveryService(
         val parentBranches = parents.inferParentBranches(repoPath)
         return parentBranches
     }
+
+    override fun branchNeedsRebase(
+        repoPath: String,
+        parentBranch: String,
+        childBranch: String,
+    ): Boolean = ancestryChecker.branchNeedsRebase(repoPath, parentBranch, childBranch)
 }
 
 private class GitWorktreeArchiveService(
@@ -523,6 +535,27 @@ private class GitBranchAncestryChecker(
         } catch (e: GitCommandException) {
             throw GitWorktreeException(
                 "Failed to check whether $baseBranch is an ancestor of $childBranch: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+
+    fun branchNeedsRebase(
+        repoPath: String,
+        parentBranch: String,
+        childBranch: String,
+    ): Boolean {
+        branchValidator.validate(parentBranch)
+        branchValidator.validate(childBranch)
+        return try {
+            gitCommandApi.hasCommitsNotContainedIn(
+                repoPath,
+                parentBranch.toAncestryRef(),
+                childBranch.toAncestryRef(),
+            )
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to check whether $parentBranch has commits not contained in $childBranch: ${e.gitOutput}",
                 e,
             )
         }

@@ -149,6 +149,14 @@ private class GitAncestryCommandService(
             else -> throwGitCommandException(command, result)
         }
     }
+
+    override fun hasCommitsNotContainedIn(
+        repoPath: String,
+        sourceRef: String,
+        containingRef: String,
+    ): Boolean = commandRunner.run(
+        gitRepoCommand(repoPath, "rev-list", "--max-count=1", "$containingRef..$sourceRef"),
+    ).isNotBlank()
 }
 
 private class GitWorktreeCommandService(
