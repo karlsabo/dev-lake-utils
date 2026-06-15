@@ -17,6 +17,7 @@ data class LocalWorktreeUiState(
     val isRoot: Boolean = false,
     val parentBranch: String? = null,
     val baseCommitHash: String? = null,
+    val needsRebase: Boolean = false,
 )
 
 data class ForceArchiveWorktreeUiState(
@@ -42,6 +43,7 @@ fun List<LocalRepositoryConfig>.toLocalRepositoryUiStates(): List<LocalRepositor
 fun List<Worktree>.toLocalWorktreeUiStates(
     repositoryRootPath: String,
     parentBranchesByChildBranch: Map<String, String> = emptyMap(),
+    needsRebaseByChildBranch: Map<String, Boolean> = emptyMap(),
 ): List<LocalWorktreeUiState> {
     val normalizedRepositoryRootPath = repositoryRootPath.normalizedLocalPath()
     val visibleBranches = map { it.branch }.filterTo(mutableSetOf()) { it.isNotBlank() }
@@ -54,6 +56,7 @@ fun List<Worktree>.toLocalWorktreeUiStates(
             isRoot = worktree.path.normalizedLocalPath() == normalizedRepositoryRootPath,
             parentBranch = parentBranchesByChildBranch[worktree.branch]?.takeIf { it in visibleBranches },
             baseCommitHash = worktree.commitHash.takeIf { worktree.branch.isBlank() },
+            needsRebase = needsRebaseByChildBranch[worktree.branch] == true,
         )
     }
 }

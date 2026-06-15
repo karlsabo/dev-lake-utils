@@ -414,12 +414,21 @@ data class CreateBranchWorktreeFromCommitIshCall(
     val targetBranch: String,
 )
 
+data class BranchNeedsRebaseCall(
+    val repoPath: String,
+    val parentBranch: String,
+    val childBranch: String,
+)
+
 data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
     val defaultBranchRefsByRepoPath: Map<String, String?> = emptyMap(),
+    val parentBranchesByRepoPath: Map<String, Map<String, String>> = emptyMap(),
+    val branchNeedsRebaseByCall: Map<BranchNeedsRebaseCall, Boolean> = emptyMap(),
     val inferDefaultBranchRefFailure: RuntimeException? = null,
     val listWorktreesFailure: RuntimeException? = null,
+    val branchNeedsRebaseFailure: RuntimeException? = null,
     val archiveWorktreeFailure: RuntimeException? = null,
 )
 
@@ -472,6 +481,7 @@ class RecordingGitWorktreeApi(
     val createBranchWorktreeCalls = mutableListOf<CreateBranchWorktreeCall>()
     val createBranchWorktreeFromCommitIshCalls = mutableListOf<CreateBranchWorktreeFromCommitIshCall>()
     val inferDefaultBranchRefCalls = mutableListOf<String>()
+    val branchNeedsRebaseCalls = mutableListOf<BranchNeedsRebaseCall>()
     val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
     val archiveWorktreeForceValues = mutableListOf<Boolean>()
     private val worktreesByRepoPath = responses.worktreesByRepoPath
@@ -549,7 +559,18 @@ class RecordingGitWorktreeApi(
         return responses.defaultBranchRefsByRepoPath[repoPath]
     }
 
-    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> = emptyMap()
+    override fun inferWorktreeParentBranches(repoPath: String) = responses.parentBranchesByRepoPath[repoPath].orEmpty()
+
+    override fun branchNeedsRebase(
+        repoPath: String,
+        parentBranch: String,
+        childBranch: String,
+    ): Boolean {
+        val call = BranchNeedsRebaseCall(repoPath, parentBranch, childBranch)
+        branchNeedsRebaseCalls += call
+        responses.branchNeedsRebaseFailure?.let { throw it }
+        return responses.branchNeedsRebaseByCall[call] == true
+    }
 
     override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
 

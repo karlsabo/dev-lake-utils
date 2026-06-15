@@ -90,6 +90,30 @@ class LocalRepositoryUiStateTest {
     }
 
     @Test
+    fun mapsWorktreeRebaseNeeds() {
+        val uiStates = listOf(
+            Worktree(path = "/repo-base", branch = "feature/base-pr", commitHash = "abc123"),
+            Worktree(path = "/repo-stacked", branch = "feature/stacked-pr", commitHash = "def456"),
+        ).toLocalWorktreeUiStates(
+            repositoryRootPath = "/repo",
+            needsRebaseByChildBranch = mapOf("feature/stacked-pr" to true),
+        )
+
+        assertEquals(false, uiStates.single { it.branch == "feature/base-pr" }.needsRebase)
+        assertEquals(true, uiStates.single { it.branch == "feature/stacked-pr" }.needsRebase)
+    }
+
+    @Test
+    fun defaultsWorktreeRebaseNeedsToFalseWhenNotSupplied() {
+        val uiStates = listOf(
+            Worktree(path = "/repo", branch = "main", commitHash = "abc123"),
+            Worktree(path = "/repo-feature", branch = "feature/x", commitHash = "def456"),
+        ).toLocalWorktreeUiStates("/repo")
+
+        assertEquals(listOf(false, false), uiStates.map { it.needsRebase })
+    }
+
+    @Test
     fun omitsParentBranchWhenHierarchyIsNotSupplied() {
         val uiStates = listOf(
             Worktree(path = "/repo", branch = "main", commitHash = "abc123"),

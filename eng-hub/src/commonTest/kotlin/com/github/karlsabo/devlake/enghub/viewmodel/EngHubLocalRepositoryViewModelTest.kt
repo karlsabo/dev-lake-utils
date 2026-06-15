@@ -249,6 +249,91 @@ class EngHubLocalRepositoryViewModelTest {
     }
 
     @Test
+    fun expandingConfiguredRepositoryMapsRebaseNeededWorktreeState() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "feature/base-pr", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/stacked-pr",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to "feature/base-pr"),
+                ),
+                branchNeedsRebaseByCall = mapOf(
+                    BranchNeedsRebaseCall(
+                        repoPath = DEV_LAKE_ROOT,
+                        parentBranch = "feature/base-pr",
+                        childBranch = "feature/stacked-pr",
+                    ) to true,
+                ),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+
+        val worktrees = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }.single().worktrees
+        }
+
+        assertEquals(
+            listOf(BranchNeedsRebaseCall(DEV_LAKE_ROOT, "feature/base-pr", "feature/stacked-pr")),
+            api.branchNeedsRebaseCalls,
+        )
+        assertEquals(false, worktrees.single { it.branch == "feature/base-pr" }.needsRebase)
+        assertEquals(true, worktrees.single { it.branch == "feature/stacked-pr" }.needsRebase)
+    }
+
+    @Test
+    fun expandingConfiguredRepositoryDefaultsRebaseNeededToFalseWhenCheckFails() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "feature/base-pr", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/stacked-pr",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to "feature/base-pr"),
+                ),
+                branchNeedsRebaseFailure = IllegalStateException("rev-list failed"),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().isExpanded && repositories.single().worktrees.size == 2
+            }.single()
+        }
+
+        assertEquals(listOf(false, false), repository.worktrees.map { it.needsRebase })
+    }
+
+    @Test
     fun worktreePollRefreshesUnifiedRepositoryEntriesWithoutRefreshingGitHubData() = runBlocking {
         val listCountsByRepo = mutableMapOf<String, Int>()
         val api = RecordingGitWorktreeApi(

@@ -459,7 +459,9 @@ Relevant current code:
 
 **Scope:** Git containment calculation only. Do not pre-detect conflicts or render indicators.
 
-### 31. Add rebase-needed flag to worktree UI state
+### 31. Add rebase-needed flag to worktree UI state - Done
+
+**Done** 2026 06 15
 
 **Acceptance criteria:** Given git reports `feature/stacked-pr` needs rebase, when worktrees are mapped to UI state, then that child has `needsRebase=true`.
 
