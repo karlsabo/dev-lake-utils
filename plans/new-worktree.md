@@ -473,7 +473,9 @@ Relevant current code:
 
 **Scope:** State plumbing only. Default `needsRebase` to `false` when git data is missing or checks fail so existing worktree rendering remains safe. Do not render the indicator or add a rebase action.
 
-### 32. Render rebase-needed indicator
+### 32. Render rebase-needed indicator - Done
+
+**Done** 2026 06 15
 
 **Acceptance criteria:** Given `feature/stacked-pr` has `needsRebase=true`, when the Worktrees pane renders, then the row shows a rebase-needed indicator.
 

@@ -61,6 +61,7 @@ internal fun localWorktreeRow(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.body2,
         )
+        worktreeRebaseNeededIndicator(state.worktree)
         worktreeProgressLabels(state.setupStatus, state.isArchiving)
         localWorktreeActionMenu(state = state, actions = actions)
     }
@@ -76,6 +77,21 @@ private fun worktreeDirtyIndicator(worktree: LocalWorktreeUiState) {
         style = MaterialTheme.typography.body2,
     )
 }
+
+@Composable
+private fun worktreeRebaseNeededIndicator(worktree: LocalWorktreeUiState) {
+    val label = worktree.rebaseNeededIndicatorLabel ?: return
+    Text(
+        text = label,
+        modifier = Modifier.semantics { contentDescription = label },
+        style = MaterialTheme.typography.caption,
+        color = MaterialTheme.colors.error,
+    )
+    Spacer(modifier = Modifier.width(8.dp))
+}
+
+internal val LocalWorktreeUiState.rebaseNeededIndicatorLabel: String?
+    get() = if (needsRebase) "Rebase needed" else null
 
 @Composable
 private fun worktreeProgressLabels(

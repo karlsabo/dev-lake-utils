@@ -26,6 +26,7 @@ kotlin {
         getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
+                implementation(libs.compose.ui.test)
             }
         }
         getByName("jvmTest") {

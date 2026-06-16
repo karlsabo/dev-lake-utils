@@ -1,5 +1,12 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.material.MaterialTheme
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.text.TextRange
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
@@ -47,6 +54,40 @@ class WorktreePanelTest {
 
         assertEquals(listOf("feature/stacked-pr", "main"), rows.map { it.worktree.branch })
         assertEquals(listOf(0, 0), rows.map { it.nestingDepth })
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun rebaseNeededWorktreeRowRendersIndicatorLabel() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                localWorktreeRow(
+                    state = rebaseNeededRow(),
+                    onOpen = {},
+                    onArchive = {},
+                    onOpenCreateWorktreeDialog = {},
+                )
+            }
+        }
+
+        onNodeWithText("Rebase needed").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun upToDateWorktreeRowDoesNotRenderRebaseNeededIndicatorLabel() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                localWorktreeRow(
+                    state = upToDateRow(),
+                    onOpen = {},
+                    onArchive = {},
+                    onOpenCreateWorktreeDialog = {},
+                )
+            }
+        }
+
+        onAllNodesWithText("Rebase needed").assertCountEquals(0)
     }
 
     @Test
@@ -534,4 +575,18 @@ class WorktreePanelTest {
     fun archiveActionIsEnabledWhenWorktreeIsIdle() {
         assertTrue(isWorktreeArchiveEnabled(setupStatus = null, isArchiving = false))
     }
+
+    private fun rebaseNeededRow(): LocalWorktreeRowState = worktreeRow(needsRebase = true)
+
+    private fun upToDateRow(): LocalWorktreeRowState = worktreeRow(needsRebase = false)
+
+    private fun worktreeRow(needsRebase: Boolean): LocalWorktreeRowState = LocalWorktreeRowState(
+        worktree = LocalWorktreeUiState(
+            branch = "feature/stacked-pr",
+            path = "/repos/dev-lake-utils-feature-stacked-pr",
+            needsRebase = needsRebase,
+        ),
+        setupStatus = null,
+        isArchiving = false,
+    )
 }
