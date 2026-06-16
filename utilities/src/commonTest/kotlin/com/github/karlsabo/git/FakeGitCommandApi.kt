@@ -27,6 +27,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var hasCommitsNotContainedInAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var worktreeAddAction: (String, String, String) -> Unit = { _, _, _ -> }
     var worktreeAddNewBranchAction: (WorktreeAddNewBranchCall) -> Unit = {}
+    var rebaseAction: (String, String) -> Unit = { _, _ -> }
     var worktreeListResult: String = ""
     var worktreeListAction: (String) -> String = { worktreeListResult }
     var worktreeRemoveAction: (String, String) -> Unit = { _, _ -> }
@@ -132,6 +133,11 @@ internal class FakeGitCommandApi : GitCommandApi {
     override fun worktreeRemove(repoPath: String, path: String) {
         calls.add(Call("worktreeRemove", listOf(repoPath, path)))
         worktreeRemoveAction(repoPath, path)
+    }
+
+    override fun rebase(repoPath: String, upstreamRef: String) {
+        calls.add(Call("rebase", listOf(repoPath, upstreamRef)))
+        rebaseAction(repoPath, upstreamRef)
     }
 
     override fun checkout(repoPath: String, ref: String) {

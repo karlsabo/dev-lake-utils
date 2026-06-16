@@ -26,7 +26,8 @@ class GitWorktreeService private constructor(
     GitRepositoryApi by parts.repositoryApi,
     GitWorktreeCreationApi by parts.creationApi,
     GitWorktreeDiscoveryApi by parts.discoveryApi,
-    GitWorktreeArchiveApi by parts.archiveApi {
+    GitWorktreeArchiveApi by parts.archiveApi,
+    GitWorktreeRebaseApi by parts.rebaseApi {
     constructor(
         gitCommandApi: GitCommandApi = GitCommandService(),
         deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
@@ -49,6 +50,7 @@ private data class GitWorktreeServiceParts(
     val creationApi: GitWorktreeCreationApi,
     val discoveryApi: GitWorktreeDiscoveryApi,
     val archiveApi: GitWorktreeArchiveApi,
+    val rebaseApi: GitWorktreeRebaseApi,
 )
 
 private fun buildGitWorktreeServiceParts(
@@ -66,6 +68,7 @@ private fun buildGitWorktreeServiceParts(
     val defaultBranchRefResolver = GitDefaultBranchRefResolver(gitCommandApi)
     val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
     val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
+    val rebaser = GitWorktreeRebaser(gitCommandApi, branchValidator)
 
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
@@ -77,6 +80,7 @@ private fun buildGitWorktreeServiceParts(
             ancestryChecker,
         ),
         archiveApi = GitWorktreeArchiveService(archiver),
+        rebaseApi = GitWorktreeRebaseService(rebaser),
     )
 }
 
@@ -160,6 +164,17 @@ private class GitWorktreeDiscoveryService(
         parentBranch: String,
         childBranch: String,
     ): Boolean = ancestryChecker.branchNeedsRebase(repoPath, parentBranch, childBranch)
+}
+
+private class GitWorktreeRebaseService(
+    private val rebaser: GitWorktreeRebaser,
+) : GitWorktreeRebaseApi {
+    override fun rebaseWorktreeOntoParent(
+        worktreePath: String,
+        parentBranch: String,
+    ) {
+        rebaser.rebaseWorktreeOntoParent(worktreePath, parentBranch)
+    }
 }
 
 private class GitWorktreeArchiveService(
@@ -794,6 +809,27 @@ private class GitWorktreeLister(
             return true
         }
         return output.isNotBlank()
+    }
+}
+
+private class GitWorktreeRebaser(
+    private val gitCommandApi: GitCommandApi,
+    private val branchValidator: GitWorktreeBranchValidator,
+) {
+    fun rebaseWorktreeOntoParent(
+        worktreePath: String,
+        parentBranch: String,
+    ) {
+        require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
+        branchValidator.validate(parentBranch)
+        try {
+            gitCommandApi.rebase(worktreePath, parentBranch)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to rebase worktree $worktreePath onto $parentBranch: ${e.gitOutput}",
+                e,
+            )
+        }
     }
 }
 

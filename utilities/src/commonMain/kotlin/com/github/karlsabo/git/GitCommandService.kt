@@ -16,6 +16,7 @@ private class DefaultGitCommandApi(
     GitBranchCommandApi by GitBranchCommandService(commandRunner),
     GitAncestryCommandApi by GitAncestryCommandService(commandRunner),
     GitWorktreeCommandApi by GitWorktreeCommandService(commandRunner),
+    GitRebaseCommandApi by GitRebaseCommandService(commandRunner),
     GitWorkingTreeCommandApi by GitWorkingTreeCommandService(commandRunner),
     GitHistoryCommandApi by GitHistoryCommandService(commandRunner),
     GitRawCommandExecutor by GitRawCommandService(commandRunner)
@@ -185,6 +186,14 @@ private class GitWorktreeCommandService(
 
     override fun worktreeRemove(repoPath: String, path: String) {
         commandRunner.run(gitRepoCommand(repoPath, "worktree", "remove", path))
+    }
+}
+
+private class GitRebaseCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitRebaseCommandApi {
+    override fun rebase(repoPath: String, upstreamRef: String) {
+        commandRunner.run(gitRepoCommand(repoPath, "rebase", "--autostash", upstreamRef))
     }
 }
 

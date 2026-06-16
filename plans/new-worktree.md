@@ -486,7 +486,9 @@ Relevant current code:
 
 **Scope:** Display only. Conflict discovery happens when rebase runs.
 
-### 33. Add git utility to rebase a worktree onto a parent branch
+### 33. Add git utility to rebase a worktree onto a parent branch - Done
+
+**Done** 2026 06 16
 
 **Acceptance criteria:** Given child worktree path `/repos/dev-lake-utils-feature-stacked-pr` and parent `feature/base-pr`, when rebase is requested, then utilities run `git rebase --autostash feature/base-pr` in the child worktree.
 

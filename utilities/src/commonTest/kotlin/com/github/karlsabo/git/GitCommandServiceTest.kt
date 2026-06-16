@@ -223,6 +223,38 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun rebase_rebasesCurrentWorktreeOntoUpstreamRefWithAutostash() {
+        val repoDir = createTempDir("repo")
+        val worktreeDir = createTempDir("wt")
+        removeTempDir(worktreeDir)
+        try {
+            initRepoWithCommit(repoDir)
+            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr"), workingDirectory = null)
+            executeCommand(
+                listOf("git", "-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr"),
+                workingDirectory = null,
+            )
+            executeCommand(listOf("sh", "-c", "echo child > $repoDir/child.txt"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "child"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "checkout", "feature/base-pr"), workingDirectory = null)
+            executeCommand(listOf("sh", "-c", "echo parent > $repoDir/parent.txt"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "parent"), workingDirectory = null)
+            service.worktreeAdd(repoDir, worktreeDir, "feature/stacked-pr")
+            executeCommand(listOf("sh", "-c", "echo child dirty > $worktreeDir/child.txt"), workingDirectory = null)
+
+            service.rebase(worktreeDir, "feature/base-pr")
+
+            assertTrue(service.isAncestor(worktreeDir, "feature/base-pr", "feature/stacked-pr"))
+            assertTrue(service.status(worktreeDir).contains("child.txt"))
+        } finally {
+            removeTempDir(repoDir)
+            removeTempDir(worktreeDir)
+        }
+    }
+
+    @Test
     fun worktree_addListRemove_lifecycle() {
         val repoDir = createTempDir("repo")
         val worktreeDir = createTempDir("wt")

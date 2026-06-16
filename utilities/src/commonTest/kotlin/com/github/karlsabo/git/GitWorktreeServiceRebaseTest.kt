@@ -8,6 +8,54 @@ import kotlin.test.assertTrue
 
 class GitWorktreeServiceRebaseTest {
     @Test
+    fun rebaseWorktreeOntoParent_runsRebaseInChildWorktreeWithAutostashCommand() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        service.rebaseWorktreeOntoParent(
+            worktreePath = childWorktreePath,
+            parentBranch = parentBranch,
+        )
+
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
+                FakeGitCommandApi.Call("rebase", listOf(childWorktreePath, parentBranch)),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun rebaseWorktreeOntoParent_wrapsGitCommandFailure() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val failure = GitCommandException(
+            command = listOf("git", "-C", childWorktreePath, "rebase", "--autostash", parentBranch),
+            exitCode = 1,
+            gitOutput = "conflict",
+        )
+        fake.rebaseAction = { _, _ -> throw failure }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.rebaseWorktreeOntoParent(
+                worktreePath = childWorktreePath,
+                parentBranch = parentBranch,
+            )
+        }
+
+        assertEquals(
+            "Failed to rebase worktree $childWorktreePath onto $parentBranch: conflict",
+            ex.message,
+        )
+        assertSame(failure, ex.cause)
+    }
+
+    @Test
     fun branchNeedsRebase_returnsTrueWhenParentHasCommitsNotContainedInChild() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"

@@ -66,6 +66,10 @@ interface GitWorktreeCommandApi {
     fun worktreeRemove(repoPath: String, path: String)
 }
 
+interface GitRebaseCommandApi {
+    fun rebase(repoPath: String, upstreamRef: String)
+}
+
 interface GitWorkingTreeCommandApi {
     fun status(repoPath: String): String
 }
@@ -86,6 +90,7 @@ interface GitCommandApi :
     GitBranchCommandApi,
     GitAncestryCommandApi,
     GitWorktreeCommandApi,
+    GitRebaseCommandApi,
     GitWorkingTreeCommandApi,
     GitHistoryCommandApi,
     GitRawCommandExecutor
