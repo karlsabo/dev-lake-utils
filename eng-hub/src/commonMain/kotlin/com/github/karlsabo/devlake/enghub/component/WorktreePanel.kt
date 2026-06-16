@@ -119,6 +119,7 @@ private fun worktreeRepositoryList(
                             repository = repository,
                             setupStatuses = state.setupStatuses,
                             archivingWorktreePaths = state.archivingWorktreePaths,
+                            rebasingWorktreePaths = state.rebasingWorktreePaths,
                         ),
                         panelActions = actions,
                         onArchiveRequested = onArchiveRequested,

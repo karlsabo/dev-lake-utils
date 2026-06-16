@@ -66,6 +66,7 @@ internal fun collectEngHubScreenState(
     val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
     val archivingPaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
+    val rebasingPaths by viewModel.rebasingLocalWorktreePathsStateFlow.collectAsState()
     val forceArchiveRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
     val repositoryCreateWorktreeRequest by
         viewModel.lastCreateLocalWorktreeFromRepositoryRequestStateFlow.collectAsState()
@@ -89,6 +90,7 @@ internal fun collectEngHubScreenState(
             forceArchiveRequest = forceArchiveRequest,
             setupStatuses = setupStatuses,
             archivingWorktreePaths = archivingPaths,
+            rebasingWorktreePaths = rebasingPaths,
             repositoryCreateWorktreeRequest = repositoryCreateWorktreeRequest?.let { request ->
                 createRepositoryWorktreeDialogState(
                     repoRootPath = request.repoRootPath,
@@ -145,6 +147,7 @@ internal fun engHubScreenActions(
                     baseCommitIsh = request.baseCommitIsh,
                 )
             },
+            onRebaseOntoParent = viewModel.rebaseLocalWorktreeOntoParent,
         ),
         forceArchive = ForceArchiveWorktreeActions(
             onConfirm = viewModel.confirmForceArchiveLocalWorktree,

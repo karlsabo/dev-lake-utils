@@ -22,12 +22,14 @@ internal data class WorktreeRowsState(
     val repository: LocalRepositoryUiState,
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
+    val rebasingWorktreePaths: Set<String> = emptySet(),
 )
 
 internal data class LocalWorktreeRowState(
     val worktree: LocalWorktreeUiState,
     val setupStatus: WorktreeSetupStatus?,
     val isArchiving: Boolean,
+    val isRebasing: Boolean = false,
     val nestingDepth: Int = 0,
 )
 
@@ -91,11 +93,19 @@ internal fun isWorktreeCreateEnabled(
     worktree: LocalWorktreeUiState,
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
-): Boolean = setupStatus == null && !isArchiving && worktree.hasCreatableBase()
+    isRebasing: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing && worktree.hasCreatableBase()
 
 internal fun isWorktreeArchiveEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
-): Boolean = setupStatus == null && !isArchiving
+    isRebasing: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing
+
+internal fun isWorktreeRebaseEnabled(
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+    isRebasing: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing
 
 private fun LocalWorktreeUiState.hasCreatableBase(): Boolean = branch != DETACHED || !baseCommitHash.isNullOrBlank()

@@ -172,12 +172,22 @@ private fun localWorktreeRows(
                         worktree = worktree,
                         setupStatus = state.setupStatuses[WorktreePath(normalizedWorktreePath)],
                         isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
+                        isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
                         nestingDepth = row.nestingDepth,
                     ),
                     onOpen = { panelActions.worktrees.onOpenWorktree(state.repository.path, worktree.path) },
                     onArchive = { onArchiveRequested(PendingArchive(state.repository.path, worktree.path)) },
                     onOpenCreateWorktreeDialog = {
                         onCreateRequested(createWorktreeDialogState(state.repository.path, worktree))
+                    },
+                    onRebaseOntoParent = {
+                        worktree.parentBranch?.let { parentBranch ->
+                            panelActions.worktrees.onRebaseOntoParent(
+                                state.repository.path,
+                                worktree.path,
+                                parentBranch,
+                            )
+                        }
                     },
                 )
             }

@@ -514,7 +514,9 @@ Relevant current code:
 
 **Scope:** Menu action visibility only. Do not run the command.
 
-### 35. Run rebase action and refresh worktree status
+### 35. Run rebase action and refresh worktree status - Done
+
+**Done** 2026 06 16
 
 **Acceptance criteria:** Given the user chooses `Rebase onto parent` for `feature/stacked-pr`, when the rebase succeeds, then Eng Hub refreshes the repository worktree status.
 

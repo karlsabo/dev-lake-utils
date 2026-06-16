@@ -43,7 +43,7 @@ internal class LocalWorktreeArchiveController(
                 errorReporter.enqueueActionError("Cannot archive root worktree: $worktreePath")
             }
 
-            markLocalWorktreeArchiving(normalizedWorktreePath) -> launchArchive(
+            state.archivingLocalWorktreePaths.addPathIfAbsent(normalizedWorktreePath) -> launchArchive(
                 repoRootPath,
                 worktreePath,
                 normalizedWorktreePath,
@@ -80,16 +80,6 @@ internal class LocalWorktreeArchiveController(
                 )
             }
             state.archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
-        }
-    }
-
-    private fun markLocalWorktreeArchiving(normalizedWorktreePath: String): Boolean {
-        while (true) {
-            val currentPaths = state.archivingLocalWorktreePaths.value
-            if (normalizedWorktreePath in currentPaths) return false
-            if (state.archivingLocalWorktreePaths.compareAndSet(currentPaths, currentPaths + normalizedWorktreePath)) {
-                return true
-            }
         }
     }
 }

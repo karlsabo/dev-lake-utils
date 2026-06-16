@@ -6,6 +6,7 @@ import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 
 internal val logger = KotlinLogging.logger {}
 
@@ -13,6 +14,14 @@ internal fun String.normalizedRepoPath(): String = trim().trimEnd('/', '\\')
 
 internal fun <T> Result<T>.rethrowCancellation(): Result<T> = onFailure { failure ->
     if (failure is CancellationException) throw failure
+}
+
+internal fun MutableStateFlow<Set<String>>.addPathIfAbsent(path: String): Boolean {
+    while (true) {
+        val currentPaths = value
+        if (path in currentPaths) return false
+        if (compareAndSet(currentPaths, currentPaths + path)) return true
+    }
 }
 
 internal fun loadIgnoredThreads(

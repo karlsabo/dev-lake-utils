@@ -65,6 +65,13 @@ class EngHubViewModel(
         localRepositories = localRepositoriesController,
         errorReporter = errorReporter,
     )
+    private val rebaseController = LocalWorktreeRebaseController(
+        viewModel = this,
+        state = state,
+        worktreeServices = worktreeServices,
+        localRepositories = localRepositoriesController,
+        errorReporter = errorReporter,
+    )
     private val ignoredNotificationPersistence = IgnoredNotificationPersistence(
         state = state,
         notificationIgnoreStore = notificationIgnoreStore,
@@ -94,6 +101,8 @@ class EngHubViewModel(
         state.useUnrelatedExistingBranchConfirmationRequest.asStateFlow()
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.archivingLocalWorktreePaths.asStateFlow()
+    val rebasingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
+        state.rebasingLocalWorktreePaths.asStateFlow()
     val forceArchiveWorktreeRequestStateFlow: StateFlow<ForceArchiveWorktreeUiState?> =
         state.forceArchiveWorktreeRequest.asStateFlow()
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> =
@@ -167,6 +176,8 @@ class EngHubViewModel(
     val openLocalWorktree: (String, String) -> Unit = existingWorktreeController::openLocalWorktree
 
     val archiveLocalWorktree: (String, String) -> Unit = archiveController::archiveLocalWorktree
+    val rebaseLocalWorktreeOntoParent: (String, String, String) -> Unit =
+        rebaseController::rebaseLocalWorktreeOntoParent
     val confirmForceArchiveLocalWorktree: (String, String) -> Unit =
         archiveController::confirmForceArchiveLocalWorktree
     val dismissForceArchiveWorktreeRequest: () -> Unit =

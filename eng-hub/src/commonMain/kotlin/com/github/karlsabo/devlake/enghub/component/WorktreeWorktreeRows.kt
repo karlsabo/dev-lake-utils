@@ -33,6 +33,7 @@ private data class LocalWorktreeRowActions(
     val onOpen: () -> Unit,
     val onArchive: () -> Unit,
     val onOpenCreateWorktreeDialog: () -> Unit,
+    val onRebaseOntoParent: () -> Unit,
 )
 
 @Composable
@@ -41,11 +42,13 @@ internal fun localWorktreeRow(
     onOpen: () -> Unit,
     onArchive: () -> Unit,
     onOpenCreateWorktreeDialog: () -> Unit,
+    onRebaseOntoParent: () -> Unit = {},
 ) {
     val actions = LocalWorktreeRowActions(
         onOpen = onOpen,
         onArchive = onArchive,
         onOpenCreateWorktreeDialog = onOpenCreateWorktreeDialog,
+        onRebaseOntoParent = onRebaseOntoParent,
     )
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -62,7 +65,7 @@ internal fun localWorktreeRow(
             style = MaterialTheme.typography.body2,
         )
         worktreeRebaseNeededIndicator(state.worktree)
-        worktreeProgressLabels(state.setupStatus, state.isArchiving)
+        worktreeProgressLabels(state.setupStatus, state.isArchiving, state.isRebasing)
         localWorktreeActionMenu(state = state, actions = actions)
     }
 }
@@ -97,6 +100,7 @@ internal val LocalWorktreeUiState.rebaseNeededIndicatorLabel: String?
 private fun worktreeProgressLabels(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
+    isRebasing: Boolean,
 ) {
     setupStatus?.let {
         Text(text = it.setupStatusLabel(), style = MaterialTheme.typography.caption)
@@ -104,6 +108,10 @@ private fun worktreeProgressLabels(
     }
     if (isArchiving) {
         Text(text = "Archiving...", style = MaterialTheme.typography.caption)
+        Spacer(modifier = Modifier.width(8.dp))
+    }
+    if (isRebasing) {
+        Text(text = "Rebasing...", style = MaterialTheme.typography.caption)
         Spacer(modifier = Modifier.width(8.dp))
     }
 }
@@ -118,7 +126,7 @@ private fun localWorktreeActionMenu(
     Box {
         IconButton(
             onClick = { menuExpanded = true },
-            enabled = !state.isArchiving,
+            enabled = !state.isArchiving && !state.isRebasing,
             modifier = Modifier
                 .size(32.dp)
                 .semantics { contentDescription = "Worktree actions for ${state.worktree.branch}" },
@@ -151,7 +159,7 @@ private fun localWorktreeMenuItem(
     when (action) {
         WorktreeMenuAction.Open -> openWorktreeMenuItem(state, rowActions, onMenuDismiss)
         WorktreeMenuAction.CreateWorktree -> createWorktreeMenuItem(state, rowActions, onMenuDismiss)
-        WorktreeMenuAction.RebaseOntoParent -> rebaseOntoParentMenuItem(onMenuDismiss)
+        WorktreeMenuAction.RebaseOntoParent -> rebaseOntoParentMenuItem(state, rowActions, onMenuDismiss)
         WorktreeMenuAction.Archive -> archiveWorktreeMenuItem(state, rowActions, onMenuDismiss)
     }
 }
@@ -184,16 +192,24 @@ private fun createWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onOpenCreateWorktreeDialog()
         },
-        enabled = isWorktreeCreateEnabled(state.worktree, state.setupStatus, state.isArchiving),
+        enabled = isWorktreeCreateEnabled(state.worktree, state.setupStatus, state.isArchiving, state.isRebasing),
     ) {
         Text("Create worktree")
     }
 }
 
 @Composable
-private fun rebaseOntoParentMenuItem(onMenuDismiss: () -> Unit) {
+private fun rebaseOntoParentMenuItem(
+    state: LocalWorktreeRowState,
+    rowActions: LocalWorktreeRowActions,
+    onMenuDismiss: () -> Unit,
+) {
     DropdownMenuItem(
-        onClick = onMenuDismiss,
+        onClick = {
+            onMenuDismiss()
+            rowActions.onRebaseOntoParent()
+        },
+        enabled = isWorktreeRebaseEnabled(state.setupStatus, state.isArchiving, state.isRebasing),
     ) {
         Text("Rebase onto parent")
     }
@@ -210,10 +226,10 @@ private fun archiveWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onArchive()
         },
-        enabled = isWorktreeArchiveEnabled(state.setupStatus, state.isArchiving),
+        enabled = isWorktreeArchiveEnabled(state.setupStatus, state.isArchiving, state.isRebasing),
     ) {
         Text("Archive")
     }
 }
 
-private fun LocalWorktreeRowState.hasBlockedOpenAction(): Boolean = setupStatus != null || isArchiving
+private fun LocalWorktreeRowState.hasBlockedOpenAction(): Boolean = setupStatus != null || isArchiving || isRebasing

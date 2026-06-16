@@ -420,6 +420,11 @@ data class BranchNeedsRebaseCall(
     val childBranch: String,
 )
 
+data class RebaseWorktreeOntoParentCall(
+    val worktreePath: String,
+    val parentBranch: String,
+)
+
 data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
@@ -430,6 +435,7 @@ data class RecordingGitWorktreeApiResponses(
     val listWorktreesFailure: RuntimeException? = null,
     val branchNeedsRebaseFailure: RuntimeException? = null,
     val archiveWorktreeFailure: RuntimeException? = null,
+    val rebaseWorktreeFailure: RuntimeException? = null,
 )
 
 data class RecordingGitWorktreeApiCallbacks(
@@ -441,6 +447,7 @@ data class RecordingGitWorktreeApiCallbacks(
     val onCreateBranchWorktreeFromCommitIsh: (CreateBranchWorktreeFromCommitIshCall) -> String = {
         error("Unexpected call")
     },
+    val onRebaseWorktreeOntoParent: (RebaseWorktreeOntoParentCall) -> Unit = {},
 )
 
 class RecordingGitWorktreeApi(
@@ -482,6 +489,7 @@ class RecordingGitWorktreeApi(
     val createBranchWorktreeFromCommitIshCalls = mutableListOf<CreateBranchWorktreeFromCommitIshCall>()
     val inferDefaultBranchRefCalls = mutableListOf<String>()
     val branchNeedsRebaseCalls = mutableListOf<BranchNeedsRebaseCall>()
+    val rebaseWorktreeOntoParentCalls = mutableListOf<RebaseWorktreeOntoParentCall>()
     val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
     val archiveWorktreeForceValues = mutableListOf<Boolean>()
     private val worktreesByRepoPath = responses.worktreesByRepoPath
@@ -573,6 +581,16 @@ class RecordingGitWorktreeApi(
     }
 
     override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
+
+    override fun rebaseWorktreeOntoParent(
+        worktreePath: String,
+        parentBranch: String,
+    ) {
+        val call = RebaseWorktreeOntoParentCall(worktreePath, parentBranch)
+        rebaseWorktreeOntoParentCalls += call
+        responses.rebaseWorktreeFailure?.let { throw it }
+        callbacks.onRebaseWorktreeOntoParent(call)
+    }
 
     override fun archiveWorktree(
         repoPath: String,
