@@ -501,7 +501,9 @@ Relevant current code:
 
 **Scope:** Git command only. Do not add UI menu, status refresh, or conflict prompt.
 
-### 34. Expose rebase action for worktrees with an inferred parent
+### 34. Expose rebase action for worktrees with an inferred parent - Done
+
+**Done** 2026 06 16
 
 **Acceptance criteria:** Given `feature/stacked-pr` has inferred parent `feature/base-pr`, when the user opens its quick menu, then a `Rebase onto parent` action is available.
 

@@ -184,6 +184,25 @@ class WorktreePanelTest {
     }
 
     @Test
+    fun worktreeMenuExposesRebaseOntoParentForWorktreeWithInferredParent() {
+        val worktree = LocalWorktreeUiState(
+            branch = "feature/stacked-pr",
+            path = "/repos/dev-lake-utils-feature-stacked-pr",
+            parentBranch = "feature/base-pr",
+        )
+
+        assertEquals(
+            listOf(
+                WorktreeMenuAction.Open,
+                WorktreeMenuAction.CreateWorktree,
+                WorktreeMenuAction.RebaseOntoParent,
+                WorktreeMenuAction.Archive,
+            ),
+            visibleWorktreeMenuActions(worktree),
+        )
+    }
+
+    @Test
     fun createWorktreeDialogUsesSelectedBaseAndEmptyTargetBranch() {
         val worktree = LocalWorktreeUiState(
             branch = "feature/base-pr",

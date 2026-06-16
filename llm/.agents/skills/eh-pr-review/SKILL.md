@@ -26,6 +26,18 @@ Parse the argument to determine the PR number:
 
 Store the PR number as `{number}` for all later steps.
 
+Derive a unique planned-comments path and store it as `{comments_path}`:
+
+- For a GitHub PR, use `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md`
+- For uncommitted/local changes, do **not** use a shared `pr-uncommitted-planned-comments.md` name. Build a unique artifact id from the repo, branch, and current timestamp:
+  - repo slug: `basename "$(git rev-parse --show-toplevel)"`
+  - branch slug: `git branch --show-current`, or `detached` if empty
+  - timestamp: `date +%Y%m%d-%H%M%S`
+  - path: `${PLANNING_MARKDOWN_DIR}/uncommitted-{repo_slug}-{branch_slug}-{timestamp}-planned-comments.md`
+- Sanitize repo and branch slugs for filenames by replacing any character outside `[A-Za-z0-9._-]` with `-`.
+
+Use `{comments_path}` for every later read, write, subagent prompt, user summary, and posting step. Do not reconstruct the path from `{number}` later.
+
 ### Step 2: Gather metadata
 
 Run these commands to collect PR context:
@@ -81,11 +93,7 @@ Load `references/review-lenses.md` and systematically analyze the PR through eac
 
 ### Step 5: Create a planned comments document
 
-Write the planned comments to:
-
-```
-${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md
-```
+Write the planned comments to `{comments_path}`.
 
 Follow the format in `references/output-templates.md`. The planned comments document must include both of these sections:
 
@@ -100,7 +108,7 @@ Spawn an agent pass using whatever the current harness actually supports. If a n
 Set the subagent model to the same model you are when the harness allows it, and give it this prompt:
 
 ```text
-Review the Pull Request comments document at ${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md with an eye of skepticism and cynicism.
+Review the Pull Request comments document at {comments_path} with an eye of skepticism and cynicism.
 
 1. Remove or rewrite comments that are weak, speculative, redundant, not actionable, or not well-supported by the PR.
 2. Keep the tone constructive, but be skeptical about whether each comment should really be posted.
@@ -115,7 +123,7 @@ Wait for the subagent or subprocess to finish before moving on. Do not continue 
 
 ### Step 7: Read the revised document, inform user, and wait
 
-After the Step 6 subagent reports completion, read `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md` from disk again before you say anything to the user. Use the subagent contents of that file as the source of truth for the rest of the workflow; do not rely on the pre-subagent version from memory.
+After the Step 6 subagent reports completion, read `{comments_path}` from disk again before you say anything to the user. Use the subagent contents of that file as the source of truth for the rest of the workflow; do not rely on the pre-subagent version from memory.
 
 Present a summary to the user:
 
@@ -143,12 +151,12 @@ Repeat until the user is satisfied.
 
 When the user says they're ready (e.g., "looks good," "post it," "create the review"), create the review using `gh api`.
 
-1. Read `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md` from disk again before you proceed
+1. Read `{comments_path}` from disk again before you proceed
 2. Refer to `references/github-review-api.md` for the exact API calls.
 
 **Critical rules:**
 
-- **ALWAYS** read `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md` from disk again before you post a comment
+- **ALWAYS** read `{comments_path}` from disk again before you post a comment
 - **ALWAYS** create a pending/draft review first. For the REST create-review endpoint, omit `event` entirely; do **not** send `"event": "PENDING"` because GitHub rejects it with `422`.
 - **NEVER** submit the review (`APPROVE`, `REQUEST_CHANGES`, or `COMMENT` event) unless explicitly told to. If the user explicitly asks to submit/approve/comment in the same turn as posting, create the pending review first, then submit it via Step 10.
 - Tell the user the review is pending and they need to submit it from the GitHub UI, unless they explicitly asked you to submit it.

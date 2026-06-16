@@ -151,6 +151,7 @@ private fun localWorktreeMenuItem(
     when (action) {
         WorktreeMenuAction.Open -> openWorktreeMenuItem(state, rowActions, onMenuDismiss)
         WorktreeMenuAction.CreateWorktree -> createWorktreeMenuItem(state, rowActions, onMenuDismiss)
+        WorktreeMenuAction.RebaseOntoParent -> rebaseOntoParentMenuItem(onMenuDismiss)
         WorktreeMenuAction.Archive -> archiveWorktreeMenuItem(state, rowActions, onMenuDismiss)
     }
 }
@@ -186,6 +187,15 @@ private fun createWorktreeMenuItem(
         enabled = isWorktreeCreateEnabled(state.worktree, state.setupStatus, state.isArchiving),
     ) {
         Text("Create worktree")
+    }
+}
+
+@Composable
+private fun rebaseOntoParentMenuItem(onMenuDismiss: () -> Unit) {
+    DropdownMenuItem(
+        onClick = onMenuDismiss,
+    ) {
+        Text("Rebase onto parent")
     }
 }
 

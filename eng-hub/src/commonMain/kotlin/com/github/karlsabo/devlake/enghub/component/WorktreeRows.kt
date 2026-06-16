@@ -14,6 +14,7 @@ internal enum class RepositoryMenuAction {
 internal enum class WorktreeMenuAction {
     Open,
     CreateWorktree,
+    RebaseOntoParent,
     Archive,
 }
 
@@ -82,6 +83,7 @@ internal fun isRepositoryCreateWorktreeEnabled(
 internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<WorktreeMenuAction> = buildList {
     add(WorktreeMenuAction.Open)
     add(WorktreeMenuAction.CreateWorktree)
+    if (!worktree.parentBranch.isNullOrBlank()) add(WorktreeMenuAction.RebaseOntoParent)
     if (!worktree.isRoot) add(WorktreeMenuAction.Archive)
 }
 
