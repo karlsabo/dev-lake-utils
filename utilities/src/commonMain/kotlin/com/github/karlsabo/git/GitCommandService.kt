@@ -195,6 +195,10 @@ private class GitRebaseCommandService(
     override fun rebase(repoPath: String, upstreamRef: String) {
         commandRunner.run(gitRepoCommand(repoPath, "rebase", "--autostash", upstreamRef))
     }
+
+    override fun abortRebase(repoPath: String) {
+        commandRunner.run(gitRepoCommand(repoPath, "rebase", "--abort"))
+    }
 }
 
 private class GitWorkingTreeCommandService(

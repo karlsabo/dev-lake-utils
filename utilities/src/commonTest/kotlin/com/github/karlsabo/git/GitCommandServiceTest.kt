@@ -255,6 +255,39 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun abortRebase_abortsRebaseInCurrentWorktree() {
+        val repoDir = createTempDir("repo")
+        val worktreeDir = createTempDir("wt")
+        removeTempDir(worktreeDir)
+        try {
+            initRepoWithCommit(repoDir)
+            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr"), workingDirectory = null)
+            executeCommand(
+                listOf("git", "-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr"),
+                workingDirectory = null,
+            )
+            executeCommand(listOf("sh", "-c", "echo child > $repoDir/README.md"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "child"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "checkout", "feature/base-pr"), workingDirectory = null)
+            executeCommand(listOf("sh", "-c", "echo parent > $repoDir/README.md"), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
+            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "parent"), workingDirectory = null)
+            service.worktreeAdd(repoDir, worktreeDir, "feature/stacked-pr")
+
+            assertFailsWith<GitCommandException> {
+                service.rebase(worktreeDir, "feature/base-pr")
+            }
+            service.abortRebase(worktreeDir)
+
+            assertEquals("", service.status(worktreeDir))
+        } finally {
+            removeTempDir(repoDir)
+            removeTempDir(worktreeDir)
+        }
+    }
+
+    @Test
     fun worktree_addListRemove_lifecycle() {
         val repoDir = createTempDir("repo")
         val worktreeDir = createTempDir("wt")

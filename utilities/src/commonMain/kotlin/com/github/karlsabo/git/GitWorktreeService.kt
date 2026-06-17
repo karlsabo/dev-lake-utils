@@ -181,6 +181,10 @@ private class GitWorktreeRebaseService(
     ) {
         rebaser.rebaseWorktreeOntoParent(worktreePath, parentBranch)
     }
+
+    override fun abortRebase(worktreePath: String) {
+        rebaser.abortRebase(worktreePath)
+    }
 }
 
 private class GitWorktreeArchiveService(
@@ -845,6 +849,18 @@ private class GitWorktreeRebaser(
             }
             throw GitWorktreeException(
                 "Failed to rebase worktree $worktreePath onto $parentBranch: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+
+    fun abortRebase(worktreePath: String) {
+        require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
+        try {
+            gitCommandApi.abortRebase(worktreePath)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to abort rebase in worktree $worktreePath: ${e.gitOutput}",
                 e,
             )
         }

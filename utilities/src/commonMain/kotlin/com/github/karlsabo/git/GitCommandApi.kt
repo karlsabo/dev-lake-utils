@@ -68,6 +68,7 @@ interface GitWorktreeCommandApi {
 
 interface GitRebaseCommandApi {
     fun rebase(repoPath: String, upstreamRef: String)
+    fun abortRebase(repoPath: String)
 }
 
 interface GitWorkingTreeCommandApi {

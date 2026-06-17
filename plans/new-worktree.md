@@ -542,7 +542,9 @@ Relevant current code:
 
 **Scope:** Classification only. Do not add abort command or prompt.
 
-### 37. Add abort-rebase utility
+### 37. Add abort-rebase utility - Done
+
+**Done** 2026 06 17
 
 **Acceptance criteria:** Given a child worktree in a conflicted rebase, when abort is requested, then utilities run `git rebase --abort` in the child worktree.
 

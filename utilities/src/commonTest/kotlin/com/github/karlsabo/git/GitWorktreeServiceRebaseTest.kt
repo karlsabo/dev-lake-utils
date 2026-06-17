@@ -100,6 +100,43 @@ class GitWorktreeServiceRebaseTest {
     }
 
     @Test
+    fun abortRebase_runsAbortInChildWorktree() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        service.abortRebase(childWorktreePath)
+
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("abortRebase", listOf(childWorktreePath))),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun abortRebase_wrapsGitCommandFailure() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val failure = GitCommandException(
+            command = listOf("git", "-C", childWorktreePath, "rebase", "--abort"),
+            exitCode = 128,
+            gitOutput = "fatal: no rebase in progress",
+        )
+        fake.abortRebaseAction = { throw failure }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.abortRebase(childWorktreePath)
+        }
+
+        assertEquals(
+            "Failed to abort rebase in worktree $childWorktreePath: fatal: no rebase in progress",
+            ex.message,
+        )
+        assertSame(failure, ex.cause)
+    }
+
+    @Test
     fun branchNeedsRebase_returnsTrueWhenParentHasCommitsNotContainedInChild() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"

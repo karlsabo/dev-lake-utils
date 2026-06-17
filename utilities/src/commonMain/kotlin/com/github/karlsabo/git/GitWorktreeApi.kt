@@ -72,6 +72,10 @@ interface GitWorktreeRebaseApi {
     ): Unit = throw UnsupportedOperationException(
         "rebaseWorktreeOntoParent is not implemented",
     )
+
+    fun abortRebase(worktreePath: String): Unit = throw UnsupportedOperationException(
+        "abortRebase is not implemented",
+    )
 }
 
 data class RepositoryWorktrees(
