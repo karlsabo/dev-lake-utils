@@ -20,6 +20,12 @@ class ExistingTargetBranchAncestryException(
     val targetBranch: String,
 ) : GitWorktreeException(existingTargetBranchAncestryFailureMessage(baseBranch, targetBranch))
 
+class GitRebaseConflictException(
+    val worktreePath: String,
+    val parentBranch: String,
+    cause: Throwable,
+) : GitWorktreeException(rebaseConflictMessage(worktreePath, parentBranch), cause)
+
 class GitWorktreeService private constructor(
     parts: GitWorktreeServiceParts,
 ) : GitWorktreeApi,
@@ -534,6 +540,11 @@ private fun existingTargetBranchAncestryFailureMessage(
 ): String = "Existing branch $targetBranch is not descended from selected base $baseBranch. " +
     "Choose a different branch or start from the correct base."
 
+private fun rebaseConflictMessage(
+    worktreePath: String,
+    parentBranch: String,
+): String = "Rebase conflict while rebasing worktree $worktreePath onto $parentBranch"
+
 private class GitBranchAncestryChecker(
     private val gitCommandApi: GitCommandApi,
     private val branchValidator: GitWorktreeBranchValidator,
@@ -825,12 +836,35 @@ private class GitWorktreeRebaser(
         try {
             gitCommandApi.rebase(worktreePath, parentBranch)
         } catch (e: GitCommandException) {
+            if (rebaseInProgress(worktreePath)) {
+                throw GitRebaseConflictException(
+                    worktreePath = worktreePath,
+                    parentBranch = parentBranch,
+                    cause = e,
+                )
+            }
             throw GitWorktreeException(
                 "Failed to rebase worktree $worktreePath onto $parentBranch: ${e.gitOutput}",
                 e,
             )
         }
     }
+
+    private fun rebaseInProgress(worktreePath: String): Boolean = listOf("rebase-merge", "rebase-apply")
+        .mapNotNull { rebaseStatePath(worktreePath, it) }
+        .any { SystemFileSystem.exists(it) }
+
+    private fun rebaseStatePath(worktreePath: String, stateDirectory: String): Path? {
+        val gitPath = try {
+            gitCommandApi.revParse(worktreePath, "--git-path", stateDirectory)
+        } catch (_: GitCommandException) {
+            return null
+        }.takeIf { it.isNotBlank() } ?: return null
+
+        return if (gitPath.isAbsolutePath()) Path(gitPath) else Path(worktreePath, gitPath)
+    }
+
+    private fun String.isAbsolutePath(): Boolean = startsWith("/") || matches(Regex("^[A-Za-z]:[\\\\/].*"))
 }
 
 private class GitWorktreeArchiver(

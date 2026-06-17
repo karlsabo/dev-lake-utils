@@ -529,7 +529,9 @@ Relevant current code:
 
 **Scope:** Successful rebase flow plus safe failure handling only. Rebase failures must be caught, reported as an action error, and followed by a best-effort refresh; until conflict-specific stories land, users may resolve/abort manually. Do not add conflict prompt or automated conflict resolution.
 
-### 36. Classify rebase conflict failure
+### 36. Classify rebase conflict failure - Done
+
+**Done** 2026 06 16
 
 **Acceptance criteria:** Given `git rebase --autostash feature/base-pr` fails and leaves a rebase in progress, when Eng Hub handles the error, then it identifies the failure as a rebase conflict.
 

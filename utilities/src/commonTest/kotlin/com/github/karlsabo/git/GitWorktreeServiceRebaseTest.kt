@@ -1,5 +1,7 @@
 package com.github.karlsabo.git
 
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,6 +28,48 @@ class GitWorktreeServiceRebaseTest {
             ),
             fake.calls,
         )
+    }
+
+    @Test
+    fun rebaseWorktreeOntoParent_classifiesFailureWithRebaseInProgressAsConflict() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = createArchiveWorktreeTempDir()
+        val parentBranch = "feature/base-pr"
+        val rebaseMergePath = Path(childWorktreePath, ".git", "rebase-merge")
+        val failure = GitCommandException(
+            command = listOf("git", "-C", childWorktreePath, "rebase", "--autostash", parentBranch),
+            exitCode = 1,
+            gitOutput = "CONFLICT (content): Merge conflict",
+        )
+        fake.rebaseAction = { _, _ -> throw failure }
+        fake.revParseAction = { _, args ->
+            when (args.toList()) {
+                listOf("--git-path", "rebase-merge") -> rebaseMergePath.toString()
+                else -> ""
+            }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        try {
+            SystemFileSystem.createDirectories(rebaseMergePath)
+
+            val ex = assertFailsWith<GitRebaseConflictException> {
+                service.rebaseWorktreeOntoParent(
+                    worktreePath = childWorktreePath,
+                    parentBranch = parentBranch,
+                )
+            }
+
+            assertEquals(
+                "Rebase conflict while rebasing worktree $childWorktreePath onto $parentBranch",
+                ex.message,
+            )
+            assertEquals(childWorktreePath, ex.worktreePath)
+            assertEquals(parentBranch, ex.parentBranch)
+            assertSame(failure, ex.cause)
+        } finally {
+            removeTempDir(childWorktreePath)
+        }
     }
 
     @Test
