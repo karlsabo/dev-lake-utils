@@ -40,6 +40,12 @@ internal data class UseUnrelatedExistingBranchConfirmationRequest(
     val targetBranch: String,
 )
 
+internal data class RebaseConflictResolutionRequest(
+    val repoRootPath: String,
+    val worktreePath: String,
+    val parentBranch: String,
+)
+
 internal data class CreateLocalWorktreeFromRepositoryRequest(
     val repoRootPath: String,
     val baseWorktreePath: String,
@@ -67,6 +73,8 @@ internal class EngHubViewModelState(
         MutableStateFlow<CreateLocalWorktreeFromRepositoryRequest?>(null)
     val useUnrelatedExistingBranchConfirmationRequest =
         MutableStateFlow<UseUnrelatedExistingBranchConfirmationRequest?>(null)
+    val rebaseConflictResolutionRequests =
+        MutableStateFlow<List<RebaseConflictResolutionRequest>>(emptyList())
     val localRepositoryExpansionsInFlight = MutableStateFlow<Set<String>>(emptySet())
     val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val rebasingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
@@ -100,7 +108,7 @@ internal fun actionErrorState(
     source: StateFlow<ActionErrorQueueState>,
 ): StateFlow<ActionErrorUiState?> = MappedStateFlow(source) { it.current }
 
-private class MappedStateFlow<T, R>(
+internal class MappedStateFlow<T, R>(
     private val source: StateFlow<T>,
     private val transform: (T) -> R,
 ) : StateFlow<R> {

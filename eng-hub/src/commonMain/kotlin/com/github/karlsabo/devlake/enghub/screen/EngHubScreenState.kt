@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
+import com.github.karlsabo.devlake.enghub.component.PendingRebaseConflictResolution
 import com.github.karlsabo.devlake.enghub.component.PendingUseUnrelatedExistingBranch
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
@@ -14,6 +15,7 @@ import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.ActionErrorUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
+import com.github.karlsabo.devlake.enghub.viewmodel.RebaseConflictResolutionRequest
 import com.github.karlsabo.devlake.enghub.viewmodel.UseUnrelatedExistingBranchConfirmationRequest
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
@@ -72,6 +74,7 @@ internal fun collectEngHubScreenState(
         viewModel.lastCreateLocalWorktreeFromRepositoryRequestStateFlow.collectAsState()
     val useUnrelatedExistingBranchRequest by
         viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.collectAsState()
+    val rebaseConflictResolutionRequest by viewModel.rebaseConflictResolutionRequestStateFlow.collectAsState()
 
     return EngHubScreenState(
         selectedPane = selectedPane,
@@ -99,6 +102,7 @@ internal fun collectEngHubScreenState(
                 )
             },
             useUnrelatedExistingBranchConfirmationRequest = useUnrelatedExistingBranchRequest?.toPendingConfirmation(),
+            rebaseConflictResolutionRequest = rebaseConflictResolutionRequest?.toPendingResolution(),
         ),
     )
 }
@@ -135,6 +139,12 @@ internal fun engHubScreenActions(
             viewModel.confirmUseUnrelatedExistingBranch(request.toViewModelRequest())
         },
         onDismissUseUnrelatedExistingBranchConfirmation = viewModel::dismissUseUnrelatedExistingBranchConfirmation,
+        onAbortRebaseConflict = { request ->
+            viewModel.abortRebaseAfterConflict(request.toViewModelRequest())
+        },
+        onLeaveRebaseConflictAsIs = { request ->
+            viewModel.leaveRebaseConflictAsIs(request.toViewModelRequest())
+        },
         worktrees = LocalWorktreeActions(
             onOpenWorktree = viewModel.openLocalWorktree,
             onArchiveWorktree = viewModel.archiveLocalWorktree,
@@ -172,6 +182,24 @@ private fun PendingUseUnrelatedExistingBranch.toViewModelRequest(): UseUnrelated
         baseWorktreePath = baseWorktreePath,
         baseBranch = baseBranch,
         targetBranch = targetBranch,
+    )
+    return viewModelRequest
+}
+
+private fun RebaseConflictResolutionRequest.toPendingResolution(): PendingRebaseConflictResolution {
+    val pendingRequest = PendingRebaseConflictResolution(
+        repoRootPath = repoRootPath,
+        worktreePath = worktreePath,
+        parentBranch = parentBranch,
+    )
+    return pendingRequest
+}
+
+private fun PendingRebaseConflictResolution.toViewModelRequest(): RebaseConflictResolutionRequest {
+    val viewModelRequest = RebaseConflictResolutionRequest(
+        repoRootPath = repoRootPath,
+        worktreePath = worktreePath,
+        parentBranch = parentBranch,
     )
     return viewModelRequest
 }

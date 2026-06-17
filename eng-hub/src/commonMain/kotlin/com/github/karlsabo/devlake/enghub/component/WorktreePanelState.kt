@@ -16,6 +16,7 @@ internal data class WorktreePanelState(
     val rebasingWorktreePaths: Set<String> = emptySet(),
     val repositoryCreateWorktreeRequest: PendingCreateWorktree? = null,
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch? = null,
+    val rebaseConflictResolutionRequest: PendingRebaseConflictResolution? = null,
 )
 
 internal data class WorktreePanelActions(
@@ -25,6 +26,8 @@ internal data class WorktreePanelActions(
     val onRepositoryCreateWorktreeRequestHandled: () -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
+    val onAbortRebaseConflict: (PendingRebaseConflictResolution) -> Unit,
+    val onLeaveRebaseConflictAsIs: (PendingRebaseConflictResolution) -> Unit,
     val worktrees: LocalWorktreeActions,
     val forceArchive: ForceArchiveWorktreeActions,
 )
@@ -54,6 +57,12 @@ internal data class PendingUseUnrelatedExistingBranch(
     val baseWorktreePath: String,
     val baseBranch: String,
     val targetBranch: String,
+)
+
+internal data class PendingRebaseConflictResolution(
+    val repoRootPath: String,
+    val worktreePath: String,
+    val parentBranch: String,
 )
 
 internal data class PendingArchive(
@@ -97,4 +106,18 @@ internal fun confirmUseUnrelatedExistingBranchDialog(
 
 internal fun dismissUseUnrelatedExistingBranchDialog(onDismiss: () -> Unit) {
     onDismiss()
+}
+
+internal fun abortRebaseConflictDialog(
+    state: PendingRebaseConflictResolution,
+    onAbort: (PendingRebaseConflictResolution) -> Unit,
+) {
+    onAbort(state)
+}
+
+internal fun leaveRebaseConflictAsIsDialog(
+    state: PendingRebaseConflictResolution,
+    onLeaveAsIs: (PendingRebaseConflictResolution) -> Unit,
+) {
+    onLeaveAsIs(state)
 }

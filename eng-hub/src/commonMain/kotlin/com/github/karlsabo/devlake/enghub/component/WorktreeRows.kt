@@ -42,7 +42,7 @@ internal fun visibleWorktreeRows(worktrees: List<LocalWorktreeUiState>): List<Vi
     val visibleRows = if (worktrees.hasValidParentBranchNesting()) {
         worktrees.asNestedRows()
     } else {
-        worktrees.asFlatRows()
+        worktrees.map { worktree -> VisibleWorktreeRow(worktree = worktree, nestingDepth = 0) }
     }
     return visibleRows
 }
@@ -66,10 +66,6 @@ private fun List<LocalWorktreeUiState>.asNestedRows(): List<VisibleWorktreeRow> 
             }
         }
     }
-}
-
-private fun List<LocalWorktreeUiState>.asFlatRows(): List<VisibleWorktreeRow> = map { worktree ->
-    VisibleWorktreeRow(worktree = worktree, nestingDepth = 0)
 }
 
 internal fun visibleRepositoryMenuActions(repository: LocalRepositoryUiState): List<RepositoryMenuAction> = buildList {

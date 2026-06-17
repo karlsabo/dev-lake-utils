@@ -83,18 +83,16 @@ private fun worktreeDirtyIndicator(worktree: LocalWorktreeUiState) {
 
 @Composable
 private fun worktreeRebaseNeededIndicator(worktree: LocalWorktreeUiState) {
-    val label = worktree.rebaseNeededIndicatorLabel ?: return
-    Text(
-        text = label,
-        modifier = Modifier.semantics { contentDescription = label },
-        style = MaterialTheme.typography.caption,
-        color = MaterialTheme.colors.error,
-    )
-    Spacer(modifier = Modifier.width(8.dp))
+    if (worktree.needsRebase) {
+        Text(
+            text = "Rebase needed",
+            modifier = Modifier.semantics { contentDescription = "Rebase needed" },
+            style = MaterialTheme.typography.caption,
+            color = MaterialTheme.colors.error,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+    }
 }
-
-internal val LocalWorktreeUiState.rebaseNeededIndicatorLabel: String?
-    get() = if (needsRebase) "Rebase needed" else null
 
 @Composable
 private fun worktreeProgressLabels(
@@ -175,7 +173,7 @@ private fun openWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onOpen()
         },
-        enabled = !state.hasBlockedOpenAction(),
+        enabled = state.setupStatus == null && !state.isArchiving && !state.isRebasing,
     ) {
         Text(setupActionLabel(defaultLabel = "Open", setupStatus = state.setupStatus))
     }
@@ -231,5 +229,3 @@ private fun archiveWorktreeMenuItem(
         Text("Archive")
     }
 }
-
-private fun LocalWorktreeRowState.hasBlockedOpenAction(): Boolean = setupStatus != null || isArchiving || isRebasing

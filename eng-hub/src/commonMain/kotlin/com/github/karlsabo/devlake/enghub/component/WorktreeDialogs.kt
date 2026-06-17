@@ -36,6 +36,7 @@ internal data class WorktreeDialogState(
     val pendingArchive: PendingArchive?,
     val pendingCreateWorktree: PendingCreateWorktree?,
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch?,
+    val rebaseConflictResolutionRequest: PendingRebaseConflictResolution?,
     val forceArchiveRequest: ForceArchiveWorktreeUiState?,
 )
 
@@ -46,6 +47,8 @@ internal data class WorktreeDialogActions(
     val onCreateWorktree: (PendingCreateWorktree) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
+    val onAbortRebaseConflict: (PendingRebaseConflictResolution) -> Unit,
+    val onLeaveRebaseConflictAsIs: (PendingRebaseConflictResolution) -> Unit,
     val forceArchive: ForceArchiveWorktreeActions,
 )
 
@@ -104,6 +107,14 @@ internal fun worktreeDialogHost(
         )
     }
 
+    state.rebaseConflictResolutionRequest?.let { request ->
+        rebaseConflictResolutionDialog(
+            request = request,
+            onAbort = { abortRebaseConflictDialog(request, actions.onAbortRebaseConflict) },
+            onLeaveAsIs = { leaveRebaseConflictAsIsDialog(request, actions.onLeaveRebaseConflictAsIs) },
+        )
+    }
+
     state.pendingCreateWorktree?.let { createWorktree ->
         createWorktreeDialog(
             state = createWorktree,
@@ -116,6 +127,47 @@ internal fun worktreeDialogHost(
             },
             onDismiss = { actions.onPendingCreateWorktreeChange(null) },
         )
+    }
+}
+
+@Composable
+private fun rebaseConflictResolutionDialog(
+    request: PendingRebaseConflictResolution,
+    onAbort: () -> Unit,
+    onLeaveAsIs: () -> Unit,
+) {
+    DialogWindow(
+        onCloseRequest = onLeaveAsIs,
+        title = "Rebase Conflict",
+        icon = painterResource(Res.drawable.icon),
+        visible = true,
+    ) {
+        MaterialTheme {
+            Surface {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                ) {
+                    Text(text = "Rebase conflict", style = MaterialTheme.typography.h6)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Rebase onto ${request.parentBranch} stopped with conflicts in ${request.worktreePath}.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Abort the rebase or leave the worktree as-is for manual conflict resolution.")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row {
+                        Button(onClick = onAbort) {
+                            Text("Abort")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = onLeaveAsIs) {
+                            Text("Leave as-is")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

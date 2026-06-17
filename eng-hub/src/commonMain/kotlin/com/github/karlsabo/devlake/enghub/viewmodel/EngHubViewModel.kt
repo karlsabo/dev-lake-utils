@@ -99,6 +99,9 @@ class EngHubViewModel(
     internal val useUnrelatedExistingBranchConfirmationRequestStateFlow:
         StateFlow<UseUnrelatedExistingBranchConfirmationRequest?> =
         state.useUnrelatedExistingBranchConfirmationRequest.asStateFlow()
+    internal val rebaseConflictResolutionRequestStateFlow:
+        StateFlow<RebaseConflictResolutionRequest?> =
+        MappedStateFlow(state.rebaseConflictResolutionRequests) { it.firstOrNull() }
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.archivingLocalWorktreePaths.asStateFlow()
     val rebasingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
@@ -178,6 +181,15 @@ class EngHubViewModel(
     val archiveLocalWorktree: (String, String) -> Unit = archiveController::archiveLocalWorktree
     val rebaseLocalWorktreeOntoParent: (String, String, String) -> Unit =
         rebaseController::rebaseLocalWorktreeOntoParent
+
+    internal fun abortRebaseAfterConflict(request: RebaseConflictResolutionRequest) {
+        rebaseController.abortRebaseAfterConflict(request)
+    }
+
+    internal fun leaveRebaseConflictAsIs(request: RebaseConflictResolutionRequest) {
+        rebaseController.leaveRebaseConflictAsIs(request)
+    }
+
     val confirmForceArchiveLocalWorktree: (String, String) -> Unit =
         archiveController::confirmForceArchiveLocalWorktree
     val dismissForceArchiveWorktreeRequest: () -> Unit =

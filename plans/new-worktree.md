@@ -557,7 +557,9 @@ Relevant current code:
 
 **Scope:** Git abort command only. Do not add user prompt.
 
-### 38. Prompt after rebase conflict
+### 38. Prompt after rebase conflict - Done
+
+**Done** 2026 06 17
 
 **Acceptance criteria:** Given a rebase conflict is detected, when the prompt appears, then choosing `Abort` aborts the rebase and choosing `Leave as-is` leaves the worktree in the conflicted rebase state.
 

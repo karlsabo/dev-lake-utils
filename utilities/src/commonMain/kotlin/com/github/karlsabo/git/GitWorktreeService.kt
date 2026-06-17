@@ -874,10 +874,10 @@ private class GitWorktreeRebaser(
         val gitPath = try {
             gitCommandApi.revParse(worktreePath, "--git-path", stateDirectory)
         } catch (_: GitCommandException) {
-            return null
-        }.takeIf { it.isNotBlank() } ?: return null
+            null
+        }?.takeIf { it.isNotBlank() }
 
-        return if (gitPath.isAbsolutePath()) Path(gitPath) else Path(worktreePath, gitPath)
+        return gitPath?.let { if (it.isAbsolutePath()) Path(it) else Path(worktreePath, it) }
     }
 
     private fun String.isAbsolutePath(): Boolean = startsWith("/") || matches(Regex("^[A-Za-z]:[\\\\/].*"))

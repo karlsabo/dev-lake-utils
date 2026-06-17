@@ -425,6 +425,10 @@ data class RebaseWorktreeOntoParentCall(
     val parentBranch: String,
 )
 
+data class AbortRebaseCall(
+    val worktreePath: String,
+)
+
 data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
@@ -436,6 +440,7 @@ data class RecordingGitWorktreeApiResponses(
     val branchNeedsRebaseFailure: RuntimeException? = null,
     val archiveWorktreeFailure: RuntimeException? = null,
     val rebaseWorktreeFailure: RuntimeException? = null,
+    val abortRebaseFailure: RuntimeException? = null,
 )
 
 data class RecordingGitWorktreeApiCallbacks(
@@ -448,6 +453,7 @@ data class RecordingGitWorktreeApiCallbacks(
         error("Unexpected call")
     },
     val onRebaseWorktreeOntoParent: (RebaseWorktreeOntoParentCall) -> Unit = {},
+    val onAbortRebase: (AbortRebaseCall) -> Unit = {},
 )
 
 class RecordingGitWorktreeApi(
@@ -490,6 +496,7 @@ class RecordingGitWorktreeApi(
     val inferDefaultBranchRefCalls = mutableListOf<String>()
     val branchNeedsRebaseCalls = mutableListOf<BranchNeedsRebaseCall>()
     val rebaseWorktreeOntoParentCalls = mutableListOf<RebaseWorktreeOntoParentCall>()
+    val abortRebaseCalls = mutableListOf<AbortRebaseCall>()
     val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
     val archiveWorktreeForceValues = mutableListOf<Boolean>()
     private val worktreesByRepoPath = responses.worktreesByRepoPath
@@ -590,6 +597,13 @@ class RecordingGitWorktreeApi(
         rebaseWorktreeOntoParentCalls += call
         responses.rebaseWorktreeFailure?.let { throw it }
         callbacks.onRebaseWorktreeOntoParent(call)
+    }
+
+    override fun abortRebase(worktreePath: String) {
+        val call = AbortRebaseCall(worktreePath)
+        abortRebaseCalls += call
+        responses.abortRebaseFailure?.let { throw it }
+        callbacks.onAbortRebase(call)
     }
 
     override fun archiveWorktree(
