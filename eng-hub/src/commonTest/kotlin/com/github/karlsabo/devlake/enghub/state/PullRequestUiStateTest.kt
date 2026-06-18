@@ -6,9 +6,9 @@ import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.Label
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.User
-import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Clock
 
 class PullRequestUiStateTest {
     @Test

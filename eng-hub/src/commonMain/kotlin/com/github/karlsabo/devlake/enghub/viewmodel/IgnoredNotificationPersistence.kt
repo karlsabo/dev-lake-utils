@@ -7,7 +7,7 @@ import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
 import com.github.karlsabo.notifications.toIgnoredNotificationThread
 import kotlinx.coroutines.flow.update
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 internal class IgnoredNotificationPersistence(
     private val state: EngHubViewModelState,

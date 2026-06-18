@@ -181,10 +181,10 @@ Other packaging tasks available today:
 
 ## Development Notes
 
-- Gradle wrapper version: `8.14`
+- Gradle wrapper version: `9.4.1`
 - Kotlin JVM target: `17`
 - UI stack: Kotlin Multiplatform + Compose Desktop
-- The module currently includes `skiko-awt-runtime-macos-arm64`, so the current setup is clearly macOS Apple Silicon oriented even though Compose packaging tasks exist for other OS formats
+- The module uses Compose Desktop's current-OS runtime dependency for Skiko rather than pinning a platform-specific Skiko artifact directly
 - The main window title is `Eng Hub`
 
 ## What Else We Still Need
@@ -199,7 +199,7 @@ These are the most obvious gaps from the current implementation:
 - Search, filtering, and sorting in both panes once the lists get large
 - A visible activity log for automatic actions like auto-approval and auto-dismissal
 - Better bootstrap UX when config is missing, especially for first-time setup
-- Platform support clarification and validation beyond the current macOS ARM64-oriented runtime dependency
+- Platform support clarification and validation for the Compose Desktop package targets
 
 ## Source Pointers
 

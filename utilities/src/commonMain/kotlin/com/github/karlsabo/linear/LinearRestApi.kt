@@ -8,7 +8,7 @@ import com.github.karlsabo.projectmanagement.ProjectComment
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import io.ktor.client.HttpClient
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.github.karlsabo.projectmanagement.ProjectMilestone as UnifiedProjectMilestone
 
 class LinearApiException(

@@ -4,7 +4,7 @@ import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.github.Notification
 import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreReason
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 internal fun Map<String, IgnoredNotificationThread>.hides(
     notification: Notification,

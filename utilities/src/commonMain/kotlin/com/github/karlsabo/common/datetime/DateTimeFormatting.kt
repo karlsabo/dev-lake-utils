@@ -1,8 +1,8 @@
 package com.github.karlsabo.common.datetime
 
-import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 /**
  * Centralized date/time formatting utilities for consistent formatting across the codebase.

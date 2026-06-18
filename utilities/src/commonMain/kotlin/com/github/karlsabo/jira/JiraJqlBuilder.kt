@@ -2,7 +2,7 @@ package com.github.karlsabo.jira
 
 import com.github.karlsabo.common.datetime.DateTimeFormatting.toCompactUtcDateTime
 import com.github.karlsabo.projectmanagement.IssueFilter
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 internal object JiraJqlBuilder {
     fun resolvedIssues(

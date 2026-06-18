@@ -32,8 +32,6 @@ import com.github.karlsabo.system.DesktopLauncher
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -41,6 +39,8 @@ import kotlinx.io.files.SystemTemporaryDirectory
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 const val DEV_LAKE_ROOT = "/repos/dev-lake-utils"
 const val DEV_LAKE_SELECTED_WORKTREE = "/repos/dev-lake-utils-feature-worktree-panel"

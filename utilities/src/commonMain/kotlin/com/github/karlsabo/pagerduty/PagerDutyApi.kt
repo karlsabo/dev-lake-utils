@@ -1,6 +1,6 @@
 package com.github.karlsabo.pagerduty
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 interface PagerDutyApi {
     /**

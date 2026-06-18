@@ -1,6 +1,5 @@
 package com.github.karlsabo.jira.serialization
 
-import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -9,6 +8,7 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
+import kotlin.time.Instant
 
 private const val DATE_TIME_WITH_MILLIS_LENGTH = 23
 private const val OFFSET_HOURS_END_INDEX = 3
@@ -49,7 +49,7 @@ fun parseOffsetDateTime(dateString: String): Instant {
 
 object CustomInstantSerializer : KSerializer<Instant> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("kotlinx.datetime.Instant", PrimitiveKind.STRING)
+        PrimitiveSerialDescriptor("kotlin.time.Instant", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): Instant {
         val rawString = decoder.decodeString()

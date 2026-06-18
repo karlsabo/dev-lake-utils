@@ -13,10 +13,11 @@
 
 # TODO
 
-* [ ] Upgrade to Kotlin 2.3.21
-  * Deep research all dependent versions and upgrade them
-* [ ] Clicking open on a notification takes you to the PR, not to what GitHub wants to take you to such as a new commit or comment.
-* [ ] Copy .idea folder from the base/root repo. Or come up with a copy script to call as part of the setup procedure.
+* [ ] Need a tool, maybe a kotlin KTS script to 'copy' the .idea folder from the base/root repo.
+  * If possible we should create a KTS script, but if the script gets too big, create a new Gradle sub project in ~/git/dev-lake-utils that builds an executable binary for each OS type
+  * When we create a new worktree, I want to be able to run idea-tool root/.idea worktree/.idea and it will update the worktree/.idea dir and file with the information needed to make intellij properly work with that project.
+  * Review what's in ~/Klaviyo/Repos/app, ~/Klaviyo/Repos/k-repo, ~/Klaviyo/Repos/fender, and /Users/karl.sabo/Klaviyo/Repos/infrastructure-deployment ./.idea folders to get an idea for everything we'll need to do.
+  *
 * [ ] Fix detekt to support Compose: https://detekt.dev/docs/introduction/compose/
     * Fix ktlint to support Compose: https://mrmans0n.github.io/compose-rules/ktlint/
 * [ ] Worktrees should start expanded

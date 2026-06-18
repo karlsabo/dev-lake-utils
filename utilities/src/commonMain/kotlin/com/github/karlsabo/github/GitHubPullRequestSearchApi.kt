@@ -1,6 +1,6 @@
 package com.github.karlsabo.github
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 interface GitHubPullRequestSearchApi {
     suspend fun getMergedPullRequestCount(

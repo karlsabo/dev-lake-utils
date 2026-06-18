@@ -1,11 +1,11 @@
 package com.github.karlsabo.pagerduty
 
 import com.github.karlsabo.tools.lenientJson
-import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.time.Instant
 
 class PagerDutyIncidentTest {
 

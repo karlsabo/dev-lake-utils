@@ -3,8 +3,8 @@ package com.github.karlsabo.github
 import com.github.karlsabo.common.datetime.DateTimeFormatting.toIsoUtcDateTime
 import com.github.karlsabo.tools.lenientJson
 import io.ktor.http.encodeURLParameter
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonElement
+import kotlin.time.Instant
 
 internal fun createMergedPrEncodedQuery(
     startDate: Instant,

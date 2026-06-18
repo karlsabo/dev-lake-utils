@@ -5,9 +5,9 @@ import com.github.karlsabo.jira.config.JiraApiRestConfig
 import com.github.karlsabo.jira.conversion.toProjectIssue
 import com.github.karlsabo.projectmanagement.IssueFilter
 import com.github.karlsabo.projectmanagement.ProjectIssue
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Instant
 
 internal class JiraIssueReader(
     private val config: JiraApiRestConfig,

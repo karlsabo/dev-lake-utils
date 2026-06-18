@@ -1,11 +1,11 @@
 package com.github.karlsabo.devlake.metrics.model
 
 import com.github.karlsabo.projectmanagement.ProjectIssue
-import kotlinx.datetime.Clock.System
-import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
+import kotlin.time.Clock.System
+import kotlin.time.Instant
 import com.github.karlsabo.github.Issue as GitHubIssue
 
 private const val DAYS_PER_WEEK = 7

@@ -1,8 +1,8 @@
 package com.github.karlsabo.tools.formatting
 
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 internal const val RECENT_ACTIVITY_DAYS = 14
 

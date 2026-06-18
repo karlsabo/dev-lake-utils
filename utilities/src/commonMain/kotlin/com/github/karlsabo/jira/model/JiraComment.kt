@@ -2,8 +2,8 @@ package com.github.karlsabo.jira.model
 
 import com.github.karlsabo.common.adf.ContentNode
 import com.github.karlsabo.jira.serialization.CustomInstantSerializer
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 @Serializable
 data class Comment(

@@ -2,11 +2,11 @@ package com.github.karlsabo.tools.formatting
 
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.tools.model.Milestone
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 private const val CHANGE_CHARACTER_LIMIT = 200
 private const val STALE_DUE_DATE_WARNING_DAYS = 90

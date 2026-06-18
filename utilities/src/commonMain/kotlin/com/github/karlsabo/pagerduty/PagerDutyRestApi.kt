@@ -15,7 +15,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.readText
-import kotlinx.datetime.Instant
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -25,6 +24,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Instant
 
 /**
  * Configuration for PagerDuty REST API.

@@ -5,7 +5,7 @@ import com.github.karlsabo.linear.LinearRestApi
 import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.tools.linearConfigPath
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.measureTime
 

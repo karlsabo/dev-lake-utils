@@ -4,7 +4,7 @@ import com.github.karlsabo.jira.config.JiraApiRestConfig
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import io.ktor.client.HttpClient
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 private const val JQL_PAGE_SIZE = 100
 

@@ -2,10 +2,10 @@ package com.github.karlsabo.github
 
 import com.github.karlsabo.github.config.loadGitHubConfig
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.io.files.Path
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 /**
  * Demo for GitHub API functionality.

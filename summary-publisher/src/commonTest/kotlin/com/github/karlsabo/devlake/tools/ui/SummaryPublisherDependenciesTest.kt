@@ -322,14 +322,14 @@ class SummaryPublisherDependenciesTest {
 
         override suspend fun getIssuesResolved(
             user: User,
-            startDate: kotlinx.datetime.Instant,
-            endDate: kotlinx.datetime.Instant,
+            startDate: kotlin.time.Instant,
+            endDate: kotlin.time.Instant,
         ) = unexpected()
 
         override suspend fun getIssuesResolvedCount(
             user: User,
-            startDate: kotlinx.datetime.Instant,
-            endDate: kotlinx.datetime.Instant,
+            startDate: kotlin.time.Instant,
+            endDate: kotlin.time.Instant,
         ) = unexpected()
 
         override suspend fun getIssuesByFilter(filter: com.github.karlsabo.projectmanagement.IssueFilter) = unexpected()
@@ -343,29 +343,29 @@ class SummaryPublisherDependenciesTest {
         override suspend fun getMergedPullRequestCount(
             gitHubUserId: String,
             organizationIds: List<String>,
-            startDate: kotlinx.datetime.Instant,
-            endDate: kotlinx.datetime.Instant,
+            startDate: kotlin.time.Instant,
+            endDate: kotlin.time.Instant,
         ) = unexpected()
 
         override suspend fun getPullRequestReviewCount(
             gitHubUserId: String,
             organizationIds: List<String>,
-            startDate: kotlinx.datetime.Instant,
-            endDate: kotlinx.datetime.Instant,
+            startDate: kotlin.time.Instant,
+            endDate: kotlin.time.Instant,
         ) = unexpected()
 
         override suspend fun getMergedPullRequests(
             gitHubUserId: String,
             organizationIds: List<String>,
-            startDate: kotlinx.datetime.Instant,
-            endDate: kotlinx.datetime.Instant,
+            startDate: kotlin.time.Instant,
+            endDate: kotlin.time.Instant,
         ) = unexpected()
 
         override suspend fun searchPullRequestsByText(
             searchText: String,
             organizationIds: List<String>,
-            startDateInclusive: kotlinx.datetime.Instant,
-            endDateInclusive: kotlinx.datetime.Instant,
+            startDateInclusive: kotlin.time.Instant,
+            endDateInclusive: kotlin.time.Instant,
         ) = unexpected()
 
         override suspend fun listNotifications() = unexpected()
@@ -404,8 +404,8 @@ class SummaryPublisherDependenciesTest {
     private object NoOpPagerDutyApi : PagerDutyApi {
         override suspend fun getServicePages(
             serviceId: String,
-            startTimeInclusive: kotlinx.datetime.Instant,
-            endTimeExclusive: kotlinx.datetime.Instant,
+            startTimeInclusive: kotlin.time.Instant,
+            endTimeExclusive: kotlin.time.Instant,
         ) = unexpected()
     }
 

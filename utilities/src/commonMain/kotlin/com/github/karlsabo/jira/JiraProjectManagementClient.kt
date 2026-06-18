@@ -6,7 +6,7 @@ import com.github.karlsabo.projectmanagement.ProjectComment
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.projectmanagement.ProjectMilestone
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 internal class JiraProjectManagementClient(
     private val issueReader: JiraIssueReader,

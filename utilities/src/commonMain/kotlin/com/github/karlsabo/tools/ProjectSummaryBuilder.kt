@@ -9,7 +9,7 @@ import com.github.karlsabo.projectmanagement.isIssueOrBug
 import com.github.karlsabo.text.TextSummarizer
 import com.github.karlsabo.tools.model.ProjectSummary
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration
 import com.github.karlsabo.github.Issue as GitHubIssue
 

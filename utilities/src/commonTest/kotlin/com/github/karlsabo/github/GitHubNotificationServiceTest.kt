@@ -2,10 +2,10 @@ package com.github.karlsabo.github
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
+import kotlin.time.Instant
 
 class GitHubNotificationServiceTest {
     @Test

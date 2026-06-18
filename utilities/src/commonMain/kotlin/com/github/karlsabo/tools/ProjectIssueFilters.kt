@@ -2,7 +2,7 @@ package com.github.karlsabo.tools
 
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.isIssueOrBug
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration
 
 internal fun List<ProjectIssue>.filterResolvedIssues(duration: Duration): List<ProjectIssue> = filter {

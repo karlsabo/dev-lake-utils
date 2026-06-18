@@ -6,10 +6,10 @@ import com.github.karlsabo.jira.config.loadJiraConfig
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.io.files.Path
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
 private const val DEFAULT_DAYS_BACK = 30
@@ -65,8 +65,8 @@ fun main(args: Array<String>) {
 private fun printMarkdownReport(
     issues: List<ProjectIssue>,
     teams: List<String>,
-    startDate: kotlinx.datetime.Instant,
-    endDate: kotlinx.datetime.Instant,
+    startDate: kotlin.time.Instant,
+    endDate: kotlin.time.Instant,
 ) {
     val startDateStr = startDate.toLocalDateTime(TimeZone.UTC).date.toString()
     val endDateStr = endDate.toLocalDateTime(TimeZone.UTC).date.toString()

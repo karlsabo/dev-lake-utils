@@ -1,6 +1,6 @@
 package com.github.karlsabo.linear.query
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /** Builder facade for Linear GraphQL queries and filters. */
 class LinearQueryBuilder(

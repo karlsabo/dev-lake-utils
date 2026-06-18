@@ -6,9 +6,9 @@ import com.github.karlsabo.github.Issue
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.tools.model.Milestone
 import com.github.karlsabo.tools.model.ProjectSummary
-import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Clock
 import com.github.karlsabo.github.User as GitHubUser
 
 class SlackMarkdownFormatterTest {

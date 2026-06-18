@@ -7,7 +7,7 @@ import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.isIssueOrBug
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.measureTime
 

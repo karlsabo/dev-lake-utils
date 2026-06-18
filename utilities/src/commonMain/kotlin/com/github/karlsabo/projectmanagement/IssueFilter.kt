@@ -1,7 +1,7 @@
 package com.github.karlsabo.projectmanagement
 
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 /**
  * A generic filter for querying issues across different project management systems.

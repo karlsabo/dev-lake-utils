@@ -8,11 +8,11 @@ import com.github.karlsabo.projectmanagement.isCompleted
 import com.github.karlsabo.projectmanagement.isIssueOrBug
 import com.github.karlsabo.tools.jiraConfigPath
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlin.math.min
+import kotlin.time.Clock
 import kotlin.time.measureTime
 
 private const val START_YEAR = 2025
@@ -92,7 +92,7 @@ private suspend fun printParents(
     jiraApi: JiraRestApi,
     parents: List<ProjectIssue>,
     userIssuesByParentKey: Map<String?, List<ProjectIssue>>,
-    startDate: kotlinx.datetime.Instant,
+    startDate: kotlin.time.Instant,
 ) {
     if (parents.isEmpty()) {
         println("No parents found for this user")
@@ -147,7 +147,7 @@ private data class ParentContribution(
     fun summaryLine(): String = "  * $userCompletedCount/$totalCompletedCount $percentageByUser%"
 }
 
-private fun printCompletedIssue(issue: ProjectIssue, startDate: kotlinx.datetime.Instant) {
+private fun printCompletedIssue(issue: ProjectIssue, startDate: kotlin.time.Instant) {
     issue.completedAt?.takeIf { it >= startDate } ?: return
     println("  * ${issue.key} - ${issue.title ?: "Untitled"}")
     printDescription(issue.description)

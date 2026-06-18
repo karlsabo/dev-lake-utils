@@ -1,7 +1,7 @@
 package com.github.karlsabo.projectmanagement
 
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 /**
  * A unified representation of a comment across different project management systems (Jira, Linear, etc.).

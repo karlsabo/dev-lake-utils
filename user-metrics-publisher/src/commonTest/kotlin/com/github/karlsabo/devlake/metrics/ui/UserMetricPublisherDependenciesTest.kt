@@ -29,11 +29,11 @@ import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
 import com.github.karlsabo.projectmanagement.ProjectMilestone
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
 import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
+import kotlin.time.Instant
 
 class UserMetricPublisherDependenciesTest {
 

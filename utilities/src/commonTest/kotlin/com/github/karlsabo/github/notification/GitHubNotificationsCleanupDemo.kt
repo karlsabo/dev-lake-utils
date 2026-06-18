@@ -6,8 +6,8 @@ import com.github.karlsabo.github.NotificationProcessingResult
 import com.github.karlsabo.github.config.loadGitHubConfig
 import com.github.karlsabo.tools.gitHubConfigPath
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
 import kotlinx.io.files.Path
+import kotlin.time.Instant
 
 fun main() {
     println("GitHub Notifications Demo")

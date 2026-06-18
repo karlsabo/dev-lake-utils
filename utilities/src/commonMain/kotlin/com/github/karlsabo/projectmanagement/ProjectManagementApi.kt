@@ -1,7 +1,7 @@
 package com.github.karlsabo.projectmanagement
 
 import com.github.karlsabo.dto.User
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A unified interface for project management operations that can be implemented

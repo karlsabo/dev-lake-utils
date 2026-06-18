@@ -1,7 +1,7 @@
 package com.github.karlsabo.tools
 
 import com.github.karlsabo.pagerduty.PagerDutyIncident
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration
 
 internal suspend fun fetchPagerDutyIncidents(

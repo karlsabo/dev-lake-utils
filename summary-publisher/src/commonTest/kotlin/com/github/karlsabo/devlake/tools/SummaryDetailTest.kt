@@ -23,14 +23,14 @@ import com.github.karlsabo.tools.SummarySources
 import com.github.karlsabo.tools.createSummary
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import com.github.karlsabo.github.Issue as GitHubIssue
 import com.github.karlsabo.github.User as GitHubUser
 

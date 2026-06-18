@@ -4,11 +4,11 @@ import com.github.karlsabo.devlake.metrics.model.UserMetrics
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.github.GitHubPullRequestSearchApi
 import com.github.karlsabo.projectmanagement.ProjectManagementApi
-import kotlinx.datetime.Clock.System
-import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock.System
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 object MetricsService {
     suspend fun createUserMetrics(

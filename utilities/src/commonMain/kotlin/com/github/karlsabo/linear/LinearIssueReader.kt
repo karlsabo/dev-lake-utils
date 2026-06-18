@@ -5,8 +5,8 @@ import com.github.karlsabo.linear.conversion.toProjectIssue
 import com.github.karlsabo.linear.query.LinearQueryBuilder
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.tools.lenientJson
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonNull
+import kotlin.time.Instant
 
 internal class LinearIssueReader(
     private val graphQlClient: LinearGraphQlClient,

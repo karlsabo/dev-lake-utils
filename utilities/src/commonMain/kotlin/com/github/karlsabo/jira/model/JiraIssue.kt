@@ -3,9 +3,9 @@ package com.github.karlsabo.jira.model
 import com.github.karlsabo.jira.serialization.CustomInstantSerializer
 import io.ktor.http.Url
 import io.ktor.http.hostWithPort
-import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 @Serializable
 data class Issue(
