@@ -134,6 +134,22 @@ Field meanings:
 - `localRepositories`: local repository roots managed by Eng Hub; each entry has an absolute `path` and optional `setupCommands`
 - `setupShell`: login shell used to run setup commands
 
+Setup commands run from the created worktree directory. Before the shell runs, Eng Hub expands these literal placeholders:
+
+- `$root-repo-dir`: the configured local repository root path
+- `$worktree-dir`: the created or reused worktree path
+
+Example setup command:
+
+```json
+"setupCommands": [
+  "cp \"$root-repo-dir/.env.example\" \"$worktree-dir/.env\"",
+  "direnv allow"
+]
+```
+
+Quote placeholders the same way you would quote normal paths in shell commands.
+
 ### First run behavior
 
 If `eng-hub-config.json` is missing or invalid, the app creates a default config file and shows an error dialog telling you to update it. The app does not continue into the main UI until configuration loads successfully.

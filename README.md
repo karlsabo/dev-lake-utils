@@ -82,6 +82,7 @@
 * [ ] Look into <https://github.com/mattpocock/skills/tree/main> for their skills
 * [ ] Look into <https://worktrunk.dev/>
 * [ ] Add a database pruning background task that runs at startup and then every hour to prune old DB entries.
+* [ ] Setup command error dialog is too cluttered to identify what failed. Need the command that failed highlighted, and maybe standard error highlighted.
 
 ## Implementation loop
 * Implement

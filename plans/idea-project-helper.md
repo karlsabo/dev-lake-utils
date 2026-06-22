@@ -1,157 +1,109 @@
 # IntelliJ IDEA project helper for worktrees
 
-**Goal**: Provide an `idea-tool source/.idea target/.idea` command that makes a new git worktree open in IntelliJ with the same useful project configuration as the base checkout without copying stale local state.
+**Goal**: Provide a KTS `idea-tool source/.idea target/.idea` command that copies the base checkout's IDEA project template into a worktree, and let Eng Hub setup commands reference the root repo and worktree paths when invoking it.
 
 **Context**:
 
 - Source request: `/Users/karl.sabo/git/dev-lake-utils/plans/idea-project-helper.md` is the repo-local plan stub for this feature.
-- `dev-lake-utils` is a Gradle/Kotlin repo with subprojects declared in `/Users/karl.sabo/git/dev-lake-utils/settings.gradle.kts`; a new executable subproject is possible but heavier than a script.
-- Existing IntelliJ-related code already lives in `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonMain/kotlin/com/github/karlsabo/intellij/ImlExcludeFolderManager.kt`, so a larger implementation should reuse or extend the `com.github.karlsabo.intellij` package rather than inventing a second IntelliJ utility area.
-- Existing worktree creation is coordinated by `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonMain/kotlin/com/github/karlsabo/git/WorktreeSetupCoordinator.kt` and called from `/Users/karl.sabo/git/dev-lake-utils/eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/LocalWorktreeFromBaseCreator.kt`; automatic Eng Hub integration should be a later story, not part of the first CLI tracer bullet.
+- A plain `cp`/`rsync` command can copy `.idea`, but path rewriting inside copied IntelliJ files is awkward without `perl`/`sed`. Keeping a small KTS script avoids fragile shell quoting and external text-rewrite commands.
+- Eng Hub config is loaded from `/Users/karl.sabo/git/dev-lake-utils/eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/EngHubConfig.kt`; local setup commands live under `LocalRepositoryConfig.setupCommands` and the local config file is `/Users/karl.sabo/Library/Application Support/DevLakeUtils/eng-hub-config.json`.
+- Configured setup commands are selected in `/Users/karl.sabo/git/dev-lake-utils/eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/WorktreeSetupCommands.kt` by matching the configured local repository path.
+- Setup commands are executed by `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonMain/kotlin/com/github/karlsabo/git/WorktreeSetupCoordinator.kt` via `ShellWorktreeSetupCommandRunner`, with `workingDirectory = request.worktreePath.value`.
+- `WorktreeSetupRequest` in `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonMain/kotlin/com/github/karlsabo/git/WorktreeSetupCoordinator.kt` already carries both `repoPath` and `worktreePath`, so it has the data needed to expand setup command placeholders.
+- Existing setup-command behavior is tested in `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonTest/kotlin/com/github/karlsabo/git/WorktreeSetupCoordinatorTest.kt`.
 - Reviewed example IDEA folders:
-  - `/Users/karl.sabo/Klaviyo/Repos/app/.idea` contains project files such as `app.iml`, `modules.xml`, `misc.xml`, shared run configs under `runConfigurations/`, plus local/transient files like `workspace.xml`, `dataSources.local.xml`, and `dataSources/`.
+  - `/Users/karl.sabo/Klaviyo/Repos/app/.idea` contains project files such as `app.iml`, `modules.xml`, `misc.xml`, shared run configs under `runConfigurations/`, plus local/template files like `workspace.xml`, `dataSources.local.xml`, and `dataSources/`.
   - `/Users/karl.sabo/Klaviyo/Repos/k-repo/.idea` contains `k-repo.iml`, `modules.xml`, project dictionaries/inspection profiles, `workspace.xml`, local data source files, and a `shelf/` directory.
   - `/Users/karl.sabo/Klaviyo/Repos/fender/.idea` contains `fender.iml`, JS/TS config XML, `modules.xml`, and `workspace.xml`.
   - `/Users/karl.sabo/Klaviyo/Repos/infrastructure-deployment/.idea` contains `infrastructure-deployment.iml`, generated `libraries/`, `modules.xml`, and `workspace.xml`.
-- `.idea/.gitignore` in `/Users/karl.sabo/Klaviyo/Repos/app/.idea/.gitignore` ignores `/workspace.xml`, `/shelf/`, `/queries/`, `/dataSources/`, `/dataSources.local.xml`, `/httpRequests/`, and `/libraries/`. Those should be treated as local state unless explicitly opted in.
+- `.idea/.gitignore` in `/Users/karl.sabo/Klaviyo/Repos/app/.idea/.gitignore` ignores `/workspace.xml`, `/shelf/`, `/queries/`, `/dataSources/`, `/dataSources.local.xml`, `/httpRequests/`, and `/libraries/`. For this workflow, those are still part of the base template and should be copied.
 - Project-level run configuration files in `/Users/karl.sabo/Klaviyo/Repos/app/.idea/runConfigurations/*.xml` use `$PROJECT_DIR$`, so they are safe to copy between worktrees.
 - `.iml` files in the reviewed projects mostly use `$MODULE_DIR$` or `$PROJECT_DIR$` macros for content roots, source roots, template folders, and exclude folders; examples include `/Users/karl.sabo/Klaviyo/Repos/app/.idea/app.iml`, `/Users/karl.sabo/Klaviyo/Repos/k-repo/.idea/k-repo.iml`, `/Users/karl.sabo/Klaviyo/Repos/fender/.idea/fender.iml`, and `/Users/karl.sabo/Klaviyo/Repos/infrastructure-deployment/.idea/infrastructure-deployment.iml`.
-- `workspace.xml` in the reviewed projects contains absolute checkout paths such as `last_opened_file_path` under the source repo. Copying it blindly risks pointing IntelliJ at the base checkout. The first version should skip it.
+- `workspace.xml` in the reviewed projects contains absolute checkout paths such as `last_opened_file_path` under the source repo. Since `workspace.xml` should be copied, source-root path rewriting belongs in the KTS script.
 
-## Draft acceptance tests
+## Decisions
 
-These are intentionally split so each story has one observable behavior.
+- Keep a small Kotlin script: `scripts/idea-tool.kts`.
+- Copy the whole source `.idea` tree by default, including `workspace.xml`, `dataSources.local.xml`, `dataSources/`, `libraries/`, and `shelf/`.
+- Overwrite copied target files by default.
+- Rewrite exact absolute source repo root strings to the target repo root in copied text files.
+- Leave `.iml` filenames alone. IntelliJ reads module file paths from `modules.xml`; renaming `.iml` files is unnecessary for same-repo worktrees.
+- Add setup-command placeholder replacement before commands are passed to the shell.
+- Use the requested placeholder tokens:
+  - `$root-repo-dir` → `WorktreeSetupRequest.repoPath`
+  - `$worktree-dir` → `WorktreeSetupRequest.worktreePath.value`
+- These are setup-command placeholders, not real shell environment variables. Hyphenated names are not valid shell variable names; replacing the literal tokens before shell execution gives the desired config syntax without shell-variable issues.
+- Keep command execution working directory as the new worktree path.
+- Do not add optional excludes, dry-run, Gradle packaging, native binaries, or Eng Hub automatic IntelliJ integration unless the simple script/config path proves insufficient.
 
-1. **Safe project config copy**
-   - Given `/tmp/base/.idea` contains `modules.xml`, `app.iml`, `misc.xml`, `runConfigurations/App_HTTP.xml`, `workspace.xml`, `dataSources.local.xml`, and `dataSources/cache.xml`, when I run `idea-tool /tmp/base/.idea /tmp/worktree/.idea`, then `/tmp/worktree/.idea` contains the project files and run configuration, but does not contain `workspace.xml`, `dataSources.local.xml`, or `dataSources/`.
+## Acceptance tests
 
-2. **Repeat runs preserve target-local state**
-   - Given `/tmp/worktree/.idea/workspace.xml` already exists with target-local IntelliJ state, when I rerun `idea-tool /tmp/base/.idea /tmp/worktree/.idea`, then `workspace.xml` is unchanged while copied project files are refreshed from `/tmp/base/.idea`.
+1. **Setup commands can reference root repo and worktree paths**
+   - Given `/Users/karl.sabo/Library/Application Support/DevLakeUtils/eng-hub-config.json` contains a local repository entry for `/tmp/base` with setup command `printf '%s\n' '$root-repo-dir|$worktree-dir' > setup-vars.txt`, when Eng Hub creates a new worktree at `/tmp/worktree`, then `/tmp/worktree/setup-vars.txt` contains `/tmp/base|/tmp/worktree`.
 
-3. **Absolute source paths are rewritten in copied files**
-   - Given a copied XML file contains `/tmp/base`, when I run `idea-tool /tmp/base/.idea /tmp/worktree/.idea`, then the output file contains `/tmp/worktree` and no `/tmp/base` references.
-
-4. **Invalid input fails without partial target changes**
-   - Given `/tmp/base/.idea` does not exist, when I run `idea-tool /tmp/base/.idea /tmp/worktree/.idea`, then the command exits non-zero, prints a clear error, and does not create `/tmp/worktree/.idea`.
-
-5. **Installable executable wrapper**
-   - Given a fresh `dev-lake-utils` checkout, when I build/install the tool through Gradle, then I can run `idea-tool /tmp/base/.idea /tmp/worktree/.idea` without invoking the Kotlin script path directly.
-
-6. **Eng Hub automatic copy after worktree creation**
-   - Given Eng Hub creates a worktree from `/Users/karl.sabo/Klaviyo/Repos/app`, when creation succeeds, then the new worktree gets safe IDEA project config copied from the base worktree before Eng Hub reports the worktree ready.
+2. **KTS script copies a base `.idea` template into a worktree**
+   - Given `/tmp/base/.idea` contains `modules.xml`, `app.iml`, `misc.xml`, `runConfigurations/App_HTTP.xml`, `workspace.xml`, `dataSources.local.xml`, `dataSources/cache.xml`, `libraries/sdk.xml`, and `shelf/shelved.patch`, and `/tmp/base/.idea/workspace.xml` contains `/tmp/base`, and `/tmp/worktree/.idea/workspace.xml` already exists with old content, when I run `kotlin scripts/idea-tool.kts /tmp/base/.idea /tmp/worktree/.idea`, then `/tmp/worktree/.idea` contains all source files, existing copied files are overwritten, and copied text files contain `/tmp/worktree` instead of `/tmp/base`.
 
 ## Stories
 
-### 1. Safe project config copy with a Kotlin script
+### 1. Expand root and worktree path placeholders in setup commands
 
-**Acceptance criteria:** Given `/tmp/base/.idea` contains `modules.xml`, `app.iml`, `misc.xml`, `runConfigurations/App_HTTP.xml`, `workspace.xml`, `dataSources.local.xml`, and `dataSources/cache.xml`, when I run `idea-tool /tmp/base/.idea /tmp/worktree/.idea`, then `/tmp/worktree/.idea` contains the project files and run configuration, but does not contain `workspace.xml`, `dataSources.local.xml`, or `dataSources/`.
+**Status:** Done.
+
+**Acceptance criteria:** Given a configured setup command contains `$root-repo-dir` and `$worktree-dir`, when Eng Hub runs setup for a created worktree, then the command executed by the setup shell contains the repository root path and created worktree path in place of those placeholders.
 
 **Expected edits:**
-- `/Users/karl.sabo/git/dev-lake-utils/scripts/idea-tool.main.kts` or equivalent script path.
-- `/Users/karl.sabo/git/dev-lake-utils/plans/idea-project-helper.md` for the repo-local plan/usage notes.
-- `/Users/karl.sabo/git/dev-lake-utils/README.md` only if we want the command discoverable immediately.
+- `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonMain/kotlin/com/github/karlsabo/git/WorktreeSetupCoordinator.kt`
+- `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonTest/kotlin/com/github/karlsabo/git/WorktreeSetupCoordinatorTest.kt`
+- `/Users/karl.sabo/git/dev-lake-utils/eng-hub/README.md` or `/Users/karl.sabo/git/dev-lake-utils/README.md` for setup command examples
+- `/Users/karl.sabo/git/dev-lake-utils/plans/idea-project-helper.md`
 
 **Scope:**
-- In: copy files/directories recursively from source `.idea` to target `.idea`.
+- In: replace literal `$root-repo-dir` with `request.repoPath` before building the shell script.
+- In: replace literal `$worktree-dir` with `request.worktreePath.value` before building the shell script.
+- In: add tests for placeholder expansion in setup command script generation or command runner behavior.
+- In: document a setup command example that invokes the KTS IDEA copy script.
+- Out: adding real process environment variables.
+- Out: automatic Eng Hub-specific IntelliJ integration.
+- Out: `.iml` renaming, optional excludes, dry-run, Gradle packaging, or native binaries.
+
+**Notes:**
+- Example config command after story 2 exists:
+
+  ```bash
+  kotlin /Users/karl.sabo/git/dev-lake-utils/scripts/idea-tool.kts "$root-repo-dir/.idea" "$worktree-dir/.idea"
+  ```
+
+- The placeholders are replaced before shell execution, so quoting them like normal path strings is still important.
+
+### 2. KTS script copies IDEA project template into a worktree
+
+**Acceptance criteria:** Given the `.idea` acceptance-test fixture above, when I run `kotlin scripts/idea-tool.kts /tmp/base/.idea /tmp/worktree/.idea`, then the target `.idea` is a refreshed copy of the source `.idea` with absolute source repo paths rewritten to the target repo path.
+
+**Expected edits:**
+- `/Users/karl.sabo/git/dev-lake-utils/scripts/idea-tool.kts`
+- `/Users/karl.sabo/git/dev-lake-utils/README.md` or `/Users/karl.sabo/git/dev-lake-utils/eng-hub/README.md`
+- `/Users/karl.sabo/git/dev-lake-utils/plans/idea-project-helper.md`
+
+**Scope:**
+- In: recursively copy every file and directory from source `.idea` to target `.idea`.
+- In: create target `.idea` if missing.
+- In: overwrite copied target files by default.
 - In: infer source repo root as parent of source `.idea` and target repo root as parent of target `.idea`.
-- In: default skip list based on reviewed `.idea/.gitignore`: `workspace.xml`, `shelf/`, `queries/`, `dataSources/`, `dataSources.local.xml`, `httpRequests/`, `libraries/`.
-- In: create target `.idea` when absent.
-- Out: Gradle packaging, Eng Hub integration, project/module renaming, and opt-in copying of local state.
+- In: rewrite exact absolute source repo root strings to the target repo root in copied text files.
+- In: basic argument validation: source exists, source/target paths are named `.idea`, and source/target are not the same path.
+- In: usage notes showing manual invocation and Eng Hub setup-command invocation using `$root-repo-dir` and `$worktree-dir`.
+- Out: optional excludes, dry-run, merge behavior, `.iml` renaming, Gradle packaging, native binaries, and Eng Hub code changes.
 
 **Notes:**
-- Start with a script as the tracer bullet. A subproject is overkill until the copy rules need real tests, XML parsing, or distribution.
-- Evidence for skip list: `/Users/karl.sabo/Klaviyo/Repos/app/.idea/.gitignore`.
-- Evidence that useful shared config lives outside skipped state: `/Users/karl.sabo/Klaviyo/Repos/app/.idea/runConfigurations/App_HTTP.xml`, `/Users/karl.sabo/Klaviyo/Repos/app/.idea/modules.xml`, `/Users/karl.sabo/Klaviyo/Repos/app/.idea/app.iml`.
+- Copying ignored IntelliJ files is intentional because the base checkout acts as the worktree template.
+- Evidence for copied template content: `/Users/karl.sabo/Klaviyo/Repos/app/.idea/workspace.xml`, `/Users/karl.sabo/Klaviyo/Repos/app/.idea/dataSources.local.xml`, `/Users/karl.sabo/Klaviyo/Repos/app/.idea/dataSources/`, `/Users/karl.sabo/Klaviyo/Repos/app/.idea/runConfigurations/App_HTTP.xml`, `/Users/karl.sabo/Klaviyo/Repos/app/.idea/modules.xml`, `/Users/karl.sabo/Klaviyo/Repos/app/.idea/app.iml`.
 
-### 2. Preserve target-local IntelliJ state on repeat runs
+## Deferred / rejected for now
 
-**Acceptance criteria:** Given `/tmp/worktree/.idea/workspace.xml` already exists with target-local IntelliJ state, when I rerun `idea-tool /tmp/base/.idea /tmp/worktree/.idea`, then `workspace.xml` is unchanged while copied project files are refreshed from `/tmp/base/.idea`.
-
-**Expected edits:**
-- `/Users/karl.sabo/git/dev-lake-utils/scripts/idea-tool.main.kts`.
-- Add fixture-style script tests if the script has a test harness, or documented manual verification in `/Users/karl.sabo/git/dev-lake-utils/plans/idea-project-helper.md`.
-
-**Scope:**
-- In: skipped files/directories in the target are never deleted or overwritten.
-- In: copied files are overwritten from source by default.
-- Out: merge behavior for XML files.
-
-**Notes:**
-- This protects `workspace.xml`, `dataSources.local.xml`, and generated `libraries/`, which are present in reviewed repos and are local/transient.
-
-### 3. Rewrite absolute source-root paths in copied text files
-
-**Acceptance criteria:** Given a copied XML file contains `/tmp/base`, when I run `idea-tool /tmp/base/.idea /tmp/worktree/.idea`, then the output file contains `/tmp/worktree` and no `/tmp/base` references.
-
-**Expected edits:**
-- `/Users/karl.sabo/git/dev-lake-utils/scripts/idea-tool.main.kts` initially.
-- If this becomes non-trivial, move logic into `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonMain/kotlin/com/github/karlsabo/intellij/` with tests under `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonTest/kotlin/com/github/karlsabo/intellij/`.
-
-**Scope:**
-- In: text-file replacement of source repo root with target repo root after copying.
-- In: report replacements to stdout.
-- Out: parsing every IntelliJ XML schema.
-
-**Notes:**
-- Most reviewed project files use `$PROJECT_DIR$`/`$MODULE_DIR$`, but `/Users/karl.sabo/Klaviyo/Repos/app/.idea/workspace.xml` and other workspace files contain absolute paths. Skipping `workspace.xml` avoids the worst case, but a rewrite pass makes the tool safer for future project files.
-
-### 4. Fail safely on invalid input
-
-**Acceptance criteria:** Given `/tmp/base/.idea` does not exist, when I run `idea-tool /tmp/base/.idea /tmp/worktree/.idea`, then the command exits non-zero, prints a clear error, and does not create `/tmp/worktree/.idea`.
-
-**Expected edits:**
-- `/Users/karl.sabo/git/dev-lake-utils/scripts/idea-tool.main.kts`.
-
-**Scope:**
-- In: validate source path exists and is a directory named `.idea`.
-- In: validate target path ends in `.idea`.
-- In: stage copy into a temporary directory before replacing/writing target files where practical.
-- Out: rollback for every possible filesystem failure.
-
-**Notes:**
-- This is the first edge-path story. Do it after the happy path and repeat-run behavior are proven.
-
-### 5. Promote to a Gradle-backed executable only if the script becomes painful
-
-**Acceptance criteria:** Given a fresh `dev-lake-utils` checkout, when I build/install the tool through Gradle, then I can run `idea-tool /tmp/base/.idea /tmp/worktree/.idea` without invoking the Kotlin script path directly.
-
-**Expected edits:**
-- `/Users/karl.sabo/git/dev-lake-utils/settings.gradle.kts` to include a new subproject, likely `idea-tool`.
-- `/Users/karl.sabo/git/dev-lake-utils/idea-tool/idea-tool.gradle.kts`.
-- `/Users/karl.sabo/git/dev-lake-utils/idea-tool/src/jvmMain/kotlin/...` for CLI entrypoint if JVM distribution is enough.
-- `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonMain/kotlin/com/github/karlsabo/intellij/` for reusable copy/path-rewrite logic.
-- `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonTest/kotlin/com/github/karlsabo/intellij/` for tests.
-
-**Scope:**
-- In: installable command wrapper with the same behavior as the script.
-- In: tests for copy, skip, idempotence, and path rewrite if logic moves out of the script.
-- Out: native binaries for every OS unless JVM startup/distribution is actually a problem.
-
-**Notes:**
-- Don't start here. The requested behavior can be proven with a script. A subproject adds Gradle/config churn before we know the rules are right.
-- Existing Gradle subproject layout is in `/Users/karl.sabo/git/dev-lake-utils/settings.gradle.kts` and shared conventions are under `/Users/karl.sabo/git/dev-lake-utils/buildSrc/src/main/kotlin/`.
-
-### 6. Copy IDEA project config automatically from Eng Hub worktree creation
-
-**Acceptance criteria:** Given Eng Hub creates a worktree from `/Users/karl.sabo/Klaviyo/Repos/app`, when creation succeeds, then the new worktree gets safe IDEA project config copied from the base worktree before Eng Hub reports the worktree ready.
-
-**Expected edits:**
-- `/Users/karl.sabo/git/dev-lake-utils/utilities/src/commonMain/kotlin/com/github/karlsabo/git/WorktreeSetupCoordinator.kt` or a collaborator called by it.
-- `/Users/karl.sabo/git/dev-lake-utils/eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/LocalWorktreeFromBaseCreator.kt` if the base `.idea` path should be passed from UI/worktree request state.
-- `/Users/karl.sabo/git/dev-lake-utils/eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubLocalWorktreeCreateHappyPathViewModelTest.kt` or adjacent tests.
-
-**Scope:**
-- In: after successful worktree creation, copy from `baseWorktreePath/.idea` to `worktreePath/.idea` using the already-proven safe-copy behavior.
-- In: surface copy failures as setup failures or warnings; decide before implementation.
-- Out: changing worktree creation itself.
-
-**Notes:**
-- Do this after the CLI behavior is stable. It couples IntelliJ-specific behavior to Eng Hub worktree setup, so it should be reversible and probably configurable.
-
-## Open questions
-
-1. Should the first version ever copy ignored/local IntelliJ state (`workspace.xml`, `dataSources.local.xml`, `dataSources/`, `libraries/`, `shelf/`), or is skipping them always correct?
-2. Should the tool rename the module file/project identity for the target worktree, or is copying `app.iml` into an `app-some-branch` worktree acceptable?
-3. Should overwriting copied target project files be the default, or should the command require `--force` once target `.idea` exists?
-4. Do you want this run manually only, via configured Eng Hub setup commands, or automatically as part of Eng Hub worktree creation?
-5. Is a JVM Gradle executable good enough if we promote from KTS, or do you specifically need native binaries for macOS/Linux/Windows?
+- **Real shell environment variables named `root-repo-dir` / `worktree-dir`**: rejected because hyphens are not valid shell variable names. Literal placeholder substitution gives the requested config syntax without shell-variable issues.
+- **Optional excludes / dry-run**: not needed for the current problem. Add only if full template copy proves noisy.
+- **Rename `.iml` files to match worktree directory names**: rejected for now. IntelliJ uses `modules.xml` to locate module files. Keeping `.idea/app.iml` for every `app` worktree is simpler and should work.
+- **Preserve target-local `workspace.xml` on rerun**: rejected. The accepted behavior is template refresh with overwrite.
+- **Automatic Eng Hub IntelliJ integration**: deferred. User-configured setup commands are enough.
+- **Gradle/native executable packaging**: deferred. Only revisit if the KTS script becomes hard to maintain or distribute. If revived, it should produce Linux, macOS, and Windows executables.

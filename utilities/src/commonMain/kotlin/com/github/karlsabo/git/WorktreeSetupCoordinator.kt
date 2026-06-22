@@ -101,7 +101,7 @@ class ShellWorktreeSetupCommandRunner : WorktreeSetupCommandRunner {
         }
 
         val result = executeCommand(
-            command = listOf(request.setupShell, "-l", "-c", buildWorktreeSetupScript(request.setupCommands)),
+            command = listOf(request.setupShell, "-l", "-c", buildWorktreeSetupScript(request)),
             workingDirectory = request.worktreePath.value,
         )
         if (result.exitCode != 0) {
@@ -280,6 +280,10 @@ class WorktreeSetupCoordinator private constructor(
     }
 }
 
+fun buildWorktreeSetupScript(request: WorktreeSetupRequest): String = buildWorktreeSetupScript(
+    request.setupCommands.map { command -> command.expandWorktreeSetupPlaceholders(request) },
+)
+
 fun buildWorktreeSetupScript(commands: List<String>): String = buildString {
     appendLine("setup_exit_code=0")
     commands.forEach { command ->
@@ -291,4 +295,77 @@ fun buildWorktreeSetupScript(commands: List<String>): String = buildString {
         )
     }
     append($$"exit \"$setup_exit_code\"")
+}
+
+private fun String.expandWorktreeSetupPlaceholders(request: WorktreeSetupRequest): String = expandShellPlaceholders(
+    mapOf(
+        $$"$root-repo-dir" to request.repoPath,
+        $$"$worktree-dir" to request.worktreePath.value,
+    ),
+)
+
+private enum class ShellQuoteContext {
+    UNQUOTED,
+    SINGLE_QUOTED,
+    DOUBLE_QUOTED,
+}
+
+private fun String.expandShellPlaceholders(replacements: Map<String, String>): String {
+    val expanded = StringBuilder()
+    var quoteContext = ShellQuoteContext.UNQUOTED
+    var index = 0
+
+    while (index < length) {
+        val replacement = replacements.entries.firstOrNull { (placeholder, _) -> startsWith(placeholder, index) }
+        if (replacement != null) {
+            expanded.append(replacement.value.escapeForShellContext(quoteContext))
+            index += replacement.key.length
+            continue
+        }
+
+        val char = this[index]
+        expanded.append(char)
+        when (quoteContext) {
+            ShellQuoteContext.UNQUOTED -> when (char) {
+                '\'' -> quoteContext = ShellQuoteContext.SINGLE_QUOTED
+                '"' -> quoteContext = ShellQuoteContext.DOUBLE_QUOTED
+                '\\' -> {
+                    index += 1
+                    if (index < length) expanded.append(this[index])
+                }
+            }
+            ShellQuoteContext.SINGLE_QUOTED -> if (char == '\'') {
+                quoteContext = ShellQuoteContext.UNQUOTED
+            }
+            ShellQuoteContext.DOUBLE_QUOTED -> when (char) {
+                '"' -> quoteContext = ShellQuoteContext.UNQUOTED
+                '\\' -> {
+                    index += 1
+                    if (index < length) expanded.append(this[index])
+                }
+            }
+        }
+        index += 1
+    }
+
+    return expanded.toString()
+}
+
+private fun String.escapeForShellContext(context: ShellQuoteContext): String = when (context) {
+    ShellQuoteContext.UNQUOTED -> shellQuote()
+    ShellQuoteContext.SINGLE_QUOTED -> escapeForSingleQuotedShell()
+    ShellQuoteContext.DOUBLE_QUOTED -> escapeForDoubleQuotedShell()
+}
+
+private fun String.shellQuote(): String = "'${escapeForSingleQuotedShell()}'"
+
+private fun String.escapeForSingleQuotedShell(): String = replace("'", "'\\''")
+
+private fun String.escapeForDoubleQuotedShell(): String = buildString(length) {
+    this@escapeForDoubleQuotedShell.forEach { char ->
+        when (char) {
+            '$', '`', '"', '\\' -> append('\\')
+        }
+        append(char)
+    }
 }

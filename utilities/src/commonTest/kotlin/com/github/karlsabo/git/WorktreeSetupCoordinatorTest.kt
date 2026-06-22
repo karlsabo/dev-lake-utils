@@ -1,5 +1,6 @@
 package com.github.karlsabo.git
 
+import com.github.karlsabo.system.executeCommand
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -316,6 +317,64 @@ private fun assertWaitingForRepository(fixture: RepositorySerializationFixture) 
 }
 
 class WorktreeSetupCoordinatorTest {
+    @Test
+    fun setupScriptExpandsRootAndWorktreePlaceholders() {
+        val repoPath = "/tmp/base"
+        val worktreePath = "/tmp/worktree"
+        val request = WorktreeSetupRequest(
+            repoPath = repoPath,
+            worktreePath = WorktreePath(worktreePath),
+            setupShell = "/bin/sh",
+            setupCommands = listOf(
+                "printf '%s\\n' '${'$'}root-repo-dir|${'$'}worktree-dir' > setup-vars.txt",
+            ),
+        )
+
+        val script = buildWorktreeSetupScript(request)
+
+        assertTrue("printf '%s\\n' '$repoPath|$worktreePath' > setup-vars.txt" in script)
+        assertFalse($$"$root-repo-dir" in script)
+        assertFalse($$"$worktree-dir" in script)
+    }
+
+    @Test
+    fun setupScriptEscapesDoubleQuotedPlaceholderValuesBeforeShellParsing() {
+        val repoPath = "/tmp/root-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
+        val worktreePath = "/tmp/worktree-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
+        val request = WorktreeSetupRequest(
+            repoPath = repoPath,
+            worktreePath = WorktreePath(worktreePath),
+            setupShell = "/bin/sh",
+            setupCommands = listOf(
+                "printf '%s\\n' \"${'$'}root-repo-dir|${'$'}worktree-dir\"",
+            ),
+        )
+
+        val result = executeCommand(listOf("/bin/sh", "-c", buildWorktreeSetupScript(request)), workingDirectory = null)
+
+        assertEquals(0, result.exitCode, result.stderr)
+        assertEquals("$repoPath|$worktreePath\n", result.stdout)
+    }
+
+    @Test
+    fun setupScriptEscapesSingleQuotedPlaceholderValuesBeforeShellParsing() {
+        val repoPath = "/tmp/root-'quote'-${'$'}UNEXPANDED-`echo wrong`"
+        val worktreePath = "/tmp/worktree-'quote'-${'$'}UNEXPANDED-`echo wrong`"
+        val request = WorktreeSetupRequest(
+            repoPath = repoPath,
+            worktreePath = WorktreePath(worktreePath),
+            setupShell = "/bin/sh",
+            setupCommands = listOf(
+                "printf '%s\\n' '${'$'}root-repo-dir|${'$'}worktree-dir'",
+            ),
+        )
+
+        val result = executeCommand(listOf("/bin/sh", "-c", buildWorktreeSetupScript(request)), workingDirectory = null)
+
+        assertEquals(0, result.exitCode, result.stderr)
+        assertEquals("$repoPath|$worktreePath\n", result.stdout)
+    }
+
     @Test
     fun duplicateSetupRequestsForSameWorktreeShareHandleAndRunUnderlyingSetupOnce() = runBlocking {
         val repoPath = "/repos/dev-lake-utils"

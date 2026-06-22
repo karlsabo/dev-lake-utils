@@ -49,7 +49,7 @@ fun parseOffsetDateTime(dateString: String): Instant {
 
 object CustomInstantSerializer : KSerializer<Instant> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("kotlin.time.Instant", PrimitiveKind.STRING)
+        PrimitiveSerialDescriptor("com.github.karlsabo.jira.serialization.CustomInstant", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): Instant {
         val rawString = decoder.decodeString()
