@@ -217,6 +217,43 @@ class GitWorktreeServiceHierarchyTest {
     }
 
     @Test
+    fun inferWorktreeParentBranches_usesFirstVisibleEquivalentAncestorAsParent() {
+        val fake = FakeGitCommandApi()
+        val repoPath = "/repos/app"
+        val childBranch = "202605-IAM-1227-migrate-app-notary"
+        val firstParentBranch = "202605_IAM-1226-app-global-notary-secrets"
+        val laterEquivalentBranch = "202606-IAM-1229-app-request-notary-migration"
+        val equivalentCommit = "a3fba4e9cc3352549e81b04892767aa0c2bfca7c"
+        fake.worktreeListResult = """
+            worktree /repos/app-202605-IAM-1227-migrate-app-notary
+            HEAD d4f7aa1
+            branch refs/heads/$childBranch
+
+            worktree /repos/app-202605_IAM-1226-app-global-notary-secrets
+            HEAD $equivalentCommit
+            branch refs/heads/$firstParentBranch
+
+            worktree /repos/app-202606-IAM-1229-app-request-notary-migration
+            HEAD $equivalentCommit
+            branch refs/heads/$laterEquivalentBranch
+        """.trimIndent()
+        fake.isAncestorAction = { _, ancestorRef, descendantRef ->
+            when (ancestorRef to descendantRef) {
+                "refs/heads/$firstParentBranch" to "refs/heads/$childBranch" -> true
+                "refs/heads/$laterEquivalentBranch" to "refs/heads/$childBranch" -> true
+                "refs/heads/$firstParentBranch" to "refs/heads/$laterEquivalentBranch" -> true
+                "refs/heads/$laterEquivalentBranch" to "refs/heads/$firstParentBranch" -> true
+                else -> false
+            }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val parents = service.inferWorktreeParentBranches(repoPath)
+
+        assertEquals(mapOf(childBranch to firstParentBranch), parents)
+    }
+
+    @Test
     fun inferWorktreeParentBranches_leavesAmbiguousNearestAncestorWithoutParent() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"

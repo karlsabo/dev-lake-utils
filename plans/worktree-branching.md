@@ -98,7 +98,9 @@ then the rows render in parent-before-child order with depths `branch-a: 0`, `br
 
 ## Story / PR plan
 
-### 1. Show a child under the first equivalent visible parent branch
+### 1. Show a child under the first equivalent visible parent branch — Done
+
+**Done:** 2026 06 22
 
 **Acceptance criteria:** Given the Worktree panel shows the confirmed app worktree shape where `202605_IAM-1226-app-global-notary-secrets` and `202606-IAM-1229-app-request-notary-migration` point at the same commit and are both ancestors of `202605-IAM-1227-migrate-app-notary`, when the repository is expanded, then `202605-IAM-1227-migrate-app-notary` appears nested under `202605_IAM-1226-app-global-notary-secrets`.
 

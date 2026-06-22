@@ -13,7 +13,6 @@
 
 # TODO
 
-* [x] Add a Kotlin script to copy a root checkout `.idea` template into a worktree: `kotlin scripts/idea-tool.kts root/.idea worktree/.idea`.
 * [ ] Fix detekt to support Compose: https://detekt.dev/docs/introduction/compose/
     * Fix ktlint to support Compose: https://mrmans0n.github.io/compose-rules/ktlint/
 * [ ] Worktrees should start expanded
