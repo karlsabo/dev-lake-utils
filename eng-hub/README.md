@@ -148,7 +148,7 @@ Example setup command:
 ]
 ```
 
-The same placeholders can pass both paths to setup tools, such as the planned IntelliJ IDEA template helper:
+The same placeholders can pass both paths to setup tools, such as the IntelliJ IDEA template helper:
 
 ```json
 "setupCommands": [
@@ -157,6 +157,16 @@ The same placeholders can pass both paths to setup tools, such as the planned In
 ```
 
 Quote placeholders the same way you would quote normal paths in shell commands.
+
+### IntelliJ IDEA project template helper
+
+To manually refresh a worktree's `.idea` directory from the root checkout template:
+
+```bash
+kotlin /Users/you/git/dev-lake-utils/scripts/idea-tool.kts /Users/you/git/example-repo/.idea /Users/you/git/example-repo-worktree/.idea
+```
+
+The helper copies the full source `.idea` tree, overwrites copied target files, and rewrites exact absolute root-checkout path strings in UTF-8 text files to the worktree path.
 
 ### First run behavior
 

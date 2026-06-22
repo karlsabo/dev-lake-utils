@@ -76,7 +76,9 @@
 
 - The placeholders are replaced before shell execution, so quoting them like normal path strings is still important.
 
-### 2. KTS script copies IDEA project template into a worktree
+### 2. KTS script copies IDEA project template into a worktree - Done
+
+**Status:** Done.
 
 **Acceptance criteria:** Given the `.idea` acceptance-test fixture above, when I run `kotlin scripts/idea-tool.kts /tmp/base/.idea /tmp/worktree/.idea`, then the target `.idea` is a refreshed copy of the source `.idea` with absolute source repo paths rewritten to the target repo path.
 
