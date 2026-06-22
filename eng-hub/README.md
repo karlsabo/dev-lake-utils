@@ -148,6 +148,14 @@ Example setup command:
 ]
 ```
 
+The same placeholders can pass both paths to setup tools, such as the planned IntelliJ IDEA template helper:
+
+```json
+"setupCommands": [
+  "kotlin /Users/you/git/dev-lake-utils/scripts/idea-tool.kts \"$root-repo-dir/.idea\" \"$worktree-dir/.idea\""
+]
+```
+
 Quote placeholders the same way you would quote normal paths in shell commands.
 
 ### First run behavior

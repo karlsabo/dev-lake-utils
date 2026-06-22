@@ -46,7 +46,7 @@
 
 ## Stories
 
-### 1. Expand root and worktree path placeholders in setup commands
+### 1. Expand root and worktree path placeholders in setup commands - Done
 
 **Status:** Done.
 

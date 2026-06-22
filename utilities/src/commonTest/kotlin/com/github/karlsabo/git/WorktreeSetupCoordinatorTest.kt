@@ -14,6 +14,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -335,6 +339,37 @@ class WorktreeSetupCoordinatorTest {
         assertTrue("printf '%s\\n' '$repoPath|$worktreePath' > setup-vars.txt" in script)
         assertFalse($$"$root-repo-dir" in script)
         assertFalse($$"$worktree-dir" in script)
+    }
+
+    @Test
+    fun setupRunsPlaceholderExpandedCommandsInWorktreeDirectory() = runBlocking {
+        val repoPath = createArchiveWorktreeTempDir()
+        val worktreePath = createArchiveWorktreeTempDir()
+        try {
+            val coordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = FakeGitWorktreeApi(),
+                setupCommandRunner = ShellWorktreeSetupCommandRunner(),
+                scope = this,
+            )
+            val request = WorktreeSetupRequest(
+                repoPath = repoPath,
+                worktreePath = WorktreePath(worktreePath),
+                setupShell = "/bin/sh",
+                setupCommands = listOf(
+                    "printf '%s\\n' '${'$'}root-repo-dir|${'$'}worktree-dir' > setup-vars.txt",
+                ),
+            )
+
+            coordinator.setup(request).await()
+
+            val setupVars = SystemFileSystem.source(Path(worktreePath, "setup-vars.txt")).buffered().use {
+                it.readString()
+            }
+            assertEquals("$repoPath|$worktreePath\n", setupVars)
+        } finally {
+            removeTempDir(repoPath)
+            removeTempDir(worktreePath)
+        }
     }
 
     @Test
