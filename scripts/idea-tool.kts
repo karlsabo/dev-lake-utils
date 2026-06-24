@@ -27,7 +27,9 @@ root. Existing target files are left untouched when the resulting content is
 unchanged.
 """.trimIndent()
 
-private class UsageError(message: String) : RuntimeException(message)
+private class UsageError(
+    message: String,
+) : RuntimeException(message)
 
 private fun fail(message: String): Nothing = throw UsageError("$message\n\n$usage")
 
@@ -122,7 +124,25 @@ private val volatileIdeaTopLevelPaths = setOf(
 private data class TargetFileContent(
     val bytes: ByteArray,
     val differsFromSource: Boolean,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as TargetFileContent
+
+        if (differsFromSource != other.differsFromSource) return false
+        if (!bytes.contentEquals(other.bytes)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = differsFromSource.hashCode()
+        result = 31 * result + bytes.contentHashCode()
+        return result
+    }
+}
 
 private fun copyIdeaFile(
     sourcePath: Path,

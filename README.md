@@ -15,6 +15,7 @@
 
 * [ ] Fix detekt to support Compose: https://detekt.dev/docs/introduction/compose/
     * Fix ktlint to support Compose: https://mrmans0n.github.io/compose-rules/ktlint/
+* [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] After hitting the approve button on a Notification, once the notifications refresh again all those notifications reappear.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on
@@ -38,7 +39,6 @@
 * [ ] Have the GH API for getting notifications return each page as it loads one, so maybe use a kotlinx coroutine channel. that way the UI is more responsive and doesn't have to wait for all notifications to load before it can start displaying some.
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.
-* [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] When setting up worktrees, do we have to disable all setup buttons? It would be great to set up multiple worktrees at a time.
 * [ ] Add information log in the app, like app notifications, so we can see what has happened, when a worktree is created, archived, etc.
 * [ ] Add the ability to put worktrees into categories
