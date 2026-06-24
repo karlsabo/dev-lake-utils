@@ -643,7 +643,19 @@ private data class GitWorktreeParentCandidate(
     val branch: String?,
     val ref: String,
     val commitHash: String? = null,
-)
+) {
+    fun sameCommitAs(other: GitWorktreeParentCandidate): Boolean = commitHash != null && commitHash == other.commitHash
+}
+
+private fun parentCandidates(
+    child: GitWorktreeParentCandidate,
+    visibleBranches: List<GitWorktreeParentCandidate>,
+    defaultBranchRef: String?,
+): List<GitWorktreeParentCandidate> = visibleBranches
+    .filter { it.branch != child.branch }
+    .filterNot { it.sameCommitAs(child) }
+    .plus(defaultBranchRef?.let { GitWorktreeParentCandidate(branch = null, ref = it) })
+    .filterNotNull()
 
 private class GitWorktreeParentInferer(
     private val gitCommandApi: GitCommandApi,
@@ -681,26 +693,14 @@ private class GitWorktreeParentInferer(
         child: GitWorktreeParentCandidate,
         visibleBranches: List<GitWorktreeParentCandidate>,
         defaultBranchRef: String?,
-    ): String? {
-        return parentCandidates(child, visibleBranches, defaultBranchRef)
-            .ancestorCandidatesOrNull(repoPath, child.ref)
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { ancestors -> dropVisibleCommitDuplicates(ancestors) }
-            ?.let { ancestors -> dropDefaultRefDuplicates(repoPath, ancestors) }
-            ?.let { uniqueAncestors -> nearestAncestorsOrNull(repoPath, uniqueAncestors) }
-            ?.singleOrNull()
-            ?.branch
-    }
-
-    private fun parentCandidates(
-        child: GitWorktreeParentCandidate,
-        visibleBranches: List<GitWorktreeParentCandidate>,
-        defaultBranchRef: String?,
-    ): List<GitWorktreeParentCandidate> = visibleBranches
-        .filter { it.branch != child.branch }
-        .filterNot { it.hasSameKnownCommit(child) }
-        .plus(defaultBranchRef?.let { GitWorktreeParentCandidate(branch = null, ref = it) })
-        .filterNotNull()
+    ): String? = parentCandidates(child, visibleBranches, defaultBranchRef)
+        .ancestorCandidatesOrNull(repoPath, child.ref)
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { ancestors -> dropVisibleCommitDuplicates(ancestors) }
+        ?.let { ancestors -> dropDefaultRefDuplicates(repoPath, ancestors) }
+        ?.let { uniqueAncestors -> nearestAncestorsOrNull(repoPath, uniqueAncestors) }
+        ?.singleOrNull()
+        ?.branch
 
     private fun List<GitWorktreeParentCandidate>.ancestorCandidatesOrNull(
         repoPath: String,
@@ -793,10 +793,6 @@ private class GitWorktreeParentInferer(
             }
         return if (hasFailure) null else hasEquivalent
     }
-
-    private fun GitWorktreeParentCandidate.hasSameKnownCommit(
-        other: GitWorktreeParentCandidate,
-    ): Boolean = commitHash != null && commitHash == other.commitHash
 
     private fun fetchRemoteBestEffort(repoPath: String, remote: String) {
         try {

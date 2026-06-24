@@ -20,9 +20,11 @@ Arguments:
   source .idea  Existing .idea directory from the root checkout.
   target .idea  .idea directory to create or refresh in the worktree.
 
-The script copies every file and directory from source to target, overwrites copied
-files, and rewrites exact absolute source repository root strings in UTF-8 text files
-to the target repository root.
+The script copies reusable project-template files, skips worktree-local IntelliJ
+state such as workspace.xml, shelf/, and dataSources*, and rewrites exact absolute
+source repository root strings in copied UTF-8 text files to the target repository
+root. Existing target files are left untouched when the resulting content is
+unchanged.
 """.trimIndent()
 
 private class UsageError(message: String) : RuntimeException(message)
@@ -87,48 +89,106 @@ private fun copyIdeaTemplate(sourceIdea: Path, targetIdea: Path) {
     Files.walk(sourceIdea).use { sourcePaths ->
         sourcePaths.forEach { sourcePath ->
             val relativePath = sourceIdea.relativize(sourcePath)
+            if (isVolatileIdeaPath(relativePath)) return@forEach
+
             val targetPath = targetIdea.resolve(relativePath)
 
             if (Files.isDirectory(sourcePath, LinkOption.NOFOLLOW_LINKS)) {
                 Files.createDirectories(targetPath)
             } else {
-                targetPath.parent?.let(Files::createDirectories)
-                Files.copy(
-                    sourcePath,
-                    targetPath,
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.COPY_ATTRIBUTES,
-                    LinkOption.NOFOLLOW_LINKS,
-                )
-                rewriteSourceRootInTextFile(targetPath, sourceRepoRoot, targetRepoRoot)
+                copyIdeaFile(sourcePath, targetPath, sourceRepoRoot, targetRepoRoot)
             }
         }
     }
 }
 
-private fun rewriteSourceRootInTextFile(path: Path, sourceRepoRoot: String, targetRepoRoot: String) {
-    if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return
+private fun isVolatileIdeaPath(relativePath: Path): Boolean {
+    if (relativePath.nameCount == 0) return false
 
-    val text = readUtf8Text(path) ?: return
-    if (!text.contains(sourceRepoRoot)) return
+    val firstName = relativePath.getName(0).toString()
+    return firstName in volatileIdeaTopLevelPaths
+}
 
-    Files.writeString(
-        path,
-        text.replace(sourceRepoRoot, targetRepoRoot),
-        StandardCharsets.UTF_8,
-        StandardOpenOption.TRUNCATE_EXISTING,
+private val volatileIdeaTopLevelPaths = setOf(
+    "workspace.xml",
+    "shelf",
+    "dataSources",
+    "dataSources.xml",
+    "dataSources.local.xml",
+    "tasks.xml",
+    "usage.statistics.xml",
+)
+
+private data class TargetFileContent(
+    val bytes: ByteArray,
+    val differsFromSource: Boolean,
+)
+
+private fun copyIdeaFile(
+    sourcePath: Path,
+    targetPath: Path,
+    sourceRepoRoot: String,
+    targetRepoRoot: String,
+) {
+    targetPath.parent?.let(Files::createDirectories)
+
+    val targetContent = targetFileContent(sourcePath, sourceRepoRoot, targetRepoRoot)
+    if (targetContent != null && hasSameContent(targetPath, targetContent.bytes)) return
+
+    Files.copy(
+        sourcePath,
+        targetPath,
+        StandardCopyOption.REPLACE_EXISTING,
+        StandardCopyOption.COPY_ATTRIBUTES,
+        LinkOption.NOFOLLOW_LINKS,
+    )
+
+    if (targetContent?.differsFromSource == true) {
+        Files.write(
+            targetPath,
+            targetContent.bytes,
+            StandardOpenOption.TRUNCATE_EXISTING,
+        )
+    }
+}
+
+private fun targetFileContent(
+    sourcePath: Path,
+    sourceRepoRoot: String,
+    targetRepoRoot: String,
+): TargetFileContent? {
+    if (!Files.isRegularFile(sourcePath, LinkOption.NOFOLLOW_LINKS)) return null
+
+    val sourceBytes = Files.readAllBytes(sourcePath)
+    val rewrittenText = rewriteSourceRootInUtf8Text(sourceBytes, sourceRepoRoot, targetRepoRoot)
+        ?: return TargetFileContent(sourceBytes, differsFromSource = false)
+    val rewrittenBytes = rewrittenText.toByteArray(StandardCharsets.UTF_8)
+
+    return TargetFileContent(
+        bytes = rewrittenBytes,
+        differsFromSource = !rewrittenBytes.contentEquals(sourceBytes),
     )
 }
 
-private fun readUtf8Text(path: Path): String? {
-    val bytes = Files.readAllBytes(path)
+private fun hasSameContent(path: Path, bytes: ByteArray): Boolean {
+    if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return false
+
+    return Files.readAllBytes(path).contentEquals(bytes)
+}
+
+private fun rewriteSourceRootInUtf8Text(
+    bytes: ByteArray,
+    sourceRepoRoot: String,
+    targetRepoRoot: String,
+): String? {
     val decoder = StandardCharsets.UTF_8
         .newDecoder()
         .onMalformedInput(CodingErrorAction.REPORT)
         .onUnmappableCharacter(CodingErrorAction.REPORT)
 
     return try {
-        decoder.decode(ByteBuffer.wrap(bytes)).toString()
+        val text = decoder.decode(ByteBuffer.wrap(bytes)).toString()
+        if (text.contains(sourceRepoRoot)) text.replace(sourceRepoRoot, targetRepoRoot) else null
     } catch (_: CharacterCodingException) {
         null
     }

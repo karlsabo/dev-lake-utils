@@ -38,36 +38,6 @@ internal data class VisibleWorktreeRow(
     val nestingDepth: Int,
 )
 
-internal fun visibleWorktreeRows(worktrees: List<LocalWorktreeUiState>): List<VisibleWorktreeRow> {
-    val visibleRows = if (worktrees.hasValidParentBranchNesting()) {
-        worktrees.asNestedRows()
-    } else {
-        worktrees.map { worktree -> VisibleWorktreeRow(worktree = worktree, nestingDepth = 0) }
-    }
-    return visibleRows
-}
-
-private fun List<LocalWorktreeUiState>.hasValidParentBranchNesting(): Boolean {
-    val parentBranches = mapNotNull { it.parentBranch }
-    val branchCounts = groupingBy { it.branch }.eachCount()
-    val parentBranchByBranch = associate { it.branch to it.parentBranch }
-    return parentBranches.isNotEmpty() &&
-        parentBranches.all { branchCounts[it] == 1 } &&
-        none { worktree -> worktree.parentBranch?.let { parentBranchByBranch[it] != null } == true }
-}
-
-private fun List<LocalWorktreeUiState>.asNestedRows(): List<VisibleWorktreeRow> {
-    val childrenByParentBranch = filter { it.parentBranch != null }.groupBy { it.parentBranch }
-    return buildList {
-        this@asNestedRows.filter { it.parentBranch == null }.forEach { worktree ->
-            add(VisibleWorktreeRow(worktree = worktree, nestingDepth = 0))
-            childrenByParentBranch[worktree.branch].orEmpty().forEach { child ->
-                add(VisibleWorktreeRow(worktree = child, nestingDepth = 1))
-            }
-        }
-    }
-}
-
 internal fun visibleRepositoryMenuActions(repository: LocalRepositoryUiState): List<RepositoryMenuAction> = buildList {
     if (repository.path.isNotBlank()) add(RepositoryMenuAction.CreateWorktree)
 }

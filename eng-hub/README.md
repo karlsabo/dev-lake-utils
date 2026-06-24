@@ -148,11 +148,13 @@ Example setup command:
 ]
 ```
 
-The same placeholders can pass both paths to setup tools, such as the IntelliJ IDEA template helper:
+The same placeholders can pass both paths to setup tools, such as the safe IntelliJ IDEA template helper. Run it
+before `idea ./` when you want reusable project settings seeded before IntelliJ opens the worktree:
 
 ```json
 "setupCommands": [
-  "kotlin /Users/you/git/dev-lake-utils/scripts/idea-tool.kts \"$root-repo-dir/.idea\" \"$worktree-dir/.idea\""
+  "kotlin /Users/you/git/dev-lake-utils/scripts/idea-tool.kts \"$root-repo-dir/.idea\" \"$worktree-dir/.idea\"",
+  "idea ./"
 ]
 ```
 
@@ -166,7 +168,29 @@ To manually refresh a worktree's `.idea` directory from the root checkout templa
 kotlin /Users/you/git/dev-lake-utils/scripts/idea-tool.kts /Users/you/git/example-repo/.idea /Users/you/git/example-repo-worktree/.idea
 ```
 
-The helper copies the full source `.idea` tree, overwrites copied target files, and rewrites exact absolute root-checkout path strings in UTF-8 text files to the worktree path.
+The helper copies reusable project-template files from the source `.idea` tree and rewrites exact absolute
+root-checkout path strings in UTF-8 text files to the worktree path. It intentionally does not copy worktree-local
+IntelliJ state such as `workspace.xml`, `shelf/`, `dataSources/`, `dataSources.xml`, or `dataSources.local.xml`
+because those files can contain project identity, window/session state, shelves, and personal database connection state
+from another checkout.
+
+Unchanged target files are left untouched during refresh, so repeatedly running the helper before `idea ./` does not
+update modification times for stable project files that already have the right content.
+
+If an existing worktree was initialized by an older helper version that copied the full `.idea` directory, close IntelliJ
+first, then optionally remove only the volatile local state from that worktree:
+
+```bash
+WORKTREE=/Users/you/git/example-repo-worktree
+rm -f "$WORKTREE/.idea/workspace.xml"
+rm -f "$WORKTREE/.idea/dataSources.xml"
+rm -f "$WORKTREE/.idea/dataSources.local.xml"
+rm -rf "$WORKTREE/.idea/shelf"
+rm -rf "$WORKTREE/.idea/dataSources"
+```
+
+Do not run this blindly if you need existing shelves or local database connections from that worktree; move those files
+aside instead. The helper does not delete them automatically.
 
 ### First run behavior
 
