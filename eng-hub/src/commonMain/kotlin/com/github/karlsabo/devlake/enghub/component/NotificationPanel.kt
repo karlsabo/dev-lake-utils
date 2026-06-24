@@ -24,12 +24,12 @@ internal fun NotificationUiState.checkoutSetupStatus(
 ): WorktreeSetupStatus? = headRef?.let { setupStatusFor(repositoryFullName, it) }
 
 @Composable
-fun notificationPanel(
+fun NotificationPanel(
     notificationsResult: Result<List<NotificationUiState>>?,
     actions: NotificationActions,
     setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
-    actingOnThreadIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
+    actingOnThreadIds: Set<String> = emptySet(),
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (notificationsResult == null) {
@@ -48,7 +48,7 @@ fun notificationPanel(
                     val listState = rememberLazyListState()
                     LazyColumn(state = listState) {
                         items(notifications, key = { it.notificationThreadId }) { notification ->
-                            notificationItem(
+                            NotificationItem(
                                 notification = notification,
                                 actions = actions,
                                 setupStatus = notification.checkoutSetupStatus(setupStatusFor),

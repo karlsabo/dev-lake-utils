@@ -2,33 +2,33 @@ package com.github.karlsabo.devlake.enghub.screen
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.github.karlsabo.devlake.enghub.component.NotificationPanel
+import com.github.karlsabo.devlake.enghub.component.PullRequestPanel
+import com.github.karlsabo.devlake.enghub.component.WorktreePanel
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
-import com.github.karlsabo.devlake.enghub.component.notificationPanel
-import com.github.karlsabo.devlake.enghub.component.pullRequestPanel
-import com.github.karlsabo.devlake.enghub.component.worktreePanel
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
 @Composable
-internal fun engHubPaneContent(
+internal fun EngHubPaneContent(
     state: EngHubScreenState,
     actions: EngHubScreenActions,
     modifier: Modifier = Modifier,
 ) {
     when (state.selectedPane) {
-        EngHubPane.PullRequests -> pullRequestsPane(
+        EngHubPane.PullRequests -> PullRequestsPane(
             state = state.pullRequests,
             actions = actions,
             modifier = modifier,
         )
 
-        EngHubPane.Notifications -> notificationsPane(
+        EngHubPane.Notifications -> NotificationsPane(
             state = state.notifications,
             actions = actions,
             modifier = modifier,
         )
 
-        EngHubPane.Worktrees -> worktreesPane(
+        EngHubPane.Worktrees -> WorktreesPane(
             state = state.worktrees,
             actions = actions,
             modifier = modifier,
@@ -37,12 +37,12 @@ internal fun engHubPaneContent(
 }
 
 @Composable
-private fun pullRequestsPane(
+private fun PullRequestsPane(
     state: PullRequestsPaneState,
     actions: EngHubScreenActions,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
-    pullRequestPanel(
+    PullRequestPanel(
         pullRequestsResult = state.result,
         onOpenInBrowser = actions.pullRequests.onOpenInBrowser,
         onCheckoutAndOpen = actions.pullRequests.onCheckoutAndOpen,
@@ -52,12 +52,12 @@ private fun pullRequestsPane(
 }
 
 @Composable
-private fun notificationsPane(
+private fun NotificationsPane(
     state: NotificationsPaneState,
     actions: EngHubScreenActions,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
-    notificationPanel(
+    NotificationPanel(
         notificationsResult = state.result,
         actions = actions.notifications,
         setupStatusFor = state.setupStatuses.setupStatusFor(actions.checkoutWorktreePath),
@@ -67,12 +67,12 @@ private fun notificationsPane(
 }
 
 @Composable
-private fun worktreesPane(
+private fun WorktreesPane(
     state: WorktreePanelState,
     actions: EngHubScreenActions,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
-    worktreePanel(
+    WorktreePanel(
         state = state,
         actions = actions.worktrees,
         modifier = modifier,

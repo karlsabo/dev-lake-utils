@@ -8,17 +8,18 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.github.karlsabo.devlake.metrics.ui.components.metricsPreview
+import com.github.karlsabo.devlake.metrics.ui.components.MetricsPreview
 
 @Composable
-fun userMetricPublisherScreen(
+fun UserMetricPublisherScreen(
     metricsPreviewText: String,
     publishButtonText: String,
     publishButtonEnabled: Boolean,
     onPublishClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     MaterialTheme {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Button(
                     onClick = onPublishClick,
@@ -27,7 +28,7 @@ fun userMetricPublisherScreen(
                     Text(publishButtonText)
                 }
 
-                metricsPreview(
+                MetricsPreview(
                     text = metricsPreviewText,
                     modifier = Modifier.weight(1f),
                 )

@@ -48,9 +48,10 @@ private data class ReviewDialogActions(
 )
 
 @Composable
-fun reviewDialog(
+fun ReviewDialog(
     onSubmit: (event: ReviewStateValue, reviewComment: String?) -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var selectedEvent by remember { mutableStateOf(ReviewStateValue.COMMENTED) }
     var reviewComment by remember { mutableStateOf("") }
@@ -62,8 +63,8 @@ fun reviewDialog(
         visible = true,
     ) {
         MaterialTheme {
-            Surface {
-                reviewDialogContent(
+            Surface(modifier = modifier) {
+                ReviewDialogContent(
                     state = ReviewDialogState(
                         selectedEvent = selectedEvent,
                         reviewComment = reviewComment,
@@ -81,7 +82,7 @@ fun reviewDialog(
 }
 
 @Composable
-private fun reviewDialogContent(
+private fun ReviewDialogContent(
     state: ReviewDialogState,
     actions: ReviewDialogActions,
 ) {
@@ -93,17 +94,17 @@ private fun reviewDialogContent(
     ) {
         Text(text = "Review Type", style = MaterialTheme.typography.h6)
         Spacer(modifier = Modifier.height(8.dp))
-        reviewEventOptions(
+        ReviewEventOptions(
             selectedEvent = state.selectedEvent,
             onSelectedEventChange = actions.onSelectedEventChange,
         )
         Spacer(modifier = Modifier.height(12.dp))
-        reviewCommentField(
+        ReviewCommentField(
             reviewComment = state.reviewComment,
             onReviewCommentChange = actions.onReviewCommentChange,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        reviewDialogButtons(
+        ReviewDialogButtons(
             selectedEvent = state.selectedEvent,
             reviewComment = state.reviewComment,
             onSubmit = actions.onSubmit,
@@ -113,7 +114,7 @@ private fun reviewDialogContent(
 }
 
 @Composable
-private fun reviewEventOptions(
+private fun ReviewEventOptions(
     selectedEvent: ReviewStateValue,
     onSelectedEventChange: (ReviewStateValue) -> Unit,
 ) {
@@ -129,7 +130,7 @@ private fun reviewEventOptions(
 }
 
 @Composable
-private fun reviewCommentField(
+private fun ReviewCommentField(
     reviewComment: String,
     onReviewCommentChange: (String) -> Unit,
 ) {
@@ -142,7 +143,7 @@ private fun reviewCommentField(
 }
 
 @Composable
-private fun reviewDialogButtons(
+private fun ReviewDialogButtons(
     selectedEvent: ReviewStateValue,
     reviewComment: String,
     onSubmit: () -> Unit,

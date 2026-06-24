@@ -21,15 +21,16 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
 @Composable
-fun notificationItem(
+fun NotificationItem(
     notification: NotificationUiState,
     actions: NotificationActions,
     setupStatus: WorktreeSetupStatus?,
+    modifier: Modifier = Modifier,
     actionInProgress: Boolean = false,
 ) {
     var showReviewDialog by remember { mutableStateOf(false) }
 
-    notificationReviewDialog(
+    NotificationReviewDialog(
         visible = showReviewDialog && notification.apiUrl != null,
         notification = notification,
         actions = actions,
@@ -37,18 +38,18 @@ fun notificationItem(
     )
 
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         elevation = 2.dp,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            notificationDetails(
+            NotificationDetails(
                 notification = notification,
                 modifier = Modifier.weight(1f),
             )
-            notificationActionButtons(
+            NotificationActionButtons(
                 notification = notification,
                 actions = actions,
                 setupStatus = setupStatus,
@@ -60,7 +61,7 @@ fun notificationItem(
 }
 
 @Composable
-private fun notificationReviewDialog(
+private fun NotificationReviewDialog(
     visible: Boolean,
     notification: NotificationUiState,
     actions: NotificationActions,
@@ -68,7 +69,7 @@ private fun notificationReviewDialog(
 ) {
     if (!visible) return
 
-    reviewDialog(
+    ReviewDialog(
         onSubmit = { event, body ->
             actions.onSubmitReview(notification, event, body)
             onDismiss()
@@ -78,7 +79,7 @@ private fun notificationReviewDialog(
 }
 
 @Composable
-private fun notificationDetails(
+private fun NotificationDetails(
     notification: NotificationUiState,
     modifier: Modifier = Modifier,
 ) {
@@ -93,7 +94,7 @@ private fun notificationDetails(
 }
 
 @Composable
-private fun notificationActionButtons(
+private fun NotificationActionButtons(
     notification: NotificationUiState,
     actions: NotificationActions,
     setupStatus: WorktreeSetupStatus?,
@@ -103,16 +104,16 @@ private fun notificationActionButtons(
     val setupInProgress = setupStatus != null
 
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        notificationOpenButton(notification, actions, actionInProgress)
-        notificationSetupButton(notification, actions, setupStatus, setupInProgress, actionInProgress)
-        notificationReviewButtons(notification, actions, actionInProgress, onShowReviewDialog)
-        notificationDoneButton(notification, actions, actionInProgress)
-        notificationUnsubscribeButton(notification, actions, actionInProgress)
+        NotificationOpenButton(notification, actions, actionInProgress)
+        NotificationSetupButton(notification, actions, setupStatus, setupInProgress, actionInProgress)
+        NotificationReviewButtons(notification, actions, actionInProgress, onShowReviewDialog)
+        NotificationDoneButton(notification, actions, actionInProgress)
+        NotificationUnsubscribeButton(notification, actions, actionInProgress)
     }
 }
 
 @Composable
-private fun notificationOpenButton(
+private fun NotificationOpenButton(
     notification: NotificationUiState,
     actions: NotificationActions,
     actionInProgress: Boolean,
@@ -128,7 +129,7 @@ private fun notificationOpenButton(
 }
 
 @Composable
-private fun notificationSetupButton(
+private fun NotificationSetupButton(
     notification: NotificationUiState,
     actions: NotificationActions,
     setupStatus: WorktreeSetupStatus?,
@@ -147,7 +148,7 @@ private fun notificationSetupButton(
 }
 
 @Composable
-private fun notificationReviewButtons(
+private fun NotificationReviewButtons(
     notification: NotificationUiState,
     actions: NotificationActions,
     actionInProgress: Boolean,
@@ -155,22 +156,24 @@ private fun notificationReviewButtons(
 ) {
     if (!notification.isPullRequest || notification.apiUrl == null) return
 
-    Button(
-        onClick = { actions.onApprove(notification) },
-        enabled = !actionInProgress,
-    ) {
-        Text("Approve")
-    }
-    Button(
-        onClick = onShowReviewDialog,
-        enabled = !actionInProgress,
-    ) {
-        Text("Review")
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Button(
+            onClick = { actions.onApprove(notification) },
+            enabled = !actionInProgress,
+        ) {
+            Text("Approve")
+        }
+        Button(
+            onClick = onShowReviewDialog,
+            enabled = !actionInProgress,
+        ) {
+            Text("Review")
+        }
     }
 }
 
 @Composable
-private fun notificationDoneButton(
+private fun NotificationDoneButton(
     notification: NotificationUiState,
     actions: NotificationActions,
     actionInProgress: Boolean,
@@ -185,7 +188,7 @@ private fun notificationDoneButton(
 }
 
 @Composable
-private fun notificationUnsubscribeButton(
+private fun NotificationUnsubscribeButton(
     notification: NotificationUiState,
     actions: NotificationActions,
     actionInProgress: Boolean,

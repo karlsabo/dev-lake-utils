@@ -86,7 +86,7 @@ fun main() {
     System.setProperty("apple.awt.application.name", ENG_HUB_DISPLAY_NAME)
     setDockIcon()
     application {
-        engHub(onExitApplication = ::exitApplication)
+        EngHub(onExitApplication = ::exitApplication)
     }
 }
 

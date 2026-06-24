@@ -29,9 +29,10 @@ import dev_lake_utils.shared_resources.generated.resources.icon
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun errorDialog(
+fun ErrorDialog(
     message: String,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     DialogWindow(
         onCloseRequest = onDismiss,
@@ -41,7 +42,7 @@ fun errorDialog(
         state = rememberDialogState(width = 720.dp, height = 520.dp),
     ) {
         MaterialTheme {
-            Surface {
+            Surface(modifier = modifier) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -50,7 +51,7 @@ fun errorDialog(
                 ) {
                     Text(text = "Error", style = MaterialTheme.typography.h6)
                     Spacer(modifier = Modifier.height(8.dp))
-                    errorMessageBody(
+                    ErrorMessageBody(
                         message = message,
                         modifier = Modifier.weight(1f),
                     )
@@ -65,7 +66,7 @@ fun errorDialog(
 }
 
 @Composable
-private fun errorMessageBody(
+private fun ErrorMessageBody(
     message: String,
     modifier: Modifier = Modifier,
 ) {

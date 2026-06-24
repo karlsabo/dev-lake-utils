@@ -34,12 +34,12 @@ private data class ConfirmationWorktreeDialogActions(
 )
 
 @Composable
-internal fun archiveWorktreeDialog(
+internal fun ArchiveWorktreeDialog(
     worktreePath: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    confirmationWorktreeDialog(
+    ConfirmationWorktreeDialog(
         state = ConfirmationWorktreeDialogState(
             title = "Archive Worktree",
             message = "Remove this worktree and delete any leftover checkout directory?",
@@ -54,12 +54,12 @@ internal fun archiveWorktreeDialog(
 }
 
 @Composable
-internal fun forceArchiveWorktreeDialog(
+internal fun ForceArchiveWorktreeDialog(
     worktreePath: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    confirmationWorktreeDialog(
+    ConfirmationWorktreeDialog(
         state = ConfirmationWorktreeDialogState(
             title = "Force Archive Worktree",
             message = "This worktree has local changes. Force removal will discard them.",
@@ -74,7 +74,7 @@ internal fun forceArchiveWorktreeDialog(
 }
 
 @Composable
-private fun confirmationWorktreeDialog(
+private fun ConfirmationWorktreeDialog(
     state: ConfirmationWorktreeDialogState,
     actions: ConfirmationWorktreeDialogActions,
 ) {
@@ -86,14 +86,14 @@ private fun confirmationWorktreeDialog(
     ) {
         MaterialTheme {
             Surface {
-                confirmationWorktreeDialogContent(state = state, actions = actions)
+                ConfirmationWorktreeDialogContent(state = state, actions = actions)
             }
         }
     }
 }
 
 @Composable
-private fun confirmationWorktreeDialogContent(
+private fun ConfirmationWorktreeDialogContent(
     state: ConfirmationWorktreeDialogState,
     actions: ConfirmationWorktreeDialogActions,
 ) {

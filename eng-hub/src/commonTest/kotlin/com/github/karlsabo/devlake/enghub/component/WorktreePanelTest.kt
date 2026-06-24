@@ -26,7 +26,7 @@ class WorktreePanelTest {
     fun rebaseNeededWorktreeRowRendersIndicatorLabel() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                localWorktreeRow(
+                LocalWorktreeRow(
                     state = rebaseNeededRow(),
                     onOpen = {},
                     onArchive = {},
@@ -43,7 +43,7 @@ class WorktreePanelTest {
     fun rebasingWorktreeRowRendersProgressLabel() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                localWorktreeRow(
+                LocalWorktreeRow(
                     state = upToDateRow().copy(isRebasing = true),
                     onOpen = {},
                     onArchive = {},
@@ -60,7 +60,7 @@ class WorktreePanelTest {
     fun upToDateWorktreeRowDoesNotRenderRebaseNeededIndicatorLabel() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                localWorktreeRow(
+                LocalWorktreeRow(
                     state = upToDateRow(),
                     onOpen = {},
                     onArchive = {},
@@ -171,7 +171,7 @@ class WorktreePanelTest {
         val rebaseRequests = mutableListOf<Unit>()
         setContent {
             MaterialTheme {
-                localWorktreeRow(
+                LocalWorktreeRow(
                     state = LocalWorktreeRowState(
                         worktree = LocalWorktreeUiState(
                             branch = "feature/stacked-pr",

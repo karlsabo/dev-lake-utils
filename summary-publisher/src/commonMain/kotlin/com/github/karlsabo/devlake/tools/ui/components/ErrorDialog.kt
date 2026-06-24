@@ -16,16 +16,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 
 @Composable
-fun errorDialog(
+fun ErrorDialog(
     message: String,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     DialogWindow(
         onCloseRequest = onDismiss,
         title = "Error",
         visible = true,
     ) {
-        Surface {
+        Surface(modifier = modifier) {
             Column(
                 modifier = Modifier
                     .padding(16.dp)

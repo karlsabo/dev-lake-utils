@@ -11,8 +11,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import com.github.karlsabo.devlake.enghub.component.errorDialog
-import com.github.karlsabo.devlake.enghub.screen.engHubScreen
+import com.github.karlsabo.devlake.enghub.component.ErrorDialog
+import com.github.karlsabo.devlake.enghub.screen.EngHubScreen
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
 import com.github.karlsabo.system.DesktopAppBootstrapResult
 import com.github.karlsabo.system.runDesktopAppBootstrap
@@ -25,7 +25,7 @@ import org.jetbrains.compose.resources.painterResource
 private val logger = KotlinLogging.logger {}
 
 @Composable
-fun engHub(onExitApplication: () -> Unit) {
+fun EngHub(onExitApplication: () -> Unit) {
     var isLoadingConfiguration by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf("") }
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
@@ -35,7 +35,7 @@ fun engHub(onExitApplication: () -> Unit) {
         when (
             val result = runDesktopAppBootstrap(
                 logger = logger,
-                description = "engHub configuration $engHubConfigPath",
+                description = "EngHub configuration $engHubConfigPath",
                 load = ::loadEngHubDependencies,
                 buildErrorMessage = ::buildEngHubConfigurationErrorMessage,
             )
@@ -59,7 +59,7 @@ fun engHub(onExitApplication: () -> Unit) {
     }
 
     if (!isLoadingConfiguration && isDisplayErrorDialog) {
-        errorDialog(
+        ErrorDialog(
             message = errorMessage,
             onDismiss = onExitApplication,
         )
@@ -78,7 +78,7 @@ fun engHub(onExitApplication: () -> Unit) {
         ),
     ) {
         viewModel?.let { vm ->
-            engHubScreen(viewModel = vm)
+            EngHubScreen(viewModel = vm)
         }
     }
 }

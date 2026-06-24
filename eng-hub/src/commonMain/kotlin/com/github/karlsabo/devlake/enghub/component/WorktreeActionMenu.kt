@@ -18,7 +18,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun localWorktreeActionMenu(
+internal fun LocalWorktreeActionMenu(
     state: LocalWorktreeRowState,
     actions: LocalWorktreeRowActions,
 ) {
@@ -39,7 +39,7 @@ internal fun localWorktreeActionMenu(
             onDismissRequest = { menuExpanded = false },
         ) {
             visibleWorktreeMenuActions(state.worktree).forEach { action ->
-                localWorktreeMenuItem(
+                LocalWorktreeMenuItem(
                     action = action,
                     state = state,
                     rowActions = actions,
@@ -51,22 +51,22 @@ internal fun localWorktreeActionMenu(
 }
 
 @Composable
-private fun localWorktreeMenuItem(
+private fun LocalWorktreeMenuItem(
     action: WorktreeMenuAction,
     state: LocalWorktreeRowState,
     rowActions: LocalWorktreeRowActions,
     onMenuDismiss: () -> Unit,
 ) {
     when (action) {
-        WorktreeMenuAction.Open -> openWorktreeMenuItem(state, rowActions, onMenuDismiss)
-        WorktreeMenuAction.CreateWorktree -> createWorktreeMenuItem(state, rowActions, onMenuDismiss)
-        WorktreeMenuAction.RebaseOntoParent -> rebaseOntoParentMenuItem(state, rowActions, onMenuDismiss)
-        WorktreeMenuAction.Archive -> archiveWorktreeMenuItem(state, rowActions, onMenuDismiss)
+        WorktreeMenuAction.Open -> OpenWorktreeMenuItem(state, rowActions, onMenuDismiss)
+        WorktreeMenuAction.CreateWorktree -> CreateWorktreeMenuItem(state, rowActions, onMenuDismiss)
+        WorktreeMenuAction.RebaseOntoParent -> RebaseOntoParentMenuItem(state, rowActions, onMenuDismiss)
+        WorktreeMenuAction.Archive -> ArchiveWorktreeMenuItem(state, rowActions, onMenuDismiss)
     }
 }
 
 @Composable
-private fun openWorktreeMenuItem(
+private fun OpenWorktreeMenuItem(
     state: LocalWorktreeRowState,
     rowActions: LocalWorktreeRowActions,
     onMenuDismiss: () -> Unit,
@@ -83,7 +83,7 @@ private fun openWorktreeMenuItem(
 }
 
 @Composable
-private fun createWorktreeMenuItem(
+private fun CreateWorktreeMenuItem(
     state: LocalWorktreeRowState,
     rowActions: LocalWorktreeRowActions,
     onMenuDismiss: () -> Unit,
@@ -100,7 +100,7 @@ private fun createWorktreeMenuItem(
 }
 
 @Composable
-private fun rebaseOntoParentMenuItem(
+private fun RebaseOntoParentMenuItem(
     state: LocalWorktreeRowState,
     rowActions: LocalWorktreeRowActions,
     onMenuDismiss: () -> Unit,
@@ -117,7 +117,7 @@ private fun rebaseOntoParentMenuItem(
 }
 
 @Composable
-private fun archiveWorktreeMenuItem(
+private fun ArchiveWorktreeMenuItem(
     state: LocalWorktreeRowState,
     rowActions: LocalWorktreeRowActions,
     onMenuDismiss: () -> Unit,

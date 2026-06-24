@@ -52,6 +52,7 @@ spotless {
     kotlin {
         target("buildSrc/src/**/*.kt", "*/src/**/*.kt")
         ktlint(libs.versions.ktlint.get())
+            .customRuleSets(listOf("io.nlopez.compose.rules:ktlint:${libs.versions.composeRulesKtlint.get()}"))
     }
 
     kotlinGradle {

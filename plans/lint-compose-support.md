@@ -66,7 +66,7 @@ The detekt docs recommend these Compose-specific adjustments:
 - `UnusedPrivateMember`: add `Preview` to `ignoreAnnotated`.
 - `TooManyFunctions`: add `Preview` to `ignoreAnnotatedFunctions`.
 
-### 2. Add compose-rules to ktlint through Spotless
+### 2. Add compose-rules to ktlint through Spotless — Done
 
 **Acceptance criteria:** Given Compose UI code exists in `UserMetricPublisherScreen`, when `./gradlew spotlessKotlinCheck` runs, then Spotless invokes ktlint with compose-rules loaded and reports real Compose lint violations.
 

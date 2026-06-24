@@ -20,7 +20,7 @@ internal fun PullRequestUiState.checkoutSetupStatus(
 ): WorktreeSetupStatus? = headRef?.let { setupStatusFor(repositoryFullName, it) }
 
 @Composable
-fun pullRequestPanel(
+fun PullRequestPanel(
     pullRequestsResult: Result<List<PullRequestUiState>>?,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
@@ -43,7 +43,7 @@ fun pullRequestPanel(
                 } else {
                     LazyColumn {
                         items(pullRequests, key = { it.number }) { pr ->
-                            pullRequestItem(
+                            PullRequestItem(
                                 pr = pr,
                                 onOpenInBrowser = onOpenInBrowser,
                                 onCheckoutAndOpen = onCheckoutAndOpen,

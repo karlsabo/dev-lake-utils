@@ -32,7 +32,7 @@ internal data class LocalWorktreeRowActions(
 )
 
 @Composable
-internal fun localWorktreeRow(
+internal fun LocalWorktreeRow(
     state: LocalWorktreeRowState,
     onOpen: () -> Unit,
     onArchive: () -> Unit,
@@ -50,21 +50,21 @@ internal fun localWorktreeRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(modifier = Modifier.width(worktreeRowIndentDp(state.nestingDepth).dp))
-        worktreeDirtyIndicator(state.worktree)
+        WorktreeDirtyIndicator(state.worktree)
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = state.worktree.branch,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.body2,
         )
-        worktreeRebaseNeededIndicator(state.worktree)
-        worktreeProgressLabels(state.setupStatus, state.isArchiving, state.isRebasing)
-        localWorktreeActionMenu(state = state, actions = actions)
+        WorktreeRebaseNeededIndicator(state.worktree)
+        WorktreeProgressLabels(state.setupStatus, state.isArchiving, state.isRebasing)
+        LocalWorktreeActionMenu(state = state, actions = actions)
     }
 }
 
 @Composable
-private fun worktreeDirtyIndicator(worktree: LocalWorktreeUiState) {
+private fun WorktreeDirtyIndicator(worktree: LocalWorktreeUiState) {
     Text(
         text = if (worktree.isDirty) "🟡" else "🟢",
         modifier = Modifier.semantics {
@@ -75,34 +75,38 @@ private fun worktreeDirtyIndicator(worktree: LocalWorktreeUiState) {
 }
 
 @Composable
-private fun worktreeRebaseNeededIndicator(worktree: LocalWorktreeUiState) {
+private fun WorktreeRebaseNeededIndicator(worktree: LocalWorktreeUiState) {
     if (worktree.needsRebase) {
-        Text(
-            text = "Rebase needed",
-            modifier = Modifier.semantics { contentDescription = "Rebase needed" },
-            style = MaterialTheme.typography.caption,
-            color = MaterialTheme.colors.error,
-        )
-        Spacer(modifier = Modifier.width(8.dp))
+        Row {
+            Text(
+                text = "Rebase needed",
+                modifier = Modifier.semantics { contentDescription = "Rebase needed" },
+                style = MaterialTheme.typography.caption,
+                color = MaterialTheme.colors.error,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
     }
 }
 
 @Composable
-private fun worktreeProgressLabels(
+private fun WorktreeProgressLabels(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
     isRebasing: Boolean,
 ) {
-    setupStatus?.let {
-        Text(text = it.setupStatusLabel(), style = MaterialTheme.typography.caption)
-        Spacer(modifier = Modifier.width(8.dp))
-    }
-    if (isArchiving) {
-        Text(text = "Archiving...", style = MaterialTheme.typography.caption)
-        Spacer(modifier = Modifier.width(8.dp))
-    }
-    if (isRebasing) {
-        Text(text = "Rebasing...", style = MaterialTheme.typography.caption)
-        Spacer(modifier = Modifier.width(8.dp))
+    Row {
+        setupStatus?.let {
+            Text(text = it.setupStatusLabel(), style = MaterialTheme.typography.caption)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        if (isArchiving) {
+            Text(text = "Archiving...", style = MaterialTheme.typography.caption)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        if (isRebasing) {
+            Text(text = "Rebasing...", style = MaterialTheme.typography.caption)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
     }
 }

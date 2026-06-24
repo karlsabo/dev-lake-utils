@@ -26,11 +26,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.github.karlsabo.devlake.enghub.component.errorDialog
+import com.github.karlsabo.devlake.enghub.component.ErrorDialog
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
 
 @Composable
-fun engHubScreen(viewModel: EngHubViewModel) {
+fun EngHubScreen(viewModel: EngHubViewModel) {
     var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
     val state = collectEngHubScreenState(viewModel, selectedPane)
     val actions = engHubScreenActions(
@@ -39,23 +39,23 @@ fun engHubScreen(viewModel: EngHubViewModel) {
     )
 
     state.actionError?.let { error ->
-        errorDialog(message = error.message, onDismiss = actions.onClearActionError)
+        ErrorDialog(message = error.message, onDismiss = actions.onClearActionError)
     }
 
     MaterialTheme {
-        engHubScreenContent(state = state, actions = actions)
+        EngHubScreenContent(state = state, actions = actions)
     }
 }
 
 @Composable
-private fun engHubScreenContent(
+private fun EngHubScreenContent(
     state: EngHubScreenState,
     actions: EngHubScreenActions,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
-        engHubSidebar(
+        EngHubSidebar(
             selectedPane = state.selectedPane,
-            onPaneSelected = actions.onPaneSelected,
+            onPaneSelect = actions.onPaneSelected,
         )
         Box(
             modifier = Modifier
@@ -66,7 +66,7 @@ private fun engHubScreenContent(
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Text(state.selectedPane.label, style = MaterialTheme.typography.h5)
             Spacer(modifier = Modifier.size(8.dp))
-            engHubPaneContent(
+            EngHubPaneContent(
                 state = state,
                 actions = actions,
                 modifier = Modifier.weight(1f),
@@ -76,9 +76,9 @@ private fun engHubScreenContent(
 }
 
 @Composable
-private fun engHubSidebar(
+private fun EngHubSidebar(
     selectedPane: EngHubPane,
-    onPaneSelected: (EngHubPane) -> Unit,
+    onPaneSelect: (EngHubPane) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxHeight().width(56.dp).padding(vertical = 8.dp),
@@ -86,17 +86,17 @@ private fun engHubSidebar(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         EngHubPane.entries.forEach { pane ->
-            engHubSidebarButton(
+            EngHubSidebarButton(
                 pane = pane,
                 selected = pane == selectedPane,
-                onClick = { onPaneSelected(pane) },
+                onClick = { onPaneSelect(pane) },
             )
         }
     }
 }
 
 @Composable
-private fun engHubSidebarButton(
+private fun EngHubSidebarButton(
     pane: EngHubPane,
     selected: Boolean,
     onClick: () -> Unit,

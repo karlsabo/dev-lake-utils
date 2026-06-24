@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun worktreePanel(
+internal fun WorktreePanel(
     state: WorktreePanelState,
     actions: WorktreePanelActions,
     modifier: Modifier = Modifier,
@@ -37,7 +37,7 @@ internal fun worktreePanel(
         }
     }
 
-    worktreeDialogHost(
+    WorktreeDialogHost(
         state = WorktreeDialogState(
             pendingArchive = pendingArchive,
             pendingCreateWorktree = pendingCreateWorktree,
@@ -62,37 +62,37 @@ internal fun worktreePanel(
         ),
     )
 
-    worktreePanelContent(
+    WorktreePanelContent(
         state = state,
         actions = actions,
-        onArchiveRequested = { pendingArchive = it },
-        onCreateRequested = { pendingCreateWorktree = it },
+        onArchiveRequest = { pendingArchive = it },
+        onCreateRequest = { pendingCreateWorktree = it },
         modifier = modifier,
     )
 }
 
 @Composable
-private fun worktreePanelContent(
+private fun WorktreePanelContent(
     state: WorktreePanelState,
     actions: WorktreePanelActions,
-    onArchiveRequested: (PendingArchive) -> Unit,
-    onCreateRequested: (PendingCreateWorktree) -> Unit,
-    modifier: Modifier,
+    onArchiveRequest: (PendingArchive) -> Unit,
+    onCreateRequest: (PendingCreateWorktree) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        worktreePanelToolbar(onAddRepository = actions.onAddRepository)
-        worktreeRepositoryList(
+        WorktreePanelToolbar(onAddRepository = actions.onAddRepository)
+        WorktreeRepositoryList(
             state = state,
             actions = actions,
-            onArchiveRequested = onArchiveRequested,
-            onCreateRequested = onCreateRequested,
+            onArchiveRequest = onArchiveRequest,
+            onCreateRequest = onCreateRequest,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         )
     }
 }
 
 @Composable
-private fun worktreePanelToolbar(onAddRepository: () -> Unit) {
+private fun WorktreePanelToolbar(onAddRepository: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -104,20 +104,20 @@ private fun worktreePanelToolbar(onAddRepository: () -> Unit) {
 }
 
 @Composable
-private fun worktreeRepositoryList(
+private fun WorktreeRepositoryList(
     state: WorktreePanelState,
     actions: WorktreePanelActions,
-    onArchiveRequested: (PendingArchive) -> Unit,
-    onCreateRequested: (PendingCreateWorktree) -> Unit,
-    modifier: Modifier,
+    onArchiveRequest: (PendingArchive) -> Unit,
+    onCreateRequest: (PendingCreateWorktree) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
         if (state.localRepositories.isEmpty()) {
-            emptyWorktreeRepositoryList()
+            EmptyWorktreeRepositoryList()
         } else {
             LazyColumn {
                 items(state.localRepositories, key = { it.path }) { repository ->
-                    localRepositoryRow(
+                    LocalRepositoryRow(
                         state = WorktreeRowsState(
                             repository = repository,
                             setupStatuses = state.setupStatuses,
@@ -125,8 +125,8 @@ private fun worktreeRepositoryList(
                             rebasingWorktreePaths = state.rebasingWorktreePaths,
                         ),
                         panelActions = actions,
-                        onArchiveRequested = onArchiveRequested,
-                        onCreateRequested = onCreateRequested,
+                        onArchiveRequest = onArchiveRequest,
+                        onCreateRequest = onCreateRequest,
                     )
                 }
             }
@@ -135,7 +135,7 @@ private fun worktreeRepositoryList(
 }
 
 @Composable
-private fun emptyWorktreeRepositoryList() {
+private fun EmptyWorktreeRepositoryList() {
     Text(
         text = "No repositories configured",
         modifier = Modifier.padding(8.dp),

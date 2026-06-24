@@ -18,7 +18,7 @@ private const val RUNNING_STATUS_COLOR = 0xFFBF8700
 private const val PENDING_STATUS_COLOR = 0xFF6E7781
 
 @Composable
-fun statusBadge(status: CiStatus, modifier: Modifier = Modifier) {
+fun StatusBadge(status: CiStatus, modifier: Modifier = Modifier) {
     val (backgroundColor, label) = when (status) {
         CiStatus.PASSED -> Color(PASSED_STATUS_COLOR) to "Passed"
         CiStatus.FAILED -> Color(FAILED_STATUS_COLOR) to "Failed"

@@ -17,7 +17,7 @@ import com.github.karlsabo.devlake.metrics.model.toSlackMarkdown
 import com.github.karlsabo.devlake.metrics.rememberUserMetricPublisherState
 import com.github.karlsabo.devlake.metrics.saveUserMetricPublisherConfig
 import com.github.karlsabo.devlake.metrics.service.SlackMessage
-import com.github.karlsabo.devlake.metrics.ui.components.errorDialog
+import com.github.karlsabo.devlake.metrics.ui.components.ErrorDialog
 import com.github.karlsabo.devlake.metrics.userMetricPublisherConfigPath
 import com.github.karlsabo.system.DesktopAppBootstrapResult
 import com.github.karlsabo.system.runDesktopAppBootstrap
@@ -33,7 +33,7 @@ import kotlin.time.measureTimedValue
 private val logger = KotlinLogging.logger {}
 
 @Composable
-fun userMetricPublisherApp(onExitApplication: () -> Unit) {
+fun UserMetricPublisherApp(onExitApplication: () -> Unit) {
     val state = rememberUserMetricPublisherState()
     val scope = rememberCoroutineScope()
 
@@ -42,7 +42,7 @@ fun userMetricPublisherApp(onExitApplication: () -> Unit) {
     }
 
     if (!state.isLoadingConfig && state.isDisplayErrorDialog) {
-        errorDialog(
+        ErrorDialog(
             message = state.errorMessage,
             onDismiss = onExitApplication,
         )
@@ -65,7 +65,7 @@ fun userMetricPublisherApp(onExitApplication: () -> Unit) {
             position = WindowPosition(Alignment.Center),
         ),
     ) {
-        userMetricPublisherScreen(
+        UserMetricPublisherScreen(
             metricsPreviewText = state.metricsPreviewText,
             publishButtonText = state.publishButtonText,
             publishButtonEnabled = state.publishButtonEnabled,

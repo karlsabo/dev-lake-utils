@@ -19,16 +19,17 @@ import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
 
 @Composable
-fun pullRequestItem(
+fun PullRequestItem(
     pr: PullRequestUiState,
     onOpenInBrowser: (String) -> Unit,
     onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
     setupStatus: WorktreeSetupStatus?,
+    modifier: Modifier = Modifier,
 ) {
     val setupInProgress = setupStatus != null
 
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         elevation = 2.dp,
     ) {
         Row(
@@ -51,7 +52,7 @@ fun pullRequestItem(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(text = pr.repositoryFullName, style = MaterialTheme.typography.caption)
-                    statusBadge(status = pr.ciStatus)
+                    StatusBadge(status = pr.ciStatus)
                     Text(text = pr.ciSummaryText, style = MaterialTheme.typography.caption)
                     Text(text = pr.reviewSummaryText, style = MaterialTheme.typography.caption)
                 }

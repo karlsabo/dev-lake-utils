@@ -30,35 +30,35 @@ import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
 @Composable
-internal fun localRepositoryRow(
+internal fun LocalRepositoryRow(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
-    onArchiveRequested: (PendingArchive) -> Unit,
-    onCreateRequested: (PendingCreateWorktree) -> Unit,
+    onArchiveRequest: (PendingArchive) -> Unit,
+    onCreateRequest: (PendingCreateWorktree) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         elevation = 2.dp,
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            localRepositoryHeader(
+            LocalRepositoryHeader(
                 state = state,
                 onToggleRepository = { panelActions.onToggleRepository(state.repository.path) },
                 onCreateWorktreeFromRepository = { panelActions.onCreateWorktreeFromRepository(state.repository.path) },
             )
             Text(text = state.repository.path, style = MaterialTheme.typography.caption)
-            localWorktreeRows(
+            LocalWorktreeRows(
                 state = state,
                 panelActions = panelActions,
-                onArchiveRequested = onArchiveRequested,
-                onCreateRequested = onCreateRequested,
+                onArchiveRequest = onArchiveRequest,
+                onCreateRequest = onCreateRequest,
             )
         }
     }
 }
 
 @Composable
-private fun localRepositoryHeader(
+private fun LocalRepositoryHeader(
     state: WorktreeRowsState,
     onToggleRepository: () -> Unit,
     onCreateWorktreeFromRepository: () -> Unit,
@@ -89,7 +89,7 @@ private fun localRepositoryHeader(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.subtitle1,
         )
-        localRepositoryActionMenu(
+        LocalRepositoryActionMenu(
             repository = repository,
             setupStatus = repositoryStatus,
             isArchiving = isRepositoryArchiving,
@@ -99,7 +99,7 @@ private fun localRepositoryHeader(
 }
 
 @Composable
-private fun localRepositoryActionMenu(
+private fun LocalRepositoryActionMenu(
     repository: LocalRepositoryUiState,
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
@@ -121,7 +121,7 @@ private fun localRepositoryActionMenu(
             onDismissRequest = { menuExpanded = false },
         ) {
             visibleRepositoryMenuActions(repository).forEach { action ->
-                localRepositoryMenuItem(
+                LocalRepositoryMenuItem(
                     action = action,
                     repository = repository,
                     setupStatus = setupStatus,
@@ -137,7 +137,7 @@ private fun localRepositoryActionMenu(
 }
 
 @Composable
-private fun localRepositoryMenuItem(
+private fun LocalRepositoryMenuItem(
     action: RepositoryMenuAction,
     repository: LocalRepositoryUiState,
     setupStatus: WorktreeSetupStatus?,
@@ -155,11 +155,11 @@ private fun localRepositoryMenuItem(
 }
 
 @Composable
-private fun localWorktreeRows(
+private fun LocalWorktreeRows(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
-    onArchiveRequested: (PendingArchive) -> Unit,
-    onCreateRequested: (PendingCreateWorktree) -> Unit,
+    onArchiveRequest: (PendingArchive) -> Unit,
+    onCreateRequest: (PendingCreateWorktree) -> Unit,
 ) {
     if (state.repository.isExpanded && state.repository.worktrees.isNotEmpty()) {
         Spacer(modifier = Modifier.size(8.dp))
@@ -167,7 +167,7 @@ private fun localWorktreeRows(
             val worktree = row.worktree
             val normalizedWorktreePath = worktree.path.normalizedWorktreePath()
             key(normalizedWorktreePath) {
-                localWorktreeRow(
+                LocalWorktreeRow(
                     state = LocalWorktreeRowState(
                         worktree = worktree,
                         setupStatus = state.setupStatuses[WorktreePath(normalizedWorktreePath)],
@@ -176,9 +176,9 @@ private fun localWorktreeRows(
                         nestingDepth = row.nestingDepth,
                     ),
                     onOpen = { panelActions.worktrees.onOpenWorktree(state.repository.path, worktree.path) },
-                    onArchive = { onArchiveRequested(PendingArchive(state.repository.path, worktree.path)) },
+                    onArchive = { onArchiveRequest(PendingArchive(state.repository.path, worktree.path)) },
                     onOpenCreateWorktreeDialog = {
-                        onCreateRequested(createWorktreeDialogState(state.repository.path, worktree))
+                        onCreateRequest(createWorktreeDialogState(state.repository.path, worktree))
                     },
                     onRebaseOntoParent = {
                         worktree.parentBranch?.let { parentBranch ->

@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.tools.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -18,7 +19,7 @@ import com.github.karlsabo.devlake.tools.rememberSummaryPublisherState
 import com.github.karlsabo.devlake.tools.saveSummaryPublisherConfig
 import com.github.karlsabo.devlake.tools.service.ZapierProjectSummary
 import com.github.karlsabo.devlake.tools.summaryPublisherConfigPath
-import com.github.karlsabo.devlake.tools.ui.components.errorDialog
+import com.github.karlsabo.devlake.tools.ui.components.ErrorDialog
 import com.github.karlsabo.dto.toSlackMarkup
 import com.github.karlsabo.dto.toTerseSlackMarkup
 import com.github.karlsabo.github.config.GitHubConfig
@@ -56,20 +57,21 @@ internal data class SummaryPublisherBootstrapTemplate(
 )
 
 @Composable
-fun summaryPublisherApp(
+fun SummaryPublisherApp(
     configFilePath: Path,
     onExitApplication: () -> Unit,
     loadDependencies: (SummaryPublisherConfig) -> SummaryPublisherDependencies = ::loadSummaryPublisherDependencies,
 ) {
     val state = rememberSummaryPublisherState()
     val scope = rememberCoroutineScope()
+    val currentLoadDependencies = rememberUpdatedState(loadDependencies)
 
     LaunchedEffect(Unit) {
-        loadConfiguration(state, configFilePath, loadDependencies = loadDependencies)
+        loadConfiguration(state, configFilePath, loadDependencies = currentLoadDependencies.value)
     }
 
     if (state.isDisplayErrorDialog) {
-        errorDialog(
+        ErrorDialog(
             message = state.errorMessage,
             onDismiss = onExitApplication,
         )

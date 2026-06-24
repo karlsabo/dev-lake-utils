@@ -29,11 +29,11 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 fun main() = application {
-    uiDemoWindow(onCloseRequest = ::exitApplication)
+    UiDemoWindow(onCloseRequest = ::exitApplication)
 }
 
 @Composable
-private fun uiDemoWindow(onCloseRequest: () -> Unit) {
+private fun UiDemoWindow(onCloseRequest: () -> Unit) {
     Window(
         onCloseRequest = onCloseRequest,
         title = "UI Demo",
@@ -45,18 +45,18 @@ private fun uiDemoWindow(onCloseRequest: () -> Unit) {
         ),
     ) {
         MaterialTheme {
-            uiDemoContent()
+            UiDemoContent()
         }
     }
 }
 
 @Composable
-private fun uiDemoContent() {
+private fun UiDemoContent() {
     var zapierJson by remember { mutableStateOf("Loading summary") }
     var projectMessages by remember { mutableStateOf(initialProjectMessages()) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        demoButton()
+        DemoButton()
         TextField(
             value = zapierJson,
             onValueChange = { zapierJson = it },
@@ -64,7 +64,7 @@ private fun uiDemoContent() {
                 .fillMaxWidth()
                 .padding(8.dp),
         )
-        projectMessagesEditor(
+        ProjectMessagesEditor(
             projectMessages = projectMessages,
             onProjectMessagesChange = { projectMessages = it },
         )
@@ -72,7 +72,7 @@ private fun uiDemoContent() {
 }
 
 @Composable
-private fun demoButton() {
+private fun DemoButton() {
     Button(
         onClick = { println("helo moto") },
         modifier = Modifier.padding(8.dp),
@@ -82,7 +82,7 @@ private fun demoButton() {
 }
 
 @Composable
-private fun projectMessagesEditor(
+private fun ProjectMessagesEditor(
     projectMessages: List<ProjectMessage>,
     onProjectMessagesChange: (List<ProjectMessage>) -> Unit,
 ) {
@@ -91,7 +91,7 @@ private fun projectMessagesEditor(
             items = projectMessages,
             key = { _, item -> item.id },
         ) { index, project ->
-            projectMessageRow(
+            ProjectMessageRow(
                 project = project,
                 onTextChange = { newValue ->
                     onProjectMessagesChange(
@@ -107,7 +107,7 @@ private fun projectMessagesEditor(
 }
 
 @Composable
-private fun projectMessageRow(
+private fun ProjectMessageRow(
     project: ProjectMessage,
     onTextChange: (String) -> Unit,
     onDelete: () -> Unit,

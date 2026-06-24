@@ -72,12 +72,12 @@ private data class CreateWorktreeDialogContentActions(
 )
 
 @Composable
-internal fun worktreeDialogHost(
+internal fun WorktreeDialogHost(
     state: WorktreeDialogState,
     actions: WorktreeDialogActions,
 ) {
     state.pendingArchive?.let { archive ->
-        archiveWorktreeDialog(
+        ArchiveWorktreeDialog(
             worktreePath = archive.worktreePath,
             onConfirm = {
                 actions.onPendingArchiveChange(null)
@@ -88,7 +88,7 @@ internal fun worktreeDialogHost(
     }
 
     state.forceArchiveRequest?.let { archive ->
-        forceArchiveWorktreeDialog(
+        ForceArchiveWorktreeDialog(
             worktreePath = archive.worktreePath,
             onConfirm = { actions.forceArchive.onConfirm(archive.repoRootPath, archive.worktreePath) },
             onDismiss = actions.forceArchive.onDismiss,
@@ -96,7 +96,7 @@ internal fun worktreeDialogHost(
     }
 
     state.useUnrelatedExistingBranchConfirmationRequest?.let { request ->
-        useUnrelatedExistingBranchConfirmationDialog(
+        UseUnrelatedExistingBranchConfirmationDialog(
             request = request,
             onConfirm = {
                 confirmUseUnrelatedExistingBranchDialog(request, actions.onConfirmUseUnrelatedExistingBranch)
@@ -108,7 +108,7 @@ internal fun worktreeDialogHost(
     }
 
     state.rebaseConflictResolutionRequest?.let { request ->
-        rebaseConflictResolutionDialog(
+        RebaseConflictResolutionDialog(
             request = request,
             onAbort = { abortRebaseConflictDialog(request, actions.onAbortRebaseConflict) },
             onLeaveAsIs = { leaveRebaseConflictAsIsDialog(request, actions.onLeaveRebaseConflictAsIs) },
@@ -116,7 +116,7 @@ internal fun worktreeDialogHost(
     }
 
     state.pendingCreateWorktree?.let { createWorktree ->
-        createWorktreeDialog(
+        CreateWorktreeDialog(
             state = createWorktree,
             onTargetBranchChange = { targetBranch ->
                 actions.onPendingCreateWorktreeChange(createWorktree.copy(targetBranch = targetBranch))
@@ -131,7 +131,7 @@ internal fun worktreeDialogHost(
 }
 
 @Composable
-private fun rebaseConflictResolutionDialog(
+private fun RebaseConflictResolutionDialog(
     request: PendingRebaseConflictResolution,
     onAbort: () -> Unit,
     onLeaveAsIs: () -> Unit,
@@ -172,7 +172,7 @@ private fun rebaseConflictResolutionDialog(
 }
 
 @Composable
-private fun useUnrelatedExistingBranchConfirmationDialog(
+private fun UseUnrelatedExistingBranchConfirmationDialog(
     request: PendingUseUnrelatedExistingBranch,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -216,7 +216,7 @@ private fun useUnrelatedExistingBranchConfirmationDialog(
 }
 
 @Composable
-private fun createWorktreeDialog(
+private fun CreateWorktreeDialog(
     state: PendingCreateWorktree,
     onTargetBranchChange: (String) -> Unit,
     onConfirm: (PendingCreateWorktree) -> Unit,
@@ -239,7 +239,7 @@ private fun createWorktreeDialog(
     ) {
         MaterialTheme {
             Surface {
-                createWorktreeDialogContent(
+                CreateWorktreeDialogContent(
                     state = CreateWorktreeDialogContentState(
                         request = state,
                         targetBranchInput = model.targetBranchInput,
@@ -314,7 +314,7 @@ private suspend fun finishValidationOnIo(
 }
 
 @Composable
-private fun createWorktreeDialogContent(
+private fun CreateWorktreeDialogContent(
     state: CreateWorktreeDialogContentState,
     actions: CreateWorktreeDialogContentActions,
 ) {
@@ -328,36 +328,38 @@ private fun createWorktreeDialogContent(
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = "Base: ${state.request.baseCommitIsh ?: state.request.baseBranch}")
         Spacer(modifier = Modifier.height(12.dp))
-        createWorktreeTargetBranchField(state, actions.onTargetBranchInputChange)
+        CreateWorktreeTargetBranchField(state, actions.onTargetBranchInputChange)
         Spacer(modifier = Modifier.height(16.dp))
-        createWorktreeDialogButtons(state, actions)
+        CreateWorktreeDialogButtons(state, actions)
     }
 }
 
 @Composable
-private fun createWorktreeTargetBranchField(
+private fun CreateWorktreeTargetBranchField(
     state: CreateWorktreeDialogContentState,
     onTargetBranchInputChange: (TextFieldValue) -> Unit,
 ) {
-    OutlinedTextField(
-        value = state.targetBranchInput,
-        onValueChange = onTargetBranchInputChange,
-        label = { Text("Target branch") },
-        isError = state.validationMessage != null,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    state.validationMessage?.let { message ->
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = message,
-            color = MaterialTheme.colors.error,
-            style = MaterialTheme.typography.caption,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = state.targetBranchInput,
+            onValueChange = onTargetBranchInputChange,
+            label = { Text("Target branch") },
+            isError = state.validationMessage != null,
+            modifier = Modifier.fillMaxWidth(),
         )
+        state.validationMessage?.let { message ->
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = message,
+                color = MaterialTheme.colors.error,
+                style = MaterialTheme.typography.caption,
+            )
+        }
     }
 }
 
 @Composable
-private fun createWorktreeDialogButtons(
+private fun CreateWorktreeDialogButtons(
     state: CreateWorktreeDialogContentState,
     actions: CreateWorktreeDialogContentActions,
 ) {
