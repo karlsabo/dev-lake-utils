@@ -25,6 +25,8 @@ val detektSourceRoots = files(
 
 detekt {
     source.setFrom(detektSourceRoots)
+    buildUponDefaultConfig = true
+    config.setFrom(layout.projectDirectory.file("config/detekt/detekt.yml"))
 }
 
 tasks.withType<Detekt>().configureEach {

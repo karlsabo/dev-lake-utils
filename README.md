@@ -15,7 +15,12 @@
 
 * [ ] Fix detekt to support Compose: https://detekt.dev/docs/introduction/compose/
     * Fix ktlint to support Compose: https://mrmans0n.github.io/compose-rules/ktlint/
+* [ ] Add jetbrains changelog gradle plugin
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
+* [ ] Need a settings UI/UX.
+  * Add it to the menu popup to launch a settings UI
+  * The Settings should have options for everything in the com.github.karlsabo.devlake.enghub.EngHubConfig
+  * We should display this settings/config on a fresh launch that doesn't have a config file yet
 * [ ] After hitting the approve button on a Notification, once the notifications refresh again all those notifications reappear.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on
@@ -32,10 +37,6 @@
 * [ ] Need a quick way to archive worktrees. Branches that aren't mine, branches that have been merged to origin/main or master.
 * [ ] Add a menu pane. So three dots in top left corner that launches a 'window' with a search for all the actions you can take.
   * Add a mock entry for now that just pops a new window that says hello world
-* [ ] Need a settings UI/UX.
-  * Add it to the menu popup to launch a settings UI
-  * The Settings should have options for everything in the com.github.karlsabo.devlake.enghub.EngHubConfig
-  * We should display this settings/config on a fresh launch that doesn't have a config file yet
 * [ ] Have the GH API for getting notifications return each page as it loads one, so maybe use a kotlinx coroutine channel. that way the UI is more responsive and doesn't have to wait for all notifications to load before it can start displaying some.
 * [ ] Switch to using https://github.com/vinceglb/FileKit or anything better
 * [ ] Clean up tests that have /User/karl.sabo in the paths. Clean up test names to be Kotlin idiomatic.

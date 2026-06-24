@@ -39,7 +39,7 @@ Repo evidence:
 
 ## Stories / PRs
 
-### 1. Configure detekt for Compose idioms
+### 1. Configure detekt for Compose idioms — Done
 
 **Acceptance criteria:** Given `SummaryPublisherScreen` is an idiomatic PascalCase `@Composable`, when `./gradlew detekt` runs, then detekt uses Compose-aware config and does not flag documented Compose false positives.
 

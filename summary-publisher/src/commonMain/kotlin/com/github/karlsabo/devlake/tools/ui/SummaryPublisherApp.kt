@@ -92,7 +92,7 @@ fun summaryPublisherApp(
             position = WindowPosition(Alignment.Center),
         ),
     ) {
-        summaryPublisherScreen(
+        SummaryPublisherScreen(
             state = SummaryPublisherScreenState(
                 topLevelSummary = state.topLevelSummary,
                 projectSummaries = state.projectSummaries,

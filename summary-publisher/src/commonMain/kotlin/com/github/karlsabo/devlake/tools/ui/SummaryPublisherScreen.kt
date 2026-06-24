@@ -34,7 +34,7 @@ internal data class SummaryPublisherScreenActions(
 )
 
 @Composable
-internal fun summaryPublisherScreen(
+internal fun SummaryPublisherScreen(
     state: SummaryPublisherScreenState,
     actions: SummaryPublisherScreenActions,
 ) {
