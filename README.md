@@ -13,8 +13,6 @@
 
 # TODO
 
-* [ ] Fix detekt to support Compose: https://detekt.dev/docs/introduction/compose/
-    * Fix ktlint to support Compose: https://mrmans0n.github.io/compose-rules/ktlint/
 * [ ] Add jetbrains changelog gradle plugin
 * [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] Need a settings UI/UX.
@@ -80,6 +78,9 @@
 * [ ] Look into <https://worktrunk.dev/>
 * [ ] Add a database pruning background task that runs at startup and then every hour to prune old DB entries.
 * [ ] Setup command error dialog is too cluttered to identify what failed. Need the command that failed highlighted, and maybe standard error highlighted.
+* [ ] Show recently close PRs and tie them to the local worktree, then allow easily archiving the worktree from the PR view.
+  * Also show the ticket and allow modifying the ticket, or a quick link to the ticket view, maybe the same with the worktree, link to the view for it.
+  * If we link to 'views' of the items, we'd want to add a navigation history (back button, forward button)
 
 ## Implementation loop
 * Implement

@@ -1,9 +1,11 @@
 import io.gitlab.arturbosch.detekt.Detekt
+import org.jetbrains.changelog.tasks.GetChangelogTask
 
 plugins {
     base
     alias(libs.plugins.spotless)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.jetbrains.changelog)
 }
 
 group = "com.github.karlsabo.devlake"
@@ -44,6 +46,10 @@ tasks.withType<Detekt>().configureEach {
 
 tasks.named("check") {
     dependsOn(tasks.named("detekt"))
+}
+
+tasks.named<GetChangelogTask>("getChangelog") {
+    unreleased = true
 }
 
 spotless {
