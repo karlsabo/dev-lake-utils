@@ -1,6 +1,5 @@
 package com.github.karlsabo.git
 
-import com.github.karlsabo.system.executeCommand
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -92,32 +91,6 @@ class WorktreeSetupException(
 
 fun interface WorktreeSetupCommandRunner {
     suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult
-}
-
-class ShellWorktreeSetupCommandRunner : WorktreeSetupCommandRunner {
-    override suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult {
-        if (request.setupCommands.isEmpty()) {
-            return WorktreeSetupCommandResult(exitCode = 0, stdout = "", stderr = "")
-        }
-
-        val result = executeCommand(
-            command = listOf(request.setupShell, "-l", "-c", buildWorktreeSetupScript(request)),
-            workingDirectory = request.worktreePath.value,
-        )
-        if (result.exitCode != 0) {
-            val output = listOf(result.stderr, result.stdout)
-                .firstOrNull { it.isNotBlank() }
-                .orEmpty()
-            throw WorktreeSetupException(
-                "Setup commands failed for ${request.worktreePath.value} with exit code ${result.exitCode}: $output",
-            )
-        }
-        return WorktreeSetupCommandResult(
-            exitCode = result.exitCode,
-            stdout = result.stdout,
-            stderr = result.stderr,
-        )
-    }
 }
 
 interface WorktreeSetupHandle {
@@ -279,27 +252,3 @@ class WorktreeSetupCoordinator private constructor(
         _statuses.update { it + (worktreePath to status) }
     }
 }
-
-fun buildWorktreeSetupScript(request: WorktreeSetupRequest): String = buildWorktreeSetupScript(
-    request.setupCommands.map { command -> command.expandWorktreeSetupPlaceholders(request) },
-)
-
-fun buildWorktreeSetupScript(commands: List<String>): String = buildString {
-    appendLine("setup_exit_code=0")
-    commands.forEach { command ->
-        appendLine(command)
-        appendLine("command_exit_code=$?")
-        appendLine(
-            $$"if [ \"$command_exit_code\" -ne 0 ] && [ \"$setup_exit_code\" -eq 0 ]; then " +
-                $$"setup_exit_code=\"$command_exit_code\"; fi",
-        )
-    }
-    append($$"exit \"$setup_exit_code\"")
-}
-
-private fun String.expandWorktreeSetupPlaceholders(request: WorktreeSetupRequest): String = expandShellPlaceholders(
-    mapOf(
-        $$"$root-repo-dir" to request.repoPath,
-        $$"$worktree-dir" to request.worktreePath.value,
-    ),
-)

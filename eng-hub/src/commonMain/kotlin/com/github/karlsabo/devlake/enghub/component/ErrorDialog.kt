@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
@@ -43,24 +44,36 @@ fun ErrorDialog(
     ) {
         MaterialTheme {
             Surface(modifier = modifier) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                        .widthIn(min = 480.dp, max = 720.dp),
-                ) {
-                    Text(text = "Error", style = MaterialTheme.typography.h6)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ErrorMessageBody(
-                        message = message,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = onDismiss) {
-                        Text("Ok")
-                    }
-                }
+                ErrorDialogContent(
+                    message = message,
+                    onDismiss = onDismiss,
+                )
             }
+        }
+    }
+}
+
+@Composable
+internal fun ErrorDialogContent(
+    message: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .widthIn(min = 480.dp, max = 720.dp),
+    ) {
+        Text(text = "Error", style = MaterialTheme.typography.h6)
+        Spacer(modifier = Modifier.height(8.dp))
+        ErrorMessageBody(
+            message = message,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onDismiss) {
+            Text("Ok")
         }
     }
 }
@@ -77,13 +90,15 @@ private fun ErrorMessageBody(
             .fillMaxWidth()
             .heightIn(max = 360.dp),
     ) {
-        Text(
-            text = message,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = 12.dp)
-                .verticalScroll(scrollState),
-        )
+        SelectionContainer {
+            Text(
+                text = message,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 12.dp)
+                    .verticalScroll(scrollState),
+            )
+        }
         VerticalScrollbar(
             modifier = Modifier
                 .align(Alignment.CenterEnd)

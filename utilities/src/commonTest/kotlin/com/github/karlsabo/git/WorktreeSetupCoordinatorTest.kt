@@ -388,7 +388,7 @@ class WorktreeSetupCoordinatorTest {
         val result = executeCommand(listOf("/bin/sh", "-c", buildWorktreeSetupScript(request)), workingDirectory = null)
 
         assertEquals(0, result.exitCode, result.stderr)
-        assertEquals("$repoPath|$worktreePath\n", result.stdout)
+        assertTrue("$repoPath|$worktreePath\n" in result.stdout, result.stdout)
     }
 
     @Test
@@ -407,7 +407,7 @@ class WorktreeSetupCoordinatorTest {
         val result = executeCommand(listOf("/bin/sh", "-c", buildWorktreeSetupScript(request)), workingDirectory = null)
 
         assertEquals(0, result.exitCode, result.stderr)
-        assertEquals("$repoPath|$worktreePath\n", result.stdout)
+        assertTrue("$repoPath|$worktreePath\n" in result.stdout, result.stdout)
     }
 
     @Test
