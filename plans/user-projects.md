@@ -99,6 +99,8 @@
 
 ### 3. Add the runnable Linear demo with `--user`, `--start`, and `--end`
 
+**Status:** Done
+
 **Acceptance criteria:** Given a Linear config exists and user `usr_123` completed `ENG-101` on `2026-06-30T18:00:00Z`, when running `./gradlew :user-metrics-publisher:runUserLinearProjectsDemo --args="--user=usr_123 --start=2026-06-01 --end=2026-06-30"`, then `ENG-101` is included in the Markdown output.
 
 **Expected edits:**

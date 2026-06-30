@@ -98,3 +98,8 @@ createJvmExecTask(
     taskName = "runLinearDemo",
     mainClassName = "com.github.karlsabo.devlake.metrics.LinearDemoKt",
 )
+
+createJvmExecTask(
+    taskName = "runUserLinearProjectsDemo",
+    mainClassName = "com.github.karlsabo.devlake.metrics.UserLinearProjectsDemoKt",
+)
