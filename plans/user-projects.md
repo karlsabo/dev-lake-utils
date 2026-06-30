@@ -84,6 +84,8 @@
 
 ### 2. Add a pure Markdown grouping renderer
 
+**Status:** Done
+
 **Acceptance criteria:** Given completed issues in projects `Operations` and `Project Atlas` with milestones `Hardening` and `MVP`, when the grouping renderer runs, then it outputs Markdown grouped as `# project name`, `## milestone title`, and `* ticket-id ticket title` in deterministic order.
 
 **Expected edits:**
