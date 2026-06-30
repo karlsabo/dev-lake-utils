@@ -39,6 +39,14 @@ internal val LINEAR_ISSUE_FIELDS = """
               identifier
               title
             }
+            project {
+              id
+              name
+            }
+            projectMilestone {
+              id
+              name
+            }
 """.trimIndent()
 
 internal val LINEAR_ISSUE_ID_FIELDS = """

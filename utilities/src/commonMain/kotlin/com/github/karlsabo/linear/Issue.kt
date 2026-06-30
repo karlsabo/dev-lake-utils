@@ -22,4 +22,6 @@ data class Issue(
     val creator: User? = null,
     val state: WorkflowState? = null,
     val parent: IssueParent? = null,
+    val project: IssueProject? = null,
+    val projectMilestone: ProjectMilestone? = null,
 )
