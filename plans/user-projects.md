@@ -116,6 +116,8 @@
 
 ### 4. Keep issues without project or milestone visible
 
+**Status:** Done
+
 **Acceptance criteria:** Given completed issue `ENG-103 Cleanup logs` has no project or no milestone, when the grouping renderer runs, then it appears under `# No project` and `## No milestone`.
 
 **Expected edits:**

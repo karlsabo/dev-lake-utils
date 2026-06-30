@@ -46,11 +46,34 @@ class UserLinearProjectsMarkdownTest {
         )
     }
 
+    @Test
+    fun rendersIssuesWithoutProjectOrMilestoneUnderPlaceholderSections() {
+        val issues = listOf(
+            issue(
+                key = "ENG-103",
+                title = "Cleanup logs",
+                projectName = null,
+                milestoneName = null,
+            ),
+        )
+
+        val markdown = renderUserLinearProjectsMarkdown(issues)
+
+        assertEquals(
+            """
+            # No project
+            ## No milestone
+            * ENG-103 Cleanup logs
+            """.trimIndent(),
+            markdown,
+        )
+    }
+
     private fun issue(
         key: String,
         title: String,
-        projectName: String,
-        milestoneName: String,
+        projectName: String?,
+        milestoneName: String?,
     ): ProjectIssue = ProjectIssue(
         id = key,
         key = key,
