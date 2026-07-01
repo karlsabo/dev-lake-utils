@@ -220,7 +220,7 @@ None currently.
 
 ### 7. Sort projects by done date ascending
 
-**Status:** Planned
+**Status:** Done
 
 **Acceptance criteria:** Given `Project Beta` is done on `2026-06-01`, `Project Alpha` is done on `2026-06-10`, `Project Gamma` is in progress, and one issue has no project, when the grouping renderer runs, then the project sections appear in this order: `Project Beta`, `Project Alpha`, `Project Gamma`, `No project`.
 

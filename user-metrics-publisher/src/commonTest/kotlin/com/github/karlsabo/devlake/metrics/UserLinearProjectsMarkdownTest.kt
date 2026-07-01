@@ -150,16 +150,78 @@ class UserLinearProjectsMarkdownTest {
 
         assertEquals(
             """
+            # Project Atlas
+            * Done: 2026-06-28
+            ## MVP
+            * ENG-101 Ship ingestion
+              * Done: 2026-06-15
+
             # Operations
             * Done: in-progress
             ## Hardening
             * OPS-7 Rotate tokens
               * Done: 2026-06-15
+            """.trimIndent(),
+            markdown,
+        )
+    }
 
-            # Project Atlas
-            * Done: 2026-06-28
+    @Test
+    fun sortsProjectsByDoneDateAscendingWithInProgressAndNoProjectLast() {
+        val issues = listOf(
+            issue(
+                key = "GAM-1",
+                title = "Keep iterating",
+                projectName = "Project Gamma",
+                milestoneName = "MVP",
+            ),
+            finalizedIssue(
+                key = "ALP-1",
+                title = "Finish alpha",
+                projectName = "Project Alpha",
+                milestoneName = "MVP",
+                projectFinalizedAt = Instant.parse("2026-06-10T14:00:00Z"),
+            ),
+            issue(
+                key = "NOP-1",
+                title = "Triage loose work",
+                projectName = null,
+                milestoneName = "MVP",
+            ),
+            finalizedIssue(
+                key = "BET-1",
+                title = "Finish beta",
+                projectName = "Project Beta",
+                milestoneName = "MVP",
+                projectFinalizedAt = Instant.parse("2026-06-01T14:00:00Z"),
+            ),
+        )
+
+        val markdown = renderUserLinearProjectsMarkdown(issues)
+
+        assertEquals(
+            """
+            # Project Beta
+            * Done: 2026-06-01
             ## MVP
-            * ENG-101 Ship ingestion
+            * BET-1 Finish beta
+              * Done: 2026-06-15
+
+            # Project Alpha
+            * Done: 2026-06-10
+            ## MVP
+            * ALP-1 Finish alpha
+              * Done: 2026-06-15
+
+            # Project Gamma
+            * Done: in-progress
+            ## MVP
+            * GAM-1 Keep iterating
+              * Done: 2026-06-15
+
+            # No project
+            ## MVP
+            * NOP-1 Triage loose work
               * Done: 2026-06-15
             """.trimIndent(),
             markdown,

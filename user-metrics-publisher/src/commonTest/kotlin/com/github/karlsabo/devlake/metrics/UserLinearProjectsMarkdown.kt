@@ -12,22 +12,25 @@ private const val IN_PROGRESS = "in-progress"
 fun renderUserLinearProjectsMarkdown(issues: List<ProjectIssue>): String {
     val sortedIssues = issues
         .map { it.toMarkdownIssue() }
-        .sortedWith(
-            compareBy<MarkdownIssue> { it.projectName }
-                .thenBy { it.projectId }
-                .thenBy { it.milestoneName }
-                .thenBy { it.key },
-        )
+        .sortedWith(compareBy<MarkdownIssue> { it.milestoneName }.thenBy { it.key })
 
     return sortedIssues
         .groupBy { it.projectGroupKey() }
-        .map { (_, projectIssues) ->
+        .map { (projectGroupKey, projectIssues) -> projectIssues.toMarkdownProject(projectGroupKey) }
+        .sortedWith(
+            compareBy<MarkdownProject> { it.doneDate == null }
+                .thenBy { !it.hasProject }
+                .thenBy { it.doneDate }
+                .thenBy { it.name }
+                .thenBy { it.groupKey.value },
+        )
+        .map { project ->
             buildList {
-                add("# ${projectIssues.first().projectName}")
-                if (projectIssues.any { it.hasProject }) {
-                    add("* Done: ${projectIssues.projectDoneDate()}")
+                add("# ${project.name}")
+                if (project.hasProject) {
+                    add("* Done: ${project.doneDate ?: IN_PROGRESS}")
                 }
-                projectIssues.groupBy { it.milestoneName }.forEach { (milestoneName, milestoneIssues) ->
+                project.issues.groupBy { it.milestoneName }.forEach { (milestoneName, milestoneIssues) ->
                     add("## $milestoneName")
                     milestoneIssues.forEach { issue ->
                         add("* ${issue.key} ${issue.title}")
@@ -48,6 +51,14 @@ private data class MarkdownIssue(
     val key: String,
     val title: String,
     val doneDate: String,
+)
+
+private data class MarkdownProject(
+    val groupKey: ProjectGroupKey,
+    val name: String,
+    val hasProject: Boolean,
+    val doneDate: String?,
+    val issues: List<MarkdownIssue>,
 )
 
 private fun ProjectIssue.toMarkdownIssue(): MarkdownIssue {
@@ -76,10 +87,21 @@ private fun MarkdownIssue.projectGroupKey(): ProjectGroupKey = projectId
     ?.let { ProjectGroupKey(ProjectGroupKeyType.ID, it) }
     ?: ProjectGroupKey(ProjectGroupKeyType.NAME, projectName)
 
-private fun List<MarkdownIssue>.projectDoneDate(): String {
+private fun List<MarkdownIssue>.toMarkdownProject(groupKey: ProjectGroupKey): MarkdownProject {
+    val hasProject = any { it.hasProject }
+    return MarkdownProject(
+        groupKey = groupKey,
+        name = first().projectName,
+        hasProject = hasProject,
+        doneDate = if (hasProject) projectDoneDate() else null,
+        issues = this,
+    )
+}
+
+private fun List<MarkdownIssue>.projectDoneDate(): String? {
     val dates = mapNotNull { it.projectDoneDate }.distinct()
     require(dates.size <= 1) { "Project ${first().projectName} has conflicting finalized dates" }
-    return dates.singleOrNull() ?: IN_PROGRESS
+    return dates.singleOrNull()
 }
 
 private fun Instant.toUtcDateOnly(): String = toLocalDateTime(TimeZone.UTC).date.toString()
