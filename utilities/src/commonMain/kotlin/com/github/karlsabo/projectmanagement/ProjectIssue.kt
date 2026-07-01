@@ -29,6 +29,7 @@ data class ProjectIssue(
     val dueDate: Instant? = null,
     val projectId: String? = null,
     val projectName: String? = null,
+    val projectFinalizedAt: Instant? = null,
     val milestoneId: String? = null,
     val milestoneName: String? = null,
 )

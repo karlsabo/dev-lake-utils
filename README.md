@@ -18,6 +18,8 @@
   * Add it to the menu popup to launch a settings UI
   * The Settings should have options for everything in the com.github.karlsabo.devlake.enghub.EngHubConfig
   * We should display this settings/config on a fresh launch that doesn't have a config file yet
+* [ ] Be more careful with the workspace.xml file with idea-tool.kts
+  * We want to keep variables such as GOPRIVATE. So we should not skip the workspace.xml file but we should selectively remove sections
 * [ ] After hitting the approve button on a Notification, once the notifications refresh again all those notifications reappear.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on

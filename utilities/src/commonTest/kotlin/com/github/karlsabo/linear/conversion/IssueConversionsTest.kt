@@ -6,6 +6,7 @@ import com.github.karlsabo.tools.lenientJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 class IssueConversionsTest {
     @Test
@@ -18,7 +19,8 @@ class IssueConversionsTest {
               "title": "Ship ingestion",
               "project": {
                 "id": "project-atlas-id",
-                "name": "Project Atlas"
+                "name": "Project Atlas",
+                "completedAt": "2026-06-28T14:00:00Z"
               },
               "projectMilestone": {
                 "id": "mvp-id",
@@ -32,8 +34,31 @@ class IssueConversionsTest {
 
         assertEquals("project-atlas-id", projectIssue.projectId)
         assertEquals("Project Atlas", projectIssue.projectName)
+        assertEquals(Instant.parse("2026-06-28T14:00:00Z"), projectIssue.projectFinalizedAt)
         assertEquals("mvp-id", projectIssue.milestoneId)
         assertEquals("MVP", projectIssue.milestoneName)
+    }
+
+    @Test
+    fun canceledLinearProjectDateIsMappedAsProjectFinalizedAt() {
+        val issue = lenientJson.decodeFromString<Issue>(
+            """
+            {
+              "id": "issue-102",
+              "identifier": "ENG-102",
+              "title": "Stop project",
+              "project": {
+                "id": "project-atlas-id",
+                "name": "Project Atlas",
+                "canceledAt": "2026-06-29T10:00:00Z"
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val projectIssue = issue.toProjectIssue()
+
+        assertEquals(Instant.parse("2026-06-29T10:00:00Z"), projectIssue.projectFinalizedAt)
     }
 
     @Test
@@ -44,6 +69,8 @@ class IssueConversionsTest {
                 project {
                   id
                   name
+                  completedAt
+                  canceledAt
                 }
                 """.trimIndent(),
             ),

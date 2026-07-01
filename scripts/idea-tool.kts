@@ -1,7 +1,6 @@
 #!/usr/bin/env kotlin
 
 import java.nio.ByteBuffer
-import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -21,10 +20,11 @@ Arguments:
   target .idea  .idea directory to create or refresh in the worktree.
 
 The script copies reusable project-template files, skips worktree-local IntelliJ
-state such as workspace.xml, shelf/, and dataSources*, and rewrites exact absolute
-source repository root strings in copied UTF-8 text files to the target repository
-root. Existing target files are left untouched when the resulting content is
-unchanged.
+state such as shelf/ and dataSources*, and rewrites exact absolute source
+repository root strings in copied UTF-8 text files to the target repository root.
+It preserves workspace.xml local state while enforcing Go module settings that
+stop the IDE from updating go.mod/go.sum. Existing target files are left untouched
+when the resulting content is unchanged.
 """.trimIndent()
 
 private class UsageError(
@@ -103,6 +103,113 @@ private fun copyIdeaTemplate(sourceIdea: Path, targetIdea: Path) {
         }
     }
 }
+
+private fun ensureGoModuleReadonlyWorkspaceSettings(targetIdea: Path) {
+    val workspacePath = targetIdea.resolve("workspace.xml")
+    val workspaceText = if (Files.isRegularFile(workspacePath, LinkOption.NOFOLLOW_LINKS)) {
+        Files.readString(workspacePath, StandardCharsets.UTF_8)
+    } else {
+        """<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+${goReadonlyVgoProjectComponent()}
+</project>
+"""
+    }
+
+    val updatedText = withGoReadonlyVgoProjectSettings(workspaceText)
+    if (updatedText == workspaceText && Files.isRegularFile(workspacePath, LinkOption.NOFOLLOW_LINKS)) return
+
+    workspacePath.parent?.let(Files::createDirectories)
+    Files.writeString(
+        workspacePath,
+        updatedText,
+        StandardCharsets.UTF_8,
+        StandardOpenOption.CREATE,
+        StandardOpenOption.TRUNCATE_EXISTING,
+    )
+}
+
+private fun withGoReadonlyVgoProjectSettings(workspaceText: String): String {
+    val vgoProjectRegex = Regex("""(?s)  <component name="VgoProject">.*?\n  </component>""")
+    val match = vgoProjectRegex.find(workspaceText)
+        ?: return workspaceText.replace(
+            Regex("""\s*</project>\s*$"""),
+            "\n${goReadonlyVgoProjectComponent()}\n</project>\n",
+        )
+
+    val updatedComponent = withGoReadonlyVgoProjectComponentSettings(match.value)
+    return workspaceText.replaceRange(match.range, updatedComponent)
+}
+
+private fun withGoReadonlyVgoProjectComponentSettings(componentText: String): String = componentText
+    .let(::withGoFlagsReadonly)
+    .let(::withAutomaticDependenciesDownloadDisabled)
+
+private fun withGoFlagsReadonly(componentText: String): String {
+    val goFlagsEntryRegex = Regex("""<entry key="GOFLAGS" value="([^"]*)" />""")
+    val existingGoFlags = goFlagsEntryRegex.find(componentText)
+    if (existingGoFlags != null) {
+        return goFlagsEntryRegex.replace(componentText) { match ->
+            "<entry key=\"GOFLAGS\" value=\"${readonlyGoFlags(match.groupValues[1])}\" />"
+        }
+    }
+
+    if (componentText.contains("<environment>")) {
+        val mapClosing = Regex("""(?m)^([ \t]*)</map>""").find(componentText)
+            ?: return componentText
+        val indent = mapClosing.groupValues[1]
+        return componentText.replaceRange(
+            mapClosing.range,
+            "$indent  <entry key=\"GOFLAGS\" value=\"-mod=readonly\" />\n$indent</map>",
+        )
+    }
+
+    return componentText.replace(
+        "\n  </component>",
+        """
+    <environment>
+      <map>
+        <entry key="GOFLAGS" value="-mod=readonly" />
+      </map>
+    </environment>
+  </component>""",
+    )
+}
+
+private fun readonlyGoFlags(rawGoFlags: String): String {
+    val flags = rawGoFlags.split(Regex("""\s+""")).filter(String::isNotBlank).toMutableList()
+    val moduleFlagIndex = flags.indexOfFirst { it.startsWith("-mod=") }
+    if (moduleFlagIndex >= 0) {
+        flags[moduleFlagIndex] = "-mod=readonly"
+    } else {
+        flags.add("-mod=readonly")
+    }
+    return flags.joinToString(" ")
+}
+
+private fun withAutomaticDependenciesDownloadDisabled(componentText: String): String {
+    val settingRegex = Regex("""<automatic-dependencies-download-enabled>.*?</automatic-dependencies-download-enabled>""")
+    if (settingRegex.containsMatchIn(componentText)) {
+        return settingRegex.replace(
+            componentText,
+            "<automatic-dependencies-download-enabled>false</automatic-dependencies-download-enabled>",
+        )
+    }
+
+    return componentText.replace(
+        "\n  </component>",
+        "\n    <automatic-dependencies-download-enabled>false</automatic-dependencies-download-enabled>\n  </component>",
+    )
+}
+
+private fun goReadonlyVgoProjectComponent(): String = """  <component name="VgoProject">
+    <environment>
+      <map>
+        <entry key="GOFLAGS" value="-mod=readonly" />
+      </map>
+    </environment>
+    <automatic-dependencies-download-enabled>false</automatic-dependencies-download-enabled>
+  </component>"""
 
 private fun isVolatileIdeaPath(relativePath: Path): Boolean {
     if (relativePath.nameCount == 0) return false
@@ -223,6 +330,7 @@ try {
     val targetIdea = ideaPath(args[1])
     validatePaths(sourceIdea, targetIdea)
     copyIdeaTemplate(sourceIdea, targetIdea)
+    ensureGoModuleReadonlyWorkspaceSettings(targetIdea)
 } catch (error: UsageError) {
     System.err.println(error.message)
     exitProcess(1)

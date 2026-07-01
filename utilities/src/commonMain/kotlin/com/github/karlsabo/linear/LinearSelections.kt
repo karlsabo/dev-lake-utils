@@ -42,6 +42,8 @@ internal val LINEAR_ISSUE_FIELDS = """
             project {
               id
               name
+              completedAt
+              canceledAt
             }
             projectMilestone {
               id

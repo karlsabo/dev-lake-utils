@@ -2,6 +2,7 @@ package com.github.karlsabo.linear.conversion
 
 import com.github.karlsabo.common.datetime.DateTimeFormatting
 import com.github.karlsabo.linear.Issue
+import com.github.karlsabo.linear.IssueProject
 import com.github.karlsabo.linear.WorkflowState
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.projectmanagement.StatusCategory
@@ -33,6 +34,7 @@ fun Issue.toProjectIssue(): ProjectIssue = ProjectIssue(
     parentKey = parent?.identifier,
     projectId = project?.id,
     projectName = project?.name,
+    projectFinalizedAt = project?.finalizedAt(),
     milestoneId = projectMilestone?.id,
     milestoneName = projectMilestone?.name,
     createdAt = createdAt,
@@ -40,6 +42,8 @@ fun Issue.toProjectIssue(): ProjectIssue = ProjectIssue(
     completedAt = completedAt,
     dueDate = parseDueDate(dueDate),
 )
+
+private fun IssueProject.finalizedAt() = completedAt ?: canceledAt
 
 /**
  * Converts Linear WorkflowState to the unified StatusCategory.

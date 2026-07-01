@@ -14,15 +14,19 @@ fun renderUserLinearProjectsMarkdown(issues: List<ProjectIssue>): String {
         .map { it.toMarkdownIssue() }
         .sortedWith(
             compareBy<MarkdownIssue> { it.projectName }
+                .thenBy { it.projectId }
                 .thenBy { it.milestoneName }
                 .thenBy { it.key },
         )
 
     return sortedIssues
-        .groupBy { it.projectName }
-        .map { (projectName, projectIssues) ->
+        .groupBy { it.projectGroupKey() }
+        .map { (_, projectIssues) ->
             buildList {
-                add("# $projectName")
+                add("# ${projectIssues.first().projectName}")
+                if (projectIssues.any { it.hasProject }) {
+                    add("* Done: ${projectIssues.projectDoneDate()}")
+                }
                 projectIssues.groupBy { it.milestoneName }.forEach { (milestoneName, milestoneIssues) ->
                     add("## $milestoneName")
                     milestoneIssues.forEach { issue ->
@@ -36,7 +40,10 @@ fun renderUserLinearProjectsMarkdown(issues: List<ProjectIssue>): String {
 }
 
 private data class MarkdownIssue(
+    val projectId: String?,
     val projectName: String,
+    val hasProject: Boolean,
+    val projectDoneDate: String?,
     val milestoneName: String,
     val key: String,
     val title: String,
@@ -47,7 +54,10 @@ private fun ProjectIssue.toMarkdownIssue(): MarkdownIssue {
     require(key.isNotBlank()) { "Project issue id=$id has a blank key" }
 
     return MarkdownIssue(
+        projectId = projectId?.takeUnless { it.isBlank() },
         projectName = projectName.placeholderIfBlank(NO_PROJECT),
+        hasProject = !projectId.isNullOrBlank() || !projectName.isNullOrBlank(),
+        projectDoneDate = projectFinalizedAt?.toUtcDateOnly(),
         milestoneName = milestoneName.placeholderIfBlank(NO_MILESTONE),
         key = key,
         title = requireNotNull(title) { "Project issue $key is missing title" },
@@ -55,7 +65,23 @@ private fun ProjectIssue.toMarkdownIssue(): MarkdownIssue {
     )
 }
 
+private enum class ProjectGroupKeyType { ID, NAME }
+
+private data class ProjectGroupKey(
+    val type: ProjectGroupKeyType,
+    val value: String,
+)
+
+private fun MarkdownIssue.projectGroupKey(): ProjectGroupKey = projectId
+    ?.let { ProjectGroupKey(ProjectGroupKeyType.ID, it) }
+    ?: ProjectGroupKey(ProjectGroupKeyType.NAME, projectName)
+
+private fun List<MarkdownIssue>.projectDoneDate(): String {
+    val dates = mapNotNull { it.projectDoneDate }.distinct()
+    require(dates.size <= 1) { "Project ${first().projectName} has conflicting finalized dates" }
+    return dates.singleOrNull() ?: IN_PROGRESS
+}
+
 private fun Instant.toUtcDateOnly(): String = toLocalDateTime(TimeZone.UTC).date.toString()
 
-private fun String?.placeholderIfBlank(placeholder: String): String =
-    if (isNullOrBlank()) placeholder else this
+private fun String?.placeholderIfBlank(placeholder: String): String = if (isNullOrBlank()) placeholder else this

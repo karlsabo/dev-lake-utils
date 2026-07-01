@@ -200,7 +200,7 @@ None currently.
 
 ### 6. Add project final-state date or in-progress subbullets
 
-**Status:** Planned
+**Status:** Done
 
 **Acceptance criteria:** Given `Project Atlas` has Linear project final-state date `2026-06-28T14:00:00Z` and `Operations` has no Linear project final-state date, when the grouping renderer runs, then `Project Atlas` shows `* Done: 2026-06-28` below its heading and `Operations` shows `* Done: in-progress` below its heading.
 
