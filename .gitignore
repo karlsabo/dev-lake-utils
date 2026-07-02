@@ -21,3 +21,6 @@ weekly-summary.md
 /.idea/gradle.xml
 /.idea/misc.xml
 /.idea/vcs.xml
+
+# RunConfigurations
+/runConfigurations/dev-lake-utils \[runUserLinearProjectsDemo karl\].run.xml

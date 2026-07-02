@@ -148,7 +148,7 @@ Example setup command:
 ]
 ```
 
-The same placeholders can pass both paths to setup tools, such as the safe IntelliJ IDEA template helper. Run it
+The same placeholders can pass both paths to setup tools, such as the IntelliJ IDEA `.idea` seeding helper. Run it
 before `idea ./` when you want reusable project settings seeded before IntelliJ opens the worktree:
 
 ```json
@@ -160,37 +160,50 @@ before `idea ./` when you want reusable project settings seeded before IntelliJ 
 
 Quote placeholders the same way you would quote normal paths in shell commands.
 
-### IntelliJ IDEA project template helper
+### IntelliJ IDEA `.idea` seeding helper
 
-To manually refresh a worktree's `.idea` directory from the root checkout template:
+To manually seed a worktree's `.idea` directory from the root checkout template:
 
 ```bash
 kotlin /Users/you/git/dev-lake-utils/scripts/idea-tool.kts /Users/you/git/example-repo/.idea /Users/you/git/example-repo-worktree/.idea
 ```
 
-The helper copies reusable project-template files from the source `.idea` tree and rewrites exact absolute
-root-checkout path strings in UTF-8 text files to the worktree path. It intentionally does not copy worktree-local
-IntelliJ state such as `workspace.xml`, `shelf/`, `dataSources/`, `dataSources.xml`, or `dataSources.local.xml`
-because those files can contain project identity, window/session state, shelves, and personal database connection state
-from another checkout.
+The helper is target-first: it copies reusable project-template files from the source `.idea` tree only when the
+corresponding target path is missing. Existing target files and symlinks are never overwritten, merged, parsed,
+formatted, validated, or repaired. Existing target directories are traversed so missing child files can still be seeded.
+This makes it safe to run before every `idea ./`, but it also means established worktree IDE state always wins.
 
-Unchanged target files are left untouched during refresh, so repeatedly running the helper before `idea ./` does not
-update modification times for stable project files that already have the right content.
+For copied regular UTF-8 text files, the helper rewrites exact absolute root-checkout path strings to the worktree path.
+It does not rewrite binary files or symlink targets.
 
-If an existing worktree was initialized by an older helper version that copied the full `.idea` directory, close IntelliJ
-first, then optionally remove only the volatile local state from that worktree:
+`workspace.xml` is seeded only when the target `workspace.xml` is missing. The helper parses the source file, removes
+worktree-local or personal components at a high level, such as project IDs, changelists/tasks, VCS/Git/GitHub PR state,
+window/tool state, recents, debugger settings, indexing state, and similar session metadata, then writes the sanitized
+copy. Useful non-denied components remain, including Go environment entries such as `GOPRIVATE`, workspace run
+configurations, Go SDK/library settings, and similar project setup. If the source has a `VgoProject` component, the
+helper also ensures `GOFLAGS` includes `-mod=readonly`. If the target `workspace.xml` already exists, it is left exactly
+as-is, even if malformed.
+
+The helper never copies `shelf/` or `usage.statistics.xml`. Shelves can contain actual code patches from another
+checkout, and usage statistics are not project setup.
+
+Datasource state is treated as seedable project setup: `dataSources.xml`, `dataSources.local.xml`, and files under
+`dataSources/` copy when the matching target paths are missing, with the same exact root-path rewriting for regular
+UTF-8 text files. Existing target datasource files and cache files are preserved.
+
+There is no `--force` mode. To reseed a specific `.idea` path, close IntelliJ, delete only that target path, and rerun
+the helper. For example:
 
 ```bash
 WORKTREE=/Users/you/git/example-repo-worktree
 rm -f "$WORKTREE/.idea/workspace.xml"
 rm -f "$WORKTREE/.idea/dataSources.xml"
 rm -f "$WORKTREE/.idea/dataSources.local.xml"
-rm -rf "$WORKTREE/.idea/shelf"
 rm -rf "$WORKTREE/.idea/dataSources"
 ```
 
-Do not run this blindly if you need existing shelves or local database connections from that worktree; move those files
-aside instead. The helper does not delete them automatically.
+Only delete paths you are willing to replace from the source checkout. Do not delete `shelf/` if you need shelves from
+that worktree; the helper will not reseed shelves because they are never copied.
 
 ### First run behavior
 
