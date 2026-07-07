@@ -127,6 +127,8 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 
 ### 5. Reject a release tag that does not match the checked-in Gradle version
 
+**Status:** Done
+
 **Acceptance criteria:** Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.3.0`, when the release workflow runs, then it fails before packaging and uploads no installer assets.
 
 **Expected edits:**

@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: preflight
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.gradle-version.outputs.version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Read release tag
+        id: tag
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required}"
+          if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tag '$tag' must be raw stable SemVer (MAJOR.MINOR.PATCH)."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Read Gradle version
+        id: gradle-version
+        shell: bash
+        run: |
+          version_file="$RUNNER_TEMP/gradle-version.txt"
+          ./gradlew -q printVersion > "$version_file"
+          version="$(grep -E '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$' "$version_file" | tail -n 1 | tr -d '\r')"
+          if [[ -z "$version" ]]; then
+            echo "::error::Could not read Gradle version from printVersion output."
+            exit 1
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Gradle version '$version' must be raw stable SemVer for releases."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches Gradle version
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          GRADLE_VERSION: ${{ steps.gradle-version.outputs.version }}
+        run: |
+          if [[ "$RELEASE_TAG" != "$GRADLE_VERSION" ]]; then
+            echo "::error::Release tag '$RELEASE_TAG' does not match Gradle version '$GRADLE_VERSION'."
+            exit 1
+          fi

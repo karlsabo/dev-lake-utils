@@ -52,6 +52,22 @@ tasks.named<GetChangelogTask>("getChangelog") {
     unreleased = true
 }
 
+abstract class PrintVersionTask : DefaultTask() {
+    @get:Input
+    abstract val versionText: Property<String>
+
+    @TaskAction
+    fun printVersion() {
+        println(versionText.get())
+    }
+}
+
+tasks.register<PrintVersionTask>("printVersion") {
+    group = "help"
+    description = "Prints the root project version."
+    versionText.set(version.toString())
+}
+
 spotless {
     isEnforceCheck = true
 
