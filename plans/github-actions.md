@@ -106,6 +106,8 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 
 ### 4. Run build workflow on `main` pushes
 
+**Status:** Done
+
 **Acceptance criteria:** Given a commit is pushed to `main`, when GitHub Actions evaluates the repository workflows, then the same build workflow starts for that push.
 
 **Expected edits:**
