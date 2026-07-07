@@ -13,7 +13,6 @@
 
 # TODO
 
-* [ ] Add GitHub actions to build and publish versions of the app for Linux, macOS, Window
 * [ ] Need a settings UI/UX.
   * Add it to the menu popup to launch a settings UI
   * The Settings should have options for everything in the com.github.karlsabo.devlake.enghub.EngHubConfig
