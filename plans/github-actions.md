@@ -86,6 +86,8 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 
 ### 3. Build Eng Hub on Windows pull requests
 
+**Status:** Done
+
 **Acceptance criteria:** Given a pull request changes Kotlin or Gradle code, when the Windows CI job runs on `windows-latest`, then it executes `./gradlew clean build` and reports success or failure on the PR.
 
 **Expected edits:**
