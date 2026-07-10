@@ -210,3 +210,55 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             "$DMG_ASSET_PATH#Eng Hub for macOS" \
             --clobber
+
+  publish-windows:
+    name: publish-windows
+    needs: [preflight, create-release]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Package Windows installer
+        run: ./gradlew.bat clean :eng-hub:packageMsi
+
+      - name: Prepare release asset
+        id: asset
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          $msiPackages = @(Get-ChildItem -Path "eng-hub/build/compose/binaries/main/msi" -Recurse -File -Filter "*.msi")
+
+          if ($msiPackages.Count -ne 1) {
+            Write-Error "Expected exactly one MSI package, found $($msiPackages.Count)."
+            exit 1
+          }
+
+          New-Item -ItemType Directory -Path "release-assets" -Force | Out-Null
+          $msiAsset = "release-assets/eng-hub-$env:RELEASE_VERSION-windows-x64.msi"
+          Move-Item -Path $msiPackages[0].FullName -Destination $msiAsset
+          "msi_path=$msiAsset" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Publish GitHub Release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+          MSI_ASSET_PATH: ${{ steps.asset.outputs.msi_path }}
+        run: |
+          gh release upload $env:RELEASE_TAG `
+            "$env:MSI_ASSET_PATH#Eng Hub for Windows (x64)" `
+            --clobber

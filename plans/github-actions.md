@@ -197,6 +197,8 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 
 ### 8. Publish Windows `.msi` on matching version tag
 
+**Status:** Done
+
 **Acceptance criteria:** Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.2.0`, when the release workflow runs on Windows, then GitHub Release `0.2.0` contains an Eng Hub `.msi` asset named with version `0.2.0`.
 
 **Expected edits:**
