@@ -2,6 +2,9 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 val engHubDisplayName = "Eng Hub"
 val engHubPackageName = "eng-hub"
+val engHubPackageVersion = rootProject.version.toString()
+    .substringBefore('-')
+    .substringBefore('+')
 
 plugins {
     id("devlake.kotlin-multiplatform-compose-conventions")
@@ -51,9 +54,9 @@ compose.desktop {
         jvmArgs += listOf("-Xdock:name=$engHubDisplayName")
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = engHubPackageName
-            packageVersion = "1.0.0"
+            packageVersion = engHubPackageVersion
         }
     }
 }

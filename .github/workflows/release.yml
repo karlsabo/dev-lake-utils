@@ -67,3 +67,79 @@ jobs:
             echo "::error::Release tag '$RELEASE_TAG' does not match Gradle version '$GRADLE_VERSION'."
             exit 1
           fi
+
+  publish-linux:
+    name: publish-linux
+    needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Linux packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes fakeroot rpm
+
+      - name: Package Linux installers
+        run: ./gradlew clean :eng-hub:packageDeb :eng-hub:packageRpm
+
+      - name: Prepare release assets
+        id: asset
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          mapfile -t deb_packages < <(find eng-hub/build/compose/binaries/main/deb -type f -name '*.deb')
+          mapfile -t rpm_packages < <(find eng-hub/build/compose/binaries/main/rpm -type f -name '*.rpm')
+
+          if (( ${#deb_packages[@]} != 1 )); then
+            echo "::error::Expected exactly one Debian package, found ${#deb_packages[@]}."
+            exit 1
+          fi
+          if (( ${#rpm_packages[@]} != 1 )); then
+            echo "::error::Expected exactly one RPM package, found ${#rpm_packages[@]}."
+            exit 1
+          fi
+
+          mkdir -p release-assets
+          deb_asset="release-assets/eng-hub-${RELEASE_VERSION}-linux-amd64.deb"
+          rpm_asset="release-assets/eng-hub-${RELEASE_VERSION}-linux-x86_64.rpm"
+          mv "${deb_packages[0]}" "$deb_asset"
+          mv "${rpm_packages[0]}" "$rpm_asset"
+          echo "deb_path=$deb_asset" >> "$GITHUB_OUTPUT"
+          echo "rpm_path=$rpm_asset" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+          DEB_ASSET_PATH: ${{ steps.asset.outputs.deb_path }}
+          RPM_ASSET_PATH: ${{ steps.asset.outputs.rpm_path }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "$DEB_ASSET_PATH#Eng Hub for Debian/Ubuntu (amd64)" \
+              "$RPM_ASSET_PATH#Eng Hub for Fedora/RHEL (x86_64)" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "$DEB_ASSET_PATH#Eng Hub for Debian/Ubuntu (amd64)" \
+              "$RPM_ASSET_PATH#Eng Hub for Fedora/RHEL (x86_64)" \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes
+          fi

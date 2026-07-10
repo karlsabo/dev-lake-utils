@@ -248,7 +248,26 @@ Other packaging tasks available today:
 ./gradlew :eng-hub:packageDmg
 ./gradlew :eng-hub:packageMsi
 ./gradlew :eng-hub:packageDeb
+./gradlew :eng-hub:packageRpm
 ```
+
+The package version comes from the root Gradle `version` in `dev-lake-utils.gradle.kts`; native packages use only
+the SemVer core version because native package formats reject prerelease and build metadata. Linux packages are written
+under `eng-hub/build/compose/binaries/main/deb` and `eng-hub/build/compose/binaries/main/rpm`.
+
+## Releasing the Linux packages
+
+Set the root Gradle version to a stable `MAJOR.MINOR.PATCH` value and merge that commit. Tag the same commit with the
+exact same raw version, without a `v` prefix. For example:
+
+```bash
+git tag 0.2.0
+git push origin 0.2.0
+```
+
+The release workflow verifies the tag against the Gradle version before building. A matching tag creates GitHub Release
+`0.2.0` and uploads the unsigned Linux packages as `eng-hub-0.2.0-linux-amd64.deb` and
+`eng-hub-0.2.0-linux-x86_64.rpm`.
 
 ## Development Notes
 

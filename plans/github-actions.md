@@ -8,8 +8,8 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 
 - The README already tracks this feature as a TODO: build and publish app versions for Linux, macOS, and Windows and attach built binaries when a new Git tag is pushed (`README.md`).
 - The repo is a Gradle multi-project build with `eng-hub`, `summary-publisher`, `user-metrics-publisher`, `utilities`, and `shared-resources` included from `settings.gradle.kts`.
-- The Eng Hub desktop app is the initial release target: `eng-hub/eng-hub.gradle.kts` configures Compose Desktop with main class `com.github.karlsabo.devlake.enghub.MainKt`, package name `eng-hub`, and native distribution targets `TargetFormat.Dmg`, `TargetFormat.Msi`, and `TargetFormat.Deb`.
-- `eng-hub/README.md` documents the existing local build and package commands: `./gradlew :eng-hub:build`, `:eng-hub:packageDistributionForCurrentOS`, `:eng-hub:packageDmg`, `:eng-hub:packageMsi`, and `:eng-hub:packageDeb`.
+- The Eng Hub desktop app is the initial release target: `eng-hub/eng-hub.gradle.kts` configures Compose Desktop with main class `com.github.karlsabo.devlake.enghub.MainKt`, package name `eng-hub`, and native distribution targets `TargetFormat.Dmg`, `TargetFormat.Msi`, `TargetFormat.Deb`, and `TargetFormat.Rpm`.
+- `eng-hub/README.md` documents the existing local build and package commands: `./gradlew :eng-hub:build`, `:eng-hub:packageDistributionForCurrentOS`, `:eng-hub:packageDmg`, `:eng-hub:packageMsi`, `:eng-hub:packageDeb`, and `:eng-hub:packageRpm`.
 - `eng-hub/eng-hub.gradle.kts` currently hard-codes `packageVersion = "1.0.0"`, while the root build hard-codes `version = "0.1.0-SNAPSHOT"` in `dev-lake-utils.gradle.kts`. Release builds need `eng-hub` package metadata to use the checked-in Gradle version, and the release workflow needs to verify that the raw stable SemVer tag matches that version before publishing.
 - The Gradle wrapper is configured for Gradle `9.4.1` in `dev-lake-utils.gradle.kts`; Kotlin JVM compilation targets JVM 17 in `buildSrc/src/main/kotlin/devlake.kotlin-multiplatform-conventions.gradle.kts`.
 - There is no checked-in GitHub Actions workflow yet under `.github/workflows`.
@@ -34,7 +34,7 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 3. Given a pull request changes Kotlin or Gradle code, when the Windows CI job runs on `windows-latest`, then it executes `./gradlew clean build` and reports success or failure on the PR.
 4. Given a commit is pushed to `main`, when GitHub Actions evaluates the repository workflows, then the same build workflow starts for that push.
 5. Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.3.0`, when the release workflow runs, then it fails before packaging and uploads no installer assets.
-6. Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.2.0`, when the release workflow runs on Linux, then GitHub Release `0.2.0` contains an Eng Hub `.deb` asset named with version `0.2.0`.
+6. Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.2.0`, when the release workflow runs on Linux, then GitHub Release `0.2.0` contains Eng Hub `.deb` and `.rpm` assets named with version `0.2.0`.
 7. Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.2.0`, when the release workflow runs on macOS, then GitHub Release `0.2.0` contains an Eng Hub `.dmg` asset named with version `0.2.0`.
 8. Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.2.0`, when the release workflow runs on Windows, then GitHub Release `0.2.0` contains an Eng Hub `.msi` asset named with version `0.2.0`.
 
@@ -141,7 +141,7 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 **Scope:**
 
 - In: release preflight; raw stable SemVer tag matching; fail-fast version mismatch; no package upload on mismatch.
-- Out: building `.deb`, `.dmg`, or `.msi`; signing/notarization; manual release dispatch; prerelease/build metadata tags.
+- Out: building `.deb`, `.rpm`, `.dmg`, or `.msi`; signing/notarization; manual release dispatch; prerelease/build metadata tags.
 
 **Notes:**
 
@@ -149,9 +149,11 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 - Raw tag `0.2.0` should compare against Gradle version `0.2.0` exactly. A tag `v0.2.0`, `0.2.0-alpha.1`, or `0.2.0+build.5` should not trigger the first release workflow.
 - Keep this as a separate story from packaging so the irreversible part of release publishing only runs after version authority is clear.
 
-### 6. Publish Linux `.deb` on matching version tag
+### 6. Publish Linux `.deb` and `.rpm` packages on matching version tag
 
-**Acceptance criteria:** Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.2.0`, when the release workflow runs on Linux, then GitHub Release `0.2.0` contains an Eng Hub `.deb` asset named with version `0.2.0`.
+**Status:** Done
+
+**Acceptance criteria:** Given tag `0.2.0` is pushed to a commit whose checked-in Gradle version is `0.2.0`, when the release workflow runs on Linux, then GitHub Release `0.2.0` contains Eng Hub `.deb` and `.rpm` assets named with version `0.2.0`.
 
 **Expected edits:**
 
@@ -161,7 +163,7 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 
 **Scope:**
 
-- In: raw stable SemVer tag trigger such as `0.2.0`; Linux runner; verify tag/version match from Story 5; run `./gradlew clean :eng-hub:packageDeb`; upload the `.deb` to GitHub Release `0.2.0`.
+- In: raw stable SemVer tag trigger such as `0.2.0`; Linux runner; verify tag/version match from Story 5; run `./gradlew clean :eng-hub:packageDeb :eng-hub:packageRpm`; upload the `.deb` and `.rpm` to GitHub Release `0.2.0`.
 - Out: macOS/Windows assets; signing; repository package publishing; Maven publishing; prerelease/build metadata version translation.
 
 **Notes:**
@@ -169,7 +171,7 @@ Add GitHub Actions that validate Eng Hub on Linux, macOS, and Windows, then atta
 - This is the release tracer bullet. It proves Gradle version authority, release creation, and asset upload end-to-end with one artifact.
 - Use `permissions: contents: write` only in the release workflow.
 - Prefer GitHub Release upload over `./gradlew publish` because the existing publish configuration is only `mavenLocal()` in `utilities/utilities.gradle.kts`, and native installers are release assets, not Maven library artifacts.
-- Asset naming should make the platform unambiguous, for example `eng-hub-0.2.0-linux-amd64.deb` if Compose emits a less descriptive file name.
+- Asset naming should make the platform unambiguous, for example `eng-hub-0.2.0-linux-amd64.deb` and `eng-hub-0.2.0-linux-x86_64.rpm` if Compose emits less descriptive file names.
 
 ### 7. Publish macOS `.dmg` on matching version tag
 
