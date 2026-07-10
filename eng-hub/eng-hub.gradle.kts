@@ -5,6 +5,9 @@ val engHubPackageName = "eng-hub"
 val engHubPackageVersion = rootProject.version.toString()
     .substringBefore('-')
     .substringBefore('+')
+require(Regex("""\d+\.\d+\.\d+""").matches(engHubPackageVersion)) {
+    "Eng Hub package version must have three numeric components: $engHubPackageVersion"
+}
 
 plugins {
     id("devlake.kotlin-multiplatform-compose-conventions")
@@ -57,6 +60,7 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = engHubPackageName
             packageVersion = engHubPackageVersion
+            macOS.packageVersion = engHubPackageVersion
         }
     }
 }

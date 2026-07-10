@@ -252,10 +252,13 @@ Other packaging tasks available today:
 ```
 
 The package version comes from the root Gradle `version` in `dev-lake-utils.gradle.kts`; native packages use only
-the SemVer core version because native package formats reject prerelease and build metadata. Linux packages are written
-under `eng-hub/build/compose/binaries/main/deb` and `eng-hub/build/compose/binaries/main/rpm`.
+the SemVer core version because native package formats reject prerelease and build metadata. Apple `jpackage` also
+rejects a zero major version, so macOS package metadata adds one to the SemVer major version while release filenames
+retain the source version. This permanent offset preserves version ordering when the project moves from `0.x` to `1.x`.
+Packages are written under `eng-hub/build/compose/binaries/main`, in the `deb`, `rpm`, or `dmg` directory for their
+format.
 
-## Releasing the Linux packages
+## Releasing native packages
 
 Set the root Gradle version to a stable `MAJOR.MINOR.PATCH` value and merge that commit. Tag the same commit with the
 exact same raw version, without a `v` prefix. For example:
@@ -266,8 +269,9 @@ git push origin 0.2.0
 ```
 
 The release workflow verifies the tag against the Gradle version before building. A matching tag creates GitHub Release
-`0.2.0` and uploads the unsigned Linux packages as `eng-hub-0.2.0-linux-amd64.deb` and
-`eng-hub-0.2.0-linux-x86_64.rpm`.
+`0.2.0` and uploads `eng-hub-0.2.0-linux-amd64.deb`, `eng-hub-0.2.0-linux-x86_64.rpm`, and
+`eng-hub-0.2.0-macos.dmg`. These packages are unsigned, and the macOS app is not notarized, so macOS Gatekeeper may
+warn users before opening it.
 
 ## Development Notes
 

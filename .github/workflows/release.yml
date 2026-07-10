@@ -68,9 +68,30 @@ jobs:
             exit 1
           fi
 
+  create-release:
+    name: create-release
+    needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes
+          fi
+
   publish-linux:
     name: publish-linux
-    needs: preflight
+    needs: [preflight, create-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -130,16 +151,62 @@ jobs:
           DEB_ASSET_PATH: ${{ steps.asset.outputs.deb_path }}
           RPM_ASSET_PATH: ${{ steps.asset.outputs.rpm_path }}
         run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" \
-              "$DEB_ASSET_PATH#Eng Hub for Debian/Ubuntu (amd64)" \
-              "$RPM_ASSET_PATH#Eng Hub for Fedora/RHEL (x86_64)" \
-              --clobber
-          else
-            gh release create "$RELEASE_TAG" \
-              "$DEB_ASSET_PATH#Eng Hub for Debian/Ubuntu (amd64)" \
-              "$RPM_ASSET_PATH#Eng Hub for Fedora/RHEL (x86_64)" \
-              --verify-tag \
-              --title "$RELEASE_TAG" \
-              --generate-notes
+          gh release upload "$RELEASE_TAG" \
+            "$DEB_ASSET_PATH#Eng Hub for Debian/Ubuntu (amd64)" \
+            "$RPM_ASSET_PATH#Eng Hub for Fedora/RHEL (x86_64)" \
+            --clobber
+
+  publish-macos:
+    name: publish-macos
+    needs: [preflight, create-release]
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Package macOS installer
+        run: ./gradlew clean :eng-hub:packageDmg
+
+      - name: Prepare release asset
+        id: asset
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          dmg_packages=()
+          while IFS= read -r -d '' package; do
+            dmg_packages+=("$package")
+          done < <(find eng-hub/build/compose/binaries/main/dmg -type f -name '*.dmg' -print0)
+
+          if (( ${#dmg_packages[@]} != 1 )); then
+            echo "::error::Expected exactly one DMG package, found ${#dmg_packages[@]}."
+            exit 1
           fi
+
+          mkdir -p release-assets
+          dmg_asset="release-assets/eng-hub-${RELEASE_VERSION}-macos.dmg"
+          mv "${dmg_packages[0]}" "$dmg_asset"
+          echo "dmg_path=$dmg_asset" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+          DMG_ASSET_PATH: ${{ steps.asset.outputs.dmg_path }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "$DMG_ASSET_PATH#Eng Hub for macOS" \
+            --clobber
