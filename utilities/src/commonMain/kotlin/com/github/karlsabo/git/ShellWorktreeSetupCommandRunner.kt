@@ -8,7 +8,7 @@ class ShellWorktreeSetupCommandRunner : WorktreeSetupCommandRunner {
             return WorktreeSetupCommandResult(exitCode = 0, stdout = "", stderr = "")
         }
 
-        val shellCommand = listOf(request.setupShell, "-l", "-c", buildWorktreeSetupScript(request))
+        val shellCommand = request.buildSetupShellCommand()
         val result = executeCommand(
             command = shellCommand,
             workingDirectory = request.worktreePath.value,
@@ -35,6 +35,18 @@ class ShellWorktreeSetupCommandRunner : WorktreeSetupCommandRunner {
         )
     }
 }
+
+private fun WorktreeSetupRequest.buildSetupShellCommand(): List<String> =
+    if (setupShell.isWindowsPowerShell()) {
+        listOf(setupShell, "-NoProfile", "-Command", buildPowerShellWorktreeSetupScript(expandedSetupCommands()))
+    } else {
+        listOf(setupShell, "-l", "-c", buildWorktreeSetupScript(this))
+    }
+
+private fun String.isWindowsPowerShell(): Boolean =
+    substringAfterLast('/').substringAfterLast('\\').equals("powershell.exe", ignoreCase = true)
+
+internal fun buildPowerShellWorktreeSetupScript(commands: List<String>): String = commands.joinToString("\n")
 
 fun buildWorktreeSetupScript(request: WorktreeSetupRequest): String = buildWorktreeSetupScript(
     request.expandedSetupCommands(),

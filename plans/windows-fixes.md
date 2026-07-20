@@ -58,7 +58,7 @@
 - The failures share fixture setup knowledge, so this remains one portability story even though the fixture supports multiple Git scenarios.
 - Write files through `SystemFileSystem` under `Path(repoDir, fileName)` instead of interpolating paths into shell commands.
 
-### 3. Run successful setup commands through PowerShell
+### 3. Run successful setup commands through PowerShell ✅
 
 **Acceptance criteria:** Given a Windows runner, when `./gradlew :utilities:jvmTest --tests 'com.github.karlsabo.git.ShellWorktreeSetupCommandRunnerTest.setupCommandsShareShellState' --no-build-cache` runs, then setup uses `powershell.exe`, a directory and variable set by earlier commands remain available to a later command, the later command writes the expected file, and the runner returns `0`.
 

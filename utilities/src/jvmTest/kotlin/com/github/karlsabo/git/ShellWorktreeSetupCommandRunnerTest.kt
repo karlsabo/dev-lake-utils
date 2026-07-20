@@ -1,5 +1,7 @@
 package com.github.karlsabo.git
 
+import com.github.karlsabo.system.OsFamily
+import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -61,15 +63,24 @@ class ShellWorktreeSetupCommandRunnerTest {
         val worktreePath = createArchiveWorktreeTempDir()
         try {
             SystemFileSystem.createDirectories(Path(worktreePath, "nested"))
+            val windows = osFamily() == OsFamily.WINDOWS
             val request = WorktreeSetupRequest(
                 repoPath = repoPath,
                 worktreePath = WorktreePath(worktreePath),
-                setupShell = "/bin/sh",
-                setupCommands = listOf(
-                    "cd nested",
-                    "export SETUP_STATE=kept",
-                    "printf '%s\\n' \"${'$'}SETUP_STATE\" > state.txt",
-                ),
+                setupShell = if (windows) "powershell.exe" else "/bin/sh",
+                setupCommands = if (windows) {
+                    listOf(
+                        "Set-Location nested",
+                        "${'$'}SETUP_STATE = 'kept'",
+                        "Set-Content -NoNewline -Path state.txt -Value ${'$'}SETUP_STATE",
+                    )
+                } else {
+                    listOf(
+                        "cd nested",
+                        "export SETUP_STATE=kept",
+                        "printf '%s' \"${'$'}SETUP_STATE\" > state.txt",
+                    )
+                },
             )
 
             val result = ShellWorktreeSetupCommandRunner().runSetup(request)
@@ -80,7 +91,7 @@ class ShellWorktreeSetupCommandRunnerTest {
             val state = SystemFileSystem.source(Path(worktreePath, "nested", "state.txt")).buffered().use {
                 it.readString()
             }
-            assertEquals("kept\n", state)
+            assertEquals("kept", state)
         } finally {
             removeTempDir(repoPath)
             removeTempDir(worktreePath)
