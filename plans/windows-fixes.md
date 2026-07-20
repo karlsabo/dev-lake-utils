@@ -72,7 +72,7 @@
 - In: preserve existing POSIX behavior for explicitly configured POSIX shells.
 - Out: failure reporting and placeholder escaping.
 
-### 4. Report native command failures from PowerShell
+### 4. Report native command failures from PowerShell ✅
 
 **Acceptance criteria:** Given a Windows runner, when `./gradlew :utilities:jvmTest --tests 'com.github.karlsabo.git.ShellWorktreeSetupCommandRunnerTest.setupFailureReportsPerCommandOutputAndRunsCommandsAfterFailure' --no-build-cache` runs, then a child process invoked by one PowerShell setup command exits `23`, later setup commands still run, and `WorktreeSetupException` reports each command's stdout, stderr, status, plus overall exit code `23`.
 

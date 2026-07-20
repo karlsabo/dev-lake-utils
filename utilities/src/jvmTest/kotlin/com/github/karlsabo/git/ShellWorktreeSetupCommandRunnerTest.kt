@@ -19,34 +19,50 @@ class ShellWorktreeSetupCommandRunnerTest {
         val repoPath = createArchiveWorktreeTempDir()
         val worktreePath = createArchiveWorktreeTempDir()
         try {
-            val request = WorktreeSetupRequest(
-                repoPath = repoPath,
-                worktreePath = WorktreePath(worktreePath),
-                setupShell = "/bin/sh",
-                setupCommands = listOf(
+            val windows = osFamily() == OsFamily.WINDOWS
+            val setupCommands = if (windows) {
+                listOf(
+                    "Write-Output 'standard out'",
+                    "& powershell.exe -NoProfile -Command \"[Console]::Error.WriteLine('standard error')\"",
+                    "& powershell.exe -NoProfile -Command \"exit 23\"",
+                    "Write-Output 'after failure'",
+                )
+            } else {
+                listOf(
                     "printf 'standard out\\n'",
                     "printf 'standard error\\n' >&2",
                     "sh -c 'exit 23'",
                     "printf 'after failure\\n'",
-                ),
+                )
+            }
+            val setupShell = if (windows) "powershell.exe" else "/bin/sh"
+            val request = WorktreeSetupRequest(
+                repoPath = repoPath,
+                worktreePath = WorktreePath(worktreePath),
+                setupShell = setupShell,
+                setupCommands = setupCommands,
             )
 
             val error = assertFailsWith<WorktreeSetupException> {
                 ShellWorktreeSetupCommandRunner().runSetup(request)
             }
-            val message = error.message.orEmpty()
+            val message = error.message.orEmpty().replace("\r\n", "\n")
 
             assertTrue("Setup failed for $worktreePath" in message, message)
             assertTrue("Working directory: $worktreePath" in message, message)
-            assertTrue("Shell: /bin/sh -l -c <generated setup script>" in message, message)
+            val shellArguments = if (windows) "-NoProfile -Command" else "-l -c"
+            assertTrue(
+                "Shell: $setupShell $shellArguments <generated setup script>" in message,
+                message,
+            )
             assertTrue("Overall exit code: 23" in message, message)
             assertTrue("[1/4] OK exit 0" in message, message)
-            assertTrue("$ printf 'standard out\\n'" in message, message)
+            assertTrue("${'$'} ${setupCommands[0]}" in message, message)
             assertTrue("stdout:\nstandard out\n" in message, message)
             assertTrue("[2/4] OK exit 0" in message, message)
             assertTrue("stderr:\nstandard error\n" in message, message)
             assertTrue("[3/4] FAILED exit 23" in message, message)
-            assertTrue("$ sh -c 'exit 23'" in message, message)
+            assertTrue("${'$'} ${setupCommands[2]}" in message, message)
             assertTrue("[4/4] OK exit 0" in message, message)
             assertTrue("stdout:\nafter failure\n" in message, message)
             assertTrue("SKIPPED" !in message, message)

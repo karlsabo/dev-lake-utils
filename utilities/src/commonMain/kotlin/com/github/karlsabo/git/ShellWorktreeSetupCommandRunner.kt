@@ -37,16 +37,57 @@ class ShellWorktreeSetupCommandRunner : WorktreeSetupCommandRunner {
 }
 
 private fun WorktreeSetupRequest.buildSetupShellCommand(): List<String> =
+    listOf(setupShell) + setupShellArguments() + generatedSetupScript()
+
+internal fun WorktreeSetupRequest.setupShellArguments(): List<String> =
+    if (setupShell.isWindowsPowerShell()) listOf("-NoProfile", "-Command") else listOf("-l", "-c")
+
+private fun WorktreeSetupRequest.generatedSetupScript(): String =
     if (setupShell.isWindowsPowerShell()) {
-        listOf(setupShell, "-NoProfile", "-Command", buildPowerShellWorktreeSetupScript(expandedSetupCommands()))
+        buildPowerShellWorktreeSetupScript(expandedSetupCommands())
     } else {
-        listOf(setupShell, "-l", "-c", buildWorktreeSetupScript(this))
+        buildWorktreeSetupScript(this)
     }
 
 private fun String.isWindowsPowerShell(): Boolean =
     substringAfterLast('/').substringAfterLast('\\').equals("powershell.exe", ignoreCase = true)
 
-internal fun buildPowerShellWorktreeSetupScript(commands: List<String>): String = commands.joinToString("\n")
+internal fun buildPowerShellWorktreeSetupScript(commands: List<String>): String = buildString {
+    appendLine("${'$'}setupExitCode = 0")
+    appendLine(
+        "${'$'}setupTmpDir = [IO.Path]::Combine(" +
+            "[IO.Path]::GetTempPath(), 'eng-hub-setup-' + [Guid]::NewGuid().ToString('N'))",
+    )
+    appendLine("[IO.Directory]::CreateDirectory(${'$'}setupTmpDir) | Out-Null")
+    appendLine("try {")
+    commands.forEachIndexed { index, command ->
+        appendLine("    ${'$'}setupStdoutFile = [IO.Path]::Combine(${'$'}setupTmpDir, 'stdout_$index')")
+        appendLine("    ${'$'}setupStderrFile = [IO.Path]::Combine(${'$'}setupTmpDir, 'stderr_$index')")
+        appendLine("    [Console]::Error.WriteLine(\"$SETUP_COMMAND_START_MARKER`t$index\")")
+        appendLine("    ${'$'}LASTEXITCODE = 0")
+        appendLine("    . {")
+        appendLine(command.prependIndent("        "))
+        appendLine("    } 1> ${'$'}setupStdoutFile 2> ${'$'}setupStderrFile")
+        appendLine("    ${'$'}commandExitCode = ${'$'}LASTEXITCODE")
+        appendLine("    [Console]::Out.WriteLine(\"$SETUP_COMMAND_STDOUT_BEGIN_MARKER`t$index\")")
+        appendLine("    [Console]::Out.Write([IO.File]::ReadAllText(${'$'}setupStdoutFile))")
+        appendLine("    [Console]::Out.WriteLine(\"$SETUP_COMMAND_STDOUT_END_MARKER`t$index`t\")")
+        appendLine("    [Console]::Error.WriteLine(\"$SETUP_COMMAND_STDERR_BEGIN_MARKER`t$index\")")
+        appendLine("    [Console]::Error.Write([IO.File]::ReadAllText(${'$'}setupStderrFile))")
+        appendLine("    [Console]::Error.WriteLine(\"$SETUP_COMMAND_STDERR_END_MARKER`t$index`t\")")
+        appendLine(
+            "    [Console]::Error.WriteLine(" +
+                "\"$SETUP_COMMAND_RESULT_MARKER`t$index`t\" + ${'$'}commandExitCode)",
+        )
+        appendLine("    if ((${'$'}commandExitCode -ne 0) -and (${'$'}setupExitCode -eq 0)) {")
+        appendLine("        ${'$'}setupExitCode = ${'$'}commandExitCode")
+        appendLine("    }")
+    }
+    appendLine("} finally {")
+    appendLine("    Remove-Item -LiteralPath ${'$'}setupTmpDir -Recurse -Force -ErrorAction SilentlyContinue")
+    appendLine("}")
+    append("exit ${'$'}setupExitCode")
+}
 
 fun buildWorktreeSetupScript(request: WorktreeSetupRequest): String = buildWorktreeSetupScript(
     request.expandedSetupCommands(),

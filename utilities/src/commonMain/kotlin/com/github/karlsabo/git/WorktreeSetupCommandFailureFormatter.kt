@@ -11,10 +11,13 @@ internal fun formatSetupCommandFailure(
     appendLine("Setup failed for ${request.worktreePath.value}")
     appendLine()
     appendLine("Working directory: ${request.worktreePath.value}")
-    appendLine("Shell: ${request.setupShell} -l -c <generated setup script>")
+    appendLine("Shell: ${request.formattedSetupShellInvocation()}")
     appendLine("Overall exit code: ${result.exitCode}")
     executions.forEach { execution -> appendSetupCommandExecution(execution, setupCommands.size) }
 }
+
+private fun WorktreeSetupRequest.formattedSetupShellInvocation(): String =
+    (listOf(setupShell) + setupShellArguments() + "<generated setup script>").joinToString(" ")
 
 private fun StringBuilder.appendSetupCommandExecution(
     execution: SetupCommandExecution,
