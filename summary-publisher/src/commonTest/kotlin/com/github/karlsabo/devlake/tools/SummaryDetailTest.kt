@@ -675,14 +675,6 @@ class SummaryDetailTest {
             repo: String,
             prNumber: Int,
         ): com.github.karlsabo.github.ReviewSummary = com.github.karlsabo.github.ReviewSummary(0, 0, emptyList())
-
-        override suspend fun submitReview(
-            prApiUrl: String,
-            event: com.github.karlsabo.github.ReviewStateValue,
-            reviewComment: String?,
-        ) {
-            TODO("Not yet implemented")
-        }
     }
 
     /**

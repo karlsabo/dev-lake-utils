@@ -28,7 +28,7 @@ class LlmSkillSyncTest {
         fs.sink(path).buffered().use { it.writeString(content) }
     }
 
-    private fun readFile(path: Path): String = fs.source(path).buffered().readString()
+    private fun readFile(path: Path): String = fs.source(path).buffered().use { it.readString() }
 
     private fun deleteRecursively(path: Path) {
         if (!fs.exists(path)) return

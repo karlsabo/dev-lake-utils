@@ -17,7 +17,6 @@ import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.NotificationRepository
 import com.github.karlsabo.github.NotificationSubject
 import com.github.karlsabo.github.PullRequest
-import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreReason
@@ -184,12 +183,6 @@ class RecordingNotificationIgnoreStore(
     }
 }
 
-data class SubmittedReview(
-    val prApiUrl: String,
-    val event: ReviewStateValue,
-    val reviewComment: String?,
-)
-
 class NotificationPersistenceGitHubApi(
     private val notifications: List<Notification> = emptyList(),
     private val pullRequestsByUrl: Map<String, PullRequest> = emptyMap(),
@@ -200,7 +193,6 @@ class NotificationPersistenceGitHubApi(
 ) : GitHubApi {
     val pullRequestByUrlCalls = mutableListOf<String>()
     val approvedPullRequestUrls = MutableStateFlow<List<String>>(emptyList())
-    val submittedReviews = MutableStateFlow<List<SubmittedReview>>(emptyList())
     val unsubscribedThreadIds = MutableStateFlow<List<String>>(emptyList())
     val markedDoneThreadIds = MutableStateFlow<List<String>>(emptyList())
 
@@ -280,14 +272,6 @@ class NotificationPersistenceGitHubApi(
         repo: String,
         prNumber: Int,
     ): ReviewSummary = ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
-
-    override suspend fun submitReview(
-        prApiUrl: String,
-        event: ReviewStateValue,
-        reviewComment: String?,
-    ) {
-        submittedReviews.value += SubmittedReview(prApiUrl, event, reviewComment)
-    }
 }
 
 fun testNotification(

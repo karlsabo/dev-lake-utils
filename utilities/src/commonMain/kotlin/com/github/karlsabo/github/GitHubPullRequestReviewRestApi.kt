@@ -68,27 +68,6 @@ internal class GitHubPullRequestReviewRestApi(
         return hasApprovedHumanReview(responseText)
     }
 
-    override suspend fun submitReview(
-        prApiUrl: String,
-        event: ReviewStateValue,
-        reviewComment: String?,
-    ) {
-        val response = restClient.client.post(reviewsUrl(prApiUrl)) {
-            contentType(ContentType.Application.Json)
-            setBody(CreateReviewRequest(event = event.toSubmitEventString(), body = reviewComment ?: ""))
-        }
-        val responseText = response.bodyAsText()
-        if (response.status.value !in successStatusCodes) {
-            logger.error { "submitReview responseText=```$responseText```" }
-            throwGitHubApiException(
-                operation = "submit review",
-                statusCode = response.status.value,
-                context = "for url=$prApiUrl",
-                responseText = responseText,
-            )
-        }
-    }
-
     private fun hasApprovedHumanReview(responseText: String): Boolean = try {
         lenientJson.parseToJsonElement(responseText).jsonArray.any(::isApprovedHumanReview)
     } catch (error: SerializationException) {

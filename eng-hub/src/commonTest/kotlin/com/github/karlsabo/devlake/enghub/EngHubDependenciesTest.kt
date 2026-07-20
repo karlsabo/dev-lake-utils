@@ -15,7 +15,6 @@ import com.github.karlsabo.github.GitHubNotificationService
 import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.PullRequest
-import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.notifications.IgnoredNotificationThread
@@ -312,12 +311,6 @@ private class RecordingGitHubApi : GitHubApi {
         repo: String,
         prNumber: Int,
     ): ReviewSummary = ReviewSummary(approvedCount = 0, requestedCount = 0, reviews = emptyList())
-
-    override suspend fun submitReview(
-        prApiUrl: String,
-        event: ReviewStateValue,
-        reviewComment: String?,
-    ) = Unit
 }
 
 private class RecordingNotificationIgnoreStore : NotificationIgnoreStore {

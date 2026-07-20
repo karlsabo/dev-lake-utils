@@ -1,9 +1,11 @@
 package com.github.karlsabo.git
 
 import com.github.karlsabo.system.executeCommand
+import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.SystemTemporaryDirectory
+import kotlinx.io.writeString
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,21 +41,35 @@ class GitCommandServiceTest {
         SystemFileSystem.delete(path, mustExist = false)
     }
 
+    private fun executeGit(vararg arguments: String): String {
+        val command = listOf("git", *arguments)
+        val result = executeCommand(command, workingDirectory = null)
+        check(result.exitCode == 0) {
+            "Fixture Git command failed (${result.exitCode}): ${command.joinToString(" ")}\n${result.stderr}"
+        }
+        return result.stdout
+    }
+
+    private fun writeFixtureFile(
+        repoDir: String,
+        fileName: String,
+        content: String,
+    ) {
+        SystemFileSystem.sink(Path(repoDir, fileName)).buffered().use { it.writeString(content) }
+    }
+
     private fun initBareRepo(path: String) {
-        val result = executeCommand(listOf("git", "init", "--bare", path), workingDirectory = null)
-        check(result.exitCode == 0) { "Failed to init bare repo: ${result.stderr}" }
+        executeGit("init", "--bare", path)
     }
 
     private fun initRepoWithCommit(path: String): String {
-        executeCommand(listOf("git", "init", path), workingDirectory = null)
-        executeCommand(listOf("git", "-C", path, "config", "user.email", "test@test.com"), workingDirectory = null)
-        executeCommand(listOf("git", "-C", path, "config", "user.name", "Test"), workingDirectory = null)
-        // Create an initial commit so we have a valid HEAD
-        executeCommand(listOf("sh", "-c", "echo hello > $path/README.md"), workingDirectory = null)
-        executeCommand(listOf("git", "-C", path, "add", "."), workingDirectory = null)
-        executeCommand(listOf("git", "-C", path, "commit", "-m", "initial"), workingDirectory = null)
-        val hashResult = executeCommand(listOf("git", "-C", path, "rev-parse", "HEAD"), workingDirectory = null)
-        return hashResult.stdout.trim()
+        executeGit("init", path)
+        executeGit("-C", path, "config", "user.email", "test@test.com")
+        executeGit("-C", path, "config", "user.name", "Test")
+        writeFixtureFile(path, "README.md", "hello\n")
+        executeGit("-C", path, "add", ".")
+        executeGit("-C", path, "commit", "-m", "initial")
+        return executeGit("-C", path, "rev-parse", "HEAD").trim()
     }
 
     // -- clone --
@@ -118,7 +134,7 @@ class GitCommandServiceTest {
         try {
             initRepoWithCommit(originDir)
             service.clone(originDir, cloneDir)
-            executeCommand(listOf("git", "-C", originDir, "branch", "feature/stacked-pr"), workingDirectory = null)
+            executeGit("-C", originDir, "branch", "feature/stacked-pr")
 
             assertTrue(service.remoteBranchExists(cloneDir, "feature/stacked-pr"))
             assertFalse(service.remoteBranchExists(cloneDir, "feature/missing-pr"))
@@ -133,7 +149,7 @@ class GitCommandServiceTest {
         val repoDir = createTempDir("repo")
         try {
             initRepoWithCommit(repoDir)
-            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/stacked-pr"), workingDirectory = null)
+            executeGit("-C", repoDir, "branch", "feature/stacked-pr")
 
             assertTrue(service.localBranchExists(repoDir, "feature/stacked-pr"))
             assertFalse(service.localBranchExists(repoDir, "feature/missing-pr"))
@@ -179,14 +195,11 @@ class GitCommandServiceTest {
         val repoDir = createTempDir("repo")
         try {
             initRepoWithCommit(repoDir)
-            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr"), workingDirectory = null)
-            executeCommand(
-                listOf("git", "-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr"),
-                workingDirectory = null,
-            )
-            executeCommand(listOf("sh", "-c", "echo child > $repoDir/child.txt"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "child"), workingDirectory = null)
+            executeGit("-C", repoDir, "branch", "feature/base-pr")
+            executeGit("-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr")
+            writeFixtureFile(repoDir, "child.txt", "child\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "child")
 
             assertTrue(service.isAncestor(repoDir, "feature/base-pr", "feature/stacked-pr"))
             assertFalse(service.isAncestor(repoDir, "feature/stacked-pr", "feature/base-pr"))
@@ -200,21 +213,18 @@ class GitCommandServiceTest {
         val repoDir = createTempDir("repo")
         try {
             initRepoWithCommit(repoDir)
-            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr"), workingDirectory = null)
-            executeCommand(
-                listOf("git", "-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr"),
-                workingDirectory = null,
-            )
-            executeCommand(listOf("sh", "-c", "echo child > $repoDir/child.txt"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "child"), workingDirectory = null)
+            executeGit("-C", repoDir, "branch", "feature/base-pr")
+            executeGit("-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr")
+            writeFixtureFile(repoDir, "child.txt", "child\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "child")
 
             assertFalse(service.hasCommitsNotContainedIn(repoDir, "feature/base-pr", "feature/stacked-pr"))
 
-            executeCommand(listOf("git", "-C", repoDir, "checkout", "feature/base-pr"), workingDirectory = null)
-            executeCommand(listOf("sh", "-c", "echo parent > $repoDir/parent.txt"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "parent"), workingDirectory = null)
+            executeGit("-C", repoDir, "checkout", "feature/base-pr")
+            writeFixtureFile(repoDir, "parent.txt", "parent\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "parent")
 
             assertTrue(service.hasCommitsNotContainedIn(repoDir, "feature/base-pr", "feature/stacked-pr"))
         } finally {
@@ -229,20 +239,17 @@ class GitCommandServiceTest {
         removeTempDir(worktreeDir)
         try {
             initRepoWithCommit(repoDir)
-            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr"), workingDirectory = null)
-            executeCommand(
-                listOf("git", "-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr"),
-                workingDirectory = null,
-            )
-            executeCommand(listOf("sh", "-c", "echo child > $repoDir/child.txt"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "child"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "checkout", "feature/base-pr"), workingDirectory = null)
-            executeCommand(listOf("sh", "-c", "echo parent > $repoDir/parent.txt"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "parent"), workingDirectory = null)
+            executeGit("-C", repoDir, "branch", "feature/base-pr")
+            executeGit("-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr")
+            writeFixtureFile(repoDir, "child.txt", "child\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "child")
+            executeGit("-C", repoDir, "checkout", "feature/base-pr")
+            writeFixtureFile(repoDir, "parent.txt", "parent\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "parent")
             service.worktreeAdd(repoDir, worktreeDir, "feature/stacked-pr")
-            executeCommand(listOf("sh", "-c", "echo child dirty > $worktreeDir/child.txt"), workingDirectory = null)
+            writeFixtureFile(worktreeDir, "child.txt", "child dirty\n")
 
             service.rebase(worktreeDir, "feature/base-pr")
 
@@ -261,18 +268,15 @@ class GitCommandServiceTest {
         removeTempDir(worktreeDir)
         try {
             initRepoWithCommit(repoDir)
-            executeCommand(listOf("git", "-C", repoDir, "branch", "feature/base-pr"), workingDirectory = null)
-            executeCommand(
-                listOf("git", "-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr"),
-                workingDirectory = null,
-            )
-            executeCommand(listOf("sh", "-c", "echo child > $repoDir/README.md"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "child"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "checkout", "feature/base-pr"), workingDirectory = null)
-            executeCommand(listOf("sh", "-c", "echo parent > $repoDir/README.md"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "parent"), workingDirectory = null)
+            executeGit("-C", repoDir, "branch", "feature/base-pr")
+            executeGit("-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr")
+            writeFixtureFile(repoDir, "README.md", "child\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "child")
+            executeGit("-C", repoDir, "checkout", "feature/base-pr")
+            writeFixtureFile(repoDir, "README.md", "parent\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "parent")
             service.worktreeAdd(repoDir, worktreeDir, "feature/stacked-pr")
 
             assertFailsWith<GitCommandException> {
@@ -294,7 +298,7 @@ class GitCommandServiceTest {
         removeTempDir(worktreeDir)
         try {
             initRepoWithCommit(repoDir)
-            executeCommand(listOf("git", "-C", repoDir, "branch", "feature-branch"), workingDirectory = null)
+            executeGit("-C", repoDir, "branch", "feature-branch")
 
             service.worktreeAdd(repoDir, worktreeDir, "feature-branch")
 
@@ -318,13 +322,10 @@ class GitCommandServiceTest {
         removeTempDir(worktreeDir)
         try {
             val baseCommit = initRepoWithCommit(repoDir)
-            executeCommand(listOf("sh", "-c", "echo mainline > $repoDir/mainline.txt"), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "add", "."), workingDirectory = null)
-            executeCommand(listOf("git", "-C", repoDir, "commit", "-m", "mainline"), workingDirectory = null)
-            val currentCommit = executeCommand(
-                listOf("git", "-C", repoDir, "rev-parse", "HEAD"),
-                workingDirectory = null,
-            ).stdout.trim()
+            writeFixtureFile(repoDir, "mainline.txt", "mainline\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "mainline")
+            val currentCommit = executeGit("-C", repoDir, "rev-parse", "HEAD").trim()
             assertFalse(baseCommit == currentCommit, "Test setup requires HEAD to differ from the base commit-ish")
 
             service.worktreeAddNewBranch(
@@ -334,15 +335,9 @@ class GitCommandServiceTest {
                 baseCommit,
             )
 
-            val branch = executeCommand(
-                listOf("git", "-C", worktreeDir, "branch", "--show-current"),
-                workingDirectory = null,
-            ).stdout.trim()
+            val branch = executeGit("-C", worktreeDir, "branch", "--show-current").trim()
             assertEquals("feature/stacked-pr", branch)
-            val branchStart = executeCommand(
-                listOf("git", "-C", worktreeDir, "rev-parse", "HEAD"),
-                workingDirectory = null,
-            ).stdout.trim()
+            val branchStart = executeGit("-C", worktreeDir, "rev-parse", "HEAD").trim()
             assertEquals(baseCommit, branchStart)
 
             val listing = service.worktreeList(repoDir)

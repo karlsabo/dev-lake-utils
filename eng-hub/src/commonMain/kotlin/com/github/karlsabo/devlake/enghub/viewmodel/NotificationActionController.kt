@@ -3,7 +3,6 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
-import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.notifications.NotificationIgnoreReason
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
@@ -24,23 +23,6 @@ internal class NotificationActionController(
             actionFailureMessage = "Failed to approve pull request",
         ) {
             gitHubServices.pullRequestReviewApi.approvePullRequestByUrl(apiUrl)
-        }
-    }
-
-    fun submitReview(
-        notification: NotificationUiState,
-        event: ReviewStateValue,
-        reviewComment: String?,
-    ) {
-        val apiUrl = requireNotNull(notification.apiUrl) {
-            "Cannot submit review for notification without an API URL"
-        }
-        runPullRequestDoneAction(
-            notification = notification,
-            actionLogName = "submit review for $apiUrl",
-            actionFailureMessage = "Failed to submit review",
-        ) {
-            gitHubServices.pullRequestReviewApi.submitReview(apiUrl, event, reviewComment)
         }
     }
 

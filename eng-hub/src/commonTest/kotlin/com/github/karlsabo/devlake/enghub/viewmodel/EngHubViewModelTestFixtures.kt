@@ -22,7 +22,6 @@ import com.github.karlsabo.github.GitHubNotificationService
 import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.PullRequest
-import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.User
 import com.github.karlsabo.notifications.IgnoredNotificationThread
@@ -177,14 +176,6 @@ class RecordingGitHubApi(
     }
 
     override suspend fun hasAnyApprovedReview(url: String): Boolean {
-        error("Unexpected call")
-    }
-
-    override suspend fun submitReview(
-        prApiUrl: String,
-        event: ReviewStateValue,
-        reviewComment: String?,
-    ) {
         error("Unexpected call")
     }
 }

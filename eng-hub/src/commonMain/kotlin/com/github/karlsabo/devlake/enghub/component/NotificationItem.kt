@@ -11,15 +11,12 @@ import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
+
 @Composable
 fun NotificationItem(
     notification: NotificationUiState,
@@ -28,15 +25,6 @@ fun NotificationItem(
     modifier: Modifier = Modifier,
     actionInProgress: Boolean = false,
 ) {
-    var showReviewDialog by remember { mutableStateOf(false) }
-
-    NotificationReviewDialog(
-        visible = showReviewDialog && notification.apiUrl != null,
-        notification = notification,
-        actions = actions,
-        onDismiss = { showReviewDialog = false },
-    )
-
     Card(
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         elevation = 2.dp,
@@ -54,28 +42,9 @@ fun NotificationItem(
                 actions = actions,
                 setupStatus = setupStatus,
                 actionInProgress = actionInProgress,
-                onShowReviewDialog = { showReviewDialog = true },
             )
         }
     }
-}
-
-@Composable
-private fun NotificationReviewDialog(
-    visible: Boolean,
-    notification: NotificationUiState,
-    actions: NotificationActions,
-    onDismiss: () -> Unit,
-) {
-    if (!visible) return
-
-    ReviewDialog(
-        onSubmit = { event, body ->
-            actions.onSubmitReview(notification, event, body)
-            onDismiss()
-        },
-        onDismiss = onDismiss,
-    )
 }
 
 @Composable
@@ -99,14 +68,13 @@ private fun NotificationActionButtons(
     actions: NotificationActions,
     setupStatus: WorktreeSetupStatus?,
     actionInProgress: Boolean,
-    onShowReviewDialog: () -> Unit,
 ) {
     val setupInProgress = setupStatus != null
 
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         NotificationOpenButton(notification, actions, actionInProgress)
         NotificationSetupButton(notification, actions, setupStatus, setupInProgress, actionInProgress)
-        NotificationReviewButtons(notification, actions, actionInProgress, onShowReviewDialog)
+        NotificationApproveButton(notification, actions, actionInProgress)
         NotificationDoneButton(notification, actions, actionInProgress)
         NotificationUnsubscribeButton(notification, actions, actionInProgress)
     }
@@ -148,27 +116,18 @@ private fun NotificationSetupButton(
 }
 
 @Composable
-private fun NotificationReviewButtons(
+private fun NotificationApproveButton(
     notification: NotificationUiState,
     actions: NotificationActions,
     actionInProgress: Boolean,
-    onShowReviewDialog: () -> Unit,
 ) {
     if (!notification.isPullRequest || notification.apiUrl == null) return
 
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Button(
-            onClick = { actions.onApprove(notification) },
-            enabled = !actionInProgress,
-        ) {
-            Text("Approve")
-        }
-        Button(
-            onClick = onShowReviewDialog,
-            enabled = !actionInProgress,
-        ) {
-            Text("Review")
-        }
+    Button(
+        onClick = { actions.onApprove(notification) },
+        enabled = !actionInProgress,
+    ) {
+        Text("Approve")
     }
 }
 

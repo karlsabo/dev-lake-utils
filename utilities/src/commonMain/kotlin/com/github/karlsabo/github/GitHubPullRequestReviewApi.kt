@@ -6,10 +6,4 @@ interface GitHubPullRequestReviewApi {
     suspend fun approvePullRequestByUrl(url: String, body: String? = null)
 
     suspend fun hasAnyApprovedReview(url: String): Boolean
-
-    suspend fun submitReview(
-        prApiUrl: String,
-        event: ReviewStateValue,
-        reviewComment: String? = null,
-    )
 }

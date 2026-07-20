@@ -393,12 +393,6 @@ class SummaryPublisherDependenciesTest {
             repo: String,
             prNumber: Int,
         ) = unexpected()
-
-        override suspend fun submitReview(
-            prApiUrl: String,
-            event: com.github.karlsabo.github.ReviewStateValue,
-            reviewComment: String?,
-        ) = unexpected()
     }
 
     private object NoOpPagerDutyApi : PagerDutyApi {

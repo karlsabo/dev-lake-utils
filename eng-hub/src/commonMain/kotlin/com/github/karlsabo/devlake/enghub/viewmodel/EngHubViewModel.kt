@@ -10,7 +10,6 @@ import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupHandle
 import com.github.karlsabo.git.WorktreeSetupStatus
-import com.github.karlsabo.github.ReviewStateValue
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -195,8 +194,6 @@ class EngHubViewModel(
     val dismissForceArchiveWorktreeRequest: () -> Unit =
         archiveController::dismissForceArchiveWorktreeRequest
     val approvePullRequest: (NotificationUiState) -> Unit = notificationActionController::approvePullRequest
-    val submitReview: (NotificationUiState, ReviewStateValue, String?) -> Unit =
-        notificationActionController::submitReview
     val markNotificationDone: (NotificationUiState) -> Unit = notificationActionController::markNotificationDone
     val unsubscribeFromNotification: (NotificationUiState) -> Unit =
         notificationActionController::unsubscribeFromNotification

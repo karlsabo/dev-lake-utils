@@ -29,7 +29,7 @@
 
 ## Stories
 
-### 1. Close LlmSkillSync test file handles
+### 1. Close LlmSkillSync test file handles ✅
 
 **Acceptance criteria:** Given a Windows runner, when `./gradlew :eng-hub:jvmTest --tests com.github.karlsabo.devlake.enghub.LlmSkillSyncTest --no-build-cache` runs, then every `LlmSkillSyncTest` passes and its temporary directories are deleted without file-lock errors.
 
@@ -43,7 +43,7 @@
 **Notes:**
 - Use `fs.source(path).buffered().use { it.readString() }`, matching `readText` in `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubViewModelTestFixtures.kt`.
 
-### 2. Make GitCommandService fixtures path-portable
+### 2. Make GitCommandService fixtures path-portable ✅
 
 **Acceptance criteria:** Given a Windows runner with Git installed, when `./gradlew :utilities:jvmTest --tests com.github.karlsabo.git.GitCommandServiceTest --no-build-cache` runs, then the Git integration suite creates its fixture commits without a POSIX shell and all tests pass.
 

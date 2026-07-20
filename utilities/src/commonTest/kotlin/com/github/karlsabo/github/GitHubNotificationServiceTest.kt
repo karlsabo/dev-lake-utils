@@ -45,12 +45,6 @@ private class OpenPullRequestReviewApi : GitHubPullRequestReviewApi {
     override suspend fun approvePullRequestByUrl(url: String, body: String?) = Unit
 
     override suspend fun hasAnyApprovedReview(url: String): Boolean = false
-
-    override suspend fun submitReview(
-        prApiUrl: String,
-        event: ReviewStateValue,
-        reviewComment: String?,
-    ) = error("Unexpected submitReview")
 }
 
 private fun pullRequestNotification(): Notification = Notification(

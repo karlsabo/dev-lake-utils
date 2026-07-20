@@ -126,7 +126,6 @@ internal fun engHubScreenActions(
             viewModel.checkoutAndOpen(repoFullName, branch)
         },
         onApprove = viewModel.approvePullRequest,
-        onSubmitReview = viewModel.submitReview,
         onMarkDone = viewModel.markNotificationDone,
         onUnsubscribe = viewModel.unsubscribeFromNotification,
     ),
