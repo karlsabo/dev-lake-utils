@@ -1,6 +1,8 @@
 package com.github.karlsabo.git
 
+import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.executeCommand
+import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -408,6 +410,65 @@ class WorktreeSetupCoordinatorTest {
 
         assertEquals(0, result.exitCode, result.stderr)
         assertTrue("$repoPath|$worktreePath\n" in result.stdout, result.stdout)
+    }
+
+    @Test
+    fun powerShellPlaceholderExpansionEscapesEveryQuoteContext() {
+        val path = $$"""C:\root space\$name`tick'apostrophe&[brackets]"quote"""
+        val request = WorktreeSetupRequest(
+            repoPath = path,
+            worktreePath = WorktreePath(path),
+            setupShell = "powershell.exe",
+            setupCommands = listOf(
+                $$"""Write-Output $root-repo-dir""",
+                $$"""Write-Output '$root-repo-dir'""",
+                $$"""Write-Output "$root-repo-dir"""",
+            ),
+        )
+
+        val commands = request.expandedSetupCommands(ShellDialect.POWERSHELL)
+
+        assertEquals(
+            listOf(
+                $$"""Write-Output 'C:\root space\$name`tick''apostrophe&[brackets]"quote'""",
+                $$"""Write-Output 'C:\root space\$name`tick''apostrophe&[brackets]"quote'""",
+                $$"""Write-Output "C:\root space\`$name``tick'apostrophe&[brackets]`"quote"""",
+            ),
+            commands,
+        )
+    }
+
+    @Test
+    fun powerShellSetupCommandsResolveShellSensitivePathsLiterally() = runBlocking {
+        if (osFamily() != OsFamily.WINDOWS) return@runBlocking
+
+        val parentPath = createArchiveWorktreeTempDir()
+        val repoPath = Path(parentPath, "root space-${'$'}value`tick'apostrophe&[brackets]").toString()
+        val worktreePath = Path(parentPath, "worktree space-${'$'}value`tick'apostrophe&[brackets]").toString()
+        try {
+            SystemFileSystem.createDirectories(Path(repoPath))
+            SystemFileSystem.createDirectories(Path(worktreePath))
+            val request = WorktreeSetupRequest(
+                repoPath = repoPath,
+                worktreePath = WorktreePath(worktreePath),
+                setupShell = "powershell.exe",
+                setupCommands = listOf(
+                    $$"""Write-Output $root-repo-dir""",
+                    $$"""Write-Output '$worktree-dir'""",
+                    $$"""Write-Output "$root-repo-dir|$worktree-dir"""",
+                ),
+            )
+
+            val result = ShellWorktreeSetupCommandRunner().runSetup(request)
+
+            assertEquals(0, result.exitCode, result.stderr)
+            assertEquals(
+                "$repoPath\n$worktreePath\n$repoPath|$worktreePath\n",
+                result.stdout.replace("\r\n", "\n"),
+            )
+        } finally {
+            removeTempDir(parentPath)
+        }
     }
 
     @Test

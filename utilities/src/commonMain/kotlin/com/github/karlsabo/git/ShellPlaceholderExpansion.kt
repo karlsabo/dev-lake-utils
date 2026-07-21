@@ -2,9 +2,18 @@ package com.github.karlsabo.git
 
 private typealias PlaceholderReplacement = Map.Entry<String, String>
 
-internal fun String.expandShellPlaceholders(replacements: Map<String, String>): String = ShellPlaceholderExpander(
+internal enum class ShellDialect {
+    POSIX,
+    POWERSHELL,
+}
+
+internal fun String.expandShellPlaceholders(
+    replacements: Map<String, String>,
+    shellDialect: ShellDialect,
+): String = ShellPlaceholderExpander(
     command = this,
     replacements = replacements,
+    shellDialect = shellDialect,
 ).expand()
 
 private enum class ShellQuoteContext {
@@ -31,16 +40,25 @@ private enum class ShellQuoteContext {
         }
     }
 
-    fun escape(value: String): String = when (this) {
-        UNQUOTED -> "'${value.replace("'", "'\\''")}'"
-        SINGLE_QUOTED -> value.replace("'", "'\\''")
-        DOUBLE_QUOTED -> value.escapeForDoubleQuotedShell()
+    fun escape(value: String, shellDialect: ShellDialect): String = when (shellDialect) {
+        ShellDialect.POSIX -> when (this) {
+            UNQUOTED -> "'${value.escapeForSingleQuotedPosixShell()}'"
+            SINGLE_QUOTED -> value.escapeForSingleQuotedPosixShell()
+            DOUBLE_QUOTED -> value.escapeForDoubleQuotedPosixShell()
+        }
+
+        ShellDialect.POWERSHELL -> when (this) {
+            UNQUOTED -> "'${value.escapeForSingleQuotedPowerShell()}'"
+            SINGLE_QUOTED -> value.escapeForSingleQuotedPowerShell()
+            DOUBLE_QUOTED -> value.escapeForDoubleQuotedPowerShell()
+        }
     }
 }
 
 private class ShellPlaceholderExpander(
     private val command: String,
     private val replacements: Map<String, String>,
+    private val shellDialect: ShellDialect,
 ) {
     private val expanded = StringBuilder()
     private var quoteContext = ShellQuoteContext.UNQUOTED
@@ -67,7 +85,7 @@ private class ShellPlaceholderExpander(
     }
 
     private fun appendReplacement(replacement: PlaceholderReplacement) {
-        expanded.append(quoteContext.escape(replacement.value))
+        expanded.append(quoteContext.escape(replacement.value, shellDialect))
         index += replacement.key.length
     }
 
@@ -75,7 +93,7 @@ private class ShellPlaceholderExpander(
         val char = command[index]
         val startingContext = quoteContext
         expanded.append(char)
-        if (startingContext != ShellQuoteContext.SINGLE_QUOTED && char == '\\') {
+        if (startingContext != ShellQuoteContext.SINGLE_QUOTED && char == shellDialect.escapeCharacter()) {
             appendEscapedChar()
         } else {
             quoteContext = startingContext.afterReading(char)
@@ -91,10 +109,28 @@ private class ShellPlaceholderExpander(
     }
 }
 
-private fun String.escapeForDoubleQuotedShell(): String = buildString(length) {
-    this@escapeForDoubleQuotedShell.forEach { char ->
+private fun ShellDialect.escapeCharacter(): Char = when (this) {
+    ShellDialect.POSIX -> '\\'
+    ShellDialect.POWERSHELL -> '`'
+}
+
+private fun String.escapeForSingleQuotedPosixShell(): String = replace("'", "'\\''")
+
+private fun String.escapeForDoubleQuotedPosixShell(): String = buildString(length) {
+    this@escapeForDoubleQuotedPosixShell.forEach { char ->
         when (char) {
             '$', '`', '"', '\\' -> append('\\')
+        }
+        append(char)
+    }
+}
+
+private fun String.escapeForSingleQuotedPowerShell(): String = replace("'", "''")
+
+private fun String.escapeForDoubleQuotedPowerShell(): String = buildString(length) {
+    this@escapeForDoubleQuotedPowerShell.forEach { char ->
+        when (char) {
+            '$', '`', '"' -> append('`')
         }
         append(char)
     }

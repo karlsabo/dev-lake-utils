@@ -47,9 +47,14 @@ internal fun WorktreeSetupRequest.setupShellArguments(): List<String> = when {
     else -> listOf("-l", "-c")
 }
 
-private fun WorktreeSetupRequest.generatedSetupScript(): String = when {
-    setupShell.isWindowsPowerShell() -> buildPowerShellWorktreeSetupScript(expandedSetupCommands())
-    else -> buildWorktreeSetupScript(this)
+private fun WorktreeSetupRequest.generatedSetupScript(): String = when (setupShellDialect()) {
+    ShellDialect.POWERSHELL -> buildPowerShellWorktreeSetupScript(expandedSetupCommands())
+    ShellDialect.POSIX -> buildWorktreeSetupScript(this)
+}
+
+internal fun WorktreeSetupRequest.setupShellDialect(): ShellDialect = when {
+    setupShell.isWindowsPowerShell() -> ShellDialect.POWERSHELL
+    else -> ShellDialect.POSIX
 }
 
 private fun String.isWindowsPowerShell(): Boolean = substringAfterLast('/')
@@ -104,7 +109,7 @@ internal fun buildPowerShellWorktreeSetupScript(commands: List<String>): String 
 }
 
 fun buildWorktreeSetupScript(request: WorktreeSetupRequest): String = buildWorktreeSetupScript(
-    request.expandedSetupCommands(),
+    request.expandedSetupCommands(ShellDialect.POSIX),
 )
 
 fun buildWorktreeSetupScript(commands: List<String>): String = buildString {
@@ -136,11 +141,14 @@ fun buildWorktreeSetupScript(commands: List<String>): String = buildString {
     append("exit \"\$setup_exit_code\"")
 }
 
-internal fun WorktreeSetupRequest.expandedSetupCommands(): List<String> = setupCommands.map { expandSetupCommand(it) }
+internal fun WorktreeSetupRequest.expandedSetupCommands(): List<String> = expandedSetupCommands(setupShellDialect())
 
-private fun WorktreeSetupRequest.expandSetupCommand(command: String): String = command.expandShellPlaceholders(
-    mapOf(
-        $$"$root-repo-dir" to repoPath,
-        $$"$worktree-dir" to worktreePath.value,
-    ),
-)
+internal fun WorktreeSetupRequest.expandedSetupCommands(shellDialect: ShellDialect): List<String> = setupCommands.map {
+    it.expandShellPlaceholders(
+        replacements = mapOf(
+            $$"$root-repo-dir" to repoPath,
+            $$"$worktree-dir" to worktreePath.value,
+        ),
+        shellDialect = shellDialect,
+    )
+}

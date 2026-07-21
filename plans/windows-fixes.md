@@ -99,7 +99,7 @@
 - In: catch command-scoped PowerShell errors, capture their stderr, assign status `1`, and continue.
 - Out: changing POSIX error behavior.
 
-### 6. Expand placeholders safely for PowerShell
+### 6. Expand placeholders safely for PowerShell ✅
 
 **Acceptance criteria:** Given a Windows runner and repo/worktree paths containing valid shell-sensitive characters, when a PowerShell setup command uses `$root-repo-dir` and `$worktree-dir`, then both placeholders resolve to the exact literal paths without PowerShell re-expanding spaces, `$`, backticks, apostrophes, `&`, or brackets.
 
