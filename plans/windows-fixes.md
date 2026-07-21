@@ -87,7 +87,7 @@
 - In: make the formatted shell invocation reflect PowerShell rather than always displaying `-l -c`.
 - Out: PowerShell errors without a native exit code; covered by story 5.
 
-### 5. Continue after a PowerShell error
+### 5. Continue after a PowerShell error ✅
 
 **Acceptance criteria:** Given a Windows runner, when a setup command raises a terminating PowerShell error, then the command is reported as failed with exit code `1`, subsequent setup commands run, and the overall setup exit code is `1` when no earlier native command returned a nonzero code.
 

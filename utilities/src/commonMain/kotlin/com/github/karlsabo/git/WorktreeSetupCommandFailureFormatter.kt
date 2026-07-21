@@ -16,8 +16,10 @@ internal fun formatSetupCommandFailure(
     executions.forEach { execution -> appendSetupCommandExecution(execution, setupCommands.size) }
 }
 
-private fun WorktreeSetupRequest.formattedSetupShellInvocation(): String =
-    (listOf(setupShell) + setupShellArguments() + "<generated setup script>").joinToString(" ")
+private fun WorktreeSetupRequest.formattedSetupShellInvocation(): String = listOf(setupShell)
+    .plus(setupShellArguments())
+    .plus("<generated setup script>")
+    .joinToString(" ")
 
 private fun StringBuilder.appendSetupCommandExecution(
     execution: SetupCommandExecution,

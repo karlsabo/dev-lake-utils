@@ -36,21 +36,25 @@ class ShellWorktreeSetupCommandRunner : WorktreeSetupCommandRunner {
     }
 }
 
-private fun WorktreeSetupRequest.buildSetupShellCommand(): List<String> =
-    listOf(setupShell) + setupShellArguments() + generatedSetupScript()
+private fun WorktreeSetupRequest.buildSetupShellCommand(): List<String> = buildList {
+    add(setupShell)
+    addAll(setupShellArguments())
+    add(generatedSetupScript())
+}
 
-internal fun WorktreeSetupRequest.setupShellArguments(): List<String> =
-    if (setupShell.isWindowsPowerShell()) listOf("-NoProfile", "-Command") else listOf("-l", "-c")
+internal fun WorktreeSetupRequest.setupShellArguments(): List<String> = when {
+    setupShell.isWindowsPowerShell() -> listOf("-NoProfile", "-Command")
+    else -> listOf("-l", "-c")
+}
 
-private fun WorktreeSetupRequest.generatedSetupScript(): String =
-    if (setupShell.isWindowsPowerShell()) {
-        buildPowerShellWorktreeSetupScript(expandedSetupCommands())
-    } else {
-        buildWorktreeSetupScript(this)
-    }
+private fun WorktreeSetupRequest.generatedSetupScript(): String = when {
+    setupShell.isWindowsPowerShell() -> buildPowerShellWorktreeSetupScript(expandedSetupCommands())
+    else -> buildWorktreeSetupScript(this)
+}
 
-private fun String.isWindowsPowerShell(): Boolean =
-    substringAfterLast('/').substringAfterLast('\\').equals("powershell.exe", ignoreCase = true)
+private fun String.isWindowsPowerShell(): Boolean = substringAfterLast('/')
+    .substringAfterLast('\\')
+    .equals("powershell.exe", ignoreCase = true)
 
 internal fun buildPowerShellWorktreeSetupScript(commands: List<String>): String = buildString {
     appendLine("${'$'}setupExitCode = 0")
@@ -65,10 +69,20 @@ internal fun buildPowerShellWorktreeSetupScript(commands: List<String>): String 
         appendLine("    ${'$'}setupStderrFile = [IO.Path]::Combine(${'$'}setupTmpDir, 'stderr_$index')")
         appendLine("    [Console]::Error.WriteLine(\"$SETUP_COMMAND_START_MARKER`t$index\")")
         appendLine("    ${'$'}LASTEXITCODE = 0")
+        appendLine("    ${'$'}commandHadPowerShellError = ${'$'}false")
         appendLine("    . {")
-        appendLine(command.prependIndent("        "))
+        appendLine("        try {")
+        appendLine("            . {")
+        appendLine(command.prependIndent("                "))
+        appendLine("            }")
+        appendLine("        } catch {")
+        appendLine("            ${'$'}commandHadPowerShellError = ${'$'}true")
+        appendLine("            Write-Error -ErrorRecord ${'$'}_ -ErrorAction Continue")
+        appendLine("        }")
         appendLine("    } 1> ${'$'}setupStdoutFile 2> ${'$'}setupStderrFile")
-        appendLine("    ${'$'}commandExitCode = ${'$'}LASTEXITCODE")
+        appendLine(
+            "    ${'$'}commandExitCode = if (${'$'}commandHadPowerShellError) { 1 } else { ${'$'}LASTEXITCODE }",
+        )
         appendLine("    [Console]::Out.WriteLine(\"$SETUP_COMMAND_STDOUT_BEGIN_MARKER`t$index\")")
         appendLine("    [Console]::Out.Write([IO.File]::ReadAllText(${'$'}setupStdoutFile))")
         appendLine("    [Console]::Out.WriteLine(\"$SETUP_COMMAND_STDOUT_END_MARKER`t$index`t\")")

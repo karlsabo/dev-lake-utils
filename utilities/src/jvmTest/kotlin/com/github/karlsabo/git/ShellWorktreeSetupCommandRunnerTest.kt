@@ -74,6 +74,42 @@ class ShellWorktreeSetupCommandRunnerTest {
     }
 
     @Test
+    fun continueAfterPowerShellError() = runBlocking {
+        if (osFamily() != OsFamily.WINDOWS) return@runBlocking
+
+        val repoPath = createArchiveWorktreeTempDir()
+        val worktreePath = createArchiveWorktreeTempDir()
+        try {
+            val setupCommands = listOf(
+                "Write-Error 'terminating PowerShell error' -ErrorAction Stop",
+                "Write-Output 'after failure'",
+            )
+            val request = WorktreeSetupRequest(
+                repoPath = repoPath,
+                worktreePath = WorktreePath(worktreePath),
+                setupShell = "powershell.exe",
+                setupCommands = setupCommands,
+            )
+
+            val error = assertFailsWith<WorktreeSetupException> {
+                ShellWorktreeSetupCommandRunner().runSetup(request)
+            }
+            val message = error.message.orEmpty().replace("\r\n", "\n")
+
+            assertTrue("Overall exit code: 1" in message, message)
+            assertTrue("[1/2] FAILED exit 1" in message, message)
+            assertTrue("$ ${setupCommands[0]}" in message, message)
+            assertTrue("terminating PowerShell error" in message, message)
+            assertTrue("[2/2] OK exit 0" in message, message)
+            assertTrue("stdout:\nafter failure\n" in message, message)
+            assertTrue("SKIPPED" !in message, message)
+        } finally {
+            removeTempDir(repoPath)
+            removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
     fun setupCommandsShareShellState() = runBlocking {
         val repoPath = createArchiveWorktreeTempDir()
         val worktreePath = createArchiveWorktreeTempDir()
