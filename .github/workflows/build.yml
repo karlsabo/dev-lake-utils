@@ -28,7 +28,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build
-        run: ./gradlew clean build
+        run: ./gradlew clean build --no-build-cache
 
   build-macos:
     name: build-macos
@@ -48,7 +48,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build
-        run: ./gradlew clean build
+        run: ./gradlew clean build --no-build-cache
 
   build-windows:
     name: build-windows
@@ -69,4 +69,4 @@ jobs:
 
       - name: Build
         shell: bash
-        run: ./gradlew clean build
+        run: ./gradlew clean build --no-build-cache

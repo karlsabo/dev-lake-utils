@@ -154,7 +154,7 @@
 - In: use OS-appropriate setup commands and path assertions in the real-shell checkout test.
 - Out: tests that use fake or blocking setup runners.
 
-### 10. Prevent CI from restoring test-task results
+### 10. Prevent CI from restoring test-task results ✅
 
 **Acceptance criteria:** Given any GitHub Actions build job, when it runs Gradle, then its test tasks execute for that job and are not satisfied by restored Gradle build-cache output from a prior run.
 
