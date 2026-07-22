@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.enghub
 
+import com.github.karlsabo.system.OsFamily
+import com.github.karlsabo.system.osFamily
 import com.github.karlsabo.tools.lenientJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -108,8 +110,11 @@ class EngHubConfigTest {
         """.trimIndent()
 
         val decoded = lenientJson.decodeFromString(EngHubConfig.serializer(), legacyJson)
+        val expectedSetupShell = if (osFamily() == OsFamily.WINDOWS) "powershell.exe" else "/bin/zsh"
 
-        assertEquals("/bin/zsh", decoded.setupShell)
+        assertEquals("powershell.exe", defaultSetupShell(OsFamily.WINDOWS))
+        assertEquals(expectedSetupShell, EngHubConfig().setupShell)
+        assertEquals(expectedSetupShell, decoded.setupShell)
         assertEquals("", decoded.planningMarkdownDir)
         assertEquals(emptyList(), decoded.localRepositories)
         assertEquals(120_000, decoded.worktreePollIntervalMs)

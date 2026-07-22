@@ -128,7 +128,7 @@
 - In: make `setupRunsPlaceholderExpandedCommandsInWorktreeDirectory` portable and prove the coordinator-to-runner path.
 - Out: additional placeholder edge cases; covered by story 6.
 
-### 8. Default Eng Hub to PowerShell on Windows
+### 8. Default Eng Hub to PowerShell on Windows ✅
 
 **Acceptance criteria:** Given a Windows runner, when `EngHubConfig` is created or decoded without an explicit `setupShell`, then its setup shell is `powershell.exe`.
 

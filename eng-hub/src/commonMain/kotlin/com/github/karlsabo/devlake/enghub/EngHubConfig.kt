@@ -2,6 +2,8 @@
 
 package com.github.karlsabo.devlake.enghub
 
+import com.github.karlsabo.system.OsFamily
+import com.github.karlsabo.system.osFamily
 import com.github.karlsabo.tools.DEV_METRICS_APP_NAME
 import com.github.karlsabo.tools.getApplicationDirectory
 import com.github.karlsabo.tools.lenientJson
@@ -24,8 +26,13 @@ data class EngHubConfig(
     val gitHubAuthor: String = "",
     val planningMarkdownDir: String = "",
     val localRepositories: List<LocalRepositoryConfig> = emptyList(),
-    val setupShell: String = "/bin/zsh",
+    val setupShell: String = defaultSetupShell(),
 )
+
+internal fun defaultSetupShell(family: OsFamily = osFamily()): String = when (family) {
+    OsFamily.WINDOWS -> "powershell.exe"
+    else -> "/bin/zsh"
+}
 
 @Serializable
 data class LocalRepositoryConfig(
