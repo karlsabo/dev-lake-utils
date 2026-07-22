@@ -52,6 +52,8 @@
 
 ### 2. Preserve complete Gradle test reports from failed jobs
 
+**Status:** Done
+
 **Acceptance criteria:** Given a Gradle test fails in a Linux, macOS, or Windows build job, when a developer downloads that job's test-report artifact, then the archive contains the generated HTML report and JUnit XML for the failed test.
 
 **Expected edits:**

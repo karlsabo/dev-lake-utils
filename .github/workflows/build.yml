@@ -37,6 +37,16 @@ jobs:
           paths: "**/build/test-results/**/TEST-*.xml"
           show: fail
 
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-test-reports-linux
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**
+          if-no-files-found: warn
+
   build-macos:
     name: build-macos
     runs-on: macos-latest
@@ -63,6 +73,16 @@ jobs:
         with:
           paths: "**/build/test-results/**/TEST-*.xml"
           show: fail
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-test-reports-macos
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**
+          if-no-files-found: warn
 
   build-windows:
     name: build-windows
@@ -91,3 +111,13 @@ jobs:
         with:
           paths: "**/build/test-results/**/TEST-*.xml"
           show: fail
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-test-reports-windows
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**
+          if-no-files-found: warn
