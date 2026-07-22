@@ -116,7 +116,7 @@
 **Notes:**
 - Double quotes are not valid Windows path characters. End-to-end path cases must use valid Windows characters; arbitrary string escaping can be tested at the script-builder level.
 
-### 7. Run placeholder-expanded setup in the worktree
+### 7. Run placeholder-expanded setup in the worktree ✅
 
 **Acceptance criteria:** Given a Windows runner, when `WorktreeSetupCoordinator` executes a repository setup command through `powershell.exe`, then the command runs in the selected worktree and writes the exact expanded root-repository and worktree paths to the expected output.
 

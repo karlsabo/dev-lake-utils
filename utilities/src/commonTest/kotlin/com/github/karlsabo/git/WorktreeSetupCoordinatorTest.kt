@@ -353,12 +353,17 @@ class WorktreeSetupCoordinatorTest {
                 setupCommandRunner = ShellWorktreeSetupCommandRunner(),
                 scope = this,
             )
+            val windows = osFamily() == OsFamily.WINDOWS
             val request = WorktreeSetupRequest(
                 repoPath = repoPath,
                 worktreePath = WorktreePath(worktreePath),
-                setupShell = "/bin/sh",
+                setupShell = if (windows) "powershell.exe" else "/bin/sh",
                 setupCommands = listOf(
-                    "printf '%s\\n' '${'$'}root-repo-dir|${'$'}worktree-dir' > setup-vars.txt",
+                    if (windows) {
+                        """[IO.File]::WriteAllText('setup-vars.txt', "${'$'}root-repo-dir|${'$'}worktree-dir")"""
+                    } else {
+                        "printf '%s' '${'$'}root-repo-dir|${'$'}worktree-dir' > setup-vars.txt"
+                    },
                 ),
             )
 
@@ -367,7 +372,7 @@ class WorktreeSetupCoordinatorTest {
             val setupVars = SystemFileSystem.source(Path(worktreePath, "setup-vars.txt")).buffered().use {
                 it.readString()
             }
-            assertEquals("$repoPath|$worktreePath\n", setupVars)
+            assertEquals("$repoPath|$worktreePath", setupVars)
         } finally {
             removeTempDir(repoPath)
             removeTempDir(worktreePath)
