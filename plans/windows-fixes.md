@@ -142,7 +142,7 @@
 - In: preserve explicitly decoded `setupShell` values.
 - Out: migrating existing config files.
 
-### 9. Run Eng Hub checkout setup natively on Windows
+### 9. Run Eng Hub checkout setup natively on Windows ✅
 
 **Acceptance criteria:** Given a Windows runner and an Eng Hub repository config containing a PowerShell setup command, when `./gradlew :eng-hub:jvmTest --tests 'com.github.karlsabo.devlake.enghub.viewmodel.EngHubCheckoutSetupViewModelTest.checkoutAndOpenRunsUnifiedRepositorySetupCommands' --no-build-cache` runs, then checkout setup executes in the selected worktree and writes the expected marker file there.
 

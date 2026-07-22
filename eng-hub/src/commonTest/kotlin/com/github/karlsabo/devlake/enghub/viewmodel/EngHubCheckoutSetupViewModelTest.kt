@@ -6,7 +6,8 @@ import com.github.karlsabo.git.WorktreeSetupCommandRunner
 import com.github.karlsabo.git.WorktreeSetupCoordinator
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.git.buildWorktreePath
-import kotlinx.coroutines.delay
+import com.github.karlsabo.system.OsFamily
+import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -14,7 +15,6 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class EngHubCheckoutSetupViewModelTest {
@@ -24,6 +24,10 @@ class EngHubCheckoutSetupViewModelTest {
         val repositoriesBaseDir = createTempDir("repositories")
         val repoPath = Path(repositoriesBaseDir, "example-service").toString()
         val worktreePath = Path(buildWorktreePath(repoPath, "feature/worktree-loading").value)
+        val markerFileName = "unified-checkout-setup.txt"
+        val markerPath = Path(worktreePath, markerFileName)
+        val markerContents = "checkout setup complete"
+        val windows = osFamily() == OsFamily.WINDOWS
         SystemFileSystem.createDirectories(worktreePath)
         try {
             val api = RecordingGitWorktreeApi(
@@ -37,25 +41,26 @@ class EngHubCheckoutSetupViewModelTest {
                 localRepositoryConfigs = listOf(
                     LocalRepositoryConfig(
                         path = "$repoPath/",
-                        setupCommands = listOf("pwd > unified-checkout-path.txt"),
+                        setupCommands = listOf(
+                            if (windows) {
+                                """[IO.File]::WriteAllText('$markerFileName', '$markerContents')"""
+                            } else {
+                                "printf '%s' '$markerContents' > '$markerFileName'"
+                            },
+                        ),
                     ),
                 ),
                 testConfig = LocalRepositoryViewModelTestConfig(
                     repositoriesBaseDir = repositoriesBaseDir,
-                    setupShell = "/bin/bash",
+                    setupShell = if (windows) "powershell.exe" else "/bin/bash",
                 ),
             )
 
-            viewModel.checkoutAndOpen("example-org/example-service", "feature/worktree-loading")
+            val checkoutJob = viewModel.checkoutAndOpen("example-org/example-service", "feature/worktree-loading")
 
-            withTimeout(2_000.milliseconds) {
-                while (!SystemFileSystem.exists(Path(worktreePath, "unified-checkout-path.txt"))) {
-                    delay(10.milliseconds)
-                }
-            }
+            withTimeout(2_000.milliseconds) { checkoutJob.join() }
 
-            val openedPath = readText(Path(worktreePath, "unified-checkout-path.txt")).trim()
-            assertTrue(openedPath.endsWith("/example-service-feature-worktree-loading"))
+            assertEquals(markerContents, readText(markerPath))
             assertEquals(
                 listOf(repoPath to "https://github.com/example-org/example-service.git"),
                 api.ensureRepositoryCalls,
