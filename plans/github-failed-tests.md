@@ -29,6 +29,8 @@
 
 ### 1. Show failed Gradle tests in each job summary
 
+**Status:** Done
+
 **Acceptance criteria:** Given a test named `exampleFailure` fails during one of the Linux, macOS, or Windows Gradle build jobs, when a developer opens that job's GitHub Actions summary, then the summary identifies the failed test suite and test name without requiring access to the runner filesystem.
 
 **Expected edits:**
