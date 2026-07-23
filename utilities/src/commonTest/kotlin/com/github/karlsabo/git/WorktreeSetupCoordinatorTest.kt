@@ -311,19 +311,10 @@ private class RepositorySerializationFixture {
     }
 }
 
-private fun executeSetupScript(request: WorktreeSetupRequest) = if (osFamily() == OsFamily.WINDOWS) {
-    executeCommand(
-        listOf(
-            "powershell.exe",
-            "-NoProfile",
-            "-Command",
-            buildPowerShellWorktreeSetupScript(request.expandedSetupCommands()),
-        ),
-        workingDirectory = null,
-    )
-} else {
-    executeCommand(listOf("/bin/sh", "-c", buildWorktreeSetupScript(request)), workingDirectory = null)
-}
+private fun executeSetupScript(request: WorktreeSetupRequest) = executeCommand(
+    request.buildSetupShellCommand(),
+    workingDirectory = null,
+)
 
 private fun assertWaitingForRepository(fixture: RepositorySerializationFixture) {
     assertEquals(
