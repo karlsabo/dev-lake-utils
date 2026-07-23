@@ -28,6 +28,8 @@ import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
 import com.github.karlsabo.system.DesktopLauncher
+import com.github.karlsabo.system.OsFamily
+import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -607,6 +609,41 @@ class RecordingGitWorktreeApi(
         responses.archiveWorktreeFailure?.let { throw it }
         callbacks.onArchiveWorktree(repoPath, worktreePath, force)
     }
+}
+
+fun nativeSetupShell(): String = if (osFamily() == OsFamily.WINDOWS) "powershell.exe" else "/bin/bash"
+
+fun writeWorkingDirectorySetupCommand(fileName: String): String = if (osFamily() == OsFamily.WINDOWS) {
+    "[IO.File]::WriteAllText('$fileName', (Get-Location).Path)"
+} else {
+    "pwd > '$fileName'"
+}
+
+fun waitForSetupFileCommand(fileName: String): String = if (osFamily() == OsFamily.WINDOWS) {
+    "while (-not (Test-Path -LiteralPath '$fileName')) { Start-Sleep -Milliseconds 10 }"
+} else {
+    "while [ ! -f '$fileName' ]; do sleep 0.01; done"
+}
+
+fun writeSetupFileCommand(fileName: String, contents: String): String = if (osFamily() == OsFamily.WINDOWS) {
+    "[IO.File]::WriteAllText('$fileName', '$contents')"
+} else {
+    "printf '%s' '$contents' > '$fileName'"
+}
+
+fun appendSetupFileCommand(path: Path, contents: String): String = if (osFamily() == OsFamily.WINDOWS) {
+    "[IO.File]::AppendAllText('$path', '$contents')"
+} else {
+    "printf '%s' '$contents' >> '$path'"
+}
+
+fun failingSetupCommands(message: String, exitCode: Int): List<String> = if (osFamily() == OsFamily.WINDOWS) {
+    listOf(
+        "[Console]::Error.WriteLine('$message')",
+        "& powershell.exe -NoProfile -Command \"exit $exitCode\"",
+    )
+} else {
+    listOf("echo '$message' >&2", "exit $exitCode")
 }
 
 fun createTempDir(prefix: String): String {

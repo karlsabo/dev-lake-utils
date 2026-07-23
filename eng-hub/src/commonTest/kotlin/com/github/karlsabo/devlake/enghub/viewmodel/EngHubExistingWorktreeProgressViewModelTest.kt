@@ -94,10 +94,10 @@ class EngHubExistingWorktreeProgressViewModelTest {
                 localRepositoryConfigs = listOf(
                     LocalRepositoryConfig(
                         path = repoRoot,
-                        setupCommands = listOf("while [ ! -f release-open ]; do sleep 0.01; done"),
+                        setupCommands = listOf(waitForSetupFileCommand("release-open")),
                     ),
                 ),
-                testConfig = LocalRepositoryViewModelTestConfig(setupShell = "/bin/bash"),
+                testConfig = LocalRepositoryViewModelTestConfig(setupShell = nativeSetupShell()),
             )
 
             viewModel.openLocalWorktree(repoRoot, worktreePath)
@@ -139,10 +139,10 @@ class EngHubExistingWorktreeProgressViewModelTest {
                 localRepositoryConfigs = listOf(
                     LocalRepositoryConfig(
                         path = repoRoot,
-                        setupCommands = listOf("while [ ! -f release-open ]; do sleep 0.01; done"),
+                        setupCommands = listOf(waitForSetupFileCommand("release-open")),
                     ),
                 ),
-                testConfig = LocalRepositoryViewModelTestConfig(setupShell = "/bin/bash"),
+                testConfig = LocalRepositoryViewModelTestConfig(setupShell = nativeSetupShell()),
             )
 
             viewModel.openLocalWorktree(repoRoot, firstWorktreePath)
@@ -194,12 +194,12 @@ class EngHubExistingWorktreeProgressViewModelTest {
                     LocalRepositoryConfig(
                         path = repoRoot,
                         setupCommands = listOf(
-                            "printf x >> '$setupCountPath'",
-                            "while [ ! -f release-open ]; do sleep 0.01; done",
+                            appendSetupFileCommand(setupCountPath, "x"),
+                            waitForSetupFileCommand("release-open"),
                         ),
                     ),
                 ),
-                testConfig = LocalRepositoryViewModelTestConfig(setupShell = "/bin/bash"),
+                testConfig = LocalRepositoryViewModelTestConfig(setupShell = nativeSetupShell()),
             )
             val releaseOpenAttempts = CompletableDeferred<Unit>()
             val openAttempts = List(50) {

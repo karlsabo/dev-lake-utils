@@ -11,7 +11,6 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class EngHubExistingWorktreeOpenViewModelTest {
@@ -34,12 +33,12 @@ class EngHubExistingWorktreeOpenViewModelTest {
                     LocalRepositoryConfig(
                         path = repoRoot,
                         setupCommands = listOf(
-                            "pwd > opened-path.txt",
-                            "while [ ! -f release-open ]; do sleep 0.01; done",
+                            writeWorkingDirectorySetupCommand("opened-path.txt"),
+                            waitForSetupFileCommand("release-open"),
                         ),
                     ),
                 ),
-                testConfig = LocalRepositoryViewModelTestConfig(setupShell = "/bin/bash"),
+                testConfig = LocalRepositoryViewModelTestConfig(setupShell = nativeSetupShell()),
             )
 
             viewModel.openLocalWorktree(repoRoot, worktreePath)
@@ -57,7 +56,10 @@ class EngHubExistingWorktreeOpenViewModelTest {
             }
 
             val openedPath = readText(Path(worktreePath, "opened-path.txt")).trim()
-            assertTrue(openedPath.endsWith(worktreePath.substringAfterLast('/')))
+            assertEquals(
+                SystemFileSystem.resolve(Path(worktreePath)),
+                SystemFileSystem.resolve(Path(openedPath)),
+            )
             writeText(Path(worktreePath, "release-open"), "")
             val completedStatus = withTimeout(2_000.milliseconds) {
                 viewModel.setupStatusesStateFlow.first { worktreeKey !in it }
@@ -91,12 +93,12 @@ class EngHubExistingWorktreeOpenViewModelTest {
                     LocalRepositoryConfig(
                         path = "$repoRoot/",
                         setupCommands = listOf(
-                            "pwd > unified-opened-path.txt",
-                            "while [ ! -f release-unified-open ]; do sleep 0.01; done",
+                            writeWorkingDirectorySetupCommand("unified-opened-path.txt"),
+                            waitForSetupFileCommand("release-unified-open"),
                         ),
                     ),
                 ),
-                testConfig = LocalRepositoryViewModelTestConfig(setupShell = "/bin/bash"),
+                testConfig = LocalRepositoryViewModelTestConfig(setupShell = nativeSetupShell()),
             )
 
             viewModel.openLocalWorktree(repoRoot, worktreePath)
@@ -114,7 +116,10 @@ class EngHubExistingWorktreeOpenViewModelTest {
             }
 
             val openedPath = readText(Path(worktreePath, "unified-opened-path.txt")).trim()
-            assertTrue(openedPath.endsWith(worktreePath.substringAfterLast('/')))
+            assertEquals(
+                SystemFileSystem.resolve(Path(worktreePath)),
+                SystemFileSystem.resolve(Path(openedPath)),
+            )
             writeText(Path(worktreePath, "release-unified-open"), "")
             val completedStatus = withTimeout(2_000.milliseconds) {
                 viewModel.setupStatusesStateFlow.first { worktreeKey !in it }

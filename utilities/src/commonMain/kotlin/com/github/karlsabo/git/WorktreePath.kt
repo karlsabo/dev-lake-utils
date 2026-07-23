@@ -17,11 +17,13 @@ fun buildWorktreePath(repoPath: String, branch: String): WorktreePath {
     require(repoPath.isNotBlank()) { "repoPath must not be blank" }
     require(branch.isNotBlank()) { "branch must not be blank" }
 
-    val trimmedRepoPath = repoPath.trimEnd('/')
-    val repoName = trimmedRepoPath.substringAfterLast('/')
+    val trimmedRepoPath = repoPath.trimEnd('/', '\\')
+    val separatorIndex = maxOf(trimmedRepoPath.lastIndexOf('/'), trimmedRepoPath.lastIndexOf('\\'))
+    val repoName = trimmedRepoPath.substring(separatorIndex + 1)
     val sanitized = sanitizeBranchName(branch)
-    val parentDir = trimmedRepoPath.substringBeforeLast('/')
-    return WorktreePath("$parentDir/$repoName-$sanitized")
+    val parentDir = if (separatorIndex >= 0) trimmedRepoPath.substring(0, separatorIndex) else trimmedRepoPath
+    val separator = if (separatorIndex >= 0) trimmedRepoPath[separatorIndex] else '/'
+    return WorktreePath("$parentDir$separator$repoName-$sanitized")
 }
 
 fun sanitizeBranchName(branch: String): String = branch

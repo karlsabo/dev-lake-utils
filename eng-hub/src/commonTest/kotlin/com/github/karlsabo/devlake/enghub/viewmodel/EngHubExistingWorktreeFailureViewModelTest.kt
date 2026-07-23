@@ -29,10 +29,10 @@ class EngHubExistingWorktreeFailureViewModelTest {
                 localRepositoryConfigs = listOf(
                     LocalRepositoryConfig(
                         path = repoRoot,
-                        setupCommands = listOf("echo setup failed >&2", "exit 23"),
+                        setupCommands = failingSetupCommands("setup failed", 23),
                     ),
                 ),
-                testConfig = LocalRepositoryViewModelTestConfig(setupShell = "/bin/bash"),
+                testConfig = LocalRepositoryViewModelTestConfig(setupShell = nativeSetupShell()),
             )
 
             viewModel.openLocalWorktree(repoRoot, worktreePath)

@@ -6,8 +6,6 @@ import com.github.karlsabo.git.WorktreeSetupCommandRunner
 import com.github.karlsabo.git.WorktreeSetupCoordinator
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.git.buildWorktreePath
-import com.github.karlsabo.system.OsFamily
-import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -27,7 +25,6 @@ class EngHubCheckoutSetupViewModelTest {
         val markerFileName = "unified-checkout-setup.txt"
         val markerPath = Path(worktreePath, markerFileName)
         val markerContents = "checkout setup complete"
-        val windows = osFamily() == OsFamily.WINDOWS
         SystemFileSystem.createDirectories(worktreePath)
         try {
             val api = RecordingGitWorktreeApi(
@@ -41,18 +38,12 @@ class EngHubCheckoutSetupViewModelTest {
                 localRepositoryConfigs = listOf(
                     LocalRepositoryConfig(
                         path = "$repoPath/",
-                        setupCommands = listOf(
-                            if (windows) {
-                                """[IO.File]::WriteAllText('$markerFileName', '$markerContents')"""
-                            } else {
-                                "printf '%s' '$markerContents' > '$markerFileName'"
-                            },
-                        ),
+                        setupCommands = listOf(writeSetupFileCommand(markerFileName, markerContents)),
                     ),
                 ),
                 testConfig = LocalRepositoryViewModelTestConfig(
                     repositoriesBaseDir = repositoriesBaseDir,
-                    setupShell = if (windows) "powershell.exe" else "/bin/bash",
+                    setupShell = nativeSetupShell(),
                 ),
             )
 
