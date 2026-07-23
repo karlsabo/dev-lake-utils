@@ -311,6 +311,20 @@ private class RepositorySerializationFixture {
     }
 }
 
+private fun executeSetupScript(request: WorktreeSetupRequest) = if (osFamily() == OsFamily.WINDOWS) {
+    executeCommand(
+        listOf(
+            "powershell.exe",
+            "-NoProfile",
+            "-Command",
+            buildPowerShellWorktreeSetupScript(request.expandedSetupCommands()),
+        ),
+        workingDirectory = null,
+    )
+} else {
+    executeCommand(listOf("/bin/sh", "-c", buildWorktreeSetupScript(request)), workingDirectory = null)
+}
+
 private fun assertWaitingForRepository(fixture: RepositorySerializationFixture) {
     assertEquals(
         WorktreeSetupStatus.WAITING_FOR_REPOSITORY,
@@ -381,40 +395,66 @@ class WorktreeSetupCoordinatorTest {
 
     @Test
     fun setupScriptEscapesDoubleQuotedPlaceholderValuesBeforeShellParsing() {
-        val repoPath = "/tmp/root-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
-        val worktreePath = "/tmp/worktree-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
+        val windows = osFamily() == OsFamily.WINDOWS
+        val repoPath = if (windows) {
+            "C:\\tmp\\root-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
+        } else {
+            "/tmp/root-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
+        }
+        val worktreePath = if (windows) {
+            "C:\\tmp\\worktree-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
+        } else {
+            "/tmp/worktree-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
+        }
         val request = WorktreeSetupRequest(
             repoPath = repoPath,
             worktreePath = WorktreePath(worktreePath),
-            setupShell = "/bin/sh",
+            setupShell = if (windows) "powershell.exe" else "/bin/sh",
             setupCommands = listOf(
-                "printf '%s\\n' \"${'$'}root-repo-dir|${'$'}worktree-dir\"",
+                if (windows) {
+                    "Write-Output \"${'$'}root-repo-dir|${'$'}worktree-dir\""
+                } else {
+                    "printf '%s\\n' \"${'$'}root-repo-dir|${'$'}worktree-dir\""
+                },
             ),
         )
 
-        val result = executeCommand(listOf("/bin/sh", "-c", buildWorktreeSetupScript(request)), workingDirectory = null)
+        val result = executeSetupScript(request)
 
         assertEquals(0, result.exitCode, result.stderr)
-        assertTrue("$repoPath|$worktreePath\n" in result.stdout, result.stdout)
+        assertTrue("$repoPath|$worktreePath\n" in result.stdout.replace("\r\n", "\n"), result.stdout)
     }
 
     @Test
     fun setupScriptEscapesSingleQuotedPlaceholderValuesBeforeShellParsing() {
-        val repoPath = "/tmp/root-'quote'-${'$'}UNEXPANDED-`echo wrong`"
-        val worktreePath = "/tmp/worktree-'quote'-${'$'}UNEXPANDED-`echo wrong`"
+        val windows = osFamily() == OsFamily.WINDOWS
+        val repoPath = if (windows) {
+            "C:\\tmp\\root-'quote'-${'$'}UNEXPANDED-`echo wrong`"
+        } else {
+            "/tmp/root-'quote'-${'$'}UNEXPANDED-`echo wrong`"
+        }
+        val worktreePath = if (windows) {
+            "C:\\tmp\\worktree-'quote'-${'$'}UNEXPANDED-`echo wrong`"
+        } else {
+            "/tmp/worktree-'quote'-${'$'}UNEXPANDED-`echo wrong`"
+        }
         val request = WorktreeSetupRequest(
             repoPath = repoPath,
             worktreePath = WorktreePath(worktreePath),
-            setupShell = "/bin/sh",
+            setupShell = if (windows) "powershell.exe" else "/bin/sh",
             setupCommands = listOf(
-                "printf '%s\\n' '${'$'}root-repo-dir|${'$'}worktree-dir'",
+                if (windows) {
+                    "Write-Output '${'$'}root-repo-dir|${'$'}worktree-dir'"
+                } else {
+                    "printf '%s\\n' '${'$'}root-repo-dir|${'$'}worktree-dir'"
+                },
             ),
         )
 
-        val result = executeCommand(listOf("/bin/sh", "-c", buildWorktreeSetupScript(request)), workingDirectory = null)
+        val result = executeSetupScript(request)
 
         assertEquals(0, result.exitCode, result.stderr)
-        assertTrue("$repoPath|$worktreePath\n" in result.stdout, result.stdout)
+        assertTrue("$repoPath|$worktreePath\n" in result.stdout.replace("\r\n", "\n"), result.stdout)
     }
 
     @Test

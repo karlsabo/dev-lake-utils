@@ -50,6 +50,16 @@ class GitCommandServiceTest {
         return result.stdout
     }
 
+    private fun listedWorktreePaths(listing: String): List<String> = listing.lineSequence()
+        .filter { it.startsWith("worktree ") }
+        .map { it.removePrefix("worktree ").replace('\\', '/').trimEnd('/') }
+        .toList()
+
+    private fun canonicalPath(path: String): String = executeGit("-C", path, "rev-parse", "--show-toplevel")
+        .trim()
+        .replace('\\', '/')
+        .trimEnd('/')
+
     private fun writeFixtureFile(
         repoDir: String,
         fileName: String,
@@ -302,13 +312,20 @@ class GitCommandServiceTest {
 
             service.worktreeAdd(repoDir, worktreeDir, "feature-branch")
 
+            val expectedWorktreePath = canonicalPath(worktreeDir)
             val listing = service.worktreeList(repoDir)
-            assertTrue(listing.contains(worktreeDir), "worktreeList should contain the new worktree path")
+            assertTrue(
+                expectedWorktreePath in listedWorktreePaths(listing),
+                "worktreeList should contain the new worktree path:\n$listing",
+            )
 
             service.worktreeRemove(repoDir, worktreeDir)
 
             val listingAfter = service.worktreeList(repoDir)
-            assertFalse(listingAfter.contains(worktreeDir), "worktreeList should no longer contain the removed path")
+            assertFalse(
+                expectedWorktreePath in listedWorktreePaths(listingAfter),
+                "worktreeList should no longer contain the removed path:\n$listingAfter",
+            )
         } finally {
             removeTempDir(repoDir)
             removeTempDir(worktreeDir)
@@ -341,7 +358,10 @@ class GitCommandServiceTest {
             assertEquals(baseCommit, branchStart)
 
             val listing = service.worktreeList(repoDir)
-            assertTrue(listing.contains(worktreeDir), "worktreeList should contain the new worktree path")
+            assertTrue(
+                canonicalPath(worktreeDir) in listedWorktreePaths(listing),
+                "worktreeList should contain the new worktree path:\n$listing",
+            )
         } finally {
             removeTempDir(repoDir)
             removeTempDir(worktreeDir)
