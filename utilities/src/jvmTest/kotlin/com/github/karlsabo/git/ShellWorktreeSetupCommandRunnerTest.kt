@@ -7,6 +7,8 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -14,6 +16,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ShellWorktreeSetupCommandRunnerTest {
+    @Test
+    fun powerShellScriptIsEncodedForProcessBuilder() {
+        val commands = listOf(
+            "Write-Output \"quoted output\"",
+            "Write-Output 'same shell: 雪 😀'",
+        )
+        val request = WorktreeSetupRequest(
+            repoPath = "repo",
+            worktreePath = WorktreePath("worktree"),
+            setupShell = "powershell.exe",
+            setupCommands = commands,
+        )
+
+        val shellCommand = request.buildSetupShellCommand()
+
+        assertEquals(listOf("powershell.exe", "-NoProfile", "-EncodedCommand"), shellCommand.dropLast(1))
+        assertEquals(buildPowerShellWorktreeSetupScript(commands), decodePowerShellCommand(shellCommand.last()))
+        assertFalse('"' in shellCommand.last())
+        assertFalse('\n' in shellCommand.last())
+    }
+
     @Test
     fun setupFailureReportsPerCommandOutputAndRunsCommandsAfterFailure() = runBlocking {
         val repoPath = createArchiveWorktreeTempDir()
@@ -50,7 +73,7 @@ class ShellWorktreeSetupCommandRunnerTest {
 
             assertTrue("Setup failed for $worktreePath" in message, message)
             assertTrue("Working directory: $worktreePath" in message, message)
-            val shellArguments = if (windows) "-NoProfile -Command" else "-l -c"
+            val shellArguments = if (windows) "-NoProfile -EncodedCommand" else "-l -c"
             assertTrue(
                 "Shell: $setupShell $shellArguments <generated setup script>" in message,
                 message,
@@ -149,4 +172,15 @@ class ShellWorktreeSetupCommandRunnerTest {
             removeTempDir(worktreePath)
         }
     }
+}
+
+@OptIn(ExperimentalEncodingApi::class)
+private fun decodePowerShellCommand(encodedCommand: String): String {
+    val bytes = Base64.Default.decode(encodedCommand)
+    require(bytes.size % 2 == 0)
+    return CharArray(bytes.size / 2) { index ->
+        val lowByte = bytes[index * 2].toInt() and 0xff
+        val highByte = bytes[index * 2 + 1].toInt() and 0xff
+        (lowByte or (highByte shl 8)).toChar()
+    }.concatToString()
 }

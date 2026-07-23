@@ -36,14 +36,19 @@ class ShellWorktreeSetupCommandRunner : WorktreeSetupCommandRunner {
     }
 }
 
-private fun WorktreeSetupRequest.buildSetupShellCommand(): List<String> = buildList {
+internal fun WorktreeSetupRequest.buildSetupShellCommand(): List<String> = buildList {
     add(setupShell)
     addAll(setupShellArguments())
-    add(generatedSetupScript())
+    add(
+        when (setupShellDialect()) {
+            ShellDialect.POWERSHELL -> encodePowerShellCommand(generatedSetupScript())
+            ShellDialect.POSIX -> generatedSetupScript()
+        },
+    )
 }
 
 internal fun WorktreeSetupRequest.setupShellArguments(): List<String> = when {
-    setupShell.isWindowsPowerShell() -> listOf("-NoProfile", "-Command")
+    setupShell.isWindowsPowerShell() -> listOf("-NoProfile", "-EncodedCommand")
     else -> listOf("-l", "-c")
 }
 
