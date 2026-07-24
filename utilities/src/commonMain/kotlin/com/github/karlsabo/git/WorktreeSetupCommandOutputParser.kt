@@ -115,6 +115,7 @@ private fun String.parseSetupCommandStream(
         val commandIndex = this@parseSetupCommandStream.substring(beginIndex, beginLineEnd)
             .split('\t')
             .getOrNull(1)
+            ?.trimEnd('\r')
             ?.toIntOrNull()
         if (commandIndex == null) {
             searchIndex = beginLineEnd + 1
