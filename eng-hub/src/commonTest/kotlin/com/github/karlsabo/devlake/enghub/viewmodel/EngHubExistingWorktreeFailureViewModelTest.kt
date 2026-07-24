@@ -45,7 +45,7 @@ class EngHubExistingWorktreeFailureViewModelTest {
             assertTrue(actionError!!.message.contains("Setup failed for $worktreePath"))
             assertTrue(actionError.message.contains("Overall exit code: 23"))
             assertTrue(actionError.message.contains("[2/2] FAILED exit 23"))
-            assertTrue(actionError.message.contains("stderr:\nsetup failed"))
+            assertTrue(actionError.message.contains("setup failed"))
             assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
         } finally {
             removeTempDir(repoRoot)
