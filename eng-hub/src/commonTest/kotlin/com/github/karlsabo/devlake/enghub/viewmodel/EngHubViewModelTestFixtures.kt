@@ -665,7 +665,8 @@ suspend fun removeTempDir(path: String) {
         lastFailure = deletion.exceptionOrNull()
         if (attempt < 9) delay(10)
     }
-    throw lastFailure ?: IllegalStateException("Failed to delete $path")
+    lastFailure?.let { throw it }
+    error("Failed to delete $path")
 }
 
 fun deleteRecursively(path: Path) {
