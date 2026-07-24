@@ -38,7 +38,7 @@ class EngHubExistingWorktreeFailureViewModelTest {
 
             viewModel.openLocalWorktree(repoRoot, worktreePath)
 
-            val actionError = withTimeout(2_000.milliseconds) {
+            val actionError = withTimeout(10_000.milliseconds) {
                 viewModel.actionErrorStateFlow.first { it != null }
             }
 

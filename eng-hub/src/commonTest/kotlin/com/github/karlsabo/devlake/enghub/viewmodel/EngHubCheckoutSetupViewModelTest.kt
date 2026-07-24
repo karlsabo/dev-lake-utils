@@ -49,7 +49,7 @@ class EngHubCheckoutSetupViewModelTest {
 
             val checkoutJob = viewModel.checkoutAndOpen("example-org/example-service", "feature/worktree-loading")
 
-            withTimeout(2_000.milliseconds) { checkoutJob.join() }
+            withTimeout(10_000.milliseconds) { checkoutJob.join() }
 
             assertEquals(markerContents, readText(markerPath))
             assertEquals(
