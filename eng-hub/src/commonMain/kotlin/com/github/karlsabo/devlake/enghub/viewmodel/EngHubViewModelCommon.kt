@@ -7,7 +7,6 @@ import com.github.karlsabo.notifications.NotificationIgnoreStore
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.io.files.Path
 
 internal val logger = KotlinLogging.logger {}
 
@@ -35,7 +34,9 @@ internal fun loadIgnoredThreads(
 
 internal fun checkoutRepoPath(repoFullName: String, config: EngHubConfig): String {
     val repoName = repoFullName.substringAfterLast('/')
-    return Path(config.repositoriesBaseDir, repoName).toString()
+    val baseDir = config.repositoriesBaseDir.trimEnd('/', '\\')
+    val separator = if (baseDir.lastIndexOf('\\') > baseDir.lastIndexOf('/')) '\\' else '/'
+    return "$baseDir$separator$repoName"
 }
 
 private val dirtyWorktreeGitOutputMarkers = listOf(
