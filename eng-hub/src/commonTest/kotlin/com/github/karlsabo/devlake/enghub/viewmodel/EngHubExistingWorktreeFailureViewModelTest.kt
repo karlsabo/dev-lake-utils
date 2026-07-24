@@ -7,6 +7,7 @@ import com.github.karlsabo.git.buildWorktreePath
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -119,7 +120,7 @@ class EngHubExistingWorktreeFailureViewModelTest {
         val repositoriesBaseDir = createTempDir("repos")
         val repoFullName = "test-org/dev-lake-utils"
         val branch = "feature/duplicate-setup"
-        val repoPath = "$repositoriesBaseDir/dev-lake-utils"
+        val repoPath = Path(repositoriesBaseDir, "dev-lake-utils").toString()
         val worktreePath = buildWorktreePath(repoPath, branch)
         val setupRunner = FailingBlockingSetupRunner()
         val gitWorktreeApi = RecordingGitWorktreeApi(
