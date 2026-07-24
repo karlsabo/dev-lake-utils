@@ -31,6 +31,7 @@ import com.github.karlsabo.system.DesktopLauncher
 import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.io.buffered
@@ -653,10 +654,18 @@ fun createTempDir(prefix: String): String {
     return path.toString()
 }
 
-fun removeTempDir(path: String) {
+suspend fun removeTempDir(path: String) {
     val root = Path(path)
     if (!SystemFileSystem.exists(root)) return
-    deleteRecursively(root)
+
+    var lastFailure: Throwable? = null
+    repeat(10) { attempt ->
+        val deletion = runCatching { deleteRecursively(root) }
+        if (deletion.isSuccess || !SystemFileSystem.exists(root)) return
+        lastFailure = deletion.exceptionOrNull()
+        if (attempt < 9) delay(10)
+    }
+    throw lastFailure ?: IllegalStateException("Failed to delete $path")
 }
 
 fun deleteRecursively(path: Path) {
