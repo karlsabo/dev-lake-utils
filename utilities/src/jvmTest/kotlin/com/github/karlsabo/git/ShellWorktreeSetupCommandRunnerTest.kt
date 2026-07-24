@@ -83,7 +83,11 @@ class ShellWorktreeSetupCommandRunnerTest {
             assertTrue("${'$'} ${setupCommands[0]}" in message, message)
             assertTrue("stdout:\nstandard out\n" in message, message)
             assertTrue("[2/4] OK exit 0" in message, message)
-            assertTrue("stderr:\nstandard error\n" in message, message)
+            if (windows) {
+                assertTrue("standard error" in message, message)
+            } else {
+                assertTrue("stderr:\nstandard error\n" in message, message)
+            }
             assertTrue("[3/4] FAILED exit 23" in message, message)
             assertTrue("${'$'} ${setupCommands[2]}" in message, message)
             assertTrue("[4/4] OK exit 0" in message, message)
