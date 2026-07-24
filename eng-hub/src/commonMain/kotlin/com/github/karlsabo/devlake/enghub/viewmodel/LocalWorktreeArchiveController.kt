@@ -62,13 +62,12 @@ internal class LocalWorktreeArchiveController(
             val result = runCatching {
                 logger.info { "Archiving worktree $worktreePath for $repoRootPath force=$force" }
                 worktreeServices.gitWorktreeApi.archiveWorktree(repoRootPath, worktreePath, force = force)
-                localRepositories.updateLocalRepositoryWorktrees(
-                    repoRootPath,
-                    worktreeServices.gitWorktreeApi.listLocalWorktreeUiStates(repoRootPath),
-                )
+                worktreeServices.gitWorktreeApi.listLocalWorktreeUiStates(repoRootPath)
             }
             state.archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
-            result.onFailure { failure ->
+            result.onSuccess { worktrees ->
+                localRepositories.updateLocalRepositoryWorktrees(repoRootPath, worktrees)
+            }.onFailure { failure ->
                 logger.error(failure) { "Failed to archive worktree $worktreePath" }
                 if (!force && failure.isDirtyWorktreeArchiveFailure()) {
                     state.forceArchiveWorktreeRequest.value = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
