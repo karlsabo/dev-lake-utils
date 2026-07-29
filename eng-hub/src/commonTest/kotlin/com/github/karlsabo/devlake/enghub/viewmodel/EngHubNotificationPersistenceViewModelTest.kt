@@ -183,14 +183,18 @@ class RecordingNotificationIgnoreStore(
     }
 }
 
+data class NotificationActionFailures(
+    val unsubscribe: Exception? = null,
+    val markDone: Exception? = null,
+)
+
 class NotificationPersistenceGitHubApi(
     private val notifications: List<Notification> = emptyList(),
     listNotificationFailuresBeforeSuccess: List<Throwable> = emptyList(),
     private val pullRequestsByUrl: Map<String, PullRequest> = emptyMap(),
     private val pullRequestFailureUrls: Set<String> = emptySet(),
     private val approvedReviewUrls: Set<String> = emptySet(),
-    private val unsubscribeFailure: Exception? = null,
-    private val markDoneFailure: Exception? = null,
+    private val actionFailures: NotificationActionFailures = NotificationActionFailures(),
 ) : GitHubApi {
     private val queuedListNotificationFailures = listNotificationFailuresBeforeSuccess.toMutableList()
     val pullRequestByUrlCalls = mutableListOf<String>()
@@ -251,12 +255,12 @@ class NotificationPersistenceGitHubApi(
 
     override suspend fun markNotificationAsDone(threadId: String) {
         markedDoneThreadIds.value += threadId
-        markDoneFailure?.let { throw it }
+        actionFailures.markDone?.let { throw it }
     }
 
     override suspend fun unsubscribeFromNotification(threadId: String) {
         unsubscribedThreadIds.value += threadId
-        unsubscribeFailure?.let { throw it }
+        actionFailures.unsubscribe?.let { throw it }
     }
 
     override suspend fun hasAnyApprovedReview(url: String): Boolean = url in approvedReviewUrls

@@ -64,6 +64,8 @@
 
 **Approved.** Each acceptance test below is one observable behavior and maps to one story/PR.
 
+**Build acceptance criterion:** `./gradlew clean build` passes.
+
 1. **Find Settings through the action popup**
    - Given Eng Hub is open, when the user opens the three-dots popup and searches for `setings`, then fuzzy matching keeps `Settings` visible; when the user selects it, the popup closes and the Settings pane is selected.
 

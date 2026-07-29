@@ -66,7 +66,9 @@ class EngHubManualNotificationPersistenceViewModelTest {
         )
         val api = NotificationPersistenceGitHubApi(
             notifications = listOf(notification),
-            markDoneFailure = IllegalStateException("mark done failed"),
+            actionFailures = NotificationActionFailures(
+                markDone = IllegalStateException("mark done failed"),
+            ),
         )
         val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)

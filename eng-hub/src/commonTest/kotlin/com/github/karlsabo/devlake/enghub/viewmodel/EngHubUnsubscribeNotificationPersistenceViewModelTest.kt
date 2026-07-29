@@ -40,7 +40,9 @@ class EngHubUnsubscribeNotificationPersistenceViewModelTest {
     @Test
     fun failedUnsubscribeDoesNotPersistThread() = runBlocking {
         val api = NotificationPersistenceGitHubApi(
-            unsubscribeFailure = IllegalStateException("boom"),
+            actionFailures = NotificationActionFailures(
+                unsubscribe = IllegalStateException("boom"),
+            ),
         )
         val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
