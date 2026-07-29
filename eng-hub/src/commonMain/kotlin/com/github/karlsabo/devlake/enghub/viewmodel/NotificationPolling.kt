@@ -20,13 +20,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
@@ -34,7 +32,6 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private const val PULL_REQUEST_SUBJECT_TYPE = "PullRequest"
 private const val NOTIFICATION_CONCURRENCY = 16
-private const val POLLING_RETRY_COUNT = 5L
 
 private data class NotificationPullRequestDetails(
     val number: Int?,
@@ -66,34 +63,25 @@ private fun polledNotifications(
     persistence: IgnoredNotificationPersistence,
 ): Flow<Result<List<NotificationUiState>>> = flow {
     while (true) {
-        val uiStates = gitHubServices.notificationApi.listNotifications()
-            .filterNot { state.ignoredThreads.value.hides(it) }
-            .asSequence()
-            .asFlow()
-            .flatMapMerge(concurrency = NOTIFICATION_CONCURRENCY) { notif ->
-                processedNotificationFlow(notif, gitHubServices.notificationService, persistence)
-            }
-            .mapNotNull { notif ->
-                gitHubServices.pullRequestReviewApi.toNotificationUiStateOrNull(notif)
-            }
-            .toList()
-        emit(Result.success(uiStates))
+        val result = runCatching {
+            gitHubServices.notificationApi.listNotifications()
+                .filterNot { state.ignoredThreads.value.hides(it) }
+                .asSequence()
+                .asFlow()
+                .flatMapMerge(concurrency = NOTIFICATION_CONCURRENCY) { notif ->
+                    processedNotificationFlow(notif, gitHubServices.notificationService, persistence)
+                }
+                .mapNotNull { notif ->
+                    gitHubServices.pullRequestReviewApi.toNotificationUiStateOrNull(notif)
+                }
+                .toList()
+        }.rethrowCancellation()
+
+        result.onFailure { logger.error(it) { "Error polling notifications" } }
+        emit(result)
         delay(config.pollIntervalMs.milliseconds)
     }
-}
-    .flowOn(Dispatchers.IO)
-    .retry(POLLING_RETRY_COUNT) { cause ->
-        if (cause.isRetriablePollingFailure()) {
-            delay(POLLING_RETRY_DELAY_MS.milliseconds)
-            true
-        } else {
-            false
-        }
-    }
-    .catch { e ->
-        logger.error(e) { "Error polling notifications" }
-        emit(Result.failure(e))
-    }
+}.flowOn(Dispatchers.IO)
 
 private fun processedNotificationFlow(
     notif: Notification,

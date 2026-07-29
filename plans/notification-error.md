@@ -18,7 +18,7 @@
 
 ## Stories
 
-### 1. Keep notification polling alive after a transient web failure
+### 1. [x] Keep notification polling alive after a transient web failure
 
 **Acceptance criteria:** Given Eng Hub is observing notifications, and the notification API first fails with `UnresolvedAddressException`, and the next poll returns notification `thread-1234`, when the notification flow is collected without recreating the ViewModel, then the flow first exposes an error state and later exposes a successful notification list containing `thread-1234`.
 

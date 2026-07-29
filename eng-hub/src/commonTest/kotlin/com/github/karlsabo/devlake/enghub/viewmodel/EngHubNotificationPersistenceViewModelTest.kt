@@ -185,12 +185,14 @@ class RecordingNotificationIgnoreStore(
 
 class NotificationPersistenceGitHubApi(
     private val notifications: List<Notification> = emptyList(),
+    listNotificationFailuresBeforeSuccess: List<Throwable> = emptyList(),
     private val pullRequestsByUrl: Map<String, PullRequest> = emptyMap(),
     private val pullRequestFailureUrls: Set<String> = emptySet(),
     private val approvedReviewUrls: Set<String> = emptySet(),
     private val unsubscribeFailure: Exception? = null,
     private val markDoneFailure: Exception? = null,
 ) : GitHubApi {
+    private val queuedListNotificationFailures = listNotificationFailuresBeforeSuccess.toMutableList()
     val pullRequestByUrlCalls = mutableListOf<String>()
     val approvedPullRequestUrls = MutableStateFlow<List<String>>(emptyList())
     val unsubscribedThreadIds = MutableStateFlow<List<String>>(emptyList())
@@ -232,7 +234,10 @@ class NotificationPersistenceGitHubApi(
         error("Unexpected call")
     }
 
-    override suspend fun listNotifications(): List<Notification> = notifications
+    override suspend fun listNotifications(): List<Notification> {
+        if (queuedListNotificationFailures.isNotEmpty()) throw queuedListNotificationFailures.removeAt(0)
+        return notifications
+    }
 
     override suspend fun getPullRequestByUrl(url: String): PullRequest {
         pullRequestByUrlCalls += url
