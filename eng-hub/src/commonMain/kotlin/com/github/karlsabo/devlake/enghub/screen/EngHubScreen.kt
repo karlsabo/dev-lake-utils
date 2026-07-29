@@ -117,22 +117,32 @@ internal fun EngHubScreenHeader(
 }
 
 @Composable
-private fun EngHubSidebar(
+internal fun EngHubSidebar(
     selectedPane: EngHubPane,
     onPaneSelect: (EngHubPane) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxHeight().width(56.dp).padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        EngHubPane.entries.filterNot { it == EngHubPane.Settings }.forEach { pane ->
-            EngHubSidebarButton(
-                pane = pane,
-                selected = pane == selectedPane,
-                onClick = { onPaneSelect(pane) },
-            )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            EngHubPane.entries.filterNot { it == EngHubPane.Settings }.forEach { pane ->
+                EngHubSidebarButton(
+                    pane = pane,
+                    selected = pane == selectedPane,
+                    onClick = { onPaneSelect(pane) },
+                )
+            }
         }
+        Spacer(modifier = Modifier.weight(1f))
+        EngHubSidebarButton(
+            pane = EngHubPane.Settings,
+            selected = selectedPane == EngHubPane.Settings,
+            onClick = { onPaneSelect(EngHubPane.Settings) },
+        )
     }
 }
 

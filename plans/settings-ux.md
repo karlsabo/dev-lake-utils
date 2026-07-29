@@ -171,6 +171,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 2. Open Settings from the bottom gear
 
+**Status:** Done
+
 **Acceptance criteria:** Given the Pull Requests pane is selected, when the user clicks the bottom-anchored gear, then the Settings pane is selected.
 
 **Expected edits:**
