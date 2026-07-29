@@ -4,7 +4,8 @@ internal enum class EngHubPane(
     val label: String,
     val icon: String,
 ) {
-    PullRequests("Pull Requests", "PR"),
+    PullRequests("Pull Requests", "⛙"),
     Notifications("Notifications", "🔔"),
     Worktrees("Worktrees", "🌳"),
+    Settings("Settings", "⚙"),
 }
