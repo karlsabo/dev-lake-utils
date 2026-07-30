@@ -20,10 +20,10 @@ import com.github.karlsabo.github.pullRequestDetailsUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.stateIn
@@ -38,14 +38,19 @@ internal fun ViewModel.pullRequestsStateFlow(
     searchApi: GitHubPullRequestSearchApi,
     reviewApi: GitHubPullRequestReviewApi,
     summaryApi: GitHubPullRequestSummaryApi,
+    configs: StateFlow<EngHubConfig>,
+): StateFlow<Result<List<PullRequestUiState>>?> = configDrivenPollingFlow(configs) { config ->
+    pullRequestsForConfig(searchApi, reviewApi, summaryApi, config)
+}.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_FLOW_STOP_TIMEOUT_MS), null)
+
+private fun pullRequestsForConfig(
+    searchApi: GitHubPullRequestSearchApi,
+    reviewApi: GitHubPullRequestReviewApi,
+    summaryApi: GitHubPullRequestSummaryApi,
     config: EngHubConfig,
-): StateFlow<Result<List<PullRequestUiState>>?> = flow {
-    while (true) {
-        val issues = searchApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
-        val prStates = buildPullRequestUiStates(issues, reviewApi, summaryApi)
-        emit(Result.success(prStates))
-        delay(config.pollIntervalMs.milliseconds)
-    }
+): Flow<Result<List<PullRequestUiState>>> = fixedIntervalPollingFlow(config) {
+    val issues = searchApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
+    Result.success(buildPullRequestUiStates(issues, reviewApi, summaryApi))
 }
     .flowOn(Dispatchers.IO)
     .retry(POLLING_RETRY_COUNT) { cause ->
@@ -60,7 +65,6 @@ internal fun ViewModel.pullRequestsStateFlow(
         logger.error(e) { "Error polling pull requests" }
         emit(Result.failure(e))
     }
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_FLOW_STOP_TIMEOUT_MS), null)
 
 internal suspend fun GitHubApi.buildPullRequestUiStates(
     issues: List<Issue>,

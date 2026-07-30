@@ -22,6 +22,7 @@ import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 internal fun EngHubSettingsScreen(
     state: EngHubSettingsUiState,
     onGitHubAuthorChange: (String) -> Unit = {},
+    onPollIntervalChange: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -37,18 +38,11 @@ internal fun EngHubSettingsScreen(
                 password = true,
             )
         }
-        SettingsSection("GitHub activity") {
-            state.organizationIds.forEachIndexed { index, organizationId ->
-                SettingsField("Organization ID ${index + 1}", organizationId, "organization-$index")
-            }
-            SettingsField(
-                label = "GitHub author",
-                value = state.gitHubAuthor,
-                tag = "github-author",
-                onValueChange = onGitHubAuthorChange,
-            )
-            SettingsField("Polling interval (seconds)", state.pollIntervalSeconds, "poll-interval")
-        }
+        GitHubActivitySettings(
+            state = state,
+            onGitHubAuthorChange = onGitHubAuthorChange,
+            onPollIntervalChange = onPollIntervalChange,
+        )
         SettingsSection("Repositories") {
             SettingsField("Repositories base directory", state.repositoriesBaseDir, "repositories-base-dir")
             SettingsField(
@@ -76,6 +70,31 @@ internal fun EngHubSettingsScreen(
             SettingsField("Planning markdown directory", state.planningMarkdownDir, "planning-markdown-dir")
             SettingsField("Setup shell", state.setupShell, "setup-shell")
         }
+    }
+}
+
+@Composable
+private fun GitHubActivitySettings(
+    state: EngHubSettingsUiState,
+    onGitHubAuthorChange: (String) -> Unit,
+    onPollIntervalChange: (String) -> Unit,
+) {
+    SettingsSection("GitHub activity") {
+        state.organizationIds.forEachIndexed { index, organizationId ->
+            SettingsField("Organization ID ${index + 1}", organizationId, "organization-$index")
+        }
+        SettingsField(
+            label = "GitHub author",
+            value = state.gitHubAuthor,
+            tag = "github-author",
+            onValueChange = onGitHubAuthorChange,
+        )
+        SettingsField(
+            label = "Polling interval (seconds)",
+            value = state.pollIntervalSeconds,
+            tag = "poll-interval",
+            onValueChange = onPollIntervalChange,
+        )
     }
 }
 

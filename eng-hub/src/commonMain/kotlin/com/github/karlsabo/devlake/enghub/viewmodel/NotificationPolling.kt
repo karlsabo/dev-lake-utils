@@ -15,7 +15,6 @@ import com.github.karlsabo.github.NotificationProcessingResult
 import com.github.karlsabo.github.PullRequestStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +27,6 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.milliseconds
 
 private const val PULL_REQUEST_SUBJECT_TYPE = "PullRequest"
 private const val NOTIFICATION_CONCURRENCY = 16
@@ -40,13 +38,13 @@ private data class NotificationPullRequestDetails(
 
 internal fun ViewModel.notificationsStateFlow(
     gitHubServices: EngHubGitHubServices,
-    config: EngHubConfig,
+    configs: StateFlow<EngHubConfig>,
     state: EngHubViewModelState,
     persistence: IgnoredNotificationPersistence,
 ): StateFlow<Result<List<NotificationUiState>>?> {
     val polledNotifications = polledNotifications(
         gitHubServices = gitHubServices,
-        config = config,
+        configs = configs,
         state = state,
         persistence = persistence,
     )
@@ -58,12 +56,12 @@ internal fun ViewModel.notificationsStateFlow(
 
 private fun polledNotifications(
     gitHubServices: EngHubGitHubServices,
-    config: EngHubConfig,
+    configs: StateFlow<EngHubConfig>,
     state: EngHubViewModelState,
     persistence: IgnoredNotificationPersistence,
-): Flow<Result<List<NotificationUiState>>> = flow {
-    while (true) {
-        val result = runCatching {
+): Flow<Result<List<NotificationUiState>>> = configDrivenPollingFlow(configs) { config ->
+    fixedIntervalPollingFlow(config) {
+        runCatching {
             gitHubServices.notificationApi.listNotifications()
                 .filterNot { state.ignoredThreads.value.hides(it) }
                 .asSequence()
@@ -75,13 +73,11 @@ private fun polledNotifications(
                     gitHubServices.pullRequestReviewApi.toNotificationUiStateOrNull(notif)
                 }
                 .toList()
-        }.rethrowCancellation()
-
-        result.onFailure { logger.error(it) { "Error polling notifications" } }
-        emit(result)
-        delay(config.pollIntervalMs.milliseconds)
-    }
-}.flowOn(Dispatchers.IO)
+        }.rethrowCancellation().also { result ->
+            result.onFailure { logger.error(it) { "Error polling notifications" } }
+        }
+    }.flowOn(Dispatchers.IO)
+}
 
 private fun processedNotificationFlow(
     notif: Notification,

@@ -34,6 +34,23 @@ class EngHubSettingsViewModelTest {
     }
 
     @Test
+    fun changingPollingIntervalCommitsMillisecondsAfter750Milliseconds() = runTest {
+        val writer = RecordingConfigWriter()
+        val viewModel = settingsViewModel(writer)
+
+        viewModel.updatePollIntervalSeconds("300")
+
+        assertEquals("300", viewModel.uiState.value.pollIntervalSeconds)
+        advanceTimeBy(749.milliseconds)
+        runCurrent()
+        assertTrue(writer.savedConfigs.isEmpty())
+
+        advanceTimeBy(1.milliseconds)
+        runCurrent()
+        assertEquals(listOf(300_000L), writer.savedConfigs.map(EngHubConfig::pollIntervalMs))
+    }
+
+    @Test
     fun aNewerDraftCannotBeOverwrittenByAnOlderDebounce() = runTest {
         val writer = RecordingConfigWriter()
         val viewModel = settingsViewModel(writer)

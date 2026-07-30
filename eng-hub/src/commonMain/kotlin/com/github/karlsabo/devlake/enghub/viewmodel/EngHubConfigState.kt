@@ -3,6 +3,8 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -15,6 +17,7 @@ internal class EngHubConfigState(
 
     val current: EngHubConfig
         get() = mutableConfig.value
+    val config: StateFlow<EngHubConfig> = mutableConfig.asStateFlow()
 
     suspend fun update(transform: (EngHubConfig) -> EngHubConfig): EngHubConfig = updateMutex.withLock {
         val currentConfig = mutableConfig.value

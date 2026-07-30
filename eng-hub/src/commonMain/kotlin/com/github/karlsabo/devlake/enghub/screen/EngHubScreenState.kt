@@ -57,6 +57,7 @@ internal data class EngHubScreenActions(
 
 internal data class EngHubSettingsActions(
     val onGitHubAuthorChange: (String) -> Unit,
+    val onPollIntervalChange: (String) -> Unit,
 )
 
 internal data class PullRequestPaneActions(
@@ -177,6 +178,7 @@ internal fun engHubScreenActions(
     ),
     settings = EngHubSettingsActions(
         onGitHubAuthorChange = settingsViewModel::updateGitHubAuthor,
+        onPollIntervalChange = settingsViewModel::updatePollIntervalSeconds,
     ),
 )
 

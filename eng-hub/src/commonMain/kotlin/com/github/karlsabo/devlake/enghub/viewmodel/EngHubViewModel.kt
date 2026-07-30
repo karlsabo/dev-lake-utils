@@ -111,18 +111,19 @@ class EngHubViewModel(
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> =
         state.actingOnThreadIds.asStateFlow()
 
-    internal suspend fun updateConfig(transform: (EngHubConfig) -> EngHubConfig): EngHubConfig =
-        state.updateConfig(transform)
+    internal suspend fun updateConfig(
+        transform: (EngHubConfig) -> EngHubConfig,
+    ): EngHubConfig = state.updateConfig(transform)
 
     val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = pullRequestsStateFlow(
         searchApi = gitHubServices.pullRequestSearchApi,
         reviewApi = gitHubServices.pullRequestReviewApi,
         summaryApi = gitHubServices.pullRequestSummaryApi,
-        config = config,
+        configs = state.config,
     )
     val notifications: StateFlow<Result<List<NotificationUiState>>?> = notificationsStateFlow(
         gitHubServices = gitHubServices,
-        config = config,
+        configs = state.config,
         state = state,
         persistence = ignoredNotificationPersistence,
     )

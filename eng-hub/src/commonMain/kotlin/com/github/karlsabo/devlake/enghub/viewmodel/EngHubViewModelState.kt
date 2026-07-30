@@ -63,9 +63,9 @@ internal class EngHubViewModelState(
 
     val currentConfig: EngHubConfig
         get() = configState.current
+    val config: StateFlow<EngHubConfig> = configState.config
 
-    suspend fun updateConfig(transform: (EngHubConfig) -> EngHubConfig): EngHubConfig =
-        configState.update(transform)
+    suspend fun updateConfig(transform: (EngHubConfig) -> EngHubConfig): EngHubConfig = configState.update(transform)
 
     val actionErrors = MutableStateFlow(ActionErrorQueueState())
     val reportedSetupFailureHandlesByPath =

@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val TEXT_COMMIT_DEBOUNCE_MS = 750L
+private const val MILLISECONDS_PER_SECOND = 1_000L
 
 class EngHubSettingsViewModel(
     engHubConfig: EngHubConfig,
@@ -29,6 +30,7 @@ class EngHubSettingsViewModel(
         createEngHubSettingsUiState(engHubConfig, gitHubConfig, gitHubSecret),
     )
     private var authorCommitJob: Job? = null
+    private var pollIntervalCommitJob: Job? = null
 
     val uiState: StateFlow<EngHubSettingsUiState> = mutableUiState.asStateFlow()
 
@@ -41,5 +43,26 @@ class EngHubSettingsViewModel(
                 currentConfig.copy(gitHubAuthor = author)
             }
         }
+    }
+
+    fun updatePollIntervalSeconds(seconds: String) {
+        mutableUiState.value = mutableUiState.value.copy(pollIntervalSeconds = seconds)
+        pollIntervalCommitJob?.cancel()
+        val intervalMs = seconds.toPollIntervalMillisecondsOrNull() ?: return
+        pollIntervalCommitJob = coroutineScope.launch {
+            delay(TEXT_COMMIT_DEBOUNCE_MS.milliseconds)
+            updateConfig { currentConfig ->
+                currentConfig.copy(pollIntervalMs = intervalMs)
+            }
+        }
+    }
+}
+
+private fun String.toPollIntervalMillisecondsOrNull(): Long? {
+    val seconds = toLongOrNull()
+    return if (seconds != null && seconds > 0 && seconds <= Long.MAX_VALUE / MILLISECONDS_PER_SECOND) {
+        seconds * MILLISECONDS_PER_SECOND
+    } else {
+        null
     }
 }

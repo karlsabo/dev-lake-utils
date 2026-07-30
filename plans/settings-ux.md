@@ -221,6 +221,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 5. Refresh polling after a committed interval change
 
+**Status:** Done
+
 **Acceptance criteria:** Given the running app polls every 600 seconds, when the user commits 300 seconds, then obsolete polling stops and replacement polling uses `300000` milliseconds without restarting Eng Hub.
 
 **Expected edits:**

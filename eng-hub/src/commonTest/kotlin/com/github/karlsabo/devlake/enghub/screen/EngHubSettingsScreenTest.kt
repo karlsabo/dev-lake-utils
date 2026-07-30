@@ -77,6 +77,30 @@ class EngHubSettingsScreenTest {
     }
 
     @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun editsPollingInterval() = runComposeUiTest {
+        val state = createEngHubSettingsUiState(
+            engHubConfig = representativeEngHubConfig(),
+            gitHubConfig = GitHubConfig(tokenPath = "/secrets/github.json"),
+            gitHubSecret = GitHubSecret(githubToken = "github_pat_private"),
+        )
+        var editedPollInterval: String? = null
+        setContent {
+            MaterialTheme {
+                EngHubSettingsScreen(
+                    state = state,
+                    onPollIntervalChange = { editedPollInterval = it },
+                    modifier = Modifier.size(800.dp, 600.dp),
+                )
+            }
+        }
+
+        onNodeWithTag("poll-interval").performScrollTo().performTextReplacement("301")
+
+        assertEquals("301", editedPollInterval)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
     private fun androidx.compose.ui.test.ComposeUiTest.assertField(tag: String, value: String) {
         onNodeWithTag(tag).performScrollTo().assertTextContains(value)
     }
