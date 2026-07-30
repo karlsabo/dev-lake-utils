@@ -28,6 +28,7 @@ class EngHubViewModel(
 ) : ViewModel() {
     private val state = EngHubViewModelState(
         config = config,
+        configWriter = worktreeServices.configWriter,
         worktreeSetupCoordinator = worktreeServices.worktreeSetupCoordinator,
         notificationIgnoreStore = notificationIgnoreStore,
     )
@@ -109,6 +110,9 @@ class EngHubViewModel(
         state.forceArchiveWorktreeRequest.asStateFlow()
     val actingOnThreadIdsStateFlow: StateFlow<Set<String>> =
         state.actingOnThreadIds.asStateFlow()
+
+    internal suspend fun updateConfig(transform: (EngHubConfig) -> EngHubConfig): EngHubConfig =
+        state.updateConfig(transform)
 
     val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = pullRequestsStateFlow(
         searchApi = gitHubServices.pullRequestSearchApi,

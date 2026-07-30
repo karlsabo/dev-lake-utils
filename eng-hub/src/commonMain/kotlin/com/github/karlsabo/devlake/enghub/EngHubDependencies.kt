@@ -22,13 +22,15 @@ internal fun loadEngHubDependencies(
 ): LoadedEngHubDependencies {
     val config = loadConfig()
     val loadedGitHubConfig = loadGitHubSettingsConfig()
+    val viewModel = componentFactory(config, loadedGitHubConfig.toApiRestConfig()).viewModel
     return LoadedEngHubDependencies(
         config = config,
-        viewModel = componentFactory(config, loadedGitHubConfig.toApiRestConfig()).viewModel,
+        viewModel = viewModel,
         settingsViewModel = EngHubSettingsViewModel(
             engHubConfig = config,
             gitHubConfig = loadedGitHubConfig.config,
             gitHubSecret = loadedGitHubConfig.secret,
+            updateConfig = viewModel::updateConfig,
         ),
     )
 }

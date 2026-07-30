@@ -42,6 +42,7 @@ fun EngHubScreen(
     val state = collectEngHubScreenState(viewModel, settingsViewModel, selectedPane)
     val actions = engHubScreenActions(
         viewModel = viewModel,
+        settingsViewModel = settingsViewModel,
         onPaneSelected = { selectedPane = it },
     )
 

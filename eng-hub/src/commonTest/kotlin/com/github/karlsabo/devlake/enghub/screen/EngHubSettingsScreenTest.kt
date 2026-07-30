@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.createEngHubSettingsUiState
@@ -16,6 +17,7 @@ import com.github.karlsabo.devlake.enghub.state.representativeEngHubConfig
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class EngHubSettingsScreenTest {
     @OptIn(ExperimentalTestApi::class)
@@ -47,6 +49,31 @@ class EngHubSettingsScreenTest {
         assertField("planning-markdown-dir", "/workspace/plans")
         assertField("setup-shell", "/bin/bash")
         onAllNodesWithText("github_pat_private", substring = true).assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun editsGitHubAuthorWithoutASaveAction() = runComposeUiTest {
+        val state = createEngHubSettingsUiState(
+            engHubConfig = representativeEngHubConfig(),
+            gitHubConfig = GitHubConfig(tokenPath = "/secrets/github.json"),
+            gitHubSecret = GitHubSecret(githubToken = "github_pat_private"),
+        )
+        var editedAuthor: String? = null
+        setContent {
+            MaterialTheme {
+                EngHubSettingsScreen(
+                    state = state,
+                    onGitHubAuthorChange = { editedAuthor = it },
+                    modifier = Modifier.size(800.dp, 600.dp),
+                )
+            }
+        }
+
+        onNodeWithTag("github-author").performScrollTo().performTextReplacement("hubot")
+
+        assertEquals("hubot", editedAuthor)
+        onAllNodesWithText("Save").assertCountEquals(0)
     }
 
     @OptIn(ExperimentalTestApi::class)

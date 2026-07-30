@@ -205,6 +205,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 4. Auto-persist a general setting
 
+**Status:** Done
+
 **Acceptance criteria:** Given `gitHubAuthor` is `octocat`, when the user changes it to `hubot` and leaves the field idle for 750 ms, then `eng-hub-config.json` contains `hubot` without a save action.
 
 **Expected edits:**

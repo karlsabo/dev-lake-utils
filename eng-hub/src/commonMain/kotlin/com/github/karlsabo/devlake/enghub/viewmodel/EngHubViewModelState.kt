@@ -3,6 +3,7 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.devlake.enghub.EngHubConfig
+import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
 import com.github.karlsabo.git.WorktreePath
@@ -54,10 +55,17 @@ internal data class CreateLocalWorktreeFromRepositoryRequest(
 
 internal class EngHubViewModelState(
     config: EngHubConfig,
+    configWriter: EngHubConfigWriter,
     worktreeSetupCoordinator: WorktreeSetupCoordinator,
     notificationIgnoreStore: NotificationIgnoreStore,
 ) {
-    var currentConfig = config
+    private val configState = EngHubConfigState(config, configWriter)
+
+    val currentConfig: EngHubConfig
+        get() = configState.current
+
+    suspend fun updateConfig(transform: (EngHubConfig) -> EngHubConfig): EngHubConfig =
+        configState.update(transform)
 
     val actionErrors = MutableStateFlow(ActionErrorQueueState())
     val reportedSetupFailureHandlesByPath =

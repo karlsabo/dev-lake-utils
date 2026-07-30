@@ -52,6 +52,11 @@ internal data class EngHubScreenActions(
     val pullRequests: PullRequestPaneActions,
     val notifications: NotificationActions,
     val worktrees: WorktreePanelActions,
+    val settings: EngHubSettingsActions,
+)
+
+internal data class EngHubSettingsActions(
+    val onGitHubAuthorChange: (String) -> Unit,
 )
 
 internal data class PullRequestPaneActions(
@@ -115,6 +120,7 @@ internal fun collectEngHubScreenState(
 
 internal fun engHubScreenActions(
     viewModel: EngHubViewModel,
+    settingsViewModel: EngHubSettingsViewModel,
     onPaneSelected: (EngHubPane) -> Unit,
 ): EngHubScreenActions = EngHubScreenActions(
     onPaneSelected = onPaneSelected,
@@ -168,6 +174,9 @@ internal fun engHubScreenActions(
             onConfirm = viewModel.confirmForceArchiveLocalWorktree,
             onDismiss = viewModel.dismissForceArchiveWorktreeRequest,
         ),
+    ),
+    settings = EngHubSettingsActions(
+        onGitHubAuthorChange = settingsViewModel::updateGitHubAuthor,
     ),
 )
 

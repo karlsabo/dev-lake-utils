@@ -98,24 +98,30 @@ internal class LocalRepositoryController(
             }
     }
 
-    private fun addLocalRepositoryBlocking(selectedPath: String) {
+    private suspend fun addLocalRepositoryBlocking(selectedPath: String) {
         val repositoryWorktrees = gitWorktreeApi.resolveRepositoryRoot(selectedPath)
         val rootPath = repositoryWorktrees.rootPath
-        val alreadyConfigured = state.currentConfig.localRepositories.any {
-            it.path.normalizedRepoPath() == rootPath.normalizedRepoPath()
+        var repositoryAdded = false
+        state.updateConfig { currentConfig ->
+            val alreadyConfigured = currentConfig.localRepositories.any {
+                it.path.normalizedRepoPath() == rootPath.normalizedRepoPath()
+            }
+            if (alreadyConfigured) {
+                currentConfig
+            } else {
+                repositoryAdded = true
+                currentConfig.copy(
+                    localRepositories = currentConfig.localRepositories + LocalRepositoryConfig(path = rootPath),
+                )
+            }
         }
-        if (alreadyConfigured) {
+        if (!repositoryAdded) {
             errorReporter.enqueueActionError("Repository already configured: $rootPath")
             return
         }
 
-        val newConfig = state.currentConfig.copy(
-            localRepositories = state.currentConfig.localRepositories + LocalRepositoryConfig(path = rootPath),
-        )
-        worktreeServices.configWriter.save(newConfig)
-        state.currentConfig = newConfig
         state.localRepositories.update { repositories ->
-            newConfig.localRepositories
+            state.currentConfig.localRepositories
                 .toLocalRepositoryUiStates()
                 .withPreservedWorktrees(
                     previousRepositories = repositories,

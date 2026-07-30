@@ -33,6 +33,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.compose.ui.test)
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
         getByName("jvmTest") {

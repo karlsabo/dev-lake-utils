@@ -36,6 +36,7 @@ internal fun EngHubPaneContent(
 
         EngHubPane.Settings -> EngHubSettingsScreen(
             state = state.settings,
+            onGitHubAuthorChange = actions.settings.onGitHubAuthorChange,
             modifier = modifier,
         )
     }

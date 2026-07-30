@@ -21,6 +21,7 @@ import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 @Composable
 internal fun EngHubSettingsScreen(
     state: EngHubSettingsUiState,
+    onGitHubAuthorChange: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -40,7 +41,12 @@ internal fun EngHubSettingsScreen(
             state.organizationIds.forEachIndexed { index, organizationId ->
                 SettingsField("Organization ID ${index + 1}", organizationId, "organization-$index")
             }
-            SettingsField("GitHub author", state.gitHubAuthor, "github-author")
+            SettingsField(
+                label = "GitHub author",
+                value = state.gitHubAuthor,
+                tag = "github-author",
+                onValueChange = onGitHubAuthorChange,
+            )
             SettingsField("Polling interval (seconds)", state.pollIntervalSeconds, "poll-interval")
         }
         SettingsSection("Repositories") {
@@ -90,13 +96,14 @@ private fun SettingsField(
     value: String,
     tag: String,
     password: Boolean = false,
+    onValueChange: ((String) -> Unit)? = null,
 ) {
     Row(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = value,
-            onValueChange = {},
+            onValueChange = onValueChange ?: {},
             label = { Text(label) },
-            readOnly = true,
+            readOnly = onValueChange == null,
             singleLine = true,
             visualTransformation = if (password) {
                 PasswordVisualTransformation()
