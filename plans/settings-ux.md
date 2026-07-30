@@ -187,6 +187,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 3. Display all loaded Eng Hub and GitHub settings
 
+**Status:** Done
+
 **Acceptance criteria:** Given valid Eng Hub and GitHub configuration with representative values for every field, when the Settings pane opens, then every value is shown in its corresponding control without rewriting either config.
 
 **Expected edits:**

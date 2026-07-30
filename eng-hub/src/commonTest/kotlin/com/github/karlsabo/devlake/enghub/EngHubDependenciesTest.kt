@@ -17,6 +17,9 @@ import com.github.karlsabo.github.Notification
 import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.config.GitHubApiRestConfig
+import com.github.karlsabo.github.config.GitHubConfig
+import com.github.karlsabo.github.config.GitHubSecret
+import com.github.karlsabo.github.config.LoadedGitHubConfig
 import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
@@ -62,21 +65,17 @@ class EngHubDependenciesTest {
             notificationIgnoreStore = fakeNotificationIgnoreStore,
         )
 
-        val viewModel = loadEngHubViewModel(
-            loadConfig = {
-                config
-            },
-            loadGitHubApiConfig = {
-                gitHubApiConfig
-            },
+        val viewModel = loadEngHubDependencies(
+            loadConfig = { config },
+            loadGitHubSettingsConfig = { loadedGitHubConfig(gitHubApiConfig.token) },
             componentFactory = { providedConfig, providedGitHubApiConfig ->
                 assertSame(config, providedConfig)
-                assertSame(gitHubApiConfig, providedGitHubApiConfig)
+                assertEquals(gitHubApiConfig, providedGitHubApiConfig)
                 object : EngHubComponent(providedConfig, providedGitHubApiConfig) {
                     override val viewModel = providedViewModel
                 }
             },
-        )
+        ).viewModel
 
         viewModel.openInBrowser("https://example.com/pr/1")
         assertEquals(
@@ -136,10 +135,10 @@ class EngHubDependenciesTest {
 
         val loadedDependencies = loadEngHubDependencies(
             loadConfig = { config },
-            loadGitHubApiConfig = { gitHubApiConfig },
+            loadGitHubSettingsConfig = { loadedGitHubConfig(gitHubApiConfig.token) },
             componentFactory = { providedConfig, providedGitHubApiConfig ->
                 assertSame(config, providedConfig)
-                assertSame(gitHubApiConfig, providedGitHubApiConfig)
+                assertEquals(gitHubApiConfig, providedGitHubApiConfig)
                 object : EngHubComponent(providedConfig, providedGitHubApiConfig) {
                     override val viewModel = providedViewModel
                 }
@@ -148,8 +147,15 @@ class EngHubDependenciesTest {
 
         assertSame(config, loadedDependencies.config)
         assertSame(providedViewModel, loadedDependencies.viewModel)
+        assertEquals("/tmp/github-secret.json", loadedDependencies.settingsViewModel.uiState.value.gitHubTokenPath)
+        assertEquals("••••••••", loadedDependencies.settingsViewModel.uiState.value.gitHubToken.maskedValue)
     }
 }
+
+private fun loadedGitHubConfig(token: String) = LoadedGitHubConfig(
+    config = GitHubConfig(tokenPath = "/tmp/github-secret.json"),
+    secret = GitHubSecret(githubToken = token),
+)
 
 private fun testNotificationUiState(): NotificationUiState = NotificationUiState(
     notificationThreadId = "thread-1",

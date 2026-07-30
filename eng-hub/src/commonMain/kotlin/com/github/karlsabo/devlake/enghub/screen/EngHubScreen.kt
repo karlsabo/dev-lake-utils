@@ -30,12 +30,16 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.component.EngHubAction
 import com.github.karlsabo.devlake.enghub.component.EngHubActionPopup
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
+import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
 
 @Composable
-fun EngHubScreen(viewModel: EngHubViewModel) {
+fun EngHubScreen(
+    viewModel: EngHubViewModel,
+    settingsViewModel: EngHubSettingsViewModel,
+) {
     var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
-    val state = collectEngHubScreenState(viewModel, selectedPane)
+    val state = collectEngHubScreenState(viewModel, settingsViewModel, selectedPane)
     val actions = engHubScreenActions(
         viewModel = viewModel,
         onPaneSelected = { selectedPane = it },

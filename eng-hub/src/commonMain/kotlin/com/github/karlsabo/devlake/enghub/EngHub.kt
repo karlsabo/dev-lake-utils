@@ -13,7 +13,6 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
 import com.github.karlsabo.devlake.enghub.screen.EngHubScreen
-import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
 import com.github.karlsabo.system.DesktopAppBootstrapResult
 import com.github.karlsabo.system.runDesktopAppBootstrap
 import dev_lake_utils.shared_resources.generated.resources.Res
@@ -29,7 +28,7 @@ fun EngHub(onExitApplication: () -> Unit) {
     var isLoadingConfiguration by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf("") }
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
-    var viewModel by remember { mutableStateOf<EngHubViewModel?>(null) }
+    var dependencies by remember { mutableStateOf<LoadedEngHubDependencies?>(null) }
 
     LaunchedEffect(Unit) {
         when (
@@ -41,7 +40,7 @@ fun EngHub(onExitApplication: () -> Unit) {
             )
         ) {
             is DesktopAppBootstrapResult.Loaded -> {
-                viewModel = result.value.viewModel
+                dependencies = result.value
                 isLoadingConfiguration = false
                 logger.info { "Configuration loaded" }
             }
@@ -70,15 +69,18 @@ fun EngHub(onExitApplication: () -> Unit) {
         onCloseRequest = onExitApplication,
         title = ENG_HUB_DISPLAY_NAME,
         icon = painterResource(Res.drawable.icon),
-        visible = !isLoadingConfiguration && viewModel != null,
+        visible = !isLoadingConfiguration && dependencies != null,
         state = rememberWindowState(
             width = 1400.dp,
             height = 900.dp,
             position = WindowPosition(Alignment.Center),
         ),
     ) {
-        viewModel?.let { vm ->
-            EngHubScreen(viewModel = vm)
+        dependencies?.let { loaded ->
+            EngHubScreen(
+                viewModel = loaded.viewModel,
+                settingsViewModel = loaded.settingsViewModel,
+            )
         }
     }
 }

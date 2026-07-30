@@ -11,9 +11,11 @@ import com.github.karlsabo.devlake.enghub.component.PendingUseUnrelatedExistingB
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.component.createRepositoryWorktreeDialogState
+import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.ActionErrorUiState
+import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.RebaseConflictResolutionRequest
 import com.github.karlsabo.devlake.enghub.viewmodel.UseUnrelatedExistingBranchConfirmationRequest
@@ -29,6 +31,7 @@ internal data class EngHubScreenState(
     val pullRequests: PullRequestsPaneState,
     val notifications: NotificationsPaneState,
     val worktrees: WorktreePanelState,
+    val settings: EngHubSettingsUiState,
 )
 
 internal data class PullRequestsPaneState(
@@ -59,6 +62,7 @@ internal data class PullRequestPaneActions(
 @Composable
 internal fun collectEngHubScreenState(
     viewModel: EngHubViewModel,
+    settingsViewModel: EngHubSettingsViewModel,
     selectedPane: EngHubPane,
 ): EngHubScreenState {
     val pullRequestsResult by viewModel.pullRequests.collectAsState()
@@ -75,6 +79,7 @@ internal fun collectEngHubScreenState(
     val useUnrelatedExistingBranchRequest by
         viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.collectAsState()
     val rebaseConflictResolutionRequest by viewModel.rebaseConflictResolutionRequestStateFlow.collectAsState()
+    val settings by settingsViewModel.uiState.collectAsState()
 
     return EngHubScreenState(
         selectedPane = selectedPane,
@@ -104,6 +109,7 @@ internal fun collectEngHubScreenState(
             useUnrelatedExistingBranchConfirmationRequest = useUnrelatedExistingBranchRequest?.toPendingConfirmation(),
             rebaseConflictResolutionRequest = rebaseConflictResolutionRequest?.toPendingResolution(),
         ),
+        settings = settings,
     )
 }
 

@@ -1,9 +1,6 @@
 package com.github.karlsabo.devlake.enghub.screen
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.github.karlsabo.devlake.enghub.component.NotificationPanel
 import com.github.karlsabo.devlake.enghub.component.PullRequestPanel
@@ -37,14 +34,10 @@ internal fun EngHubPaneContent(
             modifier = modifier,
         )
 
-        EngHubPane.Settings -> SettingsPane(modifier = modifier)
-    }
-}
-
-@Composable
-private fun SettingsPane(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text("Settings configuration will be available here.")
+        EngHubPane.Settings -> EngHubSettingsScreen(
+            state = state.settings,
+            modifier = modifier,
+        )
     }
 }
 

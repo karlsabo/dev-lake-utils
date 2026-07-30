@@ -31,23 +31,34 @@ data class GitHubConfig(
 @Serializable
 data class GitHubSecret(
     val githubToken: String,
-)
+) {
+    override fun toString(): String = "GitHubSecret()"
+}
+
+data class LoadedGitHubConfig(
+    val config: GitHubConfig,
+    val secret: GitHubSecret,
+) {
+    fun toApiRestConfig(): GitHubApiRestConfig = GitHubApiRestConfig(secret.githubToken)
+}
 
 /**
- * Loads GitHub configuration from a file.
+ * Loads the serializable GitHub configuration and its referenced secret.
  */
-fun loadGitHubConfig(configFilePath: Path): GitHubApiRestConfig {
+fun loadGitHubSettings(configFilePath: Path): LoadedGitHubConfig {
     val config = SystemFileSystem.source(Path(configFilePath)).buffered().use { source ->
         lenientJson.decodeFromString<GitHubConfig>(source.readText())
     }
-    val secretConfig = SystemFileSystem.source(Path(config.tokenPath)).buffered().use { source ->
+    val secret = SystemFileSystem.source(Path(config.tokenPath)).buffered().use { source ->
         lenientJson.decodeFromString<GitHubSecret>(source.readText())
     }
-
-    return GitHubApiRestConfig(
-        secretConfig.githubToken,
-    )
+    return LoadedGitHubConfig(config = config, secret = secret)
 }
+
+/**
+ * Loads GitHub configuration for an API client.
+ */
+fun loadGitHubConfig(configFilePath: Path): GitHubApiRestConfig = loadGitHubSettings(configFilePath).toApiRestConfig()
 
 /**
  * Saves GitHub configuration to a file.
