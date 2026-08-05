@@ -239,6 +239,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 6. Reject an invalid polling interval
 
+**Status:** Done
+
 **Acceptance criteria:** Given the persisted interval is 600 seconds, when the user enters `0`, then the field shows an actionable error and persisted/runtime configuration remains at 600 seconds.
 
 **Expected edits:**

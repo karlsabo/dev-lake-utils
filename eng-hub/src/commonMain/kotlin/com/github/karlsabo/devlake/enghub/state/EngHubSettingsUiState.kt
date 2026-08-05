@@ -17,6 +17,7 @@ class GitHubTokenUiState internal constructor(
 data class EngHubSettingsUiState(
     val organizationIds: List<String>,
     val pollIntervalSeconds: String,
+    val pollIntervalError: String? = null,
     val worktreePollIntervalSeconds: String,
     val repositoriesBaseDir: String,
     val gitHubAuthor: String,

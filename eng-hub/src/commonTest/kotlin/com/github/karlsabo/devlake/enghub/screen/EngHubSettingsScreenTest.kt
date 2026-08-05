@@ -14,6 +14,7 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.state.createEngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.representativeEngHubConfig
+import com.github.karlsabo.devlake.enghub.viewmodel.POLL_INTERVAL_ERROR
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
 import kotlin.test.Test
@@ -74,6 +75,27 @@ class EngHubSettingsScreenTest {
 
         assertEquals("hubot", editedAuthor)
         onAllNodesWithText("Save").assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun displaysAnActionablePollingIntervalError() = runComposeUiTest {
+        val state = createEngHubSettingsUiState(
+            engHubConfig = representativeEngHubConfig(),
+            gitHubConfig = GitHubConfig(tokenPath = "/secrets/github.json"),
+            gitHubSecret = GitHubSecret(githubToken = "github_pat_private"),
+        ).copy(
+            pollIntervalSeconds = "0",
+            pollIntervalError = POLL_INTERVAL_ERROR,
+        )
+        setContent {
+            MaterialTheme {
+                EngHubSettingsScreen(state = state, modifier = Modifier.size(800.dp, 600.dp))
+            }
+        }
+
+        onNodeWithTag("poll-interval").performScrollTo().assertTextContains("0")
+        onNodeWithTag("poll-interval-error").assertTextContains(POLL_INTERVAL_ERROR)
     }
 
     @OptIn(ExperimentalTestApi::class)

@@ -18,6 +18,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private const val TEXT_COMMIT_DEBOUNCE_MS = 750L
 private const val MILLISECONDS_PER_SECOND = 1_000L
+internal const val POLL_INTERVAL_ERROR = "Enter a positive whole number of seconds"
 
 class EngHubSettingsViewModel(
     engHubConfig: EngHubConfig,
@@ -46,9 +47,13 @@ class EngHubSettingsViewModel(
     }
 
     fun updatePollIntervalSeconds(seconds: String) {
-        mutableUiState.value = mutableUiState.value.copy(pollIntervalSeconds = seconds)
         pollIntervalCommitJob?.cancel()
-        val intervalMs = seconds.toPollIntervalMillisecondsOrNull() ?: return
+        val intervalMs = seconds.toPollIntervalMillisecondsOrNull()
+        mutableUiState.value = mutableUiState.value.copy(
+            pollIntervalSeconds = seconds,
+            pollIntervalError = if (intervalMs == null) POLL_INTERVAL_ERROR else null,
+        )
+        if (intervalMs == null) return
         pollIntervalCommitJob = coroutineScope.launch {
             delay(TEXT_COMMIT_DEBOUNCE_MS.milliseconds)
             updateConfig { currentConfig ->

@@ -2,7 +2,6 @@ package com.github.karlsabo.devlake.enghub.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -35,7 +34,7 @@ internal fun EngHubSettingsScreen(
                 label = "GitHub token",
                 value = state.gitHubToken.maskedValue,
                 tag = "github-token",
-                password = true,
+                presentation = SettingsFieldPresentation(password = true),
             )
         }
         GitHubActivitySettings(
@@ -93,6 +92,7 @@ private fun GitHubActivitySettings(
             label = "Polling interval (seconds)",
             value = state.pollIntervalSeconds,
             tag = "poll-interval",
+            presentation = SettingsFieldPresentation(error = state.pollIntervalError),
             onValueChange = onPollIntervalChange,
         )
     }
@@ -109,27 +109,41 @@ private fun SettingsSection(
     }
 }
 
+private data class SettingsFieldPresentation(
+    val password: Boolean = false,
+    val error: String? = null,
+)
+
 @Composable
 private fun SettingsField(
     label: String,
     value: String,
     tag: String,
-    password: Boolean = false,
+    presentation: SettingsFieldPresentation = SettingsFieldPresentation(),
     onValueChange: ((String) -> Unit)? = null,
 ) {
-    Row(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange ?: {},
             label = { Text(label) },
             readOnly = onValueChange == null,
+            isError = presentation.error != null,
             singleLine = true,
-            visualTransformation = if (password) {
+            visualTransformation = if (presentation.password) {
                 PasswordVisualTransformation()
             } else {
                 VisualTransformation.None
             },
             modifier = Modifier.fillMaxWidth().testTag(tag),
         )
+        presentation.error?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colors.error,
+                style = MaterialTheme.typography.caption,
+                modifier = Modifier.padding(start = 16.dp).testTag("$tag-error"),
+            )
+        }
     }
 }

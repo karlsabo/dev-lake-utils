@@ -51,6 +51,22 @@ class EngHubSettingsViewModelTest {
     }
 
     @Test
+    fun zeroPollingIntervalRemainsVisibleWithAnErrorWithoutUpdatingConfiguration() = runTest {
+        val writer = RecordingConfigWriter()
+        val configState = MutableConfigState(EngHubConfig(pollIntervalMs = 600_000))
+        val viewModel = settingsViewModel(writer, configState)
+
+        viewModel.updatePollIntervalSeconds("0")
+        advanceTimeBy(750.milliseconds)
+        runCurrent()
+
+        assertEquals("0", viewModel.uiState.value.pollIntervalSeconds)
+        assertEquals(POLL_INTERVAL_ERROR, viewModel.uiState.value.pollIntervalError)
+        assertTrue(writer.savedConfigs.isEmpty())
+        assertEquals(600_000, configState.current.pollIntervalMs)
+    }
+
+    @Test
     fun aNewerDraftCannotBeOverwrittenByAnOlderDebounce() = runTest {
         val writer = RecordingConfigWriter()
         val viewModel = settingsViewModel(writer)
