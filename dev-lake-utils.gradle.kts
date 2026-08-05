@@ -3,6 +3,7 @@ import org.jetbrains.changelog.tasks.GetChangelogTask
 
 plugins {
     base
+    id("devlake.task-timing")
     alias(libs.plugins.spotless)
     alias(libs.plugins.detekt)
     alias(libs.plugins.jetbrains.changelog)

@@ -112,6 +112,10 @@ Spotless with ktlint owns formatting. Run `./gradlew spotlessApply` to format Ko
 
 Detekt owns code-quality warnings that go beyond formatting. Run `./gradlew detekt` to run the static analysis checks directly, or run `./gradlew check` to run the full Gradle verification path, including Spotless and detekt.
 
+### Gradle task timing
+
+Add `-PtaskTiming=true` to any Gradle invocation to write task timing reports to `build/reports/task-timing.json` and `build/reports/task-timing.txt`. Timing is disabled by default and does not change the requested tasks or their behavior.
+
 ## Set up MCP servers
 
 * [MCP Proxy](https://github.com/smart-mcp-proxy/mcpproxy-go)
