@@ -2,67 +2,70 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.component.checkoutSetupStatus
+import com.github.karlsabo.git.WorktreeSetupCommandResult
 import com.github.karlsabo.git.WorktreeSetupCommandRunner
 import com.github.karlsabo.git.WorktreeSetupCoordinator
+import com.github.karlsabo.git.WorktreeSetupRequest
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.git.buildWorktreePath
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-
-private val NATIVE_SHELL_STARTUP_TIMEOUT = 30.seconds
 
 class EngHubCheckoutSetupViewModelTest {
 
     @Test
-    fun checkoutAndOpenRunsUnifiedRepositorySetupCommands() = runBlocking {
-        val repositoriesBaseDir = createTempDir("repositories")
+    fun checkoutAndOpenDelegatesCompleteSetupRequest() = runBlocking {
+        val repositoriesBaseDir = Path("virtual", "repositories").toString()
         val repoPath = Path(repositoriesBaseDir, "example-service").toString()
-        val worktreePath = Path(buildWorktreePath(repoPath, "feature/worktree-loading").value)
-        val markerFileName = "unified-checkout-setup.txt"
-        val markerPath = Path(worktreePath, markerFileName)
-        val markerContents = "checkout setup complete"
-        SystemFileSystem.createDirectories(worktreePath)
-        try {
-            val api = RecordingGitWorktreeApi(
-                responses = RecordingGitWorktreeApiResponses(
-                    worktreesByRepoPath = emptyMap(),
-                ),
-            )
-            val viewModel = createLocalRepositoryViewModel(
-                gitWorktreeApi = api,
-                configWriter = RecordingEngHubConfigWriter(),
-                localRepositoryConfigs = listOf(
-                    LocalRepositoryConfig(
-                        path = "$repoPath/",
-                        setupCommands = listOf(writeSetupFileCommand(markerFileName, markerContents)),
-                    ),
-                ),
-                testConfig = LocalRepositoryViewModelTestConfig(
-                    repositoriesBaseDir = repositoriesBaseDir,
-                    setupShell = nativeSetupShell(),
-                ),
-            )
-
-            val checkoutJob = viewModel.checkoutAndOpen("example-org/example-service", "feature/worktree-loading")
-
-            withTimeout(NATIVE_SHELL_STARTUP_TIMEOUT) { checkoutJob.join() }
-
-            assertEquals(markerContents, readText(markerPath))
-            assertEquals(
-                listOf(repoPath to "https://github.com/example-org/example-service.git"),
-                api.ensureRepositoryCalls,
-            )
-            assertEquals(listOf(repoPath to "feature/worktree-loading"), api.ensureWorktreeCalls)
-        } finally {
-            removeTempDir(repositoriesBaseDir)
+        val branch = "feature/worktree-loading"
+        val worktreePath = buildWorktreePath(repoPath, branch)
+        val setupCommands = listOf("prepare checkout")
+        val setupRequests = mutableListOf<WorktreeSetupRequest>()
+        val setupRunner = WorktreeSetupCommandRunner { request ->
+            setupRequests += request
+            WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
         }
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = emptyMap(),
+            ),
+        )
+        val viewModel = createCheckoutSetupViewModel(
+            api = api,
+            setupRunner = setupRunner,
+            repositoriesBaseDir = repositoriesBaseDir,
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(path = "$repoPath/", setupCommands = setupCommands),
+            ),
+        )
+
+        val checkoutJob = viewModel.checkoutAndOpen("example-org/example-service", branch)
+
+        checkoutJob.join()
+
+        assertEquals(
+            listOf(
+                WorktreeSetupRequest(
+                    repoPath = repoPath,
+                    worktreePath = worktreePath,
+                    cloneUrl = "https://github.com/example-org/example-service.git",
+                    branch = branch,
+                    setupShell = "/bin/zsh",
+                    setupCommands = setupCommands,
+                ),
+            ),
+            setupRequests,
+        )
+        assertEquals(
+            listOf(repoPath to "https://github.com/example-org/example-service.git"),
+            api.ensureRepositoryCalls,
+        )
+        assertEquals(listOf(repoPath to branch), api.ensureWorktreeCalls)
     }
 
     @Test

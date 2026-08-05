@@ -1,15 +1,22 @@
 package com.github.karlsabo.git
 
+import com.github.karlsabo.system.ProcessResult
 import com.github.karlsabo.system.executeCommand
 
-class ShellWorktreeSetupCommandRunner : WorktreeSetupCommandRunner {
+fun interface WorktreeSetupProcessExecutor {
+    fun execute(command: List<String>, workingDirectory: String?): ProcessResult
+}
+
+class ShellWorktreeSetupCommandRunner(
+    private val processExecutor: WorktreeSetupProcessExecutor = WorktreeSetupProcessExecutor(::executeCommand),
+) : WorktreeSetupCommandRunner {
     override suspend fun runSetup(request: WorktreeSetupRequest): WorktreeSetupCommandResult {
         if (request.setupCommands.isEmpty()) {
             return WorktreeSetupCommandResult(exitCode = 0, stdout = "", stderr = "")
         }
 
         val shellCommand = request.buildSetupShellCommand()
-        val result = executeCommand(
+        val result = processExecutor.execute(
             command = shellCommand,
             workingDirectory = request.worktreePath.value,
         )

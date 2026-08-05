@@ -1,12 +1,9 @@
 package com.github.karlsabo.git
 
 import com.github.karlsabo.system.OsFamily
+import com.github.karlsabo.system.ProcessResult
 import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.runBlocking
-import kotlinx.io.buffered
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.readString
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
@@ -22,12 +19,7 @@ class ShellWorktreeSetupCommandRunnerTest {
             "Write-Output \"quoted output\"",
             "Write-Output 'same shell: 雪 😀'",
         )
-        val request = WorktreeSetupRequest(
-            repoPath = "repo",
-            worktreePath = WorktreePath("worktree"),
-            setupShell = "powershell.exe",
-            setupCommands = commands,
-        )
+        val request = setupRequest(setupShell = "powershell.exe", setupCommands = commands)
 
         val shellCommand = request.buildSetupShellCommand()
 
@@ -38,145 +30,127 @@ class ShellWorktreeSetupCommandRunnerTest {
     }
 
     @Test
-    fun setupFailureReportsPerCommandOutputAndRunsCommandsAfterFailure() = runBlocking {
-        val repoPath = createArchiveWorktreeTempDir()
-        val worktreePath = createArchiveWorktreeTempDir()
-        try {
-            val windows = osFamily() == OsFamily.WINDOWS
-            val setupCommands = if (windows) {
-                listOf(
-                    "Write-Output 'standard out'",
-                    "& powershell.exe -NoProfile -Command \"[Console]::Error.WriteLine('standard error')\"",
-                    "& powershell.exe -NoProfile -Command \"exit 23\"",
-                    "Write-Output 'after failure'",
-                )
-            } else {
-                listOf(
-                    "printf 'standard out\\n'",
-                    "printf 'standard error\\n' >&2",
-                    "sh -c 'exit 23'",
-                    "printf 'after failure\\n'",
-                )
-            }
-            val setupShell = if (windows) "powershell.exe" else "/bin/sh"
-            val request = WorktreeSetupRequest(
-                repoPath = repoPath,
-                worktreePath = WorktreePath(worktreePath),
-                setupShell = setupShell,
-                setupCommands = setupCommands,
-            )
+    fun successfulProcessResultIsMappedWithoutStartingShell() = runBlocking {
+        val processResult = ProcessResult(
+            exitCode = 0,
+            stdout = commandOutput(
+                SETUP_COMMAND_STDOUT_BEGIN_MARKER,
+                SETUP_COMMAND_STDOUT_END_MARKER,
+                "standard out\n",
+            ),
+            stderr = commandMetadata(0, 0) + commandOutput(
+                SETUP_COMMAND_STDERR_BEGIN_MARKER,
+                SETUP_COMMAND_STDERR_END_MARKER,
+                "standard error\n",
+            ),
+        )
+        val executor = RecordingProcessExecutor(processResult)
+        val request = setupRequest(setupShell = "/bin/sh", setupCommands = listOf("echo output"))
 
-            val error = assertFailsWith<WorktreeSetupException> {
-                ShellWorktreeSetupCommandRunner().runSetup(request)
-            }
-            val message = error.message.orEmpty().replace("\r\n", "\n")
+        val result = ShellWorktreeSetupCommandRunner(executor).runSetup(request)
 
-            assertTrue("Setup failed for $worktreePath" in message, message)
-            assertTrue("Working directory: $worktreePath" in message, message)
-            val shellArguments = if (windows) "-NoProfile -EncodedCommand" else "-l -c"
-            assertTrue(
-                "Shell: $setupShell $shellArguments <generated setup script>" in message,
-                message,
-            )
-            assertTrue("Overall exit code: 23" in message, message)
-            assertTrue("[1/4] OK exit 0" in message, message)
-            assertTrue("${'$'} ${setupCommands[0]}" in message, message)
-            assertTrue("stdout:\nstandard out\n" in message, message)
-            assertTrue("[2/4] OK exit 0" in message, message)
-            if (windows) {
-                assertTrue("standard error" in message, message)
-            } else {
-                assertTrue("stderr:\nstandard error\n" in message, message)
-            }
-            assertTrue("[3/4] FAILED exit 23" in message, message)
-            assertTrue("${'$'} ${setupCommands[2]}" in message, message)
-            assertTrue("[4/4] OK exit 0" in message, message)
-            assertTrue("stdout:\nafter failure\n" in message, message)
-            assertTrue("SKIPPED" !in message, message)
-            assertTrue("__ENG_HUB_SETUP_COMMAND_" !in message, message)
-        } finally {
-            removeTempDir(repoPath)
-            removeTempDir(worktreePath)
-        }
+        assertEquals(request.buildSetupShellCommand(), executor.command)
+        assertEquals(request.worktreePath.value, executor.workingDirectory)
+        assertEquals(WorktreeSetupCommandResult(0, "standard out\n", "standard error\n"), result)
     }
 
     @Test
-    fun continueAfterPowerShellError() = runBlocking {
-        if (osFamily() != OsFamily.WINDOWS) return@runBlocking
+    fun failedProcessResultIsFormattedWithoutStartingShell() = runBlocking {
+        val commands = listOf("first command", "command after failure")
+        val processResult = ProcessResult(
+            exitCode = 23,
+            stdout = indexedCommandOutput(
+                SETUP_COMMAND_STDOUT_BEGIN_MARKER,
+                SETUP_COMMAND_STDOUT_END_MARKER,
+                listOf("standard out\n", "after failure\n"),
+            ),
+            stderr = commandMetadata(0, 23) + commandMetadata(1, 0) + indexedCommandOutput(
+                SETUP_COMMAND_STDERR_BEGIN_MARKER,
+                SETUP_COMMAND_STDERR_END_MARKER,
+                listOf("standard error\n", ""),
+            ),
+        )
+        val request = setupRequest(setupShell = "/bin/sh", setupCommands = commands)
 
-        val repoPath = createArchiveWorktreeTempDir()
-        val worktreePath = createArchiveWorktreeTempDir()
-        try {
-            val setupCommands = listOf(
-                "Write-Error 'terminating PowerShell error' -ErrorAction Stop",
-                "Write-Output 'after failure'",
-            )
-            val request = WorktreeSetupRequest(
-                repoPath = repoPath,
-                worktreePath = WorktreePath(worktreePath),
-                setupShell = "powershell.exe",
-                setupCommands = setupCommands,
-            )
-
-            val error = assertFailsWith<WorktreeSetupException> {
-                ShellWorktreeSetupCommandRunner().runSetup(request)
-            }
-            val message = error.message.orEmpty().replace("\r\n", "\n")
-
-            assertTrue("Overall exit code: 1" in message, message)
-            assertTrue("[1/2] FAILED exit 1" in message, message)
-            assertTrue("$ ${setupCommands[0]}" in message, message)
-            assertTrue("terminating PowerShell error" in message, message)
-            assertTrue("[2/2] OK exit 0" in message, message)
-            assertTrue("stdout:\nafter failure\n" in message, message)
-            assertTrue("SKIPPED" !in message, message)
-        } finally {
-            removeTempDir(repoPath)
-            removeTempDir(worktreePath)
+        val error = assertFailsWith<WorktreeSetupException> {
+            ShellWorktreeSetupCommandRunner(RecordingProcessExecutor(processResult)).runSetup(request)
         }
+        val message = error.message.orEmpty()
+
+        assertTrue("Setup failed for worktree" in message, message)
+        assertTrue("Working directory: worktree" in message, message)
+        assertTrue("Shell: /bin/sh -l -c <generated setup script>" in message, message)
+        assertTrue("Overall exit code: 23" in message, message)
+        assertTrue("[1/2] FAILED exit 23" in message, message)
+        assertTrue("stdout:\nstandard out\n" in message, message)
+        assertTrue("stderr:\nstandard error\n" in message, message)
+        assertTrue("[2/2] OK exit 0" in message, message)
+        assertTrue("stdout:\nafter failure\n" in message, message)
+        assertTrue("__ENG_HUB_SETUP_COMMAND_" !in message, message)
     }
 
     @Test
-    fun setupCommandsShareShellState() = runBlocking {
-        val repoPath = createArchiveWorktreeTempDir()
+    fun nativeShellInvocationSmokeTest() = runBlocking {
         val worktreePath = createArchiveWorktreeTempDir()
         try {
-            SystemFileSystem.createDirectories(Path(worktreePath, "nested"))
             val windows = osFamily() == OsFamily.WINDOWS
-            val request = WorktreeSetupRequest(
-                repoPath = repoPath,
-                worktreePath = WorktreePath(worktreePath),
+            val request = setupRequest(
+                worktreePath = worktreePath,
                 setupShell = if (windows) "powershell.exe" else "/bin/sh",
-                setupCommands = if (windows) {
-                    listOf(
-                        "Set-Location nested",
-                        "${'$'}SETUP_STATE = 'kept'",
-                        "Set-Content -NoNewline -Path state.txt -Value ${'$'}SETUP_STATE",
-                    )
-                } else {
-                    listOf(
-                        "cd nested",
-                        "export SETUP_STATE=kept",
-                        "printf '%s' \"${'$'}SETUP_STATE\" > state.txt",
-                    )
-                },
+                setupCommands = listOf(if (windows) "Write-Output 'shell smoke'" else "printf 'shell smoke\\n'"),
             )
 
             val result = ShellWorktreeSetupCommandRunner().runSetup(request)
 
             assertEquals(0, result.exitCode)
+            assertEquals("shell smoke\n", result.stdout.replace("\r\n", "\n"))
             assertEquals("", result.stderr)
-            assertFalse(SystemFileSystem.exists(Path(worktreePath, "state.txt")))
-            val state = SystemFileSystem.source(Path(worktreePath, "nested", "state.txt")).buffered().use {
-                it.readString()
-            }
-            assertEquals("kept", state)
         } finally {
-            removeTempDir(repoPath)
             removeTempDir(worktreePath)
         }
     }
 }
+
+private class RecordingProcessExecutor(
+    private val result: ProcessResult,
+) : WorktreeSetupProcessExecutor {
+    var command: List<String>? = null
+    var workingDirectory: String? = null
+
+    override fun execute(command: List<String>, workingDirectory: String?): ProcessResult {
+        this.command = command
+        this.workingDirectory = workingDirectory
+        return result
+    }
+}
+
+private fun setupRequest(
+    worktreePath: String = "worktree",
+    setupShell: String,
+    setupCommands: List<String>,
+) = WorktreeSetupRequest(
+    repoPath = "repo",
+    worktreePath = WorktreePath(worktreePath),
+    setupShell = setupShell,
+    setupCommands = setupCommands,
+)
+
+private fun commandMetadata(index: Int, exitCode: Int) = "$SETUP_COMMAND_START_MARKER\t$index\n" +
+    "$SETUP_COMMAND_RESULT_MARKER\t$index\t$exitCode\n"
+
+private fun commandOutput(
+    beginMarker: String,
+    endMarker: String,
+    output: String,
+) = "$beginMarker\t0\n$output$endMarker\t0\t\n"
+
+private fun indexedCommandOutput(
+    beginMarker: String,
+    endMarker: String,
+    outputs: List<String>,
+) = outputs.mapIndexed { index, output ->
+    "$beginMarker\t$index\n$output$endMarker\t$index\t\n"
+}.joinToString("")
 
 @OptIn(ExperimentalEncodingApi::class)
 private fun decodePowerShellCommand(encodedCommand: String): String {

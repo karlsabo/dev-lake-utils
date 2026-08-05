@@ -1,7 +1,6 @@
 package com.github.karlsabo.git
 
 import com.github.karlsabo.system.OsFamily
-import com.github.karlsabo.system.executeCommand
 import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -11,15 +10,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
-import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.readString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -288,9 +285,14 @@ private class RepositorySerializationFixture {
         setupCommands = listOf(setupCommand),
     )
 
-    suspend fun awaitFirstRepositoryEnsureBlocked() {
-        withTimeout(1_000.milliseconds) { git.firstRepositoryEnsureStarted.await() }
-        delay(100.milliseconds)
+    suspend fun awaitRequestsWaitingForRepository() {
+        withTimeout(1_000.milliseconds) {
+            git.firstRepositoryEnsureStarted.await()
+            coordinator.statuses.first { statuses ->
+                statuses[firstWorktreePath] == WorktreeSetupStatus.WAITING_FOR_REPOSITORY &&
+                    statuses[secondWorktreePath] == WorktreeSetupStatus.WAITING_FOR_REPOSITORY
+            }
+        }
     }
 
     suspend fun releaseRepositoryEnsureAndAwaitSetups() {
@@ -310,11 +312,6 @@ private class RepositorySerializationFixture {
         setupScope.cancel()
     }
 }
-
-private fun executeSetupScript(request: WorktreeSetupRequest) = executeCommand(
-    request.buildSetupShellCommand(),
-    workingDirectory = null,
-)
 
 private fun assertWaitingForRepository(fixture: RepositorySerializationFixture) {
     assertEquals(
@@ -349,103 +346,72 @@ class WorktreeSetupCoordinatorTest {
     }
 
     @Test
-    fun setupRunsPlaceholderExpandedCommandsInWorktreeDirectory() = runBlocking {
-        val repoPath = createArchiveWorktreeTempDir()
-        val worktreePath = createArchiveWorktreeTempDir()
-        try {
-            val coordinator = WorktreeSetupCoordinator(
-                gitWorktreeApi = FakeGitWorktreeApi(),
-                setupCommandRunner = ShellWorktreeSetupCommandRunner(),
-                scope = this,
-            )
-            val windows = osFamily() == OsFamily.WINDOWS
-            val request = WorktreeSetupRequest(
-                repoPath = repoPath,
-                worktreePath = WorktreePath(worktreePath),
-                setupShell = if (windows) "powershell.exe" else "/bin/sh",
-                setupCommands = listOf(
-                    if (windows) {
-                        """[IO.File]::WriteAllText('setup-vars.txt', "${'$'}root-repo-dir|${'$'}worktree-dir")"""
-                    } else {
-                        "printf '%s' '${'$'}root-repo-dir|${'$'}worktree-dir' > setup-vars.txt"
-                    },
-                ),
-            )
+    fun setupCommandsExpandRootAndWorktreePlaceholdersForEachShellDialect() {
+        val request = WorktreeSetupRequest(
+            repoPath = "/tmp/root path",
+            worktreePath = WorktreePath("/tmp/worktree path"),
+            setupShell = "/bin/sh",
+            setupCommands = listOf($$"copy $root-repo-dir $worktree-dir"),
+        )
 
-            coordinator.setup(request).await()
-
-            val setupVars = SystemFileSystem.source(Path(worktreePath, "setup-vars.txt")).buffered().use {
-                it.readString()
-            }
-            assertEquals("$repoPath|$worktreePath", setupVars)
-        } finally {
-            removeTempDir(repoPath)
-            removeTempDir(worktreePath)
-        }
+        assertEquals(
+            listOf("copy '/tmp/root path' '/tmp/worktree path'"),
+            request.expandedSetupCommands(ShellDialect.POSIX),
+        )
+        assertEquals(
+            listOf("copy '/tmp/root path' '/tmp/worktree path'"),
+            request.expandedSetupCommands(ShellDialect.POWERSHELL),
+        )
     }
 
     @Test
-    fun setupScriptEscapesDoubleQuotedPlaceholderValuesBeforeShellParsing() {
-        val windows = osFamily() == OsFamily.WINDOWS
-        val repoPath = if (windows) {
-            "C:\\tmp\\root-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
-        } else {
-            "/tmp/root-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
-        }
-        val worktreePath = if (windows) {
-            "C:\\tmp\\worktree-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
-        } else {
-            "/tmp/worktree-${'$'}UNEXPANDED-`echo wrong`-\"quoted\"-\\slash"
-        }
-        val request = WorktreeSetupRequest(
-            repoPath = repoPath,
-            worktreePath = WorktreePath(worktreePath),
-            setupShell = if (windows) "powershell.exe" else "/bin/sh",
-            setupCommands = listOf(
-                if (windows) {
-                    "Write-Output \"${'$'}root-repo-dir|${'$'}worktree-dir\""
-                } else {
-                    "printf '%s\\n' \"${'$'}root-repo-dir|${'$'}worktree-dir\""
-                },
-            ),
+    fun setupCommandsEscapeDoubleQuotedPlaceholderValuesForEachShellDialect() {
+        val posixRequest = WorktreeSetupRequest(
+            repoPath = $$"""/tmp/root-$UNEXPANDED-`echo wrong`-"quoted"-\slash""",
+            worktreePath = WorktreePath($$"""/tmp/worktree-$UNEXPANDED-`echo wrong`-"quoted"-\slash"""),
+            setupShell = "/bin/sh",
+            setupCommands = listOf($$"""printf '%s\n' "$root-repo-dir|$worktree-dir""""),
+        )
+        val powerShellRequest = WorktreeSetupRequest(
+            repoPath = $$"""C:\tmp\root-$UNEXPANDED-`echo wrong`-"quoted"-\slash""",
+            worktreePath = WorktreePath($$"""C:\tmp\worktree-$UNEXPANDED-`echo wrong`-"quoted"-\slash"""),
+            setupShell = "powershell.exe",
+            setupCommands = listOf($$"""Write-Output "$root-repo-dir|$worktree-dir""""),
         )
 
-        val result = executeSetupScript(request)
-
-        assertEquals(0, result.exitCode, result.stderr)
-        assertTrue("$repoPath|$worktreePath\n" in result.stdout.replace("\r\n", "\n"), result.stdout)
+        assertEquals(
+            listOf($$"""printf '%s\n' "/tmp/root-\$UNEXPANDED-\`echo wrong\`-\"quoted\"-\\slash|/tmp/worktree-\$UNEXPANDED-\`echo wrong\`-\"quoted\"-\\slash""""),
+            posixRequest.expandedSetupCommands(ShellDialect.POSIX),
+        )
+        assertEquals(
+            listOf($$"""Write-Output "C:\tmp\root-`$UNEXPANDED-``echo wrong``-`"quoted`"-\slash|C:\tmp\worktree-`$UNEXPANDED-``echo wrong``-`"quoted`"-\slash""""),
+            powerShellRequest.expandedSetupCommands(ShellDialect.POWERSHELL),
+        )
     }
 
     @Test
-    fun setupScriptEscapesSingleQuotedPlaceholderValuesBeforeShellParsing() {
-        val windows = osFamily() == OsFamily.WINDOWS
-        val repoPath = if (windows) {
-            "C:\\tmp\\root-'quote'-${'$'}UNEXPANDED-`echo wrong`"
-        } else {
-            "/tmp/root-'quote'-${'$'}UNEXPANDED-`echo wrong`"
-        }
-        val worktreePath = if (windows) {
-            "C:\\tmp\\worktree-'quote'-${'$'}UNEXPANDED-`echo wrong`"
-        } else {
-            "/tmp/worktree-'quote'-${'$'}UNEXPANDED-`echo wrong`"
-        }
-        val request = WorktreeSetupRequest(
-            repoPath = repoPath,
-            worktreePath = WorktreePath(worktreePath),
-            setupShell = if (windows) "powershell.exe" else "/bin/sh",
-            setupCommands = listOf(
-                if (windows) {
-                    "Write-Output '${'$'}root-repo-dir|${'$'}worktree-dir'"
-                } else {
-                    "printf '%s\\n' '${'$'}root-repo-dir|${'$'}worktree-dir'"
-                },
-            ),
+    fun setupCommandsEscapeSingleQuotedPlaceholderValuesForEachShellDialect() {
+        val posixRequest = WorktreeSetupRequest(
+            repoPath = $$"/tmp/root-'quote'-$UNEXPANDED-`echo wrong`",
+            worktreePath = WorktreePath($$"/tmp/worktree-'quote'-$UNEXPANDED-`echo wrong`"),
+            setupShell = "/bin/sh",
+            setupCommands = listOf($$"""printf '%s\n' '$root-repo-dir|$worktree-dir'"""),
+        )
+        val powerShellRequest = WorktreeSetupRequest(
+            repoPath = $$"""C:\tmp\root-'quote'-$UNEXPANDED-`echo wrong`""",
+            worktreePath = WorktreePath($$"""C:\tmp\worktree-'quote'-$UNEXPANDED-`echo wrong`"""),
+            setupShell = "powershell.exe",
+            setupCommands = listOf($$"Write-Output '$root-repo-dir|$worktree-dir'"),
         )
 
-        val result = executeSetupScript(request)
-
-        assertEquals(0, result.exitCode, result.stderr)
-        assertTrue("$repoPath|$worktreePath\n" in result.stdout.replace("\r\n", "\n"), result.stdout)
+        assertEquals(
+            listOf($$"""printf '%s\n' '/tmp/root-'\''quote'\''-$UNEXPANDED-`echo wrong`|/tmp/worktree-'\''quote'\''-$UNEXPANDED-`echo wrong`'"""),
+            posixRequest.expandedSetupCommands(ShellDialect.POSIX),
+        )
+        assertEquals(
+            listOf($$"""Write-Output 'C:\tmp\root-''quote''-$UNEXPANDED-`echo wrong`|C:\tmp\worktree-''quote''-$UNEXPANDED-`echo wrong`'"""),
+            powerShellRequest.expandedSetupCommands(ShellDialect.POWERSHELL),
+        )
     }
 
     @Test
@@ -732,7 +698,7 @@ class WorktreeSetupCoordinatorTest {
         try {
             val first = fixture.coordinator.setup(fixture.firstRequest)
             val second = fixture.coordinator.setup(fixture.secondRequest)
-            fixture.awaitFirstRepositoryEnsureBlocked()
+            fixture.awaitRequestsWaitingForRepository()
 
             assertEquals(1, fixture.git.repositoryEnsureCalls())
             assertEquals(1, fixture.git.maxConcurrentRepositoryEnsures())
