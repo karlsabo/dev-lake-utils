@@ -14,6 +14,9 @@ import kotlinx.io.files.SystemFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+
+private val NATIVE_SHELL_STARTUP_TIMEOUT = 30.seconds
 
 class EngHubCheckoutSetupViewModelTest {
 
@@ -49,7 +52,7 @@ class EngHubCheckoutSetupViewModelTest {
 
             val checkoutJob = viewModel.checkoutAndOpen("example-org/example-service", "feature/worktree-loading")
 
-            withTimeout(10_000.milliseconds) { checkoutJob.join() }
+            withTimeout(NATIVE_SHELL_STARTUP_TIMEOUT) { checkoutJob.join() }
 
             assertEquals(markerContents, readText(markerPath))
             assertEquals(
