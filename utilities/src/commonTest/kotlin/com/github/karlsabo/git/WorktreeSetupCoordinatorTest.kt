@@ -379,12 +379,18 @@ class WorktreeSetupCoordinatorTest {
             setupCommands = listOf($$"""Write-Output "$root-repo-dir|$worktree-dir""""),
         )
 
+        val escapedPosixRepoPath = $$"""/tmp/root-\$UNEXPANDED-\`echo wrong\`-\"quoted\"-\\slash"""
+        val escapedPosixWorktreePath = $$"""/tmp/worktree-\$UNEXPANDED-\`echo wrong\`-\"quoted\"-\\slash"""
+        val escapedPowerShellRepoPath = $$"""C:\tmp\root-`$UNEXPANDED-``echo wrong``-`"quoted`"-\slash"""
+        val escapedPowerShellWorktreePath =
+            $$"""C:\tmp\worktree-`$UNEXPANDED-``echo wrong``-`"quoted`"-\slash"""
+
         assertEquals(
-            listOf($$"""printf '%s\n' "/tmp/root-\$UNEXPANDED-\`echo wrong\`-\"quoted\"-\\slash|/tmp/worktree-\$UNEXPANDED-\`echo wrong\`-\"quoted\"-\\slash""""),
+            listOf("""printf '%s\n' "$escapedPosixRepoPath|$escapedPosixWorktreePath""""),
             posixRequest.expandedSetupCommands(ShellDialect.POSIX),
         )
         assertEquals(
-            listOf($$"""Write-Output "C:\tmp\root-`$UNEXPANDED-``echo wrong``-`"quoted`"-\slash|C:\tmp\worktree-`$UNEXPANDED-``echo wrong``-`"quoted`"-\slash""""),
+            listOf("""Write-Output "$escapedPowerShellRepoPath|$escapedPowerShellWorktreePath""""),
             powerShellRequest.expandedSetupCommands(ShellDialect.POWERSHELL),
         )
     }
@@ -404,12 +410,17 @@ class WorktreeSetupCoordinatorTest {
             setupCommands = listOf($$"Write-Output '$root-repo-dir|$worktree-dir'"),
         )
 
+        val escapedPosixRepoPath = $$"""/tmp/root-'\''quote'\''-$UNEXPANDED-`echo wrong`"""
+        val escapedPosixWorktreePath = $$"""/tmp/worktree-'\''quote'\''-$UNEXPANDED-`echo wrong`"""
+        val escapedPowerShellRepoPath = $$"""C:\tmp\root-''quote''-$UNEXPANDED-`echo wrong`"""
+        val escapedPowerShellWorktreePath = $$"""C:\tmp\worktree-''quote''-$UNEXPANDED-`echo wrong`"""
+
         assertEquals(
-            listOf($$"""printf '%s\n' '/tmp/root-'\''quote'\''-$UNEXPANDED-`echo wrong`|/tmp/worktree-'\''quote'\''-$UNEXPANDED-`echo wrong`'"""),
+            listOf("""printf '%s\n' '$escapedPosixRepoPath|$escapedPosixWorktreePath'"""),
             posixRequest.expandedSetupCommands(ShellDialect.POSIX),
         )
         assertEquals(
-            listOf($$"""Write-Output 'C:\tmp\root-''quote''-$UNEXPANDED-`echo wrong`|C:\tmp\worktree-''quote''-$UNEXPANDED-`echo wrong`'"""),
+            listOf("""Write-Output '$escapedPowerShellRepoPath|$escapedPowerShellWorktreePath'"""),
             powerShellRequest.expandedSetupCommands(ShellDialect.POWERSHELL),
         )
     }
