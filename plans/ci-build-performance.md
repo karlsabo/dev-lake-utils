@@ -13,6 +13,8 @@
 
 ### Identify the first macOS build hotspot
 
+**Status:** Complete. Measured in [Build run 31217431025](https://github.com/karlsabo/dev-lake-utils/actions/runs/31217431025); results are recorded in `plans/ci-build-performance-results.md`.
+
 **Acceptance criteria:** Given a full macOS CI build with task timing enabled, when its retained timing report is parsed, then `plans/ci-build-performance-results.md` names the longest material task and records enough timing evidence to choose one optimization experiment.
 
 **Expected edits:**
