@@ -28,7 +28,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build
-        run: ./gradlew clean build --no-build-cache
+        run: ./gradlew clean build --no-build-cache -PtaskTiming=true
+
+      - name: Upload task timing reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-timing-linux
+          path: build/reports/task-timing.*
+          if-no-files-found: warn
 
       - name: Summarize failed tests
         if: always()
@@ -65,7 +73,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build
-        run: ./gradlew clean build --no-build-cache
+        run: ./gradlew clean build --no-build-cache -PtaskTiming=true
+
+      - name: Upload task timing reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-timing-macos
+          path: build/reports/task-timing.*
+          if-no-files-found: warn
 
       - name: Summarize failed tests
         if: always()
@@ -103,7 +119,15 @@ jobs:
 
       - name: Build
         shell: bash
-        run: ./gradlew clean build --no-build-cache
+        run: ./gradlew clean build --no-build-cache -PtaskTiming=true
+
+      - name: Upload task timing reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-timing-windows
+          path: build/reports/task-timing.*
+          if-no-files-found: warn
 
       - name: Summarize failed tests
         if: always()
