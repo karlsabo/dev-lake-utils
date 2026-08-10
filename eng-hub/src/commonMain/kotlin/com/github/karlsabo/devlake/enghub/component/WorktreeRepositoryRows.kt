@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.Card
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.IconButton
@@ -161,35 +162,50 @@ private fun LocalWorktreeRows(
     onArchiveRequest: (PendingArchive) -> Unit,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
 ) {
-    if (state.repository.isExpanded && state.repository.worktrees.isNotEmpty()) {
-        Spacer(modifier = Modifier.size(8.dp))
-        visibleWorktreeRows(state.repository.worktrees).forEach { row ->
-            val worktree = row.worktree
-            val normalizedWorktreePath = worktree.path.normalizedWorktreePath()
-            key(normalizedWorktreePath) {
-                LocalWorktreeRow(
-                    state = LocalWorktreeRowState(
-                        worktree = worktree,
-                        setupStatus = state.setupStatuses[WorktreePath(normalizedWorktreePath)],
-                        isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
-                        isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
-                        nestingDepth = row.nestingDepth,
-                    ),
-                    onOpen = { panelActions.worktrees.onOpenWorktree(state.repository.path, worktree.path) },
-                    onArchive = { onArchiveRequest(PendingArchive(state.repository.path, worktree.path)) },
-                    onOpenCreateWorktreeDialog = {
-                        onCreateRequest(createWorktreeDialogState(state.repository.path, worktree))
+    if (!state.repository.isExpanded) return
+
+    Column {
+        if (state.repository.isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .size(24.dp)
+                    .semantics {
+                        contentDescription = "Loading worktrees for ${state.repository.name}"
                     },
-                    onRebaseOntoParent = {
-                        worktree.parentBranch?.let { parentBranch ->
-                            panelActions.worktrees.onRebaseOntoParent(
-                                state.repository.path,
-                                worktree.path,
-                                parentBranch,
-                            )
-                        }
-                    },
-                )
+                strokeWidth = 2.dp,
+            )
+        }
+        if (state.repository.worktrees.isNotEmpty()) {
+            Spacer(modifier = Modifier.size(8.dp))
+            visibleWorktreeRows(state.repository.worktrees).forEach { row ->
+                val worktree = row.worktree
+                val normalizedWorktreePath = worktree.path.normalizedWorktreePath()
+                key(normalizedWorktreePath) {
+                    LocalWorktreeRow(
+                        state = LocalWorktreeRowState(
+                            worktree = worktree,
+                            setupStatus = state.setupStatuses[WorktreePath(normalizedWorktreePath)],
+                            isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
+                            isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
+                            nestingDepth = row.nestingDepth,
+                        ),
+                        onOpen = { panelActions.worktrees.onOpenWorktree(state.repository.path, worktree.path) },
+                        onArchive = { onArchiveRequest(PendingArchive(state.repository.path, worktree.path)) },
+                        onOpenCreateWorktreeDialog = {
+                            onCreateRequest(createWorktreeDialogState(state.repository.path, worktree))
+                        },
+                        onRebaseOntoParent = {
+                            worktree.parentBranch?.let { parentBranch ->
+                                panelActions.worktrees.onRebaseOntoParent(
+                                    state.repository.path,
+                                    worktree.path,
+                                    parentBranch,
+                                )
+                            }
+                        },
+                    )
+                }
             }
         }
     }

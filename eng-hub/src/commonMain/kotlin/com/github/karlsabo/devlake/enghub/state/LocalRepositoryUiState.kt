@@ -7,6 +7,8 @@ data class LocalRepositoryUiState(
     val name: String,
     val path: String,
     val isExpanded: Boolean = false,
+    val isLoading: Boolean = false,
+    val expansionRequest: Any? = null,
     val worktrees: List<LocalWorktreeUiState> = emptyList(),
 )
 

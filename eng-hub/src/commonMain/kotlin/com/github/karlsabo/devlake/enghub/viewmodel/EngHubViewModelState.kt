@@ -83,7 +83,6 @@ internal class EngHubViewModelState(
         MutableStateFlow<UseUnrelatedExistingBranchConfirmationRequest?>(null)
     val rebaseConflictResolutionRequests =
         MutableStateFlow<List<RebaseConflictResolutionRequest>>(emptyList())
-    val localRepositoryExpansionsInFlight = MutableStateFlow<Set<String>>(emptySet())
     val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val rebasingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val forceArchiveWorktreeRequest = MutableStateFlow<ForceArchiveWorktreeUiState?>(null)

@@ -1,9 +1,12 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -209,6 +212,47 @@ class EngHubLocalRepositoryViewModelTest {
             ),
             repositories.map { it.path },
         )
+    }
+
+    @Test
+    fun expandingConfiguredRepositoryPublishesLoadingStateBeforeDiscoveryCompletes() = runBlocking {
+        val listStarted = CompletableDeferred<Unit>()
+        val releaseList = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                    ),
+                ),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onListWorktrees = {
+                    listStarted.complete(Unit)
+                    runBlocking { releaseList.await() }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+
+        val loadingRepository = viewModel.localRepositoriesStateFlow.value.single()
+        assertEquals(true, loadingRepository.isExpanded)
+        assertEquals(true, loadingRepository.isLoading)
+        withTimeout(2_000.milliseconds) { listStarted.await() }
+
+        releaseList.complete(Unit)
+        val loadedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                !repositories.single().isLoading
+            }.single()
+        }
+        assertEquals(listOf("main"), loadedRepository.worktrees.map { it.branch })
     }
 
     @Test
@@ -455,8 +499,63 @@ class EngHubLocalRepositoryViewModelTest {
 
         assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
         assertEquals("git worktree list failed", actionError?.message)
-        assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
+        assertEquals(true, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
+        assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isLoading)
         assertEquals(emptyList(), viewModel.localRepositoriesStateFlow.value.single().worktrees)
+    }
+
+    @Test
+    fun staleExpansionFailureDoesNotReportErrorDuringNewExpansion() = runBlocking {
+        val firstListStarted = CompletableDeferred<Unit>()
+        val secondListStarted = CompletableDeferred<Unit>()
+        val releaseFirstList = CompletableDeferred<Unit>()
+        val releaseSecondList = CompletableDeferred<Unit>()
+        val listCalls = Channel<() -> Unit>(capacity = 2).apply {
+            trySend {
+                firstListStarted.complete(Unit)
+                runBlocking { releaseFirstList.await() }
+            }
+            trySend {
+                secondListStarted.complete(Unit)
+                runBlocking { releaseSecondList.await() }
+            }
+        }
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = RecordingGitWorktreeApi(
+                responses = RecordingGitWorktreeApiResponses(
+                    listWorktreesFailure = IllegalStateException("git worktree list failed"),
+                ),
+                callbacks = RecordingGitWorktreeApiCallbacks(
+                    onListWorktrees = { listCalls.tryReceive().getOrThrow().invoke() },
+                ),
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        val existingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) { firstListStarted.await() }
+        val firstExpansionJob = viewModel.viewModelScope.coroutineContext[Job]!!
+            .children
+            .single { it !in existingJobs }
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) { secondListStarted.await() }
+
+        releaseFirstList.complete(Unit)
+        withTimeout(2_000.milliseconds) { firstExpansionJob.join() }
+
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+        assertEquals(true, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
+        assertEquals(true, viewModel.localRepositoriesStateFlow.value.single().isLoading)
+
+        releaseSecondList.complete(Unit)
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+        assertEquals("git worktree list failed", actionError?.message)
+        assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isLoading)
     }
 
     @Test
@@ -484,23 +583,23 @@ class EngHubLocalRepositoryViewModelTest {
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
         )
 
+        val existingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
         withTimeout(2_000.milliseconds) {
             listStarted.await()
         }
+        val expansionJob = viewModel.viewModelScope.coroutineContext[Job]!!
+            .children
+            .single { it !in existingJobs }
 
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
 
         assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
+        assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
+        assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isLoading)
 
         releaseList.complete(Unit)
-        withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { repositories ->
-                repositories.single().isExpanded
-            }
-        }
-
-        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) { expansionJob.join() }
 
         assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
     }

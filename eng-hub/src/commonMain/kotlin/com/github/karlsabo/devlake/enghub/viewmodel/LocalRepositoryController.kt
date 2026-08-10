@@ -49,12 +49,11 @@ internal class LocalRepositoryController(
         when {
             repository == null -> Unit
 
-            repository.isExpanded -> collapseLocalRepository(normalizedRepoRootPath)
+            repository.isExpanded -> expansionTracker.collapse(normalizedRepoRootPath)
 
-            expansionTracker.markInFlight(normalizedRepoRootPath) -> expandLocalRepository(
-                repoRootPath,
-                normalizedRepoRootPath,
-            )
+            else -> expansionTracker.start(normalizedRepoRootPath)?.let { request ->
+                expandLocalRepository(repoRootPath, normalizedRepoRootPath, request)
+            }
         }
     }
 
@@ -69,6 +68,7 @@ internal class LocalRepositoryController(
         repoRootPath: String,
         worktrees: List<LocalWorktreeUiState>,
         isExpanded: Boolean? = null,
+        isLoading: Boolean? = null,
     ) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
         state.localRepositories.update { repositories ->
@@ -76,6 +76,7 @@ internal class LocalRepositoryController(
                 if (currentRepository.path.normalizedRepoPath() == normalizedRepoRootPath) {
                     currentRepository.copy(
                         isExpanded = isExpanded ?: currentRepository.isExpanded,
+                        isLoading = isLoading ?: currentRepository.isLoading,
                         worktrees = worktrees,
                     )
                 } else {
@@ -132,33 +133,21 @@ internal class LocalRepositoryController(
         }
     }
 
-    private fun collapseLocalRepository(normalizedRepoRootPath: String) {
-        expansionTracker.clear(normalizedRepoRootPath)
-        state.localRepositories.update { repositories ->
-            repositories.map { currentRepository ->
-                if (currentRepository.path.normalizedRepoPath() == normalizedRepoRootPath) {
-                    currentRepository.copy(isExpanded = false)
-                } else {
-                    currentRepository
-                }
-            }
-        }
-    }
-
-    private fun expandLocalRepository(repoRootPath: String, normalizedRepoRootPath: String) {
+    private fun expandLocalRepository(repoRootPath: String, normalizedRepoRootPath: String, request: Any) {
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                val worktrees = gitWorktreeApi.listLocalWorktreeUiStates(repoRootPath)
-                if (expansionTracker.isInFlight(normalizedRepoRootPath)) {
-                    updateLocalRepositoryWorktrees(repoRootPath, worktrees, isExpanded = true)
-                }
+                gitWorktreeApi.listLocalWorktreeUiStates(repoRootPath)
             }
                 .rethrowCancellation()
+                .onSuccess { worktrees ->
+                    expansionTracker.complete(normalizedRepoRootPath, request, worktrees)
+                }
                 .onFailure { failure ->
                     logger.error(failure) { "Failed to list worktrees for $repoRootPath" }
-                    errorReporter.enqueueActionError(failure.message ?: "Failed to list worktrees")
+                    if (expansionTracker.complete(normalizedRepoRootPath, request)) {
+                        errorReporter.enqueueActionError(failure.message ?: "Failed to list worktrees")
+                    }
                 }
-            expansionTracker.clear(normalizedRepoRootPath)
         }
     }
 

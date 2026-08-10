@@ -23,6 +23,32 @@ class WorktreePanelTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun expandedLoadingRepositoryRendersAccessibleProgressIndicator() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "dev-lake-utils",
+                            path = "/repos/dev-lake-utils",
+                            isExpanded = true,
+                            isLoading = true,
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                    ),
+                    panelActions = emptyPanelActions(),
+                    onArchiveRequest = {},
+                    onCreateRequest = {},
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Loading worktrees for dev-lake-utils").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun rebaseNeededWorktreeRowRendersIndicatorLabel() = runComposeUiTest {
         setContent {
             MaterialTheme {
@@ -632,6 +658,27 @@ class WorktreePanelTest {
     fun archiveActionIsEnabledWhenWorktreeIsIdle() {
         assertTrue(isWorktreeArchiveEnabled(setupStatus = null, isArchiving = false))
     }
+
+    private fun emptyPanelActions(): WorktreePanelActions = WorktreePanelActions(
+        onAddRepository = {},
+        onToggleRepository = {},
+        onCreateWorktreeFromRepository = {},
+        onRepositoryCreateWorktreeRequestHandled = {},
+        onConfirmUseUnrelatedExistingBranch = {},
+        onDismissUseUnrelatedExistingBranchConfirmation = {},
+        onAbortRebaseConflict = {},
+        onLeaveRebaseConflictAsIs = {},
+        worktrees = LocalWorktreeActions(
+            onOpenWorktree = { _, _ -> },
+            onArchiveWorktree = { _, _ -> },
+            onCreateWorktree = {},
+            onRebaseOntoParent = { _, _, _ -> },
+        ),
+        forceArchive = ForceArchiveWorktreeActions(
+            onConfirm = { _, _ -> },
+            onDismiss = {},
+        ),
+    )
 
     private fun rebaseNeededRow(): LocalWorktreeRowState = worktreeRow(needsRebase = true)
 
