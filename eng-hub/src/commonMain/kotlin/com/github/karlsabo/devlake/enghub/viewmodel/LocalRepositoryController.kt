@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
+import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.GitWorktreeApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -133,10 +134,20 @@ internal class LocalRepositoryController(
         }
     }
 
-    private fun expandLocalRepository(repoRootPath: String, normalizedRepoRootPath: String, request: Any) {
+    private fun expandLocalRepository(
+        repoRootPath: String,
+        normalizedRepoRootPath: String,
+        request: Any,
+    ) {
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                gitWorktreeApi.listLocalWorktreeUiStates(repoRootPath)
+                val discoveredWorktrees = gitWorktreeApi.listWorktrees(repoRootPath)
+                val basicWorktrees = discoveredWorktrees.toLocalWorktreeUiStates(repoRootPath)
+                if (expansionTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) {
+                    gitWorktreeApi.toLocalWorktreeUiStates(repoRootPath, discoveredWorktrees)
+                } else {
+                    basicWorktrees
+                }
             }
                 .rethrowCancellation()
                 .onSuccess { worktrees ->

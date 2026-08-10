@@ -42,6 +42,7 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlin.random.Random
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 const val DEV_LAKE_ROOT = "/repos/dev-lake-utils"
@@ -439,6 +440,7 @@ data class RecordingGitWorktreeApiResponses(
 
 data class RecordingGitWorktreeApiCallbacks(
     val onListWorktrees: (String) -> Unit = {},
+    val onInferWorktreeParentBranches: (String) -> Unit = {},
     val onArchiveWorktree: (String, String, Boolean) -> Unit = { _, _, _ -> },
     val onCreateBranchWorktree: (CreateBranchWorktreeCall) -> String = {
         error("Unexpected call")
@@ -568,7 +570,10 @@ class RecordingGitWorktreeApi(
         return responses.defaultBranchRefsByRepoPath[repoPath]
     }
 
-    override fun inferWorktreeParentBranches(repoPath: String) = responses.parentBranchesByRepoPath[repoPath].orEmpty()
+    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> {
+        callbacks.onInferWorktreeParentBranches(repoPath)
+        return responses.parentBranchesByRepoPath[repoPath].orEmpty()
+    }
 
     override fun branchNeedsRebase(
         repoPath: String,
@@ -663,7 +668,7 @@ suspend fun removeTempDir(path: String) {
         val deletion = runCatching { deleteRecursively(root) }
         if (deletion.isSuccess || !SystemFileSystem.exists(root)) return
         lastFailure = deletion.exceptionOrNull()
-        if (attempt < 9) delay(10)
+        if (attempt < 9) delay(10.milliseconds)
     }
     lastFailure?.let { throw it }
     error("Failed to delete $path")

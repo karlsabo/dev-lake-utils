@@ -10,10 +10,10 @@ internal class LocalRepositoryExpansionTracker(
         val request = Any()
         while (true) {
             val repositories = state.localRepositories.value
-            val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath
-            } ?: return null
-            if (repository.isExpanded || repository.expansionRequest != null) return null
+            val repository = repositories
+                .firstOrNull { it.path.normalizedRepoPath() == normalizedRepoRootPath }
+                ?.takeUnless { it.isExpanded || it.expansionRequest != null }
+                ?: return null
 
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
@@ -43,6 +43,27 @@ internal class LocalRepositoryExpansionTracker(
                     repository
                 }
             }
+        }
+    }
+
+    fun publishDiscovered(
+        normalizedRepoRootPath: String,
+        request: Any,
+        worktrees: List<LocalWorktreeUiState>,
+    ): Boolean {
+        while (true) {
+            val repositories = state.localRepositories.value
+            val repository = repositories.firstOrNull {
+                it.path.normalizedRepoPath() == normalizedRepoRootPath && it.expansionRequest === request
+            } ?: return false
+            val updatedRepositories = repositories.map { currentRepository ->
+                if (currentRepository === repository) {
+                    currentRepository.copy(worktrees = worktrees)
+                } else {
+                    currentRepository
+                }
+            }
+            if (state.localRepositories.compareAndSet(repositories, updatedRepositories)) return true
         }
     }
 

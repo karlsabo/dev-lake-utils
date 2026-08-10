@@ -58,6 +58,8 @@
 
 ### 2. Render basic worktree rows before stack enrichment
 
+**Status:** Done.
+
 **Acceptance criteria:** Given local discovery returns `main` and `feature/stacked-pr` while stack enrichment remains suspended, when the repository is expanded, then both worktree rows are visible without nesting/rebase metadata and the UI still indicates background loading.
 
 **Expected edits:**

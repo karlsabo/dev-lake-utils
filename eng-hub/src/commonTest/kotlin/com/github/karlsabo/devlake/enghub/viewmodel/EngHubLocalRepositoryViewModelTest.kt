@@ -256,6 +256,53 @@ class EngHubLocalRepositoryViewModelTest {
     }
 
     @Test
+    fun expandingConfiguredRepositoryShowsBasicRowsWhileStackEnrichmentIsRunning() = runBlocking {
+        val enrichmentStarted = CompletableDeferred<Unit>()
+        val releaseEnrichment = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/stacked-pr",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to "main"),
+                ),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onInferWorktreeParentBranches = {
+                    enrichmentStarted.complete(Unit)
+                    runBlocking { releaseEnrichment.await() }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) { enrichmentStarted.await() }
+
+        val repository = viewModel.localRepositoriesStateFlow.value.single()
+        assertEquals(true, repository.isExpanded)
+        assertEquals(true, repository.isLoading)
+        assertEquals(listOf("main", "feature/stacked-pr"), repository.worktrees.map { it.branch })
+        assertEquals(listOf(null, null), repository.worktrees.map { it.parentBranch })
+        assertEquals(listOf(false, false), repository.worktrees.map { it.needsRebase })
+
+        releaseEnrichment.complete(Unit)
+        Unit
+    }
+
+    @Test
     fun expandingConfiguredRepositoryListsWorktreesAndShowsBranchesWithDirtyStatus() = runBlocking {
         val api = RecordingGitWorktreeApi(
             responses = RecordingGitWorktreeApiResponses(
@@ -328,7 +375,7 @@ class EngHubLocalRepositoryViewModelTest {
 
         val worktrees = withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->
-                repositories.single().worktrees.size == 2
+                !repositories.single().isLoading && repositories.single().worktrees.size == 2
             }.single().worktrees
         }
 
