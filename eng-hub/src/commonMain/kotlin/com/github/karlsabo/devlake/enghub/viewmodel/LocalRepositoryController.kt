@@ -160,7 +160,7 @@ internal class LocalRepositoryController(
 
             val enrichedWorktrees = gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees)
             refreshTracker.complete(normalizedRepoRootPath, request, enrichedWorktrees)
-        } catch (failure: Throwable) {
+        } catch (failure: Exception) {
             refreshTracker.fail(normalizedRepoRootPath, request)
             throw failure
         }

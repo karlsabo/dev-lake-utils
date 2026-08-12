@@ -13,7 +13,7 @@ Implement one story at a time: one acceptance test, one PR, one thin end-to-end 
 
 Before changing code, read:
 
-- `../../../notes.md`
+- `../../notes.md`
 
 Expect input to be one of:
 

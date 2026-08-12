@@ -628,7 +628,7 @@ class EngHubLocalRepositoryViewModelTest {
             trySend {}
             trySend {
                 pollFailed.complete(Unit)
-                throw IllegalStateException("git worktree list failed")
+                error("git worktree list failed")
             }
         }
         val api = RecordingGitWorktreeApi(
