@@ -601,17 +601,8 @@ private class GitBranchAncestryChecker(
 private class GitDefaultBranchRefResolver(
     private val gitCommandApi: GitCommandApi,
 ) {
-    fun inferDefaultBranchRef(repoPath: String): String? = inferDefaultBranchRef(
-        repoPath = repoPath,
-        beforeRemoteDefaultRef = {},
-    )
-
-    fun inferDefaultBranchRef(
-        repoPath: String,
-        beforeRemoteDefaultRef: (remote: String) -> Unit,
-    ): String? {
+    fun inferDefaultBranchRef(repoPath: String): String? {
         for (remote in candidateDefaultBranchRemotes(repoPath)) {
-            beforeRemoteDefaultRef(remote)
             remoteDefaultBranchRef(repoPath, remote)?.let { return it }
         }
         return null
@@ -676,9 +667,7 @@ private class GitWorktreeParentInferer(
                 )
             }
             .toList()
-        val defaultBranchRef = defaultBranchRefResolver.inferDefaultBranchRef(repoPath) { remote ->
-            fetchRemoteBestEffort(repoPath, remote)
-        }
+        val defaultBranchRef = defaultBranchRefResolver.inferDefaultBranchRef(repoPath)
 
         return visibleBranches.mapNotNull { child ->
             val childBranch = requireNotNull(child.branch)
@@ -792,17 +781,6 @@ private class GitWorktreeParentInferer(
                 }
             }
         return if (hasFailure) null else hasEquivalent
-    }
-
-    private fun fetchRemoteBestEffort(repoPath: String, remote: String) {
-        try {
-            gitCommandApi.fetch(repoPath, remote)
-        } catch (e: GitCommandException) {
-            logWarning(
-                "Failed to fetch $remote before inferring worktree hierarchy; using local refs",
-                e,
-            )
-        }
     }
 
     private fun isAncestor(

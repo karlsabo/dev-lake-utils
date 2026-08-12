@@ -93,6 +93,8 @@
 
 ### 4. Make display-time stack inference local-only
 
+**Status:** Done.
+
 **Acceptance criteria:** Given a repository has only its existing local refs and its configured remote is unavailable, when worktree display enrichment runs, then it completes from local information without fetch or remote-query commands and without changing remote-tracking refs.
 
 **Expected edits:**

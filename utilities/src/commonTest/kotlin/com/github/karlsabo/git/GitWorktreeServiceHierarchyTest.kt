@@ -2,9 +2,8 @@ package com.github.karlsabo.git
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
 
 class GitWorktreeServiceHierarchyTest {
     @Test
@@ -83,15 +82,9 @@ class GitWorktreeServiceHierarchyTest {
     }
 
     @Test
-    fun inferWorktreeParentBranches_logsFetchFailureAndUsesLocalRefs() {
+    fun inferWorktreeParentBranches_usesLocalRefsWithoutContactingRemote() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"
-        val fetchFailure = GitCommandException(
-            command = listOf("git", "fetch", "origin"),
-            exitCode = 128,
-            gitOutput = "fatal: could not fetch origin",
-        )
-        val warnings = mutableListOf<Pair<String, Throwable>>()
         fake.worktreeListResult = """
             worktree /repos/dev-lake-utils
             HEAD abc123
@@ -101,16 +94,11 @@ class GitWorktreeServiceHierarchyTest {
             HEAD def456
             branch refs/heads/feature/child
         """.trimIndent()
-        fake.fetchAction = { _, remote, refSpecs ->
-            assertEquals("origin", remote)
-            assertTrue(refSpecs.isEmpty())
-            throw fetchFailure
-        }
+        fake.fetchAction = { _, _, _ -> error("display inference must not fetch") }
+        fake.remoteBranchExistsAction = { _, _, _ -> error("display inference must not query the remote") }
         fake.remoteDefaultBranchRefAction = { _, remote ->
-            when (remote) {
-                "origin" -> "origin/HEAD"
-                else -> null
-            }
+            check(remote == "origin")
+            "origin/HEAD"
         }
         fake.isAncestorAction = { _, ancestorRef, descendantRef ->
             when (ancestorRef to descendantRef) {
@@ -121,25 +109,15 @@ class GitWorktreeServiceHierarchyTest {
                 else -> false
             }
         }
-        val service: GitWorktreeApi = GitWorktreeService(
-            gitCommandApi = fake,
-            logWarning = { message, cause -> warnings += message to cause },
-        )
+        val service: GitWorktreeApi = GitWorktreeService(fake)
 
         val parents = service.inferWorktreeParentBranches(repoPath)
 
         assertEquals(mapOf("feature/child" to "main"), parents)
-        assertEquals(1, warnings.size)
-        assertTrue(warnings.single().first.contains("using local refs"))
-        assertSame(fetchFailure, warnings.single().second)
-        assertTrue(
-            fake.calls.indexOf(FakeGitCommandApi.Call("fetch", listOf(repoPath, "origin"))) <
-                fake.calls.indexOf(
-                    FakeGitCommandApi.Call(
-                        "isAncestor",
-                        listOf(repoPath, "refs/heads/main", "refs/heads/feature/child"),
-                    ),
-                ),
+        assertFalse(
+            fake.calls.any { call ->
+                call.method in setOf("fetch", "remoteBranchExists")
+            },
         )
     }
 
