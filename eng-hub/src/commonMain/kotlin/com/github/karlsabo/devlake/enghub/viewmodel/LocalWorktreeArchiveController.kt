@@ -4,8 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+
+private val DEFAULT_WORKTREE_REMOVAL_WAIT_TIMEOUT = 30.seconds
 
 internal class LocalWorktreeArchiveController(
     private val viewModel: ViewModel,
@@ -13,6 +19,7 @@ internal class LocalWorktreeArchiveController(
     private val worktreeServices: EngHubWorktreeServices,
     private val localRepositories: LocalRepositoryController,
     private val errorReporter: ActionErrorReporter,
+    private val worktreeRemovalWaitTimeout: Duration = DEFAULT_WORKTREE_REMOVAL_WAIT_TIMEOUT,
 ) {
     fun archiveLocalWorktree(repoRootPath: String, worktreePath: String) {
         archiveLocalWorktree(repoRootPath, worktreePath, force = false)
@@ -62,12 +69,22 @@ internal class LocalWorktreeArchiveController(
             val result = runCatching {
                 logger.info { "Archiving worktree $worktreePath for $repoRootPath force=$force" }
                 worktreeServices.gitWorktreeApi.archiveWorktree(repoRootPath, worktreePath, force = force)
-                worktreeServices.gitWorktreeApi.listLocalWorktreeUiStates(repoRootPath)
             }
-            state.archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
-            result.onSuccess { worktrees ->
-                localRepositories.updateLocalRepositoryWorktrees(repoRootPath, worktrees)
+            result.onSuccess {
+                try {
+                    localRepositories.refreshLocalRepositoryWorktreesBestEffort(
+                        repoRootPath = repoRootPath,
+                        logContext = "after archive",
+                    )
+                    awaitWorktreeRemoval(
+                        repoRootPath = repoRootPath,
+                        worktreePath = normalizedWorktreePath,
+                    )
+                } finally {
+                    state.archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
+                }
             }.onFailure { failure ->
+                state.archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
                 logger.error(failure) { "Failed to archive worktree $worktreePath" }
                 if (!force && failure.isDirtyWorktreeArchiveFailure()) {
                     state.forceArchiveWorktreeRequest.value = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
@@ -78,6 +95,28 @@ internal class LocalWorktreeArchiveController(
                     repoRootPath = repoRootPath,
                     logContext = "after archive failure",
                 )
+            }
+        }
+    }
+
+    private suspend fun awaitWorktreeRemoval(
+        repoRootPath: String,
+        worktreePath: String,
+    ) {
+        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        val removalObserved = withTimeoutOrNull(worktreeRemovalWaitTimeout) {
+            state.localRepositories.first { repositories ->
+                val repository = repositories.firstOrNull {
+                    it.path.normalizedRepoPath() == normalizedRepoRootPath
+                }
+                repository == null ||
+                    repository.worktrees.none { it.path.normalizedRepoPath() == worktreePath }
+            }
+            true
+        } == true
+        if (!removalObserved) {
+            logger.warn {
+                "Stopped guarding archived worktree $worktreePath after state reconciliation timed out"
             }
         }
     }

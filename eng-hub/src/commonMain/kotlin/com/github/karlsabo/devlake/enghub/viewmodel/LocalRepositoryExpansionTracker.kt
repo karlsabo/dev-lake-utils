@@ -12,7 +12,7 @@ internal class LocalRepositoryExpansionTracker(
             val repositories = state.localRepositories.value
             val repository = repositories
                 .firstOrNull { it.path.normalizedRepoPath() == normalizedRepoRootPath }
-                ?.takeUnless { it.isExpanded || it.expansionRequest != null }
+                ?.takeUnless { it.isExpanded }
                 ?: return null
 
             val updatedRepositories = repositories.map { currentRepository ->
@@ -20,7 +20,8 @@ internal class LocalRepositoryExpansionTracker(
                     currentRepository.copy(
                         isExpanded = true,
                         isLoading = true,
-                        expansionRequest = request,
+                        operationRequest = request,
+                        refreshRequest = null,
                     )
                 } else {
                     currentRepository
@@ -37,7 +38,8 @@ internal class LocalRepositoryExpansionTracker(
                     repository.copy(
                         isExpanded = false,
                         isLoading = false,
-                        expansionRequest = null,
+                        operationRequest = null,
+                        refreshRequest = null,
                     )
                 } else {
                     repository
@@ -54,7 +56,8 @@ internal class LocalRepositoryExpansionTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath && it.expansionRequest === request
+                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                    it.operationRequest === request
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
@@ -75,13 +78,14 @@ internal class LocalRepositoryExpansionTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath && it.expansionRequest === request
+                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                    it.operationRequest === request
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
                     currentRepository.copy(
                         isLoading = false,
-                        expansionRequest = null,
+                        operationRequest = null,
                         worktrees = worktrees ?: currentRepository.worktrees,
                     )
                 } else {

@@ -6,23 +6,47 @@ import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.Worktree
 import kotlinx.coroutines.CancellationException
 
-internal fun GitWorktreeApi.listLocalWorktreeUiStates(
-    repoRootPath: String,
-): List<LocalWorktreeUiState> = toLocalWorktreeUiStates(
-    repoRootPath = repoRootPath,
-    worktrees = listWorktrees(repoRootPath),
-)
-
 internal fun GitWorktreeApi.toLocalWorktreeUiStates(
     repoRootPath: String,
     worktrees: List<Worktree>,
+): List<LocalWorktreeUiState> = enrichLocalWorktreeUiStates(
+    repoRootPath = repoRootPath,
+    worktrees = worktrees.toLocalWorktreeUiStates(repoRootPath),
+)
+
+internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
+    enrichedWorktrees: List<LocalWorktreeUiState>,
+): List<LocalWorktreeUiState> {
+    val visibleBranches = mapTo(mutableSetOf()) { it.branch }
+    val enrichmentByPath = enrichedWorktrees.associateBy { it.path.normalizedRepoPath() }
+    return map { currentWorktree ->
+        val enrichedWorktree = enrichmentByPath[currentWorktree.path.normalizedRepoPath()]
+            ?.takeIf { it.branch == currentWorktree.branch }
+        if (enrichedWorktree == null) {
+            currentWorktree
+        } else {
+            val parentBranch = enrichedWorktree.parentBranch?.takeIf { it in visibleBranches }
+            currentWorktree.copy(
+                parentBranch = parentBranch,
+                needsRebase = parentBranch != null && enrichedWorktree.needsRebase,
+            )
+        }
+    }
+}
+
+internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
+    repoRootPath: String,
+    worktrees: List<LocalWorktreeUiState>,
 ): List<LocalWorktreeUiState> {
     val parentBranchesByChildBranch = inferWorktreeParentBranchesBestEffort(repoRootPath)
-    return worktrees.toLocalWorktreeUiStates(
-        repositoryRootPath = repoRootPath,
-        parentBranchesByChildBranch = parentBranchesByChildBranch,
-        needsRebaseByChildBranch = rebaseNeedsByChildBranchBestEffort(repoRootPath, parentBranchesByChildBranch),
-    )
+    val needsRebaseByChildBranch = rebaseNeedsByChildBranchBestEffort(repoRootPath, parentBranchesByChildBranch)
+    val visibleBranches = worktrees.mapTo(mutableSetOf()) { it.branch }
+    return worktrees.map { worktree ->
+        worktree.copy(
+            parentBranch = parentBranchesByChildBranch[worktree.branch]?.takeIf { it in visibleBranches },
+            needsRebase = needsRebaseByChildBranch[worktree.branch] == true,
+        )
+    }
 }
 
 private fun GitWorktreeApi.inferWorktreeParentBranchesBestEffort(repoRootPath: String): Map<String, String> = try {

@@ -75,6 +75,8 @@
 
 ### 3. Update visible rows with background stack and rebase metadata
 
+**Status:** Done.
+
 **Acceptance criteria:** Given basic worktree rows are visible and local ancestry analysis determines `feature/stacked-pr` is based on `main` and needs rebasing, when enrichment completes, then the existing rows update to show the hierarchy/rebase state and the loading spinner disappears.
 
 **Expected edits:**

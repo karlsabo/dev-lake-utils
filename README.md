@@ -79,6 +79,7 @@
 * [ ] Show recently close PRs and tie them to the local worktree, then allow easily archiving the worktree from the PR view.
   * Also show the ticket and allow modifying the ticket, or a quick link to the ticket view, maybe the same with the worktree, link to the view for it.
   * If we link to 'views' of the items, we'd want to add a navigation history (back button, forward button)
+* [ ] We need a UI indicator for when we archive a worktree. Disable all actions and add a spinning loader. The 'Achiving...' text takes too long to appear.
 
 ## Implementation loop
 * Implement

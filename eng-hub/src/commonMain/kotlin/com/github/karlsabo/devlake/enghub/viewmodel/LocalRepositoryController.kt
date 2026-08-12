@@ -21,6 +21,7 @@ internal class LocalRepositoryController(
 ) {
     private val gitWorktreeApi: GitWorktreeApi = worktreeServices.gitWorktreeApi
     private val expansionTracker = LocalRepositoryExpansionTracker(state)
+    private val refreshTracker = LocalRepositoryRefreshTracker(state)
 
     fun pickAndAddLocalRepository() {
         viewModel.viewModelScope.launch {
@@ -65,35 +66,8 @@ internal class LocalRepositoryController(
         }
     }
 
-    fun updateLocalRepositoryWorktrees(
-        repoRootPath: String,
-        worktrees: List<LocalWorktreeUiState>,
-        isExpanded: Boolean? = null,
-        isLoading: Boolean? = null,
-    ) {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
-        state.localRepositories.update { repositories ->
-            repositories.map { currentRepository ->
-                if (currentRepository.path.normalizedRepoPath() == normalizedRepoRootPath) {
-                    currentRepository.copy(
-                        isExpanded = isExpanded ?: currentRepository.isExpanded,
-                        isLoading = isLoading ?: currentRepository.isLoading,
-                        worktrees = worktrees,
-                    )
-                } else {
-                    currentRepository
-                }
-            }
-        }
-    }
-
     fun refreshLocalRepositoryWorktreesBestEffort(repoRootPath: String, logContext: String) {
-        runCatching {
-            updateLocalRepositoryWorktrees(
-                repoRootPath,
-                gitWorktreeApi.listLocalWorktreeUiStates(repoRootPath),
-            )
-        }
+        runCatching { refreshLocalRepositoryWorktrees(repoRootPath) }
             .rethrowCancellation()
             .onFailure { failure ->
                 logger.error(failure) { "Failed to refresh worktrees $logContext for $repoRootPath" }
@@ -144,7 +118,7 @@ internal class LocalRepositoryController(
                 val discoveredWorktrees = gitWorktreeApi.listWorktrees(repoRootPath)
                 val basicWorktrees = discoveredWorktrees.toLocalWorktreeUiStates(repoRootPath)
                 if (expansionTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) {
-                    gitWorktreeApi.toLocalWorktreeUiStates(repoRootPath, discoveredWorktrees)
+                    gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees)
                 } else {
                     basicWorktrees
                 }
@@ -169,16 +143,118 @@ internal class LocalRepositoryController(
             .filter { it.isNotEmpty() }
             .distinctBy { it.normalizedRepoPath() }
             .forEach { repoRootPath ->
-                runCatching {
-                    updateLocalRepositoryWorktrees(
-                        repoRootPath,
-                        gitWorktreeApi.listLocalWorktreeUiStates(repoRootPath),
-                    )
-                }
+                runCatching { refreshLocalRepositoryWorktrees(repoRootPath) }
                     .rethrowCancellation()
                     .onFailure { failure ->
                         logger.error(failure) { "Failed to poll worktrees for $repoRootPath" }
                     }
             }
+    }
+
+    private fun refreshLocalRepositoryWorktrees(repoRootPath: String) {
+        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        val request = refreshTracker.start(normalizedRepoRootPath) ?: return
+        try {
+            val basicWorktrees = gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
+            if (!refreshTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return
+
+            val enrichedWorktrees = gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees)
+            refreshTracker.complete(normalizedRepoRootPath, request, enrichedWorktrees)
+        } catch (failure: Throwable) {
+            refreshTracker.fail(normalizedRepoRootPath, request)
+            throw failure
+        }
+    }
+}
+
+internal class LocalRepositoryRefreshTracker(
+    private val state: EngHubViewModelState,
+) {
+    fun start(normalizedRepoRootPath: String): Any? {
+        val request = Any()
+        while (true) {
+            val repositories = state.localRepositories.value
+            val repository = repositories.firstOrNull {
+                it.path.normalizedRepoPath() == normalizedRepoRootPath
+            } ?: return null
+            val updatedRepositories = repositories.map { currentRepository ->
+                if (currentRepository === repository) {
+                    currentRepository.copy(refreshRequest = request)
+                } else {
+                    currentRepository
+                }
+            }
+            if (state.localRepositories.compareAndSet(repositories, updatedRepositories)) return request
+        }
+    }
+
+    fun publishDiscovered(
+        normalizedRepoRootPath: String,
+        request: Any,
+        basicWorktrees: List<LocalWorktreeUiState>,
+    ): Boolean {
+        while (true) {
+            val repositories = state.localRepositories.value
+            val repository = repositories.firstOrNull {
+                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                    it.refreshRequest === request
+            } ?: return false
+            val updatedRepositories = repositories.map { currentRepository ->
+                if (currentRepository === repository) {
+                    currentRepository.copy(
+                        operationRequest = null,
+                        worktrees = basicWorktrees.withEnrichmentFrom(currentRepository.worktrees),
+                    )
+                } else {
+                    currentRepository
+                }
+            }
+            if (state.localRepositories.compareAndSet(repositories, updatedRepositories)) return true
+        }
+    }
+
+    fun complete(
+        normalizedRepoRootPath: String,
+        request: Any,
+        enrichedWorktrees: List<LocalWorktreeUiState>,
+    ): Boolean {
+        while (true) {
+            val repositories = state.localRepositories.value
+            val repository = repositories.firstOrNull {
+                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                    it.refreshRequest === request
+            } ?: return false
+            val updatedRepositories = repositories.map { currentRepository ->
+                if (currentRepository === repository) {
+                    currentRepository.copy(
+                        isLoading = false,
+                        operationRequest = null,
+                        refreshRequest = null,
+                        worktrees = currentRepository.worktrees.withEnrichmentFrom(enrichedWorktrees),
+                    )
+                } else {
+                    currentRepository
+                }
+            }
+            if (state.localRepositories.compareAndSet(repositories, updatedRepositories)) return true
+        }
+    }
+
+    fun fail(normalizedRepoRootPath: String, request: Any): Boolean {
+        while (true) {
+            val repositories = state.localRepositories.value
+            val repository = repositories.firstOrNull {
+                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                    it.refreshRequest === request
+            } ?: return false
+            val updatedRepositories = repositories.map { currentRepository ->
+                if (currentRepository === repository) {
+                    currentRepository.copy(refreshRequest = null)
+                } else {
+                    currentRepository
+                }
+            }
+            if (state.localRepositories.compareAndSet(repositories, updatedRepositories)) return true
+        }
     }
 }

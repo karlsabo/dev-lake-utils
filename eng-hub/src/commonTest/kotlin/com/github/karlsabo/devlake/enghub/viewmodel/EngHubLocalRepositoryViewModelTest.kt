@@ -7,6 +7,7 @@ import com.github.karlsabo.git.Worktree
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -268,11 +269,15 @@ class EngHubLocalRepositoryViewModelTest {
                             path = DEV_LAKE_SELECTED_WORKTREE,
                             branch = "feature/stacked-pr",
                             commitHash = "def456",
+                            isDirty = true,
                         ),
                     ),
                 ),
                 parentBranchesByRepoPath = mapOf(
                     DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to "main"),
+                ),
+                branchNeedsRebaseByCall = mapOf(
+                    BranchNeedsRebaseCall(DEV_LAKE_ROOT, "main", "feature/stacked-pr") to true,
                 ),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
@@ -299,7 +304,17 @@ class EngHubLocalRepositoryViewModelTest {
         assertEquals(listOf(false, false), repository.worktrees.map { it.needsRebase })
 
         releaseEnrichment.complete(Unit)
-        Unit
+        val enrichedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                !repositories.single().isLoading
+            }.single()
+        }
+        val stackedWorktree = enrichedRepository.worktrees.single { it.branch == "feature/stacked-pr" }
+        assertEquals("main", stackedWorktree.parentBranch)
+        assertEquals(true, stackedWorktree.needsRebase)
+        assertEquals(DEV_LAKE_SELECTED_WORKTREE, stackedWorktree.path)
+        assertEquals(true, stackedWorktree.isDirty)
+        assertEquals(false, stackedWorktree.isRoot)
     }
 
     @Test
@@ -472,6 +487,338 @@ class EngHubLocalRepositoryViewModelTest {
         assertEquals(listOf("docs-main"), repositories.single { it.path == DOCS_ROOT }.worktrees.map { it.branch })
         assertEquals(0, gitHubApi.openPullRequestCalls)
         assertEquals(0, gitHubApi.notificationListCalls)
+    }
+
+    @Test
+    fun pollKeepsExistingEnrichmentWhileReplacementEnrichmentIsRunning() = runBlocking {
+        val pollEnrichmentStarted = CompletableDeferred<Unit>()
+        val releasePollEnrichment = CompletableDeferred<Unit>()
+        val enrichmentCalls = Channel<() -> Unit>(capacity = 2).apply {
+            trySend {}
+            trySend {
+                pollEnrichmentStarted.complete(Unit)
+                runBlocking { releasePollEnrichment.await() }
+            }
+        }
+        val worktreeLists = Channel<List<Worktree>>(capacity = 2).apply {
+            trySend(stackedPollWorktrees())
+            trySend(stackedPollWorktrees(isDirty = true))
+        }
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = RecordingGitWorktreeApi(
+                responses = RecordingGitWorktreeApiResponses(
+                    worktreesForRepoPath = { worktreeLists.tryReceive().getOrThrow() },
+                    parentBranchesByRepoPath = mapOf(
+                        DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to "main"),
+                    ),
+                    branchNeedsRebaseByCall = mapOf(
+                        BranchNeedsRebaseCall(DEV_LAKE_ROOT, "main", "feature/stacked-pr") to true,
+                    ),
+                ),
+                callbacks = RecordingGitWorktreeApiCallbacks(
+                    onInferWorktreeParentBranches = {
+                        enrichmentCalls.tryReceive().getOrThrow().invoke()
+                    },
+                ),
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 250),
+        )
+        val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                val stackedWorktree = repositories.single().worktrees.singleOrNull {
+                    it.branch == "feature/stacked-pr"
+                }
+                !repositories.single().isLoading && stackedWorktree?.parentBranch == "main"
+            }
+        }
+        withTimeout(2_000.milliseconds) { pollEnrichmentStarted.await() }
+
+        val stackedWorktree = viewModel.localRepositoriesStateFlow.value.single().worktrees.single {
+            it.branch == "feature/stacked-pr"
+        }
+        assertEquals(true, stackedWorktree.isDirty)
+        assertEquals("main", stackedWorktree.parentBranch)
+        assertEquals(true, stackedWorktree.needsRebase)
+
+        releasePollEnrichment.complete(Unit)
+        pollingJobs.forEach { job ->
+            job.cancel()
+            job.join()
+        }
+    }
+
+    @Test
+    fun refreshPreservesLoadingWhileSupersedingInitialExpansionDiscovery() = runBlocking {
+        val expansionListStarted = CompletableDeferred<Unit>()
+        val refreshListStarted = CompletableDeferred<Unit>()
+        val releaseExpansionList = CompletableDeferred<Unit>()
+        val releaseRefreshList = CompletableDeferred<Unit>()
+        val listCalls = Channel<() -> Unit>(capacity = 2).apply {
+            trySend {
+                expansionListStarted.complete(Unit)
+                runBlocking { releaseExpansionList.await() }
+            }
+            trySend {
+                refreshListStarted.complete(Unit)
+                runBlocking { releaseRefreshList.await() }
+            }
+        }
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = RecordingGitWorktreeApi(
+                responses = RecordingGitWorktreeApiResponses(
+                    worktreesByRepoPath = mapOf(
+                        DEV_LAKE_ROOT to listOf(
+                            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                        ),
+                    ),
+                ),
+                callbacks = RecordingGitWorktreeApiCallbacks(
+                    onListWorktrees = { listCalls.tryReceive().getOrThrow().invoke() },
+                ),
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+        )
+        val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) { expansionListStarted.await() }
+        val expansionJob = viewModel.viewModelScope.coroutineContext[Job]!!.children
+            .single { it !in pollingJobs }
+        withTimeout(2_000.milliseconds) { refreshListStarted.await() }
+
+        val loadingRepository = viewModel.localRepositoriesStateFlow.value.single()
+        assertEquals(true, loadingRepository.isExpanded)
+        assertEquals(true, loadingRepository.isLoading)
+        assertEquals(emptyList(), loadingRepository.worktrees)
+
+        releaseRefreshList.complete(Unit)
+        val refreshedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                val repository = repositories.single()
+                !repository.isLoading && repository.worktrees.isNotEmpty()
+            }.single()
+        }
+        pollingJobs.forEach { job ->
+            job.cancel()
+            job.join()
+        }
+        releaseExpansionList.complete(Unit)
+        withTimeout(2_000.milliseconds) { expansionJob.join() }
+
+        assertEquals(listOf("main"), refreshedRepository.worktrees.map { it.branch })
+        assertEquals(
+            listOf("main"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
+    }
+
+    @Test
+    fun failedPollDoesNotDiscardInFlightExpansionEnrichment() = runBlocking {
+        val expansionEnrichmentStarted = CompletableDeferred<Unit>()
+        val releaseExpansionEnrichment = CompletableDeferred<Unit>()
+        val pollFailed = CompletableDeferred<Unit>()
+        val listCalls = Channel<() -> Unit>(capacity = 2).apply {
+            trySend {}
+            trySend {
+                pollFailed.complete(Unit)
+                throw IllegalStateException("git worktree list failed")
+            }
+        }
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/stacked-pr",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to "main"),
+                ),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onListWorktrees = { listCalls.tryReceive().getOrThrow().invoke() },
+                onInferWorktreeParentBranches = {
+                    expansionEnrichmentStarted.complete(Unit)
+                    runBlocking { releaseExpansionEnrichment.await() }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+        )
+        val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) { expansionEnrichmentStarted.await() }
+        withTimeout(2_000.milliseconds) { pollFailed.await() }
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().refreshRequest == null && api.listWorktreeRepoPaths.size >= 2
+            }
+        }
+        pollingJobs.forEach { job ->
+            job.cancel()
+            job.join()
+        }
+
+        assertEquals(true, viewModel.localRepositoriesStateFlow.value.single().isLoading)
+
+        releaseExpansionEnrichment.complete(Unit)
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                !repositories.single().isLoading
+            }.single()
+        }
+
+        assertEquals("main", repository.worktrees.single { it.branch == "feature/stacked-pr" }.parentBranch)
+    }
+
+    @Test
+    fun publishedRefreshPreventsInFlightExpansionFromReplacingWorktrees() = runBlocking {
+        val expansionEnrichmentStarted = CompletableDeferred<Unit>()
+        val releaseExpansionEnrichment = CompletableDeferred<Unit>()
+        val refreshEnrichmentStarted = CompletableDeferred<Unit>()
+        val releaseRefreshEnrichment = CompletableDeferred<Unit>()
+        val enrichmentCalls = Channel<() -> Unit>(capacity = 2).apply {
+            trySend {
+                expansionEnrichmentStarted.complete(Unit)
+                runBlocking { releaseExpansionEnrichment.await() }
+            }
+            trySend {
+                refreshEnrichmentStarted.complete(Unit)
+                runBlocking { releaseRefreshEnrichment.await() }
+            }
+        }
+        val worktreeLists = Channel<List<Worktree>>(capacity = 2).apply {
+            trySend(listOf(Worktree(path = DEV_LAKE_ROOT, branch = "old-main", commitHash = "old")))
+            trySend(listOf(Worktree(path = DEV_LAKE_ROOT, branch = "new-main", commitHash = "new")))
+        }
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = RecordingGitWorktreeApi(
+                responses = RecordingGitWorktreeApiResponses(
+                    worktreesForRepoPath = { worktreeLists.tryReceive().getOrThrow() },
+                ),
+                callbacks = RecordingGitWorktreeApiCallbacks(
+                    onInferWorktreeParentBranches = {
+                        enrichmentCalls.tryReceive().getOrNull()?.invoke()
+                    },
+                ),
+            ),
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+        )
+        val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) { expansionEnrichmentStarted.await() }
+        val expansionJob = viewModel.viewModelScope.coroutineContext[Job]!!.children
+            .single { it !in pollingJobs }
+        withTimeout(2_000.milliseconds) { refreshEnrichmentStarted.await() }
+        val refreshedRepository = viewModel.localRepositoriesStateFlow.value.single()
+        assertEquals(listOf("new-main"), refreshedRepository.worktrees.map { it.branch })
+        assertEquals(null, refreshedRepository.operationRequest)
+
+        releaseExpansionEnrichment.complete(Unit)
+        withTimeout(2_000.milliseconds) { expansionJob.join() }
+        assertEquals(
+            listOf("new-main"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
+
+        releaseRefreshEnrichment.complete(Unit)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().refreshRequest == null
+            }
+        }
+        pollingJobs.forEach { job ->
+            job.cancel()
+            job.join()
+        }
+    }
+
+    @Test
+    fun expansionStartedAfterRefreshPreventsStaleEnrichmentFromReplacingMetadata() = runBlocking {
+        val refreshEnrichmentStarted = CompletableDeferred<Unit>()
+        val releaseRefreshEnrichment = CompletableDeferred<Unit>()
+        val parentBranches = mutableMapOf<String, String>()
+        val enrichmentCalls = Channel<() -> Unit>(capacity = 2).apply {
+            trySend {
+                refreshEnrichmentStarted.complete(Unit)
+                runBlocking { releaseRefreshEnrichment.await() }
+                parentBranches["feature/stacked-pr"] = "main"
+            }
+            trySend { parentBranches.clear() }
+        }
+        val worktrees = listOf(
+            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "main"),
+            Worktree(
+                path = DEV_LAKE_SELECTED_WORKTREE,
+                branch = "feature/stacked-pr",
+                commitHash = "feature",
+            ),
+        )
+        val staleRebaseCall = BranchNeedsRebaseCall(DEV_LAKE_ROOT, "main", "feature/stacked-pr")
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+                parentBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to parentBranches),
+                branchNeedsRebaseByCall = mapOf(staleRebaseCall to true),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onInferWorktreeParentBranches = {
+                    enrichmentCalls.tryReceive().getOrNull()?.invoke()
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+        )
+        val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+        withTimeout(2_000.milliseconds) { refreshEnrichmentStarted.await() }
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        val expandedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                val repository = repositories.single()
+                repository.isExpanded && !repository.isLoading && repository.worktrees.size == 2
+            }.single()
+        }
+        assertEquals(null, expandedRepository.worktrees.single { it.branch == "feature/stacked-pr" }.parentBranch)
+
+        releaseRefreshEnrichment.complete(Unit)
+        withTimeout(2_000.milliseconds) {
+            while (staleRebaseCall !in api.branchNeedsRebaseCalls) delay(1.milliseconds)
+        }
+        pollingJobs.forEach { job ->
+            job.cancel()
+            job.join()
+        }
+
+        val stackedWorktree = viewModel.localRepositoriesStateFlow.value.single().worktrees.single {
+            it.branch == "feature/stacked-pr"
+        }
+        assertEquals(null, stackedWorktree.parentBranch)
+        assertEquals(false, stackedWorktree.needsRebase)
     }
 
     @Test
@@ -651,3 +998,13 @@ class EngHubLocalRepositoryViewModelTest {
         assertEquals(false, viewModel.localRepositoriesStateFlow.value.single().isExpanded)
     }
 }
+
+private fun stackedPollWorktrees(isDirty: Boolean = false): List<Worktree> = listOf(
+    Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "main"),
+    Worktree(
+        path = DEV_LAKE_SELECTED_WORKTREE,
+        branch = "feature/stacked-pr",
+        commitHash = "feature",
+        isDirty = isDirty,
+    ),
+)
