@@ -109,6 +109,8 @@
 
 ### 5. Discard stale discovery and enrichment results
 
+**Status:** Done.
+
 **Acceptance criteria:** Given worktree loading is in progress, when the user collapses the repository before loading completes, then late discovery or enrichment results do not reopen it or replace data from a later refresh.
 
 **Expected edits:**

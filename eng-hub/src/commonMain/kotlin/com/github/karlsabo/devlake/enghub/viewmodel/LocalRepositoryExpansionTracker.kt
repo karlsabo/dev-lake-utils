@@ -1,13 +1,14 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.state.LocalRepositoryWorktreeRequest
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import kotlinx.coroutines.flow.update
 
 internal class LocalRepositoryExpansionTracker(
     private val state: EngHubViewModelState,
 ) {
-    fun start(normalizedRepoRootPath: String): Any? {
-        val request = Any()
+    fun start(normalizedRepoRootPath: String): LocalRepositoryWorktreeRequest? {
+        val request = LocalRepositoryWorktreeRequest()
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories
@@ -50,14 +51,15 @@ internal class LocalRepositoryExpansionTracker(
 
     fun publishDiscovered(
         normalizedRepoRootPath: String,
-        request: Any,
+        request: LocalRepositoryWorktreeRequest,
         worktrees: List<LocalWorktreeUiState>,
     ): Boolean {
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
                 it.path.normalizedRepoPath() == normalizedRepoRootPath &&
-                    it.operationRequest === request
+                    it.operationRequest === request &&
+                    it.refreshRequest == null
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
@@ -72,14 +74,15 @@ internal class LocalRepositoryExpansionTracker(
 
     fun complete(
         normalizedRepoRootPath: String,
-        request: Any,
+        request: LocalRepositoryWorktreeRequest,
         worktrees: List<LocalWorktreeUiState>? = null,
     ): Boolean {
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
                 it.path.normalizedRepoPath() == normalizedRepoRootPath &&
-                    it.operationRequest === request
+                    it.operationRequest === request &&
+                    it.refreshRequest == null
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {

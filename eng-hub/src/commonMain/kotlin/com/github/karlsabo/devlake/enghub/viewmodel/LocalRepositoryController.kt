@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
+import com.github.karlsabo.devlake.enghub.state.LocalRepositoryWorktreeRequest
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
 import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
@@ -111,7 +112,7 @@ internal class LocalRepositoryController(
     private fun expandLocalRepository(
         repoRootPath: String,
         normalizedRepoRootPath: String,
-        request: Any,
+        request: LocalRepositoryWorktreeRequest,
     ) {
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
@@ -169,8 +170,8 @@ internal class LocalRepositoryController(
 internal class LocalRepositoryRefreshTracker(
     private val state: EngHubViewModelState,
 ) {
-    fun start(normalizedRepoRootPath: String): Any? {
-        val request = Any()
+    fun start(normalizedRepoRootPath: String): LocalRepositoryWorktreeRequest? {
+        val request = LocalRepositoryWorktreeRequest()
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
@@ -178,7 +179,10 @@ internal class LocalRepositoryRefreshTracker(
             } ?: return null
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
-                    currentRepository.copy(refreshRequest = request)
+                    currentRepository.copy(
+                        operationRequest = null,
+                        refreshRequest = request,
+                    )
                 } else {
                     currentRepository
                 }
@@ -189,7 +193,7 @@ internal class LocalRepositoryRefreshTracker(
 
     fun publishDiscovered(
         normalizedRepoRootPath: String,
-        request: Any,
+        request: LocalRepositoryWorktreeRequest,
         basicWorktrees: List<LocalWorktreeUiState>,
     ): Boolean {
         while (true) {
@@ -214,7 +218,7 @@ internal class LocalRepositoryRefreshTracker(
 
     fun complete(
         normalizedRepoRootPath: String,
-        request: Any,
+        request: LocalRepositoryWorktreeRequest,
         enrichedWorktrees: List<LocalWorktreeUiState>,
     ): Boolean {
         while (true) {
@@ -239,7 +243,7 @@ internal class LocalRepositoryRefreshTracker(
         }
     }
 
-    fun fail(normalizedRepoRootPath: String, request: Any): Boolean {
+    fun fail(normalizedRepoRootPath: String, request: LocalRepositoryWorktreeRequest): Boolean {
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
@@ -248,7 +252,10 @@ internal class LocalRepositoryRefreshTracker(
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
-                    currentRepository.copy(refreshRequest = null)
+                    currentRepository.copy(
+                        isLoading = false,
+                        refreshRequest = null,
+                    )
                 } else {
                     currentRepository
                 }

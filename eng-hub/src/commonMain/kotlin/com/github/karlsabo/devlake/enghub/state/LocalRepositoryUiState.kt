@@ -3,13 +3,15 @@ package com.github.karlsabo.devlake.enghub.state
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.Worktree
 
+class LocalRepositoryWorktreeRequest internal constructor()
+
 data class LocalRepositoryUiState(
     val name: String,
     val path: String,
     val isExpanded: Boolean = false,
     val isLoading: Boolean = false,
-    val operationRequest: Any? = null,
-    val refreshRequest: Any? = null,
+    val operationRequest: LocalRepositoryWorktreeRequest? = null,
+    val refreshRequest: LocalRepositoryWorktreeRequest? = null,
     val worktrees: List<LocalWorktreeUiState> = emptyList(),
 )
 
