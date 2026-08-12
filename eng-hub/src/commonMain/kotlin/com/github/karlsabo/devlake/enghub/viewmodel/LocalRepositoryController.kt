@@ -154,16 +154,15 @@ internal class LocalRepositoryController(
     private fun refreshLocalRepositoryWorktrees(repoRootPath: String) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
         val request = refreshTracker.start(normalizedRepoRootPath) ?: return
-        try {
+        runCatching {
             val basicWorktrees = gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
             if (!refreshTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return
 
             val enrichedWorktrees = gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees)
             refreshTracker.complete(normalizedRepoRootPath, request, enrichedWorktrees)
-        } catch (failure: Exception) {
+        }.onFailure {
             refreshTracker.fail(normalizedRepoRootPath, request)
-            throw failure
-        }
+        }.getOrThrow()
     }
 }
 

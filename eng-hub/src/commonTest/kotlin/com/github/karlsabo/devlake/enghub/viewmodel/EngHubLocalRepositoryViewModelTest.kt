@@ -15,6 +15,26 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
 
+private suspend fun awaitRebaseCall(api: RecordingGitWorktreeApi, call: BranchNeedsRebaseCall) {
+    withTimeout(2_000.milliseconds) {
+        while (call !in api.branchNeedsRebaseCalls) delay(1.milliseconds)
+    }
+}
+
+private suspend fun awaitBoth(first: CompletableDeferred<Unit>, second: CompletableDeferred<Unit>) {
+    withTimeout(2_000.milliseconds) { first.await() }
+    withTimeout(2_000.milliseconds) { second.await() }
+}
+
+private fun pollingJobs(viewModel: EngHubViewModel) = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+
+private suspend fun cancelJobs(jobs: Set<Job>) {
+    jobs.forEach { job ->
+        job.cancel()
+        job.join()
+    }
+}
+
 class EngHubLocalRepositoryViewModelTest {
 
     @Test
@@ -438,6 +458,9 @@ class EngHubLocalRepositoryViewModelTest {
 
         assertEquals(listOf(false, false), repository.worktrees.map { it.needsRebase })
     }
+}
+
+class EngHubLocalRepositoryRefreshViewModelTest {
 
     @Test
     fun worktreePollRefreshesUnifiedRepositoryEntriesWithoutRefreshingGitHubData() = runBlocking {
@@ -605,10 +628,7 @@ class EngHubLocalRepositoryViewModelTest {
                 !repository.isLoading && repository.worktrees.isNotEmpty()
             }.single()
         }
-        pollingJobs.forEach { job ->
-            job.cancel()
-            job.join()
-        }
+        cancelJobs(pollingJobs)
         releaseExpansionList.complete(Unit)
         withTimeout(2_000.milliseconds) { expansionJob.join() }
 
@@ -661,20 +681,16 @@ class EngHubLocalRepositoryViewModelTest {
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
             testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
         )
-        val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+        val pollingJobs = pollingJobs(viewModel)
 
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
-        withTimeout(2_000.milliseconds) { expansionEnrichmentStarted.await() }
-        withTimeout(2_000.milliseconds) { pollFailed.await() }
+        awaitBoth(expansionEnrichmentStarted, pollFailed)
         withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->
                 repositories.single().refreshRequest == null && api.listWorktreeRepoPaths.size >= 2
             }
         }
-        pollingJobs.forEach { job ->
-            job.cancel()
-            job.join()
-        }
+        cancelJobs(pollingJobs)
 
         assertEquals(true, viewModel.localRepositoriesStateFlow.value.single().isLoading)
 
@@ -747,11 +763,11 @@ class EngHubLocalRepositoryViewModelTest {
                 repositories.single().refreshRequest == null
             }
         }
-        pollingJobs.forEach { job ->
-            job.cancel()
-            job.join()
-        }
+        cancelJobs(pollingJobs)
     }
+}
+
+class EngHubLocalRepositoryConcurrencyViewModelTest {
 
     @Test
     fun expansionStartedAfterRefreshPreventsStaleEnrichmentFromReplacingMetadata() = runBlocking {
@@ -793,7 +809,7 @@ class EngHubLocalRepositoryViewModelTest {
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
             testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
         )
-        val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
+        val pollingJobs = pollingJobs(viewModel)
         withTimeout(2_000.milliseconds) { refreshEnrichmentStarted.await() }
 
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
@@ -806,13 +822,8 @@ class EngHubLocalRepositoryViewModelTest {
         assertEquals(null, expandedRepository.worktrees.single { it.branch == "feature/stacked-pr" }.parentBranch)
 
         releaseRefreshEnrichment.complete(Unit)
-        withTimeout(2_000.milliseconds) {
-            while (staleRebaseCall !in api.branchNeedsRebaseCalls) delay(1.milliseconds)
-        }
-        pollingJobs.forEach { job ->
-            job.cancel()
-            job.join()
-        }
+        awaitRebaseCall(api, staleRebaseCall)
+        cancelJobs(pollingJobs)
 
         val stackedWorktree = viewModel.localRepositoriesStateFlow.value.single().worktrees.single {
             it.branch == "feature/stacked-pr"
