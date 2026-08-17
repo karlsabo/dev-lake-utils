@@ -124,6 +124,8 @@
 
 ### 6. Preserve basic rows when enrichment fails
 
+**Status:** Done.
+
 **Acceptance criteria:** Given basic rows are visible, when local stack or rebase analysis fails, then the spinner stops and the basic rows remain usable without inferred hierarchy/rebase metadata.
 
 **Expected edits:**

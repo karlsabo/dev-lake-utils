@@ -4,7 +4,6 @@ import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.Worktree
-import kotlinx.coroutines.CancellationException
 
 internal fun GitWorktreeApi.toLocalWorktreeUiStates(
     repoRootPath: String,
@@ -38,8 +37,8 @@ internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
     repoRootPath: String,
     worktrees: List<LocalWorktreeUiState>,
 ): List<LocalWorktreeUiState> {
-    val parentBranchesByChildBranch = inferWorktreeParentBranchesBestEffort(repoRootPath)
-    val needsRebaseByChildBranch = rebaseNeedsByChildBranchBestEffort(repoRootPath, parentBranchesByChildBranch)
+    val parentBranchesByChildBranch = inferWorktreeParentBranches(repoRootPath)
+    val needsRebaseByChildBranch = rebaseNeedsByChildBranch(repoRootPath, parentBranchesByChildBranch)
     val visibleBranches = worktrees.mapTo(mutableSetOf()) { it.branch }
     return worktrees.map { worktree ->
         worktree.copy(
@@ -49,29 +48,9 @@ internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
     }
 }
 
-private fun GitWorktreeApi.inferWorktreeParentBranchesBestEffort(repoRootPath: String): Map<String, String> = try {
-    inferWorktreeParentBranches(repoRootPath)
-} catch (e: CancellationException) {
-    throw e
-} catch (_: RuntimeException) {
-    emptyMap()
-}
-
-private fun GitWorktreeApi.rebaseNeedsByChildBranchBestEffort(
+private fun GitWorktreeApi.rebaseNeedsByChildBranch(
     repoRootPath: String,
     parentBranchesByChildBranch: Map<String, String>,
 ): Map<String, Boolean> = parentBranchesByChildBranch.mapValues { (childBranch, parentBranch) ->
-    branchNeedsRebaseBestEffort(repoRootPath, parentBranch, childBranch)
-}
-
-private fun GitWorktreeApi.branchNeedsRebaseBestEffort(
-    repoRootPath: String,
-    parentBranch: String,
-    childBranch: String,
-): Boolean = try {
     branchNeedsRebase(repoRootPath, parentBranch, childBranch)
-} catch (e: CancellationException) {
-    throw e
-} catch (_: RuntimeException) {
-    false
 }

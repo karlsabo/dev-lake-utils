@@ -97,16 +97,35 @@ internal class LocalRepositoryController(
             return
         }
 
+        val normalizedRootPath = rootPath.normalizedRepoPath()
+        val enrichmentRequest = LocalRepositoryWorktreeRequest()
+        val basicWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(rootPath)
         state.localRepositories.update { repositories ->
             state.currentConfig.localRepositories
                 .toLocalRepositoryUiStates()
                 .withPreservedWorktrees(
                     previousRepositories = repositories,
                     updatedRootPath = rootPath,
-                    updatedWorktrees = gitWorktreeApi.toLocalWorktreeUiStates(rootPath, repositoryWorktrees.worktrees),
+                    updatedWorktrees = basicWorktrees,
                     expandUpdatedRepository = true,
-                )
+                ).map { repository ->
+                    if (repository.path.normalizedRepoPath() == normalizedRootPath) {
+                        repository.copy(refreshRequest = enrichmentRequest)
+                    } else {
+                        repository
+                    }
+                }
         }
+
+        runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(rootPath, basicWorktrees) }
+            .rethrowCancellation()
+            .onSuccess { enrichedWorktrees ->
+                refreshTracker.complete(normalizedRootPath, enrichmentRequest, enrichedWorktrees)
+            }
+            .onFailure { failure ->
+                logger.error(failure) { "Failed to enrich worktrees for newly added repository $rootPath" }
+                refreshTracker.complete(normalizedRootPath, enrichmentRequest, basicWorktrees)
+            }
     }
 
     private fun expandLocalRepository(
@@ -115,24 +134,25 @@ internal class LocalRepositoryController(
         request: LocalRepositoryWorktreeRequest,
     ) {
         viewModel.viewModelScope.launch(Dispatchers.IO) {
-            runCatching {
-                val discoveredWorktrees = gitWorktreeApi.listWorktrees(repoRootPath)
-                val basicWorktrees = discoveredWorktrees.toLocalWorktreeUiStates(repoRootPath)
-                if (expansionTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) {
-                    gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees)
-                } else {
-                    basicWorktrees
+            val basicWorktrees = runCatching {
+                gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
+            }.rethrowCancellation().getOrElse { failure ->
+                logger.error(failure) { "Failed to list worktrees for $repoRootPath" }
+                if (expansionTracker.complete(normalizedRepoRootPath, request)) {
+                    errorReporter.enqueueActionError(failure.message ?: "Failed to list worktrees")
                 }
+                return@launch
             }
+            if (!expansionTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return@launch
+
+            runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees) }
                 .rethrowCancellation()
                 .onSuccess { worktrees ->
                     expansionTracker.complete(normalizedRepoRootPath, request, worktrees)
                 }
                 .onFailure { failure ->
-                    logger.error(failure) { "Failed to list worktrees for $repoRootPath" }
-                    if (expansionTracker.complete(normalizedRepoRootPath, request)) {
-                        errorReporter.enqueueActionError(failure.message ?: "Failed to list worktrees")
-                    }
+                    logger.error(failure) { "Failed to enrich worktrees for $repoRootPath" }
+                    expansionTracker.complete(normalizedRepoRootPath, request)
                 }
         }
     }
@@ -155,15 +175,22 @@ internal class LocalRepositoryController(
     private fun refreshLocalRepositoryWorktrees(repoRootPath: String) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
         val request = refreshTracker.start(normalizedRepoRootPath) ?: return
-        runCatching {
-            val basicWorktrees = gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
-            if (!refreshTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return
-
-            val enrichedWorktrees = gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees)
-            refreshTracker.complete(normalizedRepoRootPath, request, enrichedWorktrees)
+        val basicWorktrees = runCatching {
+            gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
         }.onFailure {
             refreshTracker.fail(normalizedRepoRootPath, request)
         }.getOrThrow()
+        if (!refreshTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return
+
+        runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees) }
+            .rethrowCancellation()
+            .onSuccess { enrichedWorktrees ->
+                refreshTracker.complete(normalizedRepoRootPath, request, enrichedWorktrees)
+            }
+            .onFailure { failure ->
+                logger.error(failure) { "Failed to enrich worktrees for $repoRootPath" }
+                refreshTracker.complete(normalizedRepoRootPath, request, basicWorktrees)
+            }
     }
 }
 
