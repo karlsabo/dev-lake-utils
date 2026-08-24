@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.enghub.screen
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,14 +16,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -30,20 +37,32 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.component.EngHubAction
 import com.github.karlsabo.devlake.enghub.component.EngHubActionPopup
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
+import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
+import com.github.karlsabo.devlake.enghub.viewmodel.launchAfterSettingsFlush
+import kotlinx.coroutines.Job
 
 @Composable
 fun EngHubScreen(
     viewModel: EngHubViewModel,
     settingsViewModel: EngHubSettingsViewModel,
 ) {
-    var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
+    var selectedPane by remember(settingsViewModel) {
+        mutableStateOf(initialEngHubPane(settingsViewModel.uiState.value))
+    }
+    val coroutineScope = rememberCoroutineScope()
+    var paneNavigationJob by remember(settingsViewModel) { mutableStateOf<Job?>(null) }
     val state = collectEngHubScreenState(viewModel, settingsViewModel, selectedPane)
     val actions = engHubScreenActions(
         viewModel = viewModel,
         settingsViewModel = settingsViewModel,
-        onPaneSelected = { selectedPane = it },
+        onPaneSelected = { pane ->
+            paneNavigationJob?.cancel()
+            paneNavigationJob = coroutineScope.launchAfterSettingsFlush(settingsViewModel) {
+                selectedPane = availablePaneOrSettings(pane, settingsViewModel.uiState.value)
+            }
+        },
     )
 
     state.actionError?.let { error ->
@@ -55,6 +74,19 @@ fun EngHubScreen(
     }
 }
 
+internal fun initialEngHubPane(
+    settings: EngHubSettingsUiState,
+): EngHubPane = availablePaneOrSettings(EngHubPane.PullRequests, settings)
+
+internal fun availablePaneOrSettings(
+    requestedPane: EngHubPane,
+    settings: EngHubSettingsUiState,
+): EngHubPane = if (engHubPaneAvailability(settings).getValue(requestedPane).isEnabled) {
+    requestedPane
+} else {
+    EngHubPane.Settings
+}
+
 @Composable
 private fun EngHubScreenContent(
     state: EngHubScreenState,
@@ -63,6 +95,7 @@ private fun EngHubScreenContent(
     Row(modifier = Modifier.fillMaxSize()) {
         EngHubSidebar(
             selectedPane = state.selectedPane,
+            paneAvailability = state.paneAvailability,
             onPaneSelect = actions.onPaneSelected,
         )
         Box(
@@ -92,9 +125,18 @@ internal fun EngHubScreenHeader(
     onPaneSelect: (EngHubPane) -> Unit,
 ) {
     var actionsExpanded by remember { mutableStateOf(false) }
+    var restoreTriggerFocus by remember { mutableStateOf(false) }
+    val actionTriggerFocusRequester = remember { FocusRequester() }
     val actions = listOf(
         EngHubAction(title = "Settings") { onPaneSelect(EngHubPane.Settings) },
     )
+
+    LaunchedEffect(actionsExpanded, restoreTriggerFocus) {
+        if (!actionsExpanded && restoreTriggerFocus) {
+            actionTriggerFocusRequester.requestFocus()
+            restoreTriggerFocus = false
+        }
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -108,7 +150,9 @@ internal fun EngHubScreenHeader(
         Box {
             IconButton(
                 onClick = { actionsExpanded = true },
-                modifier = Modifier.semantics { contentDescription = "Open actions" },
+                modifier = Modifier
+                    .focusRequester(actionTriggerFocusRequester)
+                    .semantics { contentDescription = "Open actions" },
             ) {
                 Text(text = "⋯", style = MaterialTheme.typography.h5)
             }
@@ -116,6 +160,10 @@ internal fun EngHubScreenHeader(
                 expanded = actionsExpanded,
                 actions = actions,
                 onDismissRequest = { actionsExpanded = false },
+                onDismissByKeyboard = {
+                    restoreTriggerFocus = true
+                    actionsExpanded = false
+                },
             )
         }
     }
@@ -125,6 +173,8 @@ internal fun EngHubScreenHeader(
 internal fun EngHubSidebar(
     selectedPane: EngHubPane,
     onPaneSelect: (EngHubPane) -> Unit,
+    paneAvailability: Map<EngHubPane, EngHubPaneAvailability> =
+        EngHubPane.entries.associateWith { EngHubPaneAvailability(isEnabled = true) },
 ) {
     Column(
         modifier = Modifier.fillMaxHeight().width(56.dp).padding(vertical = 8.dp),
@@ -138,6 +188,7 @@ internal fun EngHubSidebar(
                 EngHubSidebarButton(
                     pane = pane,
                     selected = pane == selectedPane,
+                    availability = paneAvailability.getValue(pane),
                     onClick = { onPaneSelect(pane) },
                 )
             }
@@ -146,15 +197,18 @@ internal fun EngHubSidebar(
         EngHubSidebarButton(
             pane = EngHubPane.Settings,
             selected = selectedPane == EngHubPane.Settings,
+            availability = paneAvailability.getValue(EngHubPane.Settings),
             onClick = { onPaneSelect(EngHubPane.Settings) },
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EngHubSidebarButton(
     pane: EngHubPane,
     selected: Boolean,
+    availability: EngHubPaneAvailability,
     onClick: () -> Unit,
 ) {
     val backgroundColor = if (selected) {
@@ -168,22 +222,37 @@ private fun EngHubSidebarButton(
         MaterialTheme.colors.onSurface
     }
 
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .background(backgroundColor)
-            .semantics { contentDescription = pane.label },
-    ) {
-        IconButton(
-            onClick = onClick,
-            modifier = Modifier.fillMaxSize(),
+    val button: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(backgroundColor),
         ) {
-            Text(
-                text = pane.icon,
-                color = contentColor,
-                style = MaterialTheme.typography.button,
-                textAlign = TextAlign.Center,
-            )
+            IconButton(
+                onClick = onClick,
+                enabled = availability.isEnabled,
+                modifier = Modifier.fillMaxSize().semantics { contentDescription = pane.label },
+            ) {
+                Text(
+                    text = pane.icon,
+                    color = contentColor,
+                    style = MaterialTheme.typography.button,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
+    }
+    val disabledReason = availability.disabledReason
+    if (disabledReason == null) {
+        button()
+    } else {
+        TooltipArea(
+            tooltip = {
+                Surface(elevation = 4.dp) {
+                    Text(disabledReason, modifier = Modifier.padding(8.dp))
+                }
+            },
+            content = button,
+        )
     }
 }

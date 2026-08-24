@@ -24,6 +24,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.stateIn
@@ -35,22 +38,35 @@ internal const val STATE_FLOW_STOP_TIMEOUT_MS = 5_000L
 private const val ZERO_CHECK_RUNS = 0
 
 internal fun ViewModel.pullRequestsStateFlow(
-    searchApi: GitHubPullRequestSearchApi,
-    reviewApi: GitHubPullRequestReviewApi,
-    summaryApi: GitHubPullRequestSummaryApi,
+    gitHubAccess: StateFlow<CommittedGitHubAccess>,
     configs: StateFlow<EngHubConfig>,
-): StateFlow<Result<List<PullRequestUiState>>?> = configDrivenPollingFlow(configs) { config ->
-    pullRequestsForConfig(searchApi, reviewApi, summaryApi, config)
+): StateFlow<Result<List<PullRequestUiState>>?> = combine(configs, gitHubAccess) { config, access ->
+    config to access
+}.flatMapLatest { (config, access) ->
+    if (!access.isReady) {
+        flowOf(null)
+    } else {
+        pullRequestsForConfig(
+            searchApi = access.services.pullRequestSearchApi,
+            reviewApi = access.services.pullRequestReviewApi,
+            summaryApi = access.services.pullRequestSummaryApi,
+            config = config,
+        ).clearBeforeFirstEmission()
+    }
 }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_FLOW_STOP_TIMEOUT_MS), null)
 
-private fun pullRequestsForConfig(
+internal fun pullRequestsForConfig(
     searchApi: GitHubPullRequestSearchApi,
     reviewApi: GitHubPullRequestReviewApi,
     summaryApi: GitHubPullRequestSummaryApi,
     config: EngHubConfig,
-): Flow<Result<List<PullRequestUiState>>> = fixedIntervalPollingFlow(config) {
-    val issues = searchApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
-    Result.success(buildPullRequestUiStates(issues, reviewApi, summaryApi))
+): Flow<Result<List<PullRequestUiState>>> = if (config.organizationIds.isEmpty()) {
+    flowOf(Result.success(emptyList()))
+} else {
+    fixedIntervalPollingFlow(config) {
+        val issues = searchApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
+        Result.success(buildPullRequestUiStates(issues, reviewApi, summaryApi))
+    }
 }
     .flowOn(Dispatchers.IO)
     .retry(POLLING_RETRY_COUNT) { cause ->

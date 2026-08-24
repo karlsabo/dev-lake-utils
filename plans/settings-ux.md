@@ -255,6 +255,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 7. Add an organization ID
 
+**Status:** Done
+
 **Acceptance criteria:** Given organization ID `acme`, when the user adds `widgets`, then the auto-persisted config contains `acme` and `widgets`.
 
 **Expected edits:**
@@ -268,6 +270,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Notes:** At least one organization is not required; an empty list is valid and later yields an explanatory Pull Requests empty state.
 
 ### 8. Remove an organization ID
+
+**Status:** Done
 
 **Acceptance criteria:** Given organization IDs `acme` and `example`, when the user removes `example`, then the auto-persisted config contains only `acme`.
 
@@ -283,6 +287,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 9. Add and position a setup command
 
+**Status:** Done
+
 **Acceptance criteria:** Given `/workspace/api` has `direnv allow`, when the user adds `cp .env.example .env` before it, then the auto-persisted repository config contains both commands in that order.
 
 **Expected edits:**
@@ -296,6 +302,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Notes:** Preserve command strings exactly; they may contain shell quoting and Eng Hub placeholders.
 
 ### 10. Add a configured local repository
+
+**Status:** Done
 
 **Acceptance criteria:** Given Settings does not contain `/workspace/web`, when the user adds it, then the auto-persisted config includes `/workspace/web`.
 
@@ -311,6 +319,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 11. Remove a configured local repository
 
+**Status:** Done
+
 **Acceptance criteria:** Given Settings contains `/workspace/old`, when the user removes it, then the auto-persisted config no longer includes `/workspace/old`.
 
 **Expected edits:**
@@ -324,6 +334,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Notes:** A finite worktree/setup action already running for the removed repository may finish in its long-lived action scope; its result no longer appears in current UI state.
 
 ### 12. Choose a repositories base directory
+
+**Status:** Done
 
 **Acceptance criteria:** Given the repositories base directory control is empty, when the user chooses `/workspace` through Browse, then the field and auto-persisted config contain `/workspace`.
 
@@ -340,6 +352,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 13. Replace the GitHub token
 
+**Status:** Done
+
 **Acceptance criteria:** Given Settings loaded an existing masked token, when the user replaces it with `github_pat_new` and the debounce elapses, then the referenced secret JSON contains `github_pat_new` while both non-secret config files contain no token.
 
 **Expected edits:**
@@ -354,6 +368,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 14. Protect a newly created GitHub secret
 
+**Status:** Done
+
 **Acceptance criteria:** Given Eng Hub is running on POSIX and the selected secret does not exist, when the token is committed, then the created secret file has mode `0600`.
 
 **Expected edits:**
@@ -367,6 +383,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Notes:** Apply permission checks before treating the secret write as committed or updating `github-config.json`.
 
 ### 15. Create GitHub access files from Settings
+
+**Status:** Done
 
 **Acceptance criteria:** Given `github-config.json` and the selected secret path do not exist, when the user enters the secret path and a token, then Eng Hub creates valid `GitHubConfig` and `GitHubSecret` files and enables panes whose readiness requirements are met.
 
@@ -383,6 +401,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 16. Open Settings when Eng Hub config is missing
 
+**Status:** Done
+
 **Acceptance criteria:** Given `eng-hub-config.json` does not exist, when Eng Hub launches, then it opens the Settings pane with default draft values and does not show the terminal bootstrap error.
 
 **Expected edits:**
@@ -396,6 +416,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Notes:** Reuse the normal Settings pane; do not build a separate onboarding form or add cancel/save buttons.
 
 ### 17. Recover Eng Hub config from its backup
+
+**Status:** Done
 
 **Acceptance criteria:** Given `eng-hub-config.json` is invalid and `eng-hub-config.json.bak` is valid, when Eng Hub launches, then it loads the backup values and exposes them in Settings.
 
@@ -412,6 +434,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 18. Report an auto-save failure
 
+**Status:** Done
+
 **Acceptance criteria:** Given a valid persisted value and a storage failure, when the user commits a replacement value, then Settings shows an actionable persistence error and runtime behavior continues using the previously persisted value.
 
 **Expected edits:**
@@ -427,6 +451,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 19. Flush a pending edit during navigation
 
+**Status:** Done
+
 **Acceptance criteria:** Given `gitHubAuthor` has a pending valid edit to `hubot`, when the user changes panes before the 750 ms debounce elapses, then `hubot` is persisted before navigation completes.
 
 **Expected edits:**
@@ -440,6 +466,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Notes:** Ensure debounce cancellation cannot issue a second stale write after the flush.
 
 ### 20. Undo local repository removal
+
+**Status:** Done
 
 **Acceptance criteria:** Given `/workspace/api` has two ordered setup commands, when the user removes it and selects Undo, then the auto-persisted config again contains `/workspace/api` with both commands in their original order and no repository files were deleted.
 
@@ -455,6 +483,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 21. Invoke a filtered action by keyboard
 
+**Status:** Done
+
 **Acceptance criteria:** Given the action popup is open, when the user types `setings`, presses Down to highlight `Settings`, and presses Enter, then Settings opens.
 
 **Expected edits:**
@@ -466,6 +496,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Notes:** Keep keyboard selection valid as filtering changes the result list.
 
 ### 22. Dismiss the action popup by keyboard
+
+**Status:** Done
 
 **Acceptance criteria:** Given the action popup is open from the three-dots trigger, when the user presses Escape, then the popup closes and focus returns to the trigger.
 
@@ -479,6 +511,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Notes:** Dismissal must not navigate or invoke the highlighted action.
 
 ### 23. Persist the worktree polling interval
+
+**Status:** Done
 
 **Acceptance criteria:** Given the worktree polling interval is 120 seconds, when the user changes it to 60 and leaves it idle for 750 ms, then `worktreePollIntervalMs` is persisted as `60000`.
 
@@ -495,6 +529,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 24. Persist the setup shell
 
+**Status:** Done
+
 **Acceptance criteria:** Given the setup shell is `/bin/zsh`, when the user changes it to `/bin/bash` and leaves it idle for 750 ms, then the config contains `/bin/bash` for subsequent setup commands.
 
 **Expected edits:**
@@ -510,6 +546,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 25. Edit a configured repository path
 
+**Status:** Done
+
 **Acceptance criteria:** Given Settings contains repository `/workspace/old`, when the user changes its path to `/workspace/new` through Browse, then the auto-persisted repository entry uses `/workspace/new` and retains its setup commands.
 
 **Expected edits:**
@@ -523,6 +561,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 
 ### 26. Edit a setup command
 
+**Status:** Done
+
 **Acceptance criteria:** Given `/workspace/api` has setup command `direnv allow`, when the user changes it to `direnv allow .` and leaves it idle for 750 ms, then the auto-persisted command is `direnv allow .`.
 
 **Expected edits:**
@@ -534,6 +574,8 @@ Implement these in order. Each story is one ticket, one acceptance test, and one
 **Scope:** Debounced text editing of one command while preserving its position. Reject blank command rows and preserve shell text exactly.
 
 ### 27. Remove a setup command
+
+**Status:** Done
 
 **Acceptance criteria:** Given `/workspace/api` has setup commands `cp .env.example .env` and `direnv allow`, when the user removes `cp .env.example .env`, then the auto-persisted repository retains only `direnv allow`.
 

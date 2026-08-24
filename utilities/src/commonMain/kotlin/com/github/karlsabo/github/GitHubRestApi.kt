@@ -8,6 +8,7 @@ class GitHubRestApi private constructor(
     notificationApi: GitHubNotificationApi,
     pullRequestReviewApi: GitHubPullRequestReviewApi,
     pullRequestSummaryApi: GitHubPullRequestSummaryApi,
+    private val closeClient: () -> Unit,
 ) : GitHubApi,
     GitHubPullRequestSearchApi by pullRequestSearchApi,
     GitHubNotificationApi by notificationApi,
@@ -22,5 +23,8 @@ class GitHubRestApi private constructor(
         notificationApi = GitHubNotificationRestApi(restClient),
         pullRequestReviewApi = GitHubPullRequestReviewRestApi(restClient),
         pullRequestSummaryApi = GitHubPullRequestSummaryRestApi(restClient),
+        closeClient = restClient::close,
     )
+
+    fun close() = closeClient()
 }

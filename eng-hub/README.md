@@ -4,10 +4,12 @@ Desktop Compose app for watching GitHub pull requests and notifications, then ta
 
 ## What It Currently Does
 
-The app has two panes:
+The app has four panes:
 
 - `Pull Requests`
 - `Notifications`
+- `Worktrees`
+- `Settings`
 
 ### Pull Requests pane
 
@@ -63,7 +65,7 @@ This is important because the app is already opinionated, not just a passive das
 
 ## Local Setup
 
-The app expects two config files under the shared `DevLakeUtils` application directory.
+The app stores two config files under the shared `DevLakeUtils` application directory. On first launch, Settings opens with defaults so these files can be created through the application.
 
 Config directory by OS:
 
@@ -71,7 +73,7 @@ Config directory by OS:
 - Linux: `~/.local/share/DevLakeUtils`
 - Windows: `%APPDATA%/DevLakeUtils`
 
-Required files:
+Configuration files:
 
 - `github-config.json`
 - `eng-hub-config.json`
@@ -131,7 +133,7 @@ Field meanings:
 - `repositoriesBaseDir`: where repos are cloned if missing
 - `gitHubAuthor`: GitHub login used for the pull request query
 - `planningMarkdownDir`: absolute directory used when syncing LLM markdown templates that contain `${PLANNING_MARKDOWN_DIR}`
-- `localRepositories`: local repository roots managed by Eng Hub; each entry has an absolute `path` and optional `setupCommands`
+- `localRepositories`: local repository roots managed by Eng Hub; each entry has an absolute `path` and optional `setupCommands`. Duplicate checks resolve separators plus lexical `.` and `..` segments without accessing the filesystem, while the configured spelling is preserved. Path identity is case-insensitive on Windows and macOS and case-sensitive on Linux. macOS uses the conservative case-insensitive identity because detecting a case-sensitive volume would require filesystem access that Settings intentionally avoids.
 - `setupShell`: login shell used to run setup commands
 
 Setup commands run from the created worktree directory. Before the shell runs, Eng Hub expands these literal placeholders:
@@ -207,7 +209,9 @@ that worktree; the helper will not reseed shelves because they are never copied.
 
 ### First run behavior
 
-If `eng-hub-config.json` is missing or invalid, the app creates a default config file and shows an error dialog telling you to update it. The app does not continue into the main UI until configuration loads successfully.
+If `eng-hub-config.json` is missing, the app opens Settings with default draft values. Launching alone does not create the file; valid edits are auto-persisted without a save action. Other panes remain visible and unavailable panes explain which settings they require.
+
+If `eng-hub-config.json` is malformed, Eng Hub tries `eng-hub-config.json.bak`. A valid backup opens in the normal Settings pane; if neither file is valid, the app opens Settings with default drafts rather than attempting field-level recovery.
 
 ## Launching
 

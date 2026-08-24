@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.git.GitRebaseConflictException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,72 +23,68 @@ internal class LocalWorktreeRebaseController(
         worktreePath: String,
         parentBranch: String,
     ) {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
-        val normalizedWorktreePath = worktreePath.normalizedRepoPath()
-        if (normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty()) return
-        if (!state.rebasingLocalWorktreePaths.addPathIfAbsent(normalizedWorktreePath)) return
+        val worktreeIdentity = worktreePath.normalizedRepositoryPath()
+        if (repoRootPath.isBlank() || worktreeIdentity.isEmpty()) return
+        if (!state.rebasingLocalWorktreePaths.addPathIfAbsent(worktreeIdentity)) return
 
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             try {
                 runCatching {
                     require(parentBranch.isNotBlank()) { "Parent branch is required" }
-                    logger.info {
-                        "Rebasing worktree $normalizedWorktreePath for $normalizedRepoRootPath onto $parentBranch"
-                    }
-                    worktreeServices.gitWorktreeApi.rebaseWorktreeOntoParent(normalizedWorktreePath, parentBranch)
+                    logger.info { "Rebasing worktree $worktreePath for $repoRootPath onto $parentBranch" }
+                    worktreeServices.gitWorktreeApi.rebaseWorktreeOntoParent(worktreePath, parentBranch)
                 }
                     .rethrowCancellation()
                     .onSuccess {
                         localRepositories.refreshLocalRepositoryWorktreesBestEffort(
-                            repoRootPath = normalizedRepoRootPath,
+                            repoRootPath = repoRootPath,
                             logContext = "after rebase",
                         )
                     }
                     .onFailure { failure ->
                         handleRebaseFailure(
                             failure = failure,
-                            repoRootPath = normalizedRepoRootPath,
-                            worktreePath = normalizedWorktreePath,
+                            repoRootPath = repoRootPath,
+                            worktreePath = worktreePath,
                             parentBranch = parentBranch,
                         )
                     }
             } finally {
-                state.rebasingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
+                state.rebasingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
             }
         }
     }
 
     fun abortRebaseAfterConflict(request: RebaseConflictResolutionRequest) {
-        val normalizedRepoRootPath = request.repoRootPath.normalizedRepoPath()
-        val normalizedWorktreePath = request.worktreePath.normalizedRepoPath()
-        if (!canAbortRebaseAfterConflict(request, normalizedRepoRootPath, normalizedWorktreePath)) return
+        val worktreeIdentity = request.worktreePath.normalizedRepositoryPath()
+        if (!canAbortRebaseAfterConflict(request, request.repoRootPath, worktreeIdentity)) return
 
         viewModel.viewModelScope.launch(Dispatchers.IO) {
-            state.rebasingLocalWorktreePaths.update { paths -> paths + normalizedWorktreePath }
+            state.rebasingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
             try {
                 runCatching {
-                    logger.info { "Aborting conflicted rebase in worktree $normalizedWorktreePath" }
-                    worktreeServices.gitWorktreeApi.abortRebase(normalizedWorktreePath)
+                    logger.info { "Aborting conflicted rebase in worktree ${request.worktreePath}" }
+                    worktreeServices.gitWorktreeApi.abortRebase(request.worktreePath)
                 }
                     .rethrowCancellation()
                     .onSuccess {
                         clearMatchingConflictRequest(request)
                         localRepositories.refreshLocalRepositoryWorktreesBestEffort(
-                            repoRootPath = normalizedRepoRootPath,
+                            repoRootPath = request.repoRootPath,
                             logContext = "after aborting rebase",
                         )
                     }
                     .onFailure { failure ->
-                        logger.error(failure) { "Failed to abort rebase in worktree $normalizedWorktreePath" }
+                        logger.error(failure) { "Failed to abort rebase in worktree ${request.worktreePath}" }
                         errorReporter.enqueueActionError(failure.message ?: "Failed to abort rebase")
                         localRepositories.refreshLocalRepositoryWorktreesBestEffort(
-                            repoRootPath = normalizedRepoRootPath,
+                            repoRootPath = request.repoRootPath,
                             logContext = "after abort rebase failure",
                         )
                     }
             } finally {
-                state.rebasingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
-                abortingRebaseWorktreePaths.update { paths -> paths - normalizedWorktreePath }
+                state.rebasingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
+                abortingRebaseWorktreePaths.update { paths -> paths - worktreeIdentity }
             }
         }
     }

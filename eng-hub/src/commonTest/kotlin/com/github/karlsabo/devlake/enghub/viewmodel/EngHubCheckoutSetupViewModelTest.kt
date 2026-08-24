@@ -14,6 +14,8 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class EngHubCheckoutSetupViewModelTest {
@@ -66,6 +68,88 @@ class EngHubCheckoutSetupViewModelTest {
             api.ensureRepositoryCalls,
         )
         assertEquals(listOf(repoPath to branch), api.ensureWorktreeCalls)
+    }
+
+    @Test
+    fun checkoutSetupAfterConfigUpdateUsesTheCommittedSetupShell() = runBlocking {
+        val repositoriesBaseDir = Path("virtual", "repositories").toString()
+        val repoPath = Path(repositoriesBaseDir, "example-service").toString()
+        val setupRequests = mutableListOf<WorktreeSetupRequest>()
+        val setupRunner = WorktreeSetupCommandRunner { request ->
+            setupRequests += request
+            WorktreeSetupCommandResult(exitCode = 0, stdout = "", stderr = "")
+        }
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(worktreesByRepoPath = emptyMap()),
+        )
+        val viewModel = createCheckoutSetupViewModel(
+            api = api,
+            setupRunner = setupRunner,
+            repositoriesBaseDir = repositoriesBaseDir,
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(path = repoPath, setupCommands = listOf("prepare checkout")),
+            ),
+        )
+
+        viewModel.updateConfig { config -> config.copy(setupShell = "/bin/bash") }
+        viewModel.requestCheckoutSetup("example-org/example-service", "feature/new-shell").await()
+
+        assertEquals("/bin/bash", setupRequests.single().setupShell)
+    }
+
+    @Test
+    fun blankRepositoriesBaseDirectoryRejectsCheckoutBeforeSetupStarts() {
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(worktreesByRepoPath = emptyMap()),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            viewModel.requestCheckoutSetup("example-org/example-service", "feature/missing-base-dir")
+        }
+
+        assertTrue(error.message.orEmpty().contains("repositories base directory"))
+        assertTrue(api.ensureRepositoryCalls.isEmpty())
+        assertTrue(api.ensureWorktreeCalls.isEmpty())
+    }
+
+    @Test
+    fun blankSetupShellRejectsConfiguredCommandsBeforeSetupStarts() = runBlocking {
+        val repositoriesBaseDir = Path("virtual", "repositories").toString()
+        val repoPath = Path(repositoriesBaseDir, "example-service").toString()
+        val setupRequests = mutableListOf<WorktreeSetupRequest>()
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(worktreesByRepoPath = emptyMap()),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(LocalRepositoryConfig(repoPath, listOf("prepare"))),
+            testConfig = LocalRepositoryViewModelTestConfig(
+                repositoriesBaseDir = repositoriesBaseDir,
+                setupShell = "",
+            ),
+            services = LocalRepositoryViewModelServices(
+                worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                    gitWorktreeApi = api,
+                    setupCommandRunner = WorktreeSetupCommandRunner { request ->
+                        setupRequests += request
+                        WorktreeSetupCommandResult(0, "", "")
+                    },
+                ),
+            ),
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            viewModel.requestCheckoutSetup("example-org/example-service", "feature/blank-shell")
+        }
+
+        assertTrue(error.message.orEmpty().contains("setup shell"))
+        assertTrue(setupRequests.isEmpty())
+        assertTrue(api.ensureRepositoryCalls.isEmpty())
     }
 
     @Test

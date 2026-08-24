@@ -27,6 +27,7 @@ private typealias CheckoutAndOpen = (repoFullName: String, branch: String) -> Un
 
 internal data class EngHubScreenState(
     val selectedPane: EngHubPane,
+    val paneAvailability: Map<EngHubPane, EngHubPaneAvailability>,
     val actionError: ActionErrorUiState?,
     val pullRequests: PullRequestsPaneState,
     val notifications: NotificationsPaneState,
@@ -36,6 +37,7 @@ internal data class EngHubScreenState(
 
 internal data class PullRequestsPaneState(
     val result: Result<List<PullRequestUiState>>?,
+    val organizationIdsEmpty: Boolean,
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
 )
 
@@ -56,8 +58,30 @@ internal data class EngHubScreenActions(
 )
 
 internal data class EngHubSettingsActions(
-    val onGitHubAuthorChange: (String) -> Unit,
-    val onPollIntervalChange: (String) -> Unit,
+    val onGitHubTokenPathChange: (String) -> Unit = {},
+    val onChooseGitHubTokenPath: () -> Unit = {},
+    val onGitHubTokenChange: (String) -> Unit = {},
+    val onOrganizationIdDraftChange: (String) -> Unit = {},
+    val onAddOrganizationId: () -> Unit = {},
+    val onRemoveOrganizationId: (Int) -> Unit = {},
+    val onLocalRepositoryDraftChange: (String) -> Unit = {},
+    val onAddLocalRepository: () -> Unit = {},
+    val onLocalRepositoryPathChange: (repositoryIndex: Int, path: String) -> Unit = { _, _ -> },
+    val onChooseLocalRepositoryPath: (Int) -> Unit = {},
+    val onRemoveLocalRepository: (Int) -> Unit = {},
+    val onUndoLocalRepositoryRemoval: () -> Unit = {},
+    val onSetupCommandDraftChange: (repositoryIndex: Int, command: String) -> Unit = { _, _ -> },
+    val onAddSetupCommand: (repositoryIndex: Int, insertionIndex: Int) -> Unit = { _, _ -> },
+    val onSetupCommandChange: (repositoryIndex: Int, commandIndex: Int, command: String) -> Unit = { _, _, _ -> },
+    val onRemoveSetupCommand: (repositoryIndex: Int, commandIndex: Int) -> Unit = { _, _ -> },
+    val onRepositoriesBaseDirChange: (String) -> Unit = {},
+    val onChooseRepositoriesBaseDir: () -> Unit = {},
+    val onPlanningMarkdownDirChange: (String) -> Unit = {},
+    val onChoosePlanningMarkdownDir: () -> Unit = {},
+    val onGitHubAuthorChange: (String) -> Unit = {},
+    val onPollIntervalChange: (String) -> Unit = {},
+    val onWorktreePollIntervalChange: (String) -> Unit = {},
+    val onSetupShellChange: (String) -> Unit = {},
 )
 
 internal data class PullRequestPaneActions(
@@ -71,8 +95,9 @@ internal fun collectEngHubScreenState(
     settingsViewModel: EngHubSettingsViewModel,
     selectedPane: EngHubPane,
 ): EngHubScreenState {
-    val pullRequestsResult by viewModel.pullRequests.collectAsState()
-    val notificationsResult by viewModel.notifications.collectAsState()
+    val settings by settingsViewModel.uiState.collectAsState()
+    val paneAvailability = engHubPaneAvailability(settings)
+    val activityResults = collectActivityPaneResults(viewModel, paneAvailability)
     val actionError by viewModel.actionErrorStateFlow.collectAsState()
     val setupStatuses by viewModel.setupStatusesStateFlow.collectAsState()
     val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
@@ -85,17 +110,18 @@ internal fun collectEngHubScreenState(
     val useUnrelatedExistingBranchRequest by
         viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.collectAsState()
     val rebaseConflictResolutionRequest by viewModel.rebaseConflictResolutionRequestStateFlow.collectAsState()
-    val settings by settingsViewModel.uiState.collectAsState()
 
     return EngHubScreenState(
         selectedPane = selectedPane,
+        paneAvailability = paneAvailability,
         actionError = actionError,
         pullRequests = PullRequestsPaneState(
-            result = pullRequestsResult,
+            result = activityResults.pullRequests,
+            organizationIdsEmpty = settings.committedConfig.organizationIds.isEmpty(),
             setupStatuses = setupStatuses,
         ),
         notifications = NotificationsPaneState(
-            result = notificationsResult,
+            result = activityResults.notifications,
             actingOnThreadIds = actingOnThreadIds,
             setupStatuses = setupStatuses,
         ),
@@ -117,6 +143,31 @@ internal fun collectEngHubScreenState(
         ),
         settings = settings,
     )
+}
+
+private data class ActivityPaneResults(
+    val pullRequests: Result<List<PullRequestUiState>>?,
+    val notifications: Result<List<NotificationUiState>>?,
+)
+
+@Composable
+private fun collectActivityPaneResults(
+    viewModel: EngHubViewModel,
+    availability: Map<EngHubPane, EngHubPaneAvailability>,
+): ActivityPaneResults {
+    val pullRequests = if (availability.getValue(EngHubPane.PullRequests).isEnabled) {
+        val result by viewModel.pullRequests.collectAsState()
+        result
+    } else {
+        null
+    }
+    val notifications = if (availability.getValue(EngHubPane.Notifications).isEnabled) {
+        val result by viewModel.notifications.collectAsState()
+        result
+    } else {
+        null
+    }
+    return ActivityPaneResults(pullRequests, notifications)
 }
 
 internal fun engHubScreenActions(
@@ -176,10 +227,34 @@ internal fun engHubScreenActions(
             onDismiss = viewModel.dismissForceArchiveWorktreeRequest,
         ),
     ),
-    settings = EngHubSettingsActions(
-        onGitHubAuthorChange = settingsViewModel::updateGitHubAuthor,
-        onPollIntervalChange = settingsViewModel::updatePollIntervalSeconds,
-    ),
+    settings = engHubSettingsActions(settingsViewModel),
+)
+
+private fun engHubSettingsActions(viewModel: EngHubSettingsViewModel) = EngHubSettingsActions(
+    onGitHubTokenPathChange = viewModel.gitHubTokenSettings::updateSecretPath,
+    onChooseGitHubTokenPath = viewModel.gitHubTokenSettings::chooseSecretPath,
+    onGitHubTokenChange = viewModel.gitHubTokenSettings::updateToken,
+    onOrganizationIdDraftChange = viewModel::updateOrganizationIdDraft,
+    onAddOrganizationId = viewModel::addOrganizationId,
+    onRemoveOrganizationId = viewModel::removeOrganizationId,
+    onLocalRepositoryDraftChange = viewModel.localRepositorySettings::updateDraft,
+    onAddLocalRepository = viewModel.localRepositorySettings::add,
+    onLocalRepositoryPathChange = viewModel.localRepositorySettings::updatePath,
+    onChooseLocalRepositoryPath = viewModel.localRepositorySettings::choosePath,
+    onRemoveLocalRepository = viewModel.localRepositorySettings::remove,
+    onUndoLocalRepositoryRemoval = viewModel.localRepositorySettings::undoRemoval,
+    onSetupCommandDraftChange = viewModel.setupCommandSettings::updateDraft,
+    onAddSetupCommand = viewModel.setupCommandSettings::add,
+    onSetupCommandChange = viewModel.setupCommandSettings::update,
+    onRemoveSetupCommand = viewModel.setupCommandSettings::remove,
+    onRepositoriesBaseDirChange = viewModel.directorySettings::updateRepositoriesBaseDir,
+    onChooseRepositoriesBaseDir = viewModel.directorySettings::chooseRepositoriesBaseDir,
+    onPlanningMarkdownDirChange = viewModel.directorySettings::updatePlanningMarkdownDir,
+    onChoosePlanningMarkdownDir = viewModel.directorySettings::choosePlanningMarkdownDir,
+    onGitHubAuthorChange = viewModel.generalTextSettings::updateGitHubAuthor,
+    onPollIntervalChange = viewModel.generalTextSettings::updatePollIntervalSeconds,
+    onWorktreePollIntervalChange = viewModel.generalTextSettings::updateWorktreePollIntervalSeconds,
+    onSetupShellChange = viewModel.generalTextSettings::updateSetupShell,
 )
 
 private fun UseUnrelatedExistingBranchConfirmationRequest.toPendingConfirmation(): PendingUseUnrelatedExistingBranch {

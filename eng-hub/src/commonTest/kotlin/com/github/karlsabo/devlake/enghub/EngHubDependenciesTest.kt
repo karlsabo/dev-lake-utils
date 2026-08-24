@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.enghub
 
+import com.github.karlsabo.devlake.enghub.screen.EngHubPane
+import com.github.karlsabo.devlake.enghub.screen.initialEngHubPane
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubDesktopServices
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubGitHubServices
@@ -18,23 +20,138 @@ import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.github.config.GitHubConfig
+import com.github.karlsabo.github.config.GitHubConfigStore
 import com.github.karlsabo.github.config.GitHubSecret
+import com.github.karlsabo.github.config.GitHubSecretFileWriter
 import com.github.karlsabo.github.config.LoadedGitHubConfig
 import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
 import com.github.karlsabo.system.DesktopLauncher
+import com.github.karlsabo.tools.lenientJson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.SystemTemporaryDirectory
+import kotlinx.io.readString
+import kotlinx.io.writeString
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 class EngHubDependenciesTest {
+
+    @Test
+    fun malformedGitHubConfigurationRecoversAsFreshSettings() {
+        val directory = temporaryGitHubDirectory()
+        val configPath = Path(directory, "github-config.json")
+        writeGitHubTestFile(configPath, "invalid")
+        try {
+            val loaded = loadGitHubSettingsForEngHub(configPath)
+
+            assertEquals(GitHubConfig(""), loaded.config)
+            assertEquals(GitHubSecret(""), loaded.secret)
+        } finally {
+            deleteGitHubTestDirectory(directory)
+        }
+    }
+
+    @Test
+    fun malformedGitHubPrimaryRecoversTheValidBackupForSettings() {
+        val directory = temporaryGitHubDirectory()
+        val configPath = Path(directory, "github-config.json")
+        val secretPath = Path(directory, "github-secret.json")
+        val backupConfig = GitHubConfig(secretPath.toString())
+        writeGitHubTestFile(configPath, "invalid")
+        writeGitHubTestFile(Path("$configPath.bak"), lenientJson.encodeToString(backupConfig))
+        writeGitHubTestFile(secretPath, lenientJson.encodeToString(GitHubSecret("backup-token")))
+        try {
+            val loaded = loadGitHubSettingsForEngHub(configPath)
+
+            assertEquals(backupConfig, loaded.config)
+            assertEquals(GitHubSecret("backup-token"), loaded.secret)
+        } finally {
+            deleteGitHubTestDirectory(directory)
+        }
+    }
+
+    @Test
+    fun unreadableGitHubSecretKeepsItsPathButNeverLoadsTheSecretBackup() {
+        val directory = temporaryGitHubDirectory()
+        val configPath = Path(directory, "github-config.json")
+        val secretPath = Path(directory, "github-secret.json")
+        val config = GitHubConfig(secretPath.toString())
+        writeGitHubTestFile(configPath, lenientJson.encodeToString(config))
+        writeGitHubTestFile(secretPath, "invalid")
+        writeGitHubTestFile(Path("$secretPath.bak"), lenientJson.encodeToString(GitHubSecret("backup-token")))
+        try {
+            val loaded = loadGitHubSettingsForEngHub(configPath)
+
+            assertEquals(config, loaded.config)
+            assertEquals(GitHubSecret(""), loaded.secret)
+        } finally {
+            deleteGitHubTestDirectory(directory)
+        }
+    }
+
+    @Test
+    fun rejectsEveryEngHubTransactionPathAsTheGitHubSecretBeforeMutation() = runBlocking {
+        val directory = temporaryGitHubDirectory()
+        val engHubPath = Path(directory, "eng-hub-config.json")
+        val gitHubPath = Path(directory, "github-config.json")
+        val originalConfig = EngHubConfig(gitHubAuthor = "octocat")
+        val originalGitHubConfig = GitHubConfig(Path(directory, "original-secret.json").toString())
+        val protectedContents = mapOf(
+            engHubPath to lenientJson.encodeToString(originalConfig),
+            Path("$engHubPath.new") to "pending contents",
+            Path("$engHubPath.bak") to "backup contents",
+        )
+        protectedContents.forEach(::writeGitHubTestFile)
+        writeGitHubTestFile(gitHubPath, lenientJson.encodeToString(originalGitHubConfig))
+        var secretWrites = 0
+        val configStore = GitHubConfigStore(
+            secretFileWriter = GitHubSecretFileWriter { _, _ -> secretWrites++ },
+        )
+        val loadedGitHubConfig = LoadedGitHubConfig(originalGitHubConfig, GitHubSecret("existing-token"))
+
+        try {
+            val dependencies = loadEngHubDependencies(
+                loadConfig = { originalConfig },
+                gitHubConfigFilePath = gitHubPath,
+                loadGitHubSettingsConfig = { loadedGitHubConfig },
+                componentFactory = ::testEngHubComponent,
+                gitHubSettingsInfrastructure = GitHubSettingsInfrastructure(
+                    filePicker = RecordingFilePicker(),
+                    configStore = configStore,
+                    protectedPaths = protectedContents.keys.toList(),
+                ),
+            )
+
+            protectedContents.keys.forEach { alias ->
+                dependencies.settingsViewModel.gitHubTokenSettings.updateSecretPath(alias.toString())
+                dependencies.settingsViewModel.flushPendingEdits()
+
+                assertTrue(dependencies.settingsViewModel.uiState.value.gitHubAccessReady)
+                protectedContents.forEach { (path, contents) -> assertEquals(contents, readGitHubTestFile(path)) }
+                assertEquals(originalGitHubConfig, lenientJson.decodeFromString(readGitHubTestFile(gitHubPath)))
+            }
+
+            assertEquals(0, secretWrites)
+            assertFalse(SystemFileSystem.exists(Path("$gitHubPath.new")))
+            assertFalse(SystemFileSystem.exists(Path("$gitHubPath.bak")))
+        } finally {
+            deleteGitHubTestDirectory(directory)
+        }
+    }
 
     @Test
     fun loadEngHubViewModelUsesProvidedDependencies() = runBlocking {
@@ -73,6 +190,7 @@ class EngHubDependenciesTest {
                 assertEquals(gitHubApiConfig, providedGitHubApiConfig)
                 object : EngHubComponent(providedConfig, providedGitHubApiConfig) {
                     override val viewModel = providedViewModel
+                    override val directoryPicker = RecordingDirectoryPicker()
                 }
             },
         ).viewModel
@@ -98,22 +216,9 @@ class EngHubDependenciesTest {
     }
 
     @Test
-    fun loadEngHubDependenciesReturnsConfigAndViewModel() {
-        val config = EngHubConfig(
-            organizationIds = listOf("test-org"),
-            repositoriesBaseDir = "/tmp/repos",
-            gitHubAuthor = "test-user",
-            localRepositories = listOf(
-                LocalRepositoryConfig(
-                    path = "/workspace/example-service",
-                    setupCommands = listOf(
-                        "direnv allow",
-                        "direnv exec . idea ./",
-                    ),
-                ),
-            ),
-        )
-        val gitHubApiConfig = GitHubApiRestConfig(token = "test-token")
+    fun missingEngHubConfigLoadsDefaultSettingsDraft() {
+        val config = EngHubConfig()
+        val gitHubApiConfig = GitHubApiRestConfig(token = "")
         val fakeGitHubApi = RecordingGitHubApi()
         val fakeNotificationIgnoreStore = RecordingNotificationIgnoreStore()
         val fakeGitWorktreeApi = RecordingGitWorktreeApi()
@@ -134,22 +239,50 @@ class EngHubDependenciesTest {
         )
 
         val loadedDependencies = loadEngHubDependencies(
-            loadConfig = { config },
-            loadGitHubSettingsConfig = { loadedGitHubConfig(gitHubApiConfig.token) },
+            loadConfig = { null },
+            loadGitHubSettingsConfig = { null },
             componentFactory = { providedConfig, providedGitHubApiConfig ->
-                assertSame(config, providedConfig)
+                assertEquals(config, providedConfig)
                 assertEquals(gitHubApiConfig, providedGitHubApiConfig)
                 object : EngHubComponent(providedConfig, providedGitHubApiConfig) {
                     override val viewModel = providedViewModel
+                    override val directoryPicker = RecordingDirectoryPicker()
                 }
             },
         )
 
-        assertSame(config, loadedDependencies.config)
+        val settings = loadedDependencies.settingsViewModel.uiState.value
+        assertEquals(config, loadedDependencies.config)
         assertSame(providedViewModel, loadedDependencies.viewModel)
-        assertEquals("/tmp/github-secret.json", loadedDependencies.settingsViewModel.uiState.value.gitHubTokenPath)
-        assertEquals("••••••••", loadedDependencies.settingsViewModel.uiState.value.gitHubToken.maskedValue)
+        assertEquals(emptyList(), settings.organizationIds)
+        assertEquals("600", settings.pollIntervalSeconds)
+        assertEquals("120", settings.worktreePollIntervalSeconds)
+        assertEquals("", settings.repositoriesBaseDir)
+        assertEquals("", settings.gitHubAuthor)
+        assertEquals("", settings.gitHubTokenPath)
+        assertEquals("", settings.gitHubToken.maskedValue)
+        assertEquals(EngHubPane.Settings, initialEngHubPane(settings))
     }
+}
+
+private fun temporaryGitHubDirectory(): Path {
+    val directory = Path(SystemTemporaryDirectory, "eng-hub-github-${Random.nextLong()}")
+    SystemFileSystem.createDirectories(directory)
+    return directory
+}
+
+private fun writeGitHubTestFile(path: Path, text: String) {
+    SystemFileSystem.sink(path, false).buffered().use { sink -> sink.writeString(text) }
+}
+
+private fun readGitHubTestFile(path: Path): String = SystemFileSystem
+    .source(path)
+    .buffered()
+    .use { source -> source.readString() }
+
+private fun deleteGitHubTestDirectory(directory: Path) {
+    SystemFileSystem.list(directory).forEach { path -> SystemFileSystem.delete(path, mustExist = false) }
+    SystemFileSystem.delete(directory, mustExist = false)
 }
 
 private fun loadedGitHubConfig(token: String) = LoadedGitHubConfig(
@@ -238,8 +371,36 @@ private class RecordingGitWorktreeApi : GitWorktreeApi {
     ) = Unit
 }
 
+private fun testEngHubComponent(config: EngHubConfig, gitHubApiConfig: GitHubApiRestConfig): EngHubComponent {
+    val gitHubApi = RecordingGitHubApi()
+    val gitWorktreeApi = RecordingGitWorktreeApi()
+    val viewModel = com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel(
+        gitHubServices = EngHubGitHubServices(
+            api = gitHubApi,
+            notificationService = GitHubNotificationService(gitHubApi),
+        ),
+        worktreeServices = EngHubWorktreeServices(
+            gitWorktreeApi = gitWorktreeApi,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = gitWorktreeApi),
+            directoryPicker = RecordingDirectoryPicker(),
+            configWriter = RecordingEngHubConfigWriter(),
+        ),
+        desktopServices = EngHubDesktopServices(RecordingDesktopLauncher()),
+        config = config,
+        notificationIgnoreStore = RecordingNotificationIgnoreStore(),
+    )
+    return object : EngHubComponent(config, gitHubApiConfig) {
+        override val viewModel = viewModel
+        override val directoryPicker = RecordingDirectoryPicker()
+    }
+}
+
 private class RecordingDirectoryPicker : DirectoryPicker {
     override suspend fun pickDirectory(title: String): String? = null
+}
+
+private class RecordingFilePicker : FilePicker {
+    override suspend fun pickFilePath(title: String): String? = null
 }
 
 private class RecordingEngHubConfigWriter : EngHubConfigWriter {

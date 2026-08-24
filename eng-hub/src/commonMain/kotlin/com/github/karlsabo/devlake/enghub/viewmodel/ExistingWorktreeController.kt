@@ -16,18 +16,16 @@ internal class ExistingWorktreeController(
     private val errorReporter: ActionErrorReporter,
 ) {
     fun openLocalWorktree(repoRootPath: String, worktreePath: String) {
-        val normalizedWorktreePath = worktreePath.normalizedRepoPath()
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
-        if (normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty()) return
+        if (repoRootPath.isBlank() || worktreePath.isBlank()) return
 
-        val worktreeKey = WorktreePath(normalizedWorktreePath)
+        val worktreeKey = WorktreePath(worktreePath)
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             var setupHandle: WorktreeSetupHandle? = null
             runCatching {
-                logger.info { "Setup: requesting existing worktree setup for $normalizedWorktreePath" }
-                setupHandle = requestExistingWorktreeSetup(normalizedRepoRootPath, normalizedWorktreePath)
+                logger.info { "Setup: requesting existing worktree setup for $worktreePath" }
+                setupHandle = requestExistingWorktreeSetup(repoRootPath, worktreePath)
                 setupHandle.await()
-                logger.info { "Setup: existing worktree setup done for $normalizedWorktreePath" }
+                logger.info { "Setup: existing worktree setup done for $worktreePath" }
             }.onFailure { failure ->
                 val message = failure.message ?: "Failed to set up worktree"
                 val shouldReport = setupHandle?.let { handle ->
@@ -41,15 +39,19 @@ internal class ExistingWorktreeController(
         }
     }
 
-    fun requestExistingWorktreeSetup(repoRootPath: String, worktreePath: String): WorktreeSetupHandle {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
-        val normalizedWorktreePath = worktreePath.normalizedRepoPath()
+    fun requestExistingWorktreeSetup(
+        repoRootPath: String,
+        worktreePath: String,
+    ): WorktreeSetupHandle {
+        val activeConfig = state.currentConfig
+        val setupCommands = configuredWorktreeSetupCommands(repoRootPath, activeConfig)
+        requireSetupShellForCommands(activeConfig.setupShell, setupCommands)
         return worktreeServices.worktreeSetupCoordinator.setup(
             WorktreeSetupRequest(
-                repoPath = normalizedRepoRootPath,
-                worktreePath = WorktreePath(normalizedWorktreePath),
-                setupShell = state.currentConfig.setupShell,
-                setupCommands = configuredWorktreeSetupCommands(normalizedRepoRootPath, state.currentConfig),
+                repoPath = repoRootPath,
+                worktreePath = WorktreePath(worktreePath),
+                setupShell = activeConfig.setupShell,
+                setupCommands = setupCommands,
             ),
         )
     }

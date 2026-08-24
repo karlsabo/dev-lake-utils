@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 
@@ -9,13 +10,13 @@ internal fun List<LocalRepositoryUiState>.withPreservedWorktrees(
     updatedWorktrees: List<LocalWorktreeUiState>,
     expandUpdatedRepository: Boolean = false,
 ): List<LocalRepositoryUiState> {
-    val normalizedUpdatedRootPath = updatedRootPath.normalizedRepoPath()
+    val normalizedUpdatedRootPath = updatedRootPath.normalizedRepositoryPath()
     val previousRepositoriesByPath = previousRepositories.associateBy { repository ->
-        repository.path.normalizedRepoPath()
+        repository.path.normalizedRepositoryPath()
     }
 
     return map { repository ->
-        val normalizedPath = repository.path.normalizedRepoPath()
+        val normalizedPath = repository.path.normalizedRepositoryPath()
         val previousRepository = previousRepositoriesByPath[normalizedPath]
         val worktrees = if (normalizedPath == normalizedUpdatedRootPath) {
             updatedWorktrees

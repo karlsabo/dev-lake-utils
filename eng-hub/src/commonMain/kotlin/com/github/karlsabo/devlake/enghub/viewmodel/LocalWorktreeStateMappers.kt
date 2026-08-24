@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.GitWorktreeApi
@@ -17,9 +18,9 @@ internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
     enrichedWorktrees: List<LocalWorktreeUiState>,
 ): List<LocalWorktreeUiState> {
     val visibleBranches = mapTo(mutableSetOf()) { it.branch }
-    val enrichmentByPath = enrichedWorktrees.associateBy { it.path.normalizedRepoPath() }
+    val enrichmentByPath = enrichedWorktrees.associateBy { it.path.normalizedRepositoryPath() }
     return map { currentWorktree ->
-        val enrichedWorktree = enrichmentByPath[currentWorktree.path.normalizedRepoPath()]
+        val enrichedWorktree = enrichmentByPath[currentWorktree.path.normalizedRepositoryPath()]
             ?.takeIf { it.branch == currentWorktree.branch }
         if (enrichedWorktree == null) {
             currentWorktree

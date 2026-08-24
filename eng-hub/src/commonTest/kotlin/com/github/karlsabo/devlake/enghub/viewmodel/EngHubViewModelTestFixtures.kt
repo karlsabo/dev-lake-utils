@@ -97,6 +97,9 @@ fun devLakePollWorktrees(callCount: Int): List<Worktree> = if (callCount == 1) {
 
 class RecordingGitHubApi(
     private val pullRequestsByUrl: Map<String, PullRequest>,
+    private val openPullRequests: List<Issue>? = null,
+    private val notifications: List<Notification>? = null,
+    private val pollingGate: CompletableDeferred<Unit>? = null,
 ) : GitHubApi {
     val pullRequestByUrlCalls = mutableListOf<String>()
     var openPullRequestCalls = 0
@@ -111,7 +114,8 @@ class RecordingGitHubApi(
 
     override suspend fun getOpenPullRequestsByAuthor(organizationIds: List<String>, author: String): List<Issue> {
         openPullRequestCalls += 1
-        error("Unexpected call")
+        pollingGate?.await()
+        return openPullRequests ?: error("Unexpected call")
     }
 
     override suspend fun getCheckRunsForRef(
@@ -164,7 +168,8 @@ class RecordingGitHubApi(
 
     override suspend fun listNotifications(): List<Notification> {
         notificationListCalls += 1
-        error("Unexpected call")
+        pollingGate?.await()
+        return notifications ?: error("Unexpected call")
     }
 
     override suspend fun approvePullRequestByUrl(url: String, body: String?) {

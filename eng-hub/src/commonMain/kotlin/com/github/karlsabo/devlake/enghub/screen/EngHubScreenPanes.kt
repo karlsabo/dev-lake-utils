@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.github.karlsabo.devlake.enghub.component.NotificationPanel
 import com.github.karlsabo.devlake.enghub.component.PullRequestPanel
+import com.github.karlsabo.devlake.enghub.component.PullRequestPanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanel
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.git.WorktreePath
@@ -36,8 +37,7 @@ internal fun EngHubPaneContent(
 
         EngHubPane.Settings -> EngHubSettingsScreen(
             state = state.settings,
-            onGitHubAuthorChange = actions.settings.onGitHubAuthorChange,
-            onPollIntervalChange = actions.settings.onPollIntervalChange,
+            actions = actions.settings,
             modifier = modifier,
         )
     }
@@ -51,9 +51,12 @@ private fun PullRequestsPane(
 ) {
     PullRequestPanel(
         pullRequestsResult = state.result,
-        onOpenInBrowser = actions.pullRequests.onOpenInBrowser,
-        onCheckoutAndOpen = actions.pullRequests.onCheckoutAndOpen,
-        setupStatusFor = state.setupStatuses.setupStatusFor(actions.checkoutWorktreePath),
+        organizationIdsEmpty = state.organizationIdsEmpty,
+        actions = PullRequestPanelActions(
+            onOpenInBrowser = actions.pullRequests.onOpenInBrowser,
+            onCheckoutAndOpen = actions.pullRequests.onCheckoutAndOpen,
+            setupStatusFor = state.setupStatuses.setupStatusFor(actions.checkoutWorktreePath),
+        ),
         modifier = modifier,
     )
 }

@@ -92,27 +92,28 @@ internal class LocalWorktreeFromBaseCreator(
     private fun buildCreateLocalWorktreeFromBaseSetupRequest(
         request: CreateLocalWorktreeFromBaseRequest,
     ): WorktreeSetupRequest {
-        val normalizedRepoRootPath = request.repoRootPath.normalizedRepoPath()
-        val normalizedBaseWorktreePath = request.baseWorktreePath.normalizedRepoPath()
         validateCreateLocalWorktreeFromBaseRequest(
-            repoRootPath = normalizedRepoRootPath,
-            baseWorktreePath = normalizedBaseWorktreePath,
+            repoRootPath = request.repoRootPath,
+            baseWorktreePath = request.baseWorktreePath,
             baseBranch = request.baseBranch,
             targetBranch = request.targetBranch,
             baseCommitIsh = request.baseCommitIsh,
         )
 
-        val worktreePath = buildWorktreePath(normalizedRepoRootPath, request.targetBranch)
+        val worktreePath = buildWorktreePath(request.repoRootPath, request.targetBranch)
+        val activeConfig = state.currentConfig
+        val setupCommands = configuredWorktreeSetupCommands(request.repoRootPath, activeConfig)
+        requireSetupShellForCommands(activeConfig.setupShell, setupCommands)
         return WorktreeSetupRequest(
-            repoPath = normalizedRepoRootPath,
+            repoPath = request.repoRootPath,
             worktreePath = worktreePath,
-            baseWorktreePath = normalizedBaseWorktreePath,
+            baseWorktreePath = request.baseWorktreePath,
             baseBranch = request.baseBranch.takeIf { request.baseCommitIsh == null },
             baseCommitIsh = request.baseCommitIsh,
             targetBranch = request.targetBranch,
             allowUnrelatedExistingBranch = request.allowUnrelatedExistingBranch,
-            setupShell = state.currentConfig.setupShell,
-            setupCommands = configuredWorktreeSetupCommands(normalizedRepoRootPath, state.currentConfig),
+            setupShell = activeConfig.setupShell,
+            setupCommands = setupCommands,
         )
     }
 

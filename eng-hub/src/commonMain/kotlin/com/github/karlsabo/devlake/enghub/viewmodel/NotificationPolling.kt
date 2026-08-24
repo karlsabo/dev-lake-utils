@@ -20,8 +20,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.stateIn
@@ -37,46 +39,52 @@ private data class NotificationPullRequestDetails(
 )
 
 internal fun ViewModel.notificationsStateFlow(
-    gitHubServices: EngHubGitHubServices,
+    gitHubAccess: StateFlow<CommittedGitHubAccess>,
     configs: StateFlow<EngHubConfig>,
     state: EngHubViewModelState,
     persistence: IgnoredNotificationPersistence,
 ): StateFlow<Result<List<NotificationUiState>>?> {
     val polledNotifications = polledNotifications(
-        gitHubServices = gitHubServices,
+        gitHubAccess = gitHubAccess,
         configs = configs,
         state = state,
         persistence = persistence,
     )
 
     return combine(polledNotifications, state.ignoredThreads) { result, ignored ->
-        result.map { list -> list.filterNot { ignored.hides(it) } }
+        result?.map { list -> list.filterNot { ignored.hides(it) } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_FLOW_STOP_TIMEOUT_MS), null)
 }
 
 private fun polledNotifications(
-    gitHubServices: EngHubGitHubServices,
+    gitHubAccess: StateFlow<CommittedGitHubAccess>,
     configs: StateFlow<EngHubConfig>,
     state: EngHubViewModelState,
     persistence: IgnoredNotificationPersistence,
-): Flow<Result<List<NotificationUiState>>> = configDrivenPollingFlow(configs) { config ->
-    fixedIntervalPollingFlow(config) {
-        runCatching {
-            gitHubServices.notificationApi.listNotifications()
-                .filterNot { state.ignoredThreads.value.hides(it) }
-                .asSequence()
-                .asFlow()
-                .flatMapMerge(concurrency = NOTIFICATION_CONCURRENCY) { notif ->
-                    processedNotificationFlow(notif, gitHubServices.notificationService, persistence)
-                }
-                .mapNotNull { notif ->
-                    gitHubServices.pullRequestReviewApi.toNotificationUiStateOrNull(notif)
-                }
-                .toList()
-        }.rethrowCancellation().also { result ->
-            result.onFailure { logger.error(it) { "Error polling notifications" } }
-        }
-    }.flowOn(Dispatchers.IO)
+): Flow<Result<List<NotificationUiState>>?> = combine(configs, gitHubAccess) { config, access ->
+    config to access
+}.flatMapLatest { (config, access) ->
+    if (!access.isReady) {
+        flowOf(null)
+    } else {
+        fixedIntervalPollingFlow(config) {
+            runCatching {
+                access.services.notificationApi.listNotifications()
+                    .filterNot { state.ignoredThreads.value.hides(it) }
+                    .asSequence()
+                    .asFlow()
+                    .flatMapMerge(concurrency = NOTIFICATION_CONCURRENCY) { notif ->
+                        processedNotificationFlow(notif, access.services.notificationService, persistence)
+                    }
+                    .mapNotNull { notif ->
+                        access.services.pullRequestReviewApi.toNotificationUiStateOrNull(notif)
+                    }
+                    .toList()
+            }.rethrowCancellation().also { result ->
+                result.onFailure { logger.error(it) { "Error polling notifications" } }
+            }
+        }.flowOn(Dispatchers.IO).clearBeforeFirstEmission()
+    }
 }
 
 private fun processedNotificationFlow(

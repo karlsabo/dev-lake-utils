@@ -10,8 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 internal val logger = KotlinLogging.logger {}
 
-internal fun String.normalizedRepoPath(): String = trim().trimEnd('/', '\\')
-
 internal fun <T> Result<T>.rethrowCancellation(): Result<T> = onFailure { failure ->
     if (failure is CancellationException) throw failure
 }
@@ -31,6 +29,12 @@ internal fun loadIgnoredThreads(
 }
     .onFailure { logger.error(it) { "Failed to load persisted ignored notifications" } }
     .getOrElse { emptyMap() }
+
+internal fun requireSetupShellForCommands(setupShell: String, setupCommands: List<String>) {
+    require(setupShell.isNotBlank() || setupCommands.isEmpty()) {
+        "Enter a setup shell in Settings before running setup commands"
+    }
+}
 
 internal fun checkoutRepoPath(repoFullName: String, config: EngHubConfig): String {
     val repoName = repoFullName.substringAfterLast('/')

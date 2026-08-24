@@ -45,8 +45,13 @@ internal class CheckoutController(
 
     fun requestCheckoutSetup(repoFullName: String, branch: String): WorktreeSetupHandle {
         val activeConfig = state.currentConfig
+        require(activeConfig.repositoriesBaseDir.isNotBlank()) {
+            "Enter a repositories base directory in Settings before setting up a checkout"
+        }
         val repoPath = checkoutRepoPath(repoFullName, activeConfig)
         val worktreePath = buildWorktreePath(repoPath, branch)
+        val setupCommands = configuredWorktreeSetupCommands(repoPath, activeConfig)
+        requireSetupShellForCommands(activeConfig.setupShell, setupCommands)
         logger.info { "Setup: requesting checkout setup for $repoFullName branch=$branch at $worktreePath" }
         return worktreeServices.worktreeSetupCoordinator.setup(
             WorktreeSetupRequest(
@@ -55,7 +60,7 @@ internal class CheckoutController(
                 cloneUrl = "https://github.com/$repoFullName.git",
                 branch = branch,
                 setupShell = activeConfig.setupShell,
-                setupCommands = configuredWorktreeSetupCommands(repoPath, activeConfig),
+                setupCommands = setupCommands,
             ),
         )
     }

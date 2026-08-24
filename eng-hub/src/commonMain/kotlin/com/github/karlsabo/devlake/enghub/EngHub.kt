@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
@@ -13,12 +14,12 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
 import com.github.karlsabo.devlake.enghub.screen.EngHubScreen
+import com.github.karlsabo.devlake.enghub.viewmodel.launchAfterSettingsFlush
 import com.github.karlsabo.system.DesktopAppBootstrapResult
 import com.github.karlsabo.system.runDesktopAppBootstrap
 import dev_lake_utils.shared_resources.generated.resources.Res
 import dev_lake_utils.shared_resources.generated.resources.icon
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.io.files.SystemFileSystem
 import org.jetbrains.compose.resources.painterResource
 
 private val logger = KotlinLogging.logger {}
@@ -29,6 +30,7 @@ fun EngHub(onExitApplication: () -> Unit) {
     var errorMessage by remember { mutableStateOf("") }
     var isDisplayErrorDialog by remember { mutableStateOf(false) }
     var dependencies by remember { mutableStateOf<LoadedEngHubDependencies?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         when (
@@ -48,9 +50,6 @@ fun EngHub(onExitApplication: () -> Unit) {
             is DesktopAppBootstrapResult.Failed -> {
                 errorMessage = result.errorMessage
                 logger.error { errorMessage }
-                if (!SystemFileSystem.exists(engHubConfigPath)) {
-                    saveEngHubConfig(EngHubConfig())
-                }
                 isDisplayErrorDialog = true
                 isLoadingConfiguration = false
             }
@@ -66,7 +65,9 @@ fun EngHub(onExitApplication: () -> Unit) {
     }
 
     Window(
-        onCloseRequest = onExitApplication,
+        onCloseRequest = {
+            coroutineScope.launchAfterSettingsFlush(dependencies?.settingsViewModel, onExitApplication)
+        },
         title = ENG_HUB_DISPLAY_NAME,
         icon = painterResource(Res.drawable.icon),
         visible = !isLoadingConfiguration && dependencies != null,
@@ -87,6 +88,5 @@ fun EngHub(onExitApplication: () -> Unit) {
 
 private fun buildEngHubConfigurationErrorMessage(error: Throwable): String = buildString {
     appendLine("Failed to load configuration: $error.")
-    appendLine("Creating new configuration.")
-    append("Please update the configuration file:\n$engHubConfigPath.")
+    append("Please correct the configuration file:\n$engHubConfigPath.")
 }

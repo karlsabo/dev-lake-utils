@@ -3,22 +3,23 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryWorktreeRequest
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
 import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.GitWorktreeApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 
 internal class LocalRepositoryController(
     private val viewModel: ViewModel,
     private val state: EngHubViewModelState,
     private val worktreeServices: EngHubWorktreeServices,
     private val errorReporter: ActionErrorReporter,
+    private val repositoryIdentity: (String) -> String = { it.normalizedRepositoryPath() },
 ) {
     private val gitWorktreeApi: GitWorktreeApi = worktreeServices.gitWorktreeApi
     private val expansionTracker = LocalRepositoryExpansionTracker(state)
@@ -45,9 +46,9 @@ internal class LocalRepositoryController(
     }
 
     fun toggleLocalRepositoryExpansion(repoRootPath: String) {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        val normalizedRepoRootPath = repositoryIdentity(repoRootPath)
         val repository = state.localRepositories.value.firstOrNull {
-            it.path.normalizedRepoPath() == normalizedRepoRootPath
+            repositoryIdentity(it.path) == normalizedRepoRootPath
         }
         when {
             repository == null -> Unit
@@ -61,10 +62,7 @@ internal class LocalRepositoryController(
     }
 
     suspend fun pollConfiguredLocalRepositoryWorktrees() {
-        while (true) {
-            delay(state.currentConfig.worktreePollIntervalMs.coerceAtLeast(1).milliseconds)
-            refreshConfiguredLocalRepositoryWorktrees()
-        }
+        worktreePollingFlow(state.config, ::refreshConfiguredLocalRepositoryWorktrees).collect()
     }
 
     fun refreshLocalRepositoryWorktreesBestEffort(repoRootPath: String, logContext: String) {
@@ -81,7 +79,7 @@ internal class LocalRepositoryController(
         var repositoryAdded = false
         state.updateConfig { currentConfig ->
             val alreadyConfigured = currentConfig.localRepositories.any {
-                it.path.normalizedRepoPath() == rootPath.normalizedRepoPath()
+                repositoryIdentity(it.path) == repositoryIdentity(rootPath)
             }
             if (alreadyConfigured) {
                 currentConfig
@@ -97,7 +95,7 @@ internal class LocalRepositoryController(
             return
         }
 
-        val normalizedRootPath = rootPath.normalizedRepoPath()
+        val normalizedRootPath = repositoryIdentity(rootPath)
         val enrichmentRequest = LocalRepositoryWorktreeRequest()
         val basicWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(rootPath)
         state.localRepositories.update { repositories ->
@@ -109,7 +107,7 @@ internal class LocalRepositoryController(
                     updatedWorktrees = basicWorktrees,
                     expandUpdatedRepository = true,
                 ).map { repository ->
-                    if (repository.path.normalizedRepoPath() == normalizedRootPath) {
+                    if (repositoryIdentity(repository.path) == normalizedRootPath) {
                         repository.copy(refreshRequest = enrichmentRequest)
                     } else {
                         repository
@@ -162,7 +160,7 @@ internal class LocalRepositoryController(
             .asSequence()
             .map { it.path.trim() }
             .filter { it.isNotEmpty() }
-            .distinctBy { it.normalizedRepoPath() }
+            .distinctBy { repositoryIdentity(it) }
             .forEach { repoRootPath ->
                 runCatching { refreshLocalRepositoryWorktrees(repoRootPath) }
                     .rethrowCancellation()
@@ -173,7 +171,7 @@ internal class LocalRepositoryController(
     }
 
     private fun refreshLocalRepositoryWorktrees(repoRootPath: String) {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        val normalizedRepoRootPath = repositoryIdentity(repoRootPath)
         val request = refreshTracker.start(normalizedRepoRootPath) ?: return
         val basicWorktrees = runCatching {
             gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
@@ -202,7 +200,7 @@ internal class LocalRepositoryRefreshTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath
+                it.path.normalizedRepositoryPath() == normalizedRepoRootPath
             } ?: return null
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
@@ -226,7 +224,7 @@ internal class LocalRepositoryRefreshTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                it.path.normalizedRepositoryPath() == normalizedRepoRootPath &&
                     it.refreshRequest === request
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
@@ -251,7 +249,7 @@ internal class LocalRepositoryRefreshTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                it.path.normalizedRepositoryPath() == normalizedRepoRootPath &&
                     it.refreshRequest === request
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
@@ -274,7 +272,7 @@ internal class LocalRepositoryRefreshTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                it.path.normalizedRepositoryPath() == normalizedRepoRootPath &&
                     it.refreshRequest === request
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->

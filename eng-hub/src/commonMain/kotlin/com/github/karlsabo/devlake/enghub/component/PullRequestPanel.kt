@@ -19,15 +19,28 @@ internal fun PullRequestUiState.checkoutSetupStatus(
     setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
 ): WorktreeSetupStatus? = headRef?.let { setupStatusFor(repositoryFullName, it) }
 
+data class PullRequestPanelActions(
+    val onOpenInBrowser: (String) -> Unit,
+    val onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
+    val setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
+)
+
 @Composable
 fun PullRequestPanel(
     pullRequestsResult: Result<List<PullRequestUiState>>?,
-    onOpenInBrowser: (String) -> Unit,
-    onCheckoutAndOpen: (repoFullName: String, branch: String) -> Unit,
-    setupStatusFor: (repoFullName: String, branch: String) -> WorktreeSetupStatus?,
+    actions: PullRequestPanelActions,
     modifier: Modifier = Modifier,
+    organizationIdsEmpty: Boolean = false,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
+        if (organizationIdsEmpty) {
+            Text(
+                text = "Add at least one organization in Settings to search for pull requests",
+                modifier = Modifier.padding(8.dp),
+                style = MaterialTheme.typography.body2,
+            )
+            return@Box
+        }
         if (pullRequestsResult == null) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             return@Box
@@ -45,9 +58,9 @@ fun PullRequestPanel(
                         items(pullRequests, key = { it.number }) { pr ->
                             PullRequestItem(
                                 pr = pr,
-                                onOpenInBrowser = onOpenInBrowser,
-                                onCheckoutAndOpen = onCheckoutAndOpen,
-                                setupStatus = pr.checkoutSetupStatus(setupStatusFor),
+                                onOpenInBrowser = actions.onOpenInBrowser,
+                                onCheckoutAndOpen = actions.onCheckoutAndOpen,
+                                setupStatus = pr.checkoutSetupStatus(actions.setupStatusFor),
                             )
                         }
                     }

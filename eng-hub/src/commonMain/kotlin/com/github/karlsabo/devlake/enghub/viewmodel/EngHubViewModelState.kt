@@ -4,6 +4,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.EngHubConfigWriter
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
 import com.github.karlsabo.git.WorktreePath
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private const val FIRST_ACTION_ERROR_ID = 1L
 
@@ -60,12 +63,15 @@ internal class EngHubViewModelState(
     notificationIgnoreStore: NotificationIgnoreStore,
 ) {
     private val configState = EngHubConfigState(config, configWriter)
+    private val configUpdateMutex = Mutex()
 
     val currentConfig: EngHubConfig
         get() = configState.current
     val config: StateFlow<EngHubConfig> = configState.config
 
-    suspend fun updateConfig(transform: (EngHubConfig) -> EngHubConfig): EngHubConfig = configState.update(transform)
+    suspend fun updateConfig(transform: (EngHubConfig) -> EngHubConfig): EngHubConfig = configUpdateMutex.withLock {
+        configState.update(transform).also(::refreshLocalRepositories)
+    }
 
     val actionErrors = MutableStateFlow(ActionErrorQueueState())
     val reportedSetupFailureHandlesByPath =
@@ -88,6 +94,16 @@ internal class EngHubViewModelState(
     val forceArchiveWorktreeRequest = MutableStateFlow<ForceArchiveWorktreeUiState?>(null)
     val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
     val ignoredThreads = MutableStateFlow(loadIgnoredThreads(notificationIgnoreStore))
+
+    private fun refreshLocalRepositories(config: EngHubConfig) {
+        val previousByPath = localRepositories.value.associateBy { it.path.normalizedRepositoryPath() }
+        localRepositories.value = config.localRepositories.toLocalRepositoryUiStates().map { configuredRepository ->
+            previousByPath[configuredRepository.path.normalizedRepositoryPath()]?.copy(
+                name = configuredRepository.name,
+                path = configuredRepository.path,
+            ) ?: configuredRepository
+        }
+    }
 }
 
 internal data class ActionErrorQueueState(

@@ -20,6 +20,20 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 object EngHubScope
 
+internal fun createEngHubGitHubServices(config: GitHubApiRestConfig): EngHubGitHubServices {
+    val api = GitHubRestApi(config)
+    return engHubGitHubServices(api)
+}
+
+private fun engHubGitHubServices(api: GitHubRestApi): EngHubGitHubServices = EngHubGitHubServices(
+    pullRequestSearchApi = api,
+    notificationApi = api,
+    pullRequestReviewApi = api,
+    pullRequestSummaryApi = api,
+    notificationService = GitHubNotificationService(api),
+    closeServices = api::close,
+)
+
 @ContributesTo(EngHubScope::class)
 interface EngHubBindings {
 
@@ -34,8 +48,7 @@ interface EngHubBindings {
     @Provides
     fun provideEngHubGitHubServices(
         gitHubRestApi: GitHubRestApi,
-        notificationService: GitHubNotificationService,
-    ): EngHubGitHubServices = EngHubGitHubServices(gitHubRestApi, notificationService)
+    ): EngHubGitHubServices = engHubGitHubServices(gitHubRestApi)
 
     @Provides
     fun provideGitWorktreeApi(): GitWorktreeApi = GitWorktreeService()
@@ -65,6 +78,7 @@ abstract class EngHubComponent(
     @get:Provides val gitHubApiConfig: GitHubApiRestConfig,
 ) {
     abstract val viewModel: EngHubViewModel
+    abstract val directoryPicker: DirectoryPicker
 }
 
 @CreateComponent

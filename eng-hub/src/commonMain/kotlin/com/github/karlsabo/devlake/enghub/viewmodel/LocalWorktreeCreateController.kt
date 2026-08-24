@@ -21,18 +21,17 @@ internal class LocalWorktreeCreateController(
     )
 
     fun requestCreateLocalWorktreeFromRepository(repoRootPath: String) {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
-        logger.info { "Create local worktree requested for repository $normalizedRepoRootPath" }
+        logger.info { "Create local worktree requested for repository $repoRootPath" }
         state.lastCreateLocalWorktreeFromRepositoryRequest.value = null
 
         viewModel.viewModelScope.launch(Dispatchers.IO) {
-            runCatching { resolveCreateLocalWorktreeRepositoryBase(normalizedRepoRootPath) }
+            runCatching { resolveCreateLocalWorktreeRepositoryBase(repoRootPath) }
                 .rethrowCancellation()
                 .onSuccess { request -> state.lastCreateLocalWorktreeFromRepositoryRequest.value = request }
                 .onFailure { failure ->
                     val message = failure.message ?: "Failed to resolve default branch for worktree creation"
                     logger.error(failure) {
-                        "Failed to resolve create local worktree base for repository $normalizedRepoRootPath"
+                        "Failed to resolve create local worktree base for repository $repoRootPath"
                     }
                     errorReporter.enqueueActionError(message)
                 }
@@ -79,16 +78,16 @@ internal class LocalWorktreeCreateController(
     }
 
     private fun resolveCreateLocalWorktreeRepositoryBase(
-        normalizedRepoRootPath: String,
+        repoRootPath: String,
     ): CreateLocalWorktreeFromRepositoryRequest {
-        require(normalizedRepoRootPath.isNotEmpty()) { "Repository root path is required" }
-        val baseRef = worktreeServices.gitWorktreeApi.inferDefaultBranchRef(normalizedRepoRootPath)
+        require(repoRootPath.isNotBlank()) { "Repository root path is required" }
+        val baseRef = worktreeServices.gitWorktreeApi.inferDefaultBranchRef(repoRootPath)
         require(!baseRef.isNullOrBlank()) {
-            "Could not infer default branch for $normalizedRepoRootPath"
+            "Could not infer default branch for $repoRootPath"
         }
         return CreateLocalWorktreeFromRepositoryRequest(
-            repoRootPath = normalizedRepoRootPath,
-            baseWorktreePath = normalizedRepoRootPath,
+            repoRootPath = repoRootPath,
+            baseWorktreePath = repoRootPath,
             baseBranch = baseRef,
         )
     }

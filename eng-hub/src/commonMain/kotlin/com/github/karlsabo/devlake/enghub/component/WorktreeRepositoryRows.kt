@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
@@ -66,7 +67,7 @@ private fun LocalRepositoryHeader(
 ) {
     val repository = state.repository
     val normalizedRepositoryPath = repository.normalizedPathOrNull()
-    val repositoryStatus = normalizedRepositoryPath?.let { state.setupStatuses[WorktreePath(it)] }
+    val repositoryStatus = state.setupStatuses[WorktreePath(repository.path)]
     val isRepositoryArchiving = normalizedRepositoryPath != null &&
         normalizedRepositoryPath in state.archivingWorktreePaths
     Row(
@@ -180,12 +181,12 @@ private fun LocalWorktreeRows(
             Spacer(modifier = Modifier.size(8.dp))
             visibleWorktreeRows(state.repository.worktrees).forEach { row ->
                 val worktree = row.worktree
-                val normalizedWorktreePath = worktree.path.normalizedWorktreePath()
+                val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
                 key(normalizedWorktreePath) {
                     LocalWorktreeRow(
                         state = LocalWorktreeRowState(
                             worktree = worktree,
-                            setupStatus = state.setupStatuses[WorktreePath(normalizedWorktreePath)],
+                            setupStatus = state.setupStatuses[WorktreePath(worktree.path)],
                             isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
                             isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
                             nestingDepth = row.nestingDepth,
@@ -218,8 +219,6 @@ private fun repositoryToggleDescription(repository: LocalRepositoryUiState): Str
 }
 
 private fun LocalRepositoryUiState.normalizedPathOrNull(): String? {
-    val normalizedPath = path.normalizedWorktreePath()
+    val normalizedPath = path.normalizedRepositoryPath()
     return normalizedPath.takeIf { it.isNotEmpty() }
 }
-
-private fun String.normalizedWorktreePath(): String = trim().trimEnd('/', '\\')

@@ -24,8 +24,8 @@ internal class GitHubRestClient(
     private val config: GitHubApiRestConfig,
     private val clientOverride: HttpClient? = null,
 ) {
-    val client: HttpClient by lazy {
-        clientOverride ?: HttpClient(CIO) {
+    private val ownedClient = lazy {
+        HttpClient(CIO) {
             install(Auth) {
                 bearer {
                     loadTokens {
@@ -45,6 +45,11 @@ internal class GitHubRestClient(
             install(HttpCache)
             expectSuccess = false
         }
+    }
+    val client: HttpClient by lazy { clientOverride ?: ownedClient.value }
+
+    fun close() {
+        if (ownedClient.isInitialized()) ownedClient.value.close()
     }
 
     suspend fun getSuccessfulResponseText(

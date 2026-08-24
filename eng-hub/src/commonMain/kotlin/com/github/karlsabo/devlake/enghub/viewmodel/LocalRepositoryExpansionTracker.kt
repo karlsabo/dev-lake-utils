@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryWorktreeRequest
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import kotlinx.coroutines.flow.update
@@ -12,7 +13,7 @@ internal class LocalRepositoryExpansionTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories
-                .firstOrNull { it.path.normalizedRepoPath() == normalizedRepoRootPath }
+                .firstOrNull { it.path.normalizedRepositoryPath() == normalizedRepoRootPath }
                 ?.takeUnless { it.isExpanded }
                 ?: return null
 
@@ -35,7 +36,7 @@ internal class LocalRepositoryExpansionTracker(
     fun collapse(normalizedRepoRootPath: String) {
         state.localRepositories.update { repositories ->
             repositories.map { repository ->
-                if (repository.path.normalizedRepoPath() == normalizedRepoRootPath) {
+                if (repository.path.normalizedRepositoryPath() == normalizedRepoRootPath) {
                     repository.copy(
                         isExpanded = false,
                         isLoading = false,
@@ -57,7 +58,7 @@ internal class LocalRepositoryExpansionTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                it.path.normalizedRepositoryPath() == normalizedRepoRootPath &&
                     it.operationRequest === request &&
                     it.refreshRequest == null
             } ?: return false
@@ -80,7 +81,7 @@ internal class LocalRepositoryExpansionTracker(
         while (true) {
             val repositories = state.localRepositories.value
             val repository = repositories.firstOrNull {
-                it.path.normalizedRepoPath() == normalizedRepoRootPath &&
+                it.path.normalizedRepositoryPath() == normalizedRepoRootPath &&
                     it.operationRequest === request &&
                     it.refreshRequest == null
             } ?: return false

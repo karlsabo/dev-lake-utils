@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -41,8 +42,8 @@ internal class LocalWorktreeArchiveController(
         worktreePath: String,
         force: Boolean,
     ) {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
-        val normalizedWorktreePath = worktreePath.normalizedRepoPath()
+        val normalizedRepoRootPath = repoRootPath.normalizedRepositoryPath()
+        val normalizedWorktreePath = worktreePath.normalizedRepositoryPath()
         when {
             normalizedRepoRootPath.isEmpty() || normalizedWorktreePath.isEmpty() -> Unit
 
@@ -103,14 +104,14 @@ internal class LocalWorktreeArchiveController(
         repoRootPath: String,
         worktreePath: String,
     ) {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepoPath()
+        val normalizedRepoRootPath = repoRootPath.normalizedRepositoryPath()
         val removalObserved = withTimeoutOrNull(worktreeRemovalWaitTimeout) {
             state.localRepositories.first { repositories ->
                 val repository = repositories.firstOrNull {
-                    it.path.normalizedRepoPath() == normalizedRepoRootPath
+                    it.path.normalizedRepositoryPath() == normalizedRepoRootPath
                 }
                 repository == null ||
-                    repository.worktrees.none { it.path.normalizedRepoPath() == worktreePath }
+                    repository.worktrees.none { it.path.normalizedRepositoryPath() == worktreePath }
             }
             true
         } == true

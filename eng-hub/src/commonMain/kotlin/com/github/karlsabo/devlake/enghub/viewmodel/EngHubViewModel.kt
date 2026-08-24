@@ -13,6 +13,7 @@ import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -33,6 +34,8 @@ class EngHubViewModel(
         notificationIgnoreStore = notificationIgnoreStore,
     )
     private val errorReporter = ActionErrorReporter(state)
+    private val currentGitHubAccess = MutableStateFlow(CommittedGitHubAccess(gitHubServices, isReady = true))
+    private val gitHubServiceActionTracker = GitHubServiceActionTracker(viewModelScope)
     private val localRepositoriesController = LocalRepositoryController(
         viewModel = this,
         state = state,
@@ -77,9 +80,10 @@ class EngHubViewModel(
         notificationIgnoreStore = notificationIgnoreStore,
     )
     private val notificationActionController = NotificationActionController(
-        viewModel = this,
         state = state,
-        gitHubServices = gitHubServices,
+        launchGitHubAction = { action ->
+            gitHubServiceActionTracker.launch(currentGitHubAccess.value.services, action)
+        },
         persistence = ignoredNotificationPersistence,
         errorReporter = errorReporter,
     )
@@ -90,6 +94,7 @@ class EngHubViewModel(
         state.setupStatusesStateFlow
     val localRepositoriesStateFlow: StateFlow<List<LocalRepositoryUiState>> =
         state.localRepositories.asStateFlow()
+    internal val configStateFlow: StateFlow<EngHubConfig> = state.config
     internal val lastCreateLocalWorktreeFromBaseRequestStateFlow:
         StateFlow<CreateLocalWorktreeFromBaseRequest?> =
         state.lastCreateLocalWorktreeFromBaseRequest.asStateFlow()
@@ -115,14 +120,22 @@ class EngHubViewModel(
         transform: (EngHubConfig) -> EngHubConfig,
     ): EngHubConfig = state.updateConfig(transform)
 
+    internal fun initializeGitHubAccessReadiness(isReady: Boolean) {
+        currentGitHubAccess.value = currentGitHubAccess.value.copy(isReady = isReady)
+    }
+
+    internal fun updateGitHubAccess(gitHubServices: EngHubGitHubServices, isReady: Boolean) {
+        val replacedServices = currentGitHubAccess.value.services
+        currentGitHubAccess.value = CommittedGitHubAccess(gitHubServices, isReady)
+        if (replacedServices !== gitHubServices) gitHubServiceActionTracker.retire(replacedServices)
+    }
+
     val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = pullRequestsStateFlow(
-        searchApi = gitHubServices.pullRequestSearchApi,
-        reviewApi = gitHubServices.pullRequestReviewApi,
-        summaryApi = gitHubServices.pullRequestSummaryApi,
+        gitHubAccess = currentGitHubAccess,
         configs = state.config,
     )
     val notifications: StateFlow<Result<List<NotificationUiState>>?> = notificationsStateFlow(
-        gitHubServices = gitHubServices,
+        gitHubAccess = currentGitHubAccess,
         configs = state.config,
         state = state,
         persistence = ignoredNotificationPersistence,

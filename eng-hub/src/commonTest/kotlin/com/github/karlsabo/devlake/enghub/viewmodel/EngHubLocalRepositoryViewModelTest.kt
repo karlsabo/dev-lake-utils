@@ -2,12 +2,15 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.WorktreeSetupCoordinator
+import com.github.karlsabo.system.OsFamily
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -305,6 +308,52 @@ class EngHubLocalRepositoryViewModelTest {
         assertEquals("Repository already configured: $DEV_LAKE_ROOT", actionError?.message)
         assertEquals(emptyList(), configWriter.savedConfigs.value)
         assertEquals(initialRepositories, viewModel.localRepositoriesStateFlow.value)
+    }
+
+    @Test
+    fun pickingMacOsCaseAndLexicalRepositoryAliasDoesNotWriteRefreshOrDuplicate() = runBlocking {
+        val configuredPath = "/Users/me/repo"
+        val selectedPath = "/users/ME/REPO-linked"
+        val resolvedAlias = "/users/ME/./other/../REPO//"
+        val repositoryWorktrees = RepositoryWorktrees(
+            rootPath = resolvedAlias,
+            selectedWorktreePath = selectedPath,
+            worktrees = listOf(Worktree(path = resolvedAlias, branch = "main", commitHash = "abc123")),
+        )
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = mapOf(selectedPath to repositoryWorktrees),
+        )
+        val configWriter = RecordingEngHubConfigWriter()
+        val worktreeServices = EngHubWorktreeServices(
+            gitWorktreeApi = api,
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(gitWorktreeApi = api),
+            directoryPicker = object : DirectoryPicker {
+                override suspend fun pickDirectory(title: String): String = selectedPath
+            },
+            configWriter = configWriter,
+        )
+        val state = EngHubViewModelState(
+            config = EngHubConfig(localRepositories = localRepositoryConfigs(configuredPath)),
+            configWriter = configWriter,
+            worktreeSetupCoordinator = worktreeServices.worktreeSetupCoordinator,
+            notificationIgnoreStore = NoOpNotificationIgnoreStore(),
+        )
+        val controller = LocalRepositoryController(
+            viewModel = object : ViewModel() {},
+            state = state,
+            worktreeServices = worktreeServices,
+            errorReporter = ActionErrorReporter(state),
+            repositoryIdentity = { it.normalizedRepositoryPath(OsFamily.MACOS) },
+        )
+        val initialRepositories = state.localRepositories.value
+
+        controller.pickAndAddLocalRepository()
+
+        withTimeout(2_000.milliseconds) { state.actionErrors.first { it.current != null } }
+        assertEquals(listOf(selectedPath), api.resolvedPaths)
+        assertEquals(emptyList(), configWriter.savedConfigs.value)
+        assertEquals(emptyList(), api.listWorktreeRepoPaths)
+        assertEquals(initialRepositories, state.localRepositories.value)
     }
 
     @Test
