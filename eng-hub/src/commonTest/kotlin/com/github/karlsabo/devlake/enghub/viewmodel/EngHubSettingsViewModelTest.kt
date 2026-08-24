@@ -450,11 +450,12 @@ class EngHubSettingsViewModelTest {
         advanceTimeBy(750.milliseconds)
         runCurrent()
 
+        val expectedPath = Path("/secrets/new-github.json")
         val expected = LoadedGitHubConfig(
-            GitHubConfig("/secrets/new-github.json"),
+            GitHubConfig(expectedPath.toString()),
             GitHubSecret("github_pat_new"),
         )
-        assertEquals(listOf(Path("/secrets/new-github.json") to expected.secret), savedAccess)
+        assertEquals(listOf(expectedPath to expected.secret), savedAccess)
         assertEquals(listOf(expected), committedAccess)
         assertTrue(viewModel.uiState.value.gitHubAccessReady)
     }

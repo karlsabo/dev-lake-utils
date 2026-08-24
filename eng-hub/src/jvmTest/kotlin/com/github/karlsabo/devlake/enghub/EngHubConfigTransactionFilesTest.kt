@@ -167,7 +167,12 @@ class EngHubConfigTransactionFilesTest {
     )
 
     private fun withTransactionPaths(test: (TransactionPaths) -> Unit) {
-        val directory = Files.createTempDirectory(java.nio.file.Path.of("/tmp"), "eh-config-")
+        val shortTempRoot = java.nio.file.Path.of("/tmp").takeIf(Files::isDirectory)
+        val directory = if (shortTempRoot == null) {
+            Files.createTempDirectory("eh-config-")
+        } else {
+            Files.createTempDirectory(shortTempRoot, "eh-config-")
+        }
         try {
             test(TransactionPaths(directory))
         } finally {

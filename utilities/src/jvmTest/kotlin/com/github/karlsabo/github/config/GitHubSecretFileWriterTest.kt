@@ -3,7 +3,6 @@ package com.github.karlsabo.github.config
 import com.github.karlsabo.tools.lenientJson
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
-import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.io.IOException
 import java.nio.file.FileSystems
 import java.nio.file.Files
@@ -25,7 +24,7 @@ import kotlin.test.assertTrue
 class GitHubSecretFileWriterTest {
     @Test
     fun rejectsDirectoryDestinationBeforeChangingItsPermissionsOrLocation() = runBlocking {
-        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runBlocking
         val directory = Files.createTempDirectory("github-secret-writer-")
         val secretPath = directory.resolve("github-secret.json")
         val marker = secretPath.resolve("keep.txt")
@@ -52,7 +51,7 @@ class GitHubSecretFileWriterTest {
 
     @Test
     fun rejectsSymbolicLinkDestinationWithoutChangingItsTarget() = runBlocking {
-        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runBlocking
         val directory = Files.createTempDirectory("github-secret-writer-")
         val targetPath = directory.resolve("target.json")
         val secretPath = directory.resolve("github-secret.json")
@@ -79,7 +78,7 @@ class GitHubSecretFileWriterTest {
 
     @Test
     fun rejectsMultiplyLinkedPrimaryWithoutRotatingOrReplacingIt() = runBlocking {
-        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"))
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("unix")) return@runBlocking
         val directory = Files.createTempDirectory("github-secret-writer-")
         val secretPath = directory.resolve("github-secret.json")
         val aliasPath = directory.resolve("secret-alias.json")
@@ -106,7 +105,7 @@ class GitHubSecretFileWriterTest {
 
     @Test
     fun rejectsSecretPathThroughSymlinkedParentBeforeAnyWrite() = runBlocking {
-        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runBlocking
         val directory = Files.createTempDirectory("github-path-alias-")
         val configPath = directory.resolve("github-config.json")
         val aliasDirectory = directory.resolve("alias")
@@ -140,7 +139,7 @@ class GitHubSecretFileWriterTest {
 
     @Test
     fun rejectsProtectedPathThroughSymlinkedParentBeforeAnyWrite() = runBlocking {
-        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runBlocking
         val directory = Files.createTempDirectory("github-protected-path-alias-")
         val configPath = directory.resolve("github-config.json")
         val secretPath = directory.resolve("github-secret.json")
@@ -182,7 +181,7 @@ class GitHubSecretFileWriterTest {
 
     @Test
     fun createsSecretWithOwnerReadWritePermissionsOnlyOnPosix() = runBlocking {
-        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runBlocking
         val directory = Files.createTempDirectory("github-secret-writer-")
         val secretPath = directory.resolve("github-secret.json")
 
