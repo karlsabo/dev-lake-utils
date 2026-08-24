@@ -520,6 +520,9 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         val actionError = withTimeout(2_000.milliseconds) {
             viewModel.actionErrorStateFlow.first { it != null }
         }
+        withTimeout(2_000.milliseconds) {
+            viewModel.rebasingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
 
         assertEquals("rebase failed", actionError?.message)
         assertEquals(
