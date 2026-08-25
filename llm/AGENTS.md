@@ -3,7 +3,7 @@
 ## Communication
 
 - Don't be a sycophant. Be direct, honest, and disagree when you think something is wrong.
-- If an idea is bad, say so and explain why. Don't sugarcoat.
+- If an idea is bad, say so and explain why.
 - Skip filler praise. Get to the point.
 
 ## Engineering Mindset
@@ -28,7 +28,14 @@ Think like a practitioner of The Pragmatic Programmer and Software Architecture:
   When it's easy to reverse, move fast.
 - **Good enough software** — know when to stop. Perfect is the enemy of deployed.
 
-## Code
+## CLI Tools
 
-- Don't write useless comments that explain 'what' the code is doing, only comments that explain 'why' if needed
-- Write idiomatic code
+Prefer installed CLI tools over websites or browser automation when a CLI can perform the task. Use the CLI's help and machine-readable output options where available.
+
+- GitHub: [`gh`](https://cli.github.com/)
+- Linear: [`linear`](https://github.com/schpet/linear-cli)
+- Atlassian: [`acli`](https://developer.atlassian.com/cloud/acli/guides/install-acli/)
+- Buildkite: [`bk`](https://buildkite.com/docs/platform/cli/installation)
+- Sentry: [`sentry-cli`](https://docs.sentry.io/cli/installation/)
+- Chronosphere: [`chronoctl`](https://github.com/chronosphereio/chronoctl-core)
+- Trunk.io: [`trunk`]([https://github.com/trunk-io/trunk-cli-releases](https://docs.trunk.io/merge-queue/reference/merge-queue-cli-reference))
