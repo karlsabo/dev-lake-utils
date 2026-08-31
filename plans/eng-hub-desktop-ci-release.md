@@ -93,7 +93,9 @@ The installation-directory invariant is a documented constraint supported by the
 
 **Notes:** `eng-hub/eng-hub.gradle.kts` declares `TargetFormat.Msi`; `.github/workflows/release.yml` already contains a `packageMsi` job that can be validated or reworked.
 
-### 5. Publish the Debian package
+### 5. Publish the Debian package - done
+
+**done:** 2026-08-31
 
 **Acceptance criteria:** Given the GitHub Release for version `1.2.3` is being built, when the Debian packaging job completes, then the release contains `eng-hub-1.2.3-linux-amd64.deb`.
 
@@ -103,7 +105,9 @@ The installation-directory invariant is a documented constraint supported by the
 
 **Notes:** `eng-hub/eng-hub.gradle.kts` declares `TargetFormat.Deb`; `.github/workflows/release.yml` already contains a `packageDeb` job that can be validated or reworked.
 
-### 6. Publish the RPM package
+### 6. Publish the RPM package - done
+
+**done:** 2026-08-31
 
 **Acceptance criteria:** Given the GitHub Release for version `1.2.3` is being built, when the RPM packaging job completes, then the release contains `eng-hub-1.2.3-linux-x86_64.rpm`.
 
