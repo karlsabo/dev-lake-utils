@@ -57,7 +57,9 @@ The installation-directory invariant is a documented constraint supported by the
 
 **Notes:** The workflow is already committed and builds on Linux, macOS, and Windows. The repository-required validation command is defined in `AGENTS.md` as `./gradlew clean build`.
 
-### 2. A stable tag creates a GitHub Release
+### 2. A stable tag creates a GitHub Release - done
+
+**done:** 2026 08 31
 
 **Acceptance criteria:** Given tag `1.2.3` is pushed, when `.github/workflows/release.yml` runs, then it creates GitHub Release `1.2.3` and supplies Gradle package version `1.2.3` instead of the default `1.0.0-SNAPSHOT`.
 
@@ -65,7 +67,7 @@ The installation-directory invariant is a documented constraint supported by the
 
 **Scope:** Raw stable SemVer tag matching, validation, GitHub Release creation, and Gradle version wiring. Tags prefixed with `v`, `SNAPSHOT` versions, and installer formats are out.
 
-**Notes:** `.github/workflows/release.yml` currently has uncommitted `v`-prefix changes that must be reverted to raw `1.2.3` tags while retaining the `releaseVersion` override in `dev-lake-utils.gradle.kts`. `eng-hub/eng-hub.gradle.kts` strips pre-release/build suffixes and requires three numeric package-version components.
+**Notes:** `.github/workflows/release.yml` accepts raw stable SemVer tags such as `1.2.3` and passes the tag unchanged as the Gradle release version. `eng-hub/eng-hub.gradle.kts` strips pre-release/build suffixes and requires three numeric package-version components.
 
 ### 3. Publish the macOS DMG
 
