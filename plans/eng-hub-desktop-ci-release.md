@@ -69,7 +69,9 @@ The installation-directory invariant is a documented constraint supported by the
 
 **Notes:** `.github/workflows/release.yml` accepts raw stable SemVer tags such as `1.2.3` and passes the tag unchanged as the Gradle release version. `eng-hub/eng-hub.gradle.kts` strips pre-release/build suffixes and requires three numeric package-version components.
 
-### 3. Publish the macOS DMG
+### 3. Publish the macOS DMG - done
+
+**done:** 2026-08-31
 
 **Acceptance criteria:** Given the GitHub Release for version `1.2.3` is being built, when the macOS packaging job completes, then the release contains `eng-hub-1.2.3-macos.dmg`.
 
