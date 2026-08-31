@@ -81,7 +81,9 @@ The installation-directory invariant is a documented constraint supported by the
 
 **Notes:** `eng-hub/eng-hub.gradle.kts` declares `TargetFormat.Dmg`; `.github/workflows/release.yml` already contains a `packageDmg` job that can be validated or reworked.
 
-### 4. Publish the Windows MSI
+### 4. Publish the Windows MSI - done
+
+**done:** 2026-08-31
 
 **Acceptance criteria:** Given the GitHub Release for version `1.2.3` is being built, when the Windows packaging job completes, then the release contains `eng-hub-1.2.3-windows-x64.msi`.
 
