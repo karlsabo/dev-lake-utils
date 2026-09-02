@@ -61,6 +61,7 @@ internal data class ExistingBranchDiscoveryState(
     val branches: List<String> = emptyList(),
     val originBranches: List<String> = emptyList(),
     val originBranchRefreshSucceeded: Boolean? = null,
+    val worktreePathsByBranch: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
     val requestId: Long = 0,
     val pullRequestQuery: String = "",

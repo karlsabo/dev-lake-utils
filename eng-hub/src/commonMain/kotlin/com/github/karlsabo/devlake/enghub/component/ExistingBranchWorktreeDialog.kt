@@ -52,7 +52,7 @@ internal data class ExistingWorktreeDialogActions(
     val onModeChange: (CreateWorktreeMode) -> Unit,
     val onQueryChange: (String) -> Unit,
     val onSelectResult: (ExistingWorktreeResult) -> Unit,
-    val onConfirm: () -> Unit,
+    val onConfirm: (ExistingWorktreeResult) -> Unit,
     val onDismiss: () -> Unit,
     val onKeyEvent: (KeyEvent) -> Boolean,
 )
@@ -60,7 +60,7 @@ internal data class ExistingWorktreeDialogActions(
 internal data class ExistingWorktreeDialogCallbacks(
     val onModeChange: (CreateWorktreeMode) -> Unit,
     val onQueryChange: (String) -> Unit,
-    val onConfirm: () -> Unit,
+    val onConfirm: (ExistingWorktreeResult) -> Unit,
     val onDismiss: () -> Unit,
     val selection: ExistingWorktreeSelectionCallbacks,
 )
@@ -74,7 +74,7 @@ internal data class ExistingWorktreeSelectionCallbacks(
 private data class ExistingWorktreeKeyboardCallbacks(
     val onHighlight: (Int) -> Unit,
     val onSelect: (ExistingWorktreeResult) -> Unit,
-    val onConfirm: () -> Unit,
+    val onConfirm: (ExistingWorktreeResult) -> Unit,
 )
 
 private data class ExistingWorktreeRowActions(
@@ -87,7 +87,7 @@ internal fun ExistingBranchWorktreeDialogContent(
     request: PendingCreateWorktree,
     discovery: ExistingBranchDiscoveryUiState,
     onRequestChange: (PendingCreateWorktree) -> Unit,
-    onConfirm: () -> Unit,
+    onConfirm: (ExistingWorktreeResult) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val activeDiscovery = discovery.takeIf { it.repoRootPath == request.repoRootPath }
@@ -112,7 +112,7 @@ private fun existingRepositoryDialogModel(
     request: PendingCreateWorktree,
     discovery: ExistingBranchDiscoveryUiState,
     onRequestChange: (PendingCreateWorktree) -> Unit,
-    onConfirm: () -> Unit,
+    onConfirm: (ExistingWorktreeResult) -> Unit,
     onDismiss: () -> Unit,
 ): ExistingWorktreeDialogModel {
     val results = existingWorktreeResults(discovery, request.existingBranchQuery)
@@ -230,7 +230,10 @@ internal fun ExistingWorktreeDialogBody(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Row {
-            Button(onClick = actions.onConfirm, enabled = state.selectedResult != null) {
+            Button(
+                onClick = { state.selectedResult?.let(actions.onConfirm) },
+                enabled = state.selectedResult != null,
+            ) {
                 Text("Use Existing")
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -302,7 +305,9 @@ private sealed interface ExistingWorktreeKeyboardAction {
         val result: ExistingWorktreeResult,
     ) : ExistingWorktreeKeyboardAction
 
-    data object Confirm : ExistingWorktreeKeyboardAction
+    data class Confirm(
+        val result: ExistingWorktreeResult,
+    ) : ExistingWorktreeKeyboardAction
 }
 
 private fun handleExistingWorktreeKeyEvent(
@@ -317,7 +322,7 @@ private fun handleExistingWorktreeKeyEvent(
     null -> false
     is ExistingWorktreeKeyboardAction.Highlight -> callbacks.onHighlight(action.index).let { true }
     is ExistingWorktreeKeyboardAction.Select -> callbacks.onSelect(action.result).let { true }
-    ExistingWorktreeKeyboardAction.Confirm -> callbacks.onConfirm().let { true }
+    is ExistingWorktreeKeyboardAction.Confirm -> callbacks.onConfirm(action.result).let { true }
 }
 
 private fun KeyEvent.isEnterKey(): Boolean = key == Key.Enter || key == Key.NumPadEnter
@@ -335,7 +340,7 @@ private fun existingWorktreeKeyboardAction(
 
         Key.DirectionUp, Key.NumPadDirectionUp -> highlightResultBy(highlightedIndex, -1, results.size)
 
-        Key.Enter, Key.NumPadEnter -> selectedResult?.let { ExistingWorktreeKeyboardAction.Confirm }
+        Key.Enter, Key.NumPadEnter -> selectedResult?.let(ExistingWorktreeKeyboardAction::Confirm)
             ?: results.getOrNull(highlightedIndex ?: -1)?.let(ExistingWorktreeKeyboardAction::Select)
 
         else -> null

@@ -92,6 +92,7 @@ data class RefreshedExistingBranches(
     val branches: List<String>,
     val originBranches: List<String>,
     val originBranchRefreshSucceeded: Boolean,
+    val worktreePathsByBranch: Map<String, String> = emptyMap(),
 )
 
 data class RepositoryWorktrees(

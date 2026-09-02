@@ -111,10 +111,13 @@ private fun EngHubScreenContent(
             request = request,
             discovery = state.globalExistingBranchDiscovery,
             onRequestChange = { pendingGlobalCreateWorktree = it },
-            onConfirm = {
-                val selectedResult = requireNotNull(request.selectedExistingResult)
+            onConfirm = { selectedResult ->
                 pendingGlobalCreateWorktree = null
-                actions.onCheckoutExistingBranch(selectedResult.repoRootPath, selectedResult.branch)
+                actions.onCheckoutExistingBranch(
+                    selectedResult.repoRootPath,
+                    selectedResult.branch,
+                    selectedResult.existingWorktreePath,
+                )
             },
             onDismiss = { pendingGlobalCreateWorktree = null },
         )

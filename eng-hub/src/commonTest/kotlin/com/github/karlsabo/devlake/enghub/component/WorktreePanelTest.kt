@@ -666,7 +666,7 @@ class WorktreePanelTest {
         onRepositoryCreateWorktreeRequestHandled = {},
         onDiscoverExistingBranches = {},
         onDiscoverExistingPullRequest = { _, _ -> },
-        onCheckoutExistingBranch = { _, _ -> },
+        onCheckoutExistingBranch = { _, _, _ -> },
         onConfirmUseUnrelatedExistingBranch = {},
         onDismissUseUnrelatedExistingBranchConfirmation = {},
         onAbortRebaseConflict = {},

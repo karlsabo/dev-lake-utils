@@ -34,6 +34,7 @@ internal class ExistingWorktreeController(
                         branches = branches.branches,
                         originBranches = branches.originBranches,
                         originBranchRefreshSucceeded = branches.originBranchRefreshSucceeded,
+                        worktreePathsByBranch = branches.worktreePathsByBranch,
                     )
                 }
                 .onFailure { failure ->
@@ -43,6 +44,7 @@ internal class ExistingWorktreeController(
                         branches = emptyList(),
                         originBranches = emptyList(),
                         originBranchRefreshSucceeded = false,
+                        worktreePathsByBranch = emptyMap(),
                     )
                 }
         }
@@ -71,6 +73,7 @@ internal class ExistingWorktreeController(
         branches: List<String>,
         originBranches: List<String>,
         originBranchRefreshSucceeded: Boolean,
+        worktreePathsByBranch: Map<String, String>,
     ) {
         while (true) {
             val current = state.existingBranchDiscovery.value
@@ -79,15 +82,23 @@ internal class ExistingWorktreeController(
                 branches = branches,
                 originBranches = originBranches,
                 originBranchRefreshSucceeded = originBranchRefreshSucceeded,
+                worktreePathsByBranch = worktreePathsByBranch,
                 isLoading = false,
             )
             if (state.existingBranchDiscovery.compareAndSet(current, completed)) return
         }
     }
 
-    fun checkoutExistingBranch(repoRootPath: String, branch: String) {
+    fun checkoutExistingBranch(
+        repoRootPath: String,
+        branch: String,
+        existingWorktreePath: String? = null,
+    ) {
         if (repoRootPath.isBlank() || branch.isBlank()) return
-        val worktreePath = buildWorktreePath(repoRootPath, branch)
+        val worktreePath = existingWorktreePath
+            ?.takeIf(String::isNotBlank)
+            ?.let(::WorktreePath)
+            ?: buildWorktreePath(repoRootPath, branch)
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             var setupHandle: WorktreeSetupHandle? = null
             runCatching {

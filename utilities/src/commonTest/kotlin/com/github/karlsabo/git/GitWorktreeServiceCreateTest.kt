@@ -25,6 +25,7 @@ class GitWorktreeServiceCreateTest {
         assertEquals(listOf("feature/existing-worktree", "feature/local", "main"), branches.branches)
         assertEquals(listOf("feature/existing-worktree", "main"), branches.originBranches)
         assertTrue(branches.originBranchRefreshSucceeded)
+        assertEquals(mapOf("main" to "/repos/dev-lake-utils"), branches.worktreePathsByBranch)
         assertEquals(
             listOf(FakeGitCommandApi.Call("fetch", listOf("/repos/dev-lake-utils", "origin", "--prune"))),
             fake.calls.filter { it.method == "fetch" },
@@ -115,6 +116,29 @@ class GitWorktreeServiceCreateTest {
             fake.calls.filter { it.method == "worktreeAddNewBranch" },
         )
         assertTrue(fake.calls.none { it.method == "remoteBranchExists" })
+    }
+
+    @Test
+    fun checkoutExistingBranchWorktreeReusesDiscoveredWorktreePathWithoutCreating() {
+        val existingWorktreePath = "/tmp/dev-lake-utils-already-local"
+        val fake = FakeGitCommandApi().apply {
+            worktreeListResult = """
+                worktree /repos/dev-lake-utils
+                HEAD abc123
+                branch refs/heads/main
+
+                worktree $existingWorktreePath
+                HEAD def456
+                branch refs/heads/feature/already-local
+            """.trimIndent()
+        }
+        val service = GitWorktreeService(fake)
+
+        val result = service.checkoutExistingBranchWorktree("/repos/dev-lake-utils", "feature/already-local")
+
+        assertEquals(existingWorktreePath, result)
+        assertTrue(fake.calls.none { it.method == "worktreeAdd" || it.method == "worktreeAddNewBranch" })
+        assertTrue(fake.calls.none { it.method == "listLocalBranches" || it.method == "listRemoteBranches" })
     }
 
     @Test

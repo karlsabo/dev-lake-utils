@@ -218,7 +218,8 @@ class EngHubViewModel(
     val discoverGlobalExistingPullRequests: (String) -> Unit =
         globalExistingWorktreeDiscoveryController::discoverPullRequests
     val discoverExistingPullRequest: (String, String) -> Unit = existingWorktreeController::discoverPullRequest
-    val checkoutExistingBranch: (String, String) -> Unit = existingWorktreeController::checkoutExistingBranch
+    val checkoutExistingBranch: (repoRootPath: String, branch: String, existingWorktreePath: String?) -> Unit =
+        existingWorktreeController::checkoutExistingBranch
     val openLocalWorktree: (String, String) -> Unit = existingWorktreeController::openLocalWorktree
 
     val archiveLocalWorktree: (String, String) -> Unit = archiveController::archiveLocalWorktree

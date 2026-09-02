@@ -17,7 +17,7 @@ internal fun GlobalExistingBranchWorktreeDialog(
     request: PendingGlobalCreateWorktree,
     discovery: GlobalExistingBranchDiscoveryUiState,
     onRequestChange: (PendingGlobalCreateWorktree) -> Unit,
-    onConfirm: () -> Unit,
+    onConfirm: (ExistingWorktreeResult) -> Unit,
     onDismiss: () -> Unit,
 ) {
     DialogWindow(
@@ -45,7 +45,7 @@ internal fun GlobalExistingBranchWorktreeDialogContent(
     request: PendingGlobalCreateWorktree,
     discovery: GlobalExistingBranchDiscoveryUiState,
     onRequestChange: (PendingGlobalCreateWorktree) -> Unit,
-    onConfirm: () -> Unit,
+    onConfirm: (ExistingWorktreeResult) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val model = globalExistingDialogModel(
@@ -63,7 +63,7 @@ private fun globalExistingDialogModel(
     request: PendingGlobalCreateWorktree,
     discovery: GlobalExistingBranchDiscoveryUiState,
     onRequestChange: (PendingGlobalCreateWorktree) -> Unit,
-    onConfirm: () -> Unit,
+    onConfirm: (ExistingWorktreeResult) -> Unit,
     onDismiss: () -> Unit,
 ): ExistingWorktreeDialogModel {
     val results = globalExistingWorktreeResults(discovery, request.existingBranchQuery)
@@ -114,7 +114,7 @@ private fun globalUnsupportedPullRequestMessage(
 private data class GlobalExistingDialogCallbacks(
     val request: PendingGlobalCreateWorktree,
     val onRequestChange: (PendingGlobalCreateWorktree) -> Unit,
-    val onConfirm: () -> Unit,
+    val onConfirm: (ExistingWorktreeResult) -> Unit,
     val onDismiss: () -> Unit,
 ) {
     fun toDialogCallbacks(

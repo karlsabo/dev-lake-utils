@@ -27,7 +27,7 @@ internal data class WorktreePanelActions(
     val onRepositoryCreateWorktreeRequestHandled: () -> Unit,
     val onDiscoverExistingBranches: (String) -> Unit,
     val onDiscoverExistingPullRequest: (repoRootPath: String, query: String) -> Unit,
-    val onCheckoutExistingBranch: (repoRootPath: String, branch: String) -> Unit,
+    val onCheckoutExistingBranch: (repoRootPath: String, branch: String, existingWorktreePath: String?) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val onAbortRebaseConflict: (PendingRebaseConflictResolution) -> Unit,
@@ -58,6 +58,7 @@ internal data class ExistingBranchDiscoveryUiState(
     val branches: List<String> = emptyList(),
     val originBranches: List<String> = emptyList(),
     val originBranchRefreshSucceeded: Boolean? = null,
+    val worktreePathsByBranch: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
     val pullRequestQuery: String = "",
     val pullRequest: ExistingPullRequestWorktreeResult? = null,
@@ -73,11 +74,13 @@ internal data class GlobalExistingBranchDiscoveryUiState(
 internal sealed interface ExistingWorktreeResult {
     val repoRootPath: String
     val branch: String
+    val existingWorktreePath: String?
 }
 
 internal data class ExistingBranchWorktreeResult(
     override val repoRootPath: String,
     override val branch: String,
+    override val existingWorktreePath: String? = null,
 ) : ExistingWorktreeResult
 
 internal data class ExistingPullRequestWorktreeResult(
@@ -85,6 +88,7 @@ internal data class ExistingPullRequestWorktreeResult(
     override val branch: String,
     val repositoryFullName: String,
     val number: Int,
+    override val existingWorktreePath: String? = null,
 ) : ExistingWorktreeResult
 
 internal data class PendingCreateWorktree(

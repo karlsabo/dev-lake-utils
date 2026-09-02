@@ -315,9 +315,7 @@ private class GitExistingBranchWorktreeCreator(
         branchValidator.validate(branch)
         val worktreePath = buildWorktreePath(repoPath, branch).value
         planner.listWorktrees(repoPath).firstOrNull { it.branch == branch }?.let { existing ->
-            if (existing.path != worktreePath) {
-                throw GitWorktreeException("Branch $branch is already checked out elsewhere at ${existing.path}.")
-            }
+            logger.info { "Reusing existing worktree at ${existing.path} for branch $branch" }
             return existing.path
         }
 
@@ -698,9 +696,8 @@ private class GitExistingBranchDiscovery(
         val originFetch = runCatching { gitCommandApi.fetch(repoPath, "origin", prune = true) }
             .onFailure { logWarning("Failed to refresh origin branches for $repoPath", it) }
 
-        val worktreeBranches = loadBranches("worktrees", repoPath) {
-            lister.listWorktreeEntries(repoPath).map(Worktree::branch)
-        }
+        val worktrees = loadWorktrees(repoPath)
+        val worktreeBranches = worktrees.map(Worktree::branch)
         val localBranches = loadBranches("local branches", repoPath) {
             gitCommandApi.listLocalBranches(repoPath)
         }
@@ -714,8 +711,13 @@ private class GitExistingBranchDiscovery(
             branches = (worktreeBranches + localBranches + originBranches).normalizedBranches(),
             originBranches = originBranches,
             originBranchRefreshSucceeded = originFetch.isSuccess && originBranchListing.isSuccess,
+            worktreePathsByBranch = worktrees.worktreePathsByBranch(),
         )
     }
+
+    private fun loadWorktrees(repoPath: String): List<Worktree> = runCatching { lister.listWorktreeEntries(repoPath) }
+        .onFailure { logWarning("Failed to list worktrees for $repoPath", it) }
+        .getOrDefault(emptyList())
 
     private fun loadBranches(
         source: String,
@@ -726,6 +728,11 @@ private class GitExistingBranchDiscovery(
         .getOrDefault(emptyList())
 
     private fun List<String>.normalizedBranches(): List<String> = filter(String::isNotBlank).distinct().sorted()
+
+    private fun List<Worktree>.worktreePathsByBranch(): Map<String, String> = asSequence()
+        .filter { worktree -> worktree.branch.isNotBlank() && worktree.path.isNotBlank() }
+        .distinctBy(Worktree::branch)
+        .associate { worktree -> worktree.branch to worktree.path }
 }
 
 private class GitOriginUrlResolver(

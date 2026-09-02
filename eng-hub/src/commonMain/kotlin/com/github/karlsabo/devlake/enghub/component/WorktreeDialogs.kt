@@ -46,7 +46,7 @@ internal data class WorktreeDialogActions(
     val onPendingCreateWorktreeChange: (PendingCreateWorktree?) -> Unit,
     val onArchiveWorktree: (PendingArchive) -> Unit,
     val onCreateWorktree: (PendingCreateWorktree) -> Unit,
-    val onCheckoutExistingBranch: (repoRootPath: String, branch: String) -> Unit,
+    val onCheckoutExistingBranch: (repoRootPath: String, branch: String, existingWorktreePath: String?) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val onAbortRebaseConflict: (PendingRebaseConflictResolution) -> Unit,
@@ -70,7 +70,7 @@ private data class CreateWorktreeDialogContentState(
 private data class CreateWorktreeDialogActions(
     val onStateChange: (PendingCreateWorktree) -> Unit,
     val onCreateNew: (PendingCreateWorktree) -> Unit,
-    val onCheckoutExisting: (repoRootPath: String, branch: String) -> Unit,
+    val onCheckoutExisting: (ExistingWorktreeResult) -> Unit,
     val onDismiss: () -> Unit,
 )
 
@@ -134,9 +134,9 @@ internal fun WorktreeDialogHost(
                     actions.onPendingCreateWorktreeChange(null)
                     actions.onCreateWorktree(request)
                 },
-                onCheckoutExisting = { repoRootPath, branch ->
+                onCheckoutExisting = { result ->
                     actions.onPendingCreateWorktreeChange(null)
-                    actions.onCheckoutExistingBranch(repoRootPath, branch)
+                    actions.onCheckoutExistingBranch(result.repoRootPath, result.branch, result.existingWorktreePath)
                 },
                 onDismiss = { actions.onPendingCreateWorktreeChange(null) },
             ),
@@ -272,12 +272,7 @@ private fun CreateWorktreeDialog(
                         request = state,
                         discovery = discovery,
                         onRequestChange = actions.onStateChange,
-                        onConfirm = {
-                            actions.onCheckoutExisting(
-                                state.repoRootPath,
-                                requireNotNull(state.selectedExistingResult).branch,
-                            )
-                        },
+                        onConfirm = actions.onCheckoutExisting,
                         onDismiss = actions.onDismiss,
                     )
                 }

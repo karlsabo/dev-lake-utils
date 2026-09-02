@@ -55,7 +55,7 @@ internal data class EngHubScreenActions(
     val checkoutWorktreePath: CheckoutWorktreePath,
     val onDiscoverGlobalExistingBranches: () -> Unit,
     val onDiscoverGlobalExistingPullRequests: (query: String) -> Unit,
-    val onCheckoutExistingBranch: (repoRootPath: String, branch: String) -> Unit,
+    val onCheckoutExistingBranch: (repoRootPath: String, branch: String, existingWorktreePath: String?) -> Unit,
     val pullRequests: PullRequestPaneActions,
     val notifications: NotificationActions,
     val worktrees: WorktreePanelActions,

@@ -133,6 +133,22 @@ class ExistingBranchWorktreeDialogTest {
     }
 
     @Test
+    fun existingBranchResultCarriesDiscoveredWorktreePath() {
+        val branch = "feature/already-local"
+        val worktreePath = "/tmp/dev-lake-utils-already-local"
+        val discovery = ExistingBranchDiscoveryUiState(
+            repoRootPath = REPO_PATH,
+            branches = listOf(branch),
+            worktreePathsByBranch = mapOf(branch to worktreePath),
+        )
+
+        assertEquals(
+            listOf(ExistingBranchWorktreeResult(REPO_PATH, branch, worktreePath)),
+            existingWorktreeResults(discovery, "already-local"),
+        )
+    }
+
+    @Test
     fun sameBranchSelectionIsScopedToRepositoryIdentity() {
         val branch = "release/123"
         val selected = ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, branch)

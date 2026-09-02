@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.karlsabo.git.RefreshedExistingBranches
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -63,9 +64,7 @@ internal class GlobalExistingWorktreeDiscoveryController(
                 finishBranchDiscovery(
                     request = request,
                     repoRootPath = repoRootPath,
-                    branches = branches.branches,
-                    originBranches = branches.originBranches,
-                    originBranchRefreshSucceeded = branches.originBranchRefreshSucceeded,
+                    branches = branches,
                 )
             }
             .onFailure { failure ->
@@ -73,9 +72,11 @@ internal class GlobalExistingWorktreeDiscoveryController(
                 finishBranchDiscovery(
                     request = request,
                     repoRootPath = repoRootPath,
-                    branches = emptyList(),
-                    originBranches = emptyList(),
-                    originBranchRefreshSucceeded = false,
+                    branches = RefreshedExistingBranches(
+                        branches = emptyList(),
+                        originBranches = emptyList(),
+                        originBranchRefreshSucceeded = false,
+                    ),
                 )
             }
     }
@@ -183,17 +184,16 @@ internal class GlobalExistingWorktreeDiscoveryController(
     private fun finishBranchDiscovery(
         request: GlobalExistingBranchDiscoveryState,
         repoRootPath: String,
-        branches: List<String>,
-        originBranches: List<String>,
-        originBranchRefreshSucceeded: Boolean,
+        branches: RefreshedExistingBranches,
     ) {
         while (true) {
             val current = state.globalExistingBranchDiscovery.value
             if (current.requestId != request.requestId || repoRootPath !in current.repoRootPaths) return
             val repository = current.repositories.getValue(repoRootPath).copy(
-                branches = branches,
-                originBranches = originBranches,
-                originBranchRefreshSucceeded = originBranchRefreshSucceeded,
+                branches = branches.branches,
+                originBranches = branches.originBranches,
+                originBranchRefreshSucceeded = branches.originBranchRefreshSucceeded,
+                worktreePathsByBranch = branches.worktreePathsByBranch,
                 isLoading = false,
             )
             val repositories = current.repositories + (repoRootPath to repository)

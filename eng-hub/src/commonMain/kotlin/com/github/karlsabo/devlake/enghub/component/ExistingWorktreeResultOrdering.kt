@@ -8,13 +8,19 @@ internal fun existingWorktreeResults(
 ): List<ExistingWorktreeResult> = buildList {
     addAll(
         filterExistingBranches(discovery.branches, query).map { branch ->
-            ExistingBranchWorktreeResult(discovery.repoRootPath, branch)
+            ExistingBranchWorktreeResult(
+                repoRootPath = discovery.repoRootPath,
+                branch = branch,
+                existingWorktreePath = discovery.worktreePathsByBranch[branch],
+            )
         },
     )
     discovery.pullRequest
         ?.takeIf { discovery.pullRequestQuery == query.trim() }
         ?.takeIf { pullRequest -> discovery.canUsePullRequestHead(pullRequest.branch) }
-        ?.let(::add)
+        ?.let { pullRequest ->
+            add(pullRequest.copy(existingWorktreePath = discovery.worktreePathsByBranch[pullRequest.branch]))
+        }
 }.rankedByExistingWorktreeMatch(query)
 
 internal fun filterExistingBranches(branches: List<String>, query: String): List<String> = branches

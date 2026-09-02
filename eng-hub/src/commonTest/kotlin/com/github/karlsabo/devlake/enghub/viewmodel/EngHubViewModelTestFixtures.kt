@@ -443,6 +443,7 @@ data class RecordingGitWorktreeApiResponses(
     val existingBranchesForRepoPath: ((String) -> List<String>)? = null,
     val existingBranchDiscoveryFailure: RuntimeException? = null,
     val originBranchesByRepoPath: Map<String, List<String>> = emptyMap(),
+    val existingWorktreePathsByBranchByRepoPath: Map<String, Map<String, String>> = emptyMap(),
     val originUrlsByRepoPath: Map<String, String?> = emptyMap(),
     val parentBranchesByRepoPath: Map<String, Map<String, String>> = emptyMap(),
     val branchNeedsRebaseByCall: Map<BranchNeedsRebaseCall, Boolean> = emptyMap(),
@@ -599,7 +600,17 @@ class RecordingGitWorktreeApi(
                 ?: responses.existingBranchesByRepoPath.getValue(repoPath),
             originBranches = responses.originBranchesByRepoPath[repoPath].orEmpty(),
             originBranchRefreshSucceeded = true,
+            worktreePathsByBranch = responses.existingWorktreePathsByBranchByRepoPath[repoPath]
+                ?: responses.worktreePathsByBranch(repoPath),
         )
+    }
+
+    private fun RecordingGitWorktreeApiResponses.worktreePathsByBranch(repoPath: String): Map<String, String> {
+        val worktrees = worktreesForRepoPath?.invoke(repoPath) ?: worktreesByRepoPath?.get(repoPath)
+        return worktrees.orEmpty()
+            .filter { worktree -> worktree.branch.isNotBlank() && worktree.path.isNotBlank() }
+            .distinctBy(Worktree::branch)
+            .associate { worktree -> worktree.branch to worktree.path }
     }
 
     override fun originUrl(repoPath: String): String? = responses.originUrlsByRepoPath[repoPath]

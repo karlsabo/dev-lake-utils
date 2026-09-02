@@ -583,6 +583,42 @@ class WorktreeSetupCoordinatorTest {
     }
 
     @Test
+    fun existingBranchRequestAcceptsDiscoveredWorktreePathAndRerunsSetup() = runBlocking {
+        val repoPath = "/repos/dev-lake-utils"
+        val branch = "feature/already-local"
+        val worktreePath = WorktreePath("/tmp/dev-lake-utils-already-local")
+        val events = mutableListOf<String>()
+        val git = FakeGitWorktreeApi().apply {
+            expectedRepoPath = repoPath
+            expectedBranch = branch
+            createdBranchWorktreePath = worktreePath
+            onCheckoutExistingBranchWorktree = { events += "reuse" }
+        }
+        val coordinator = WorktreeSetupCoordinator(
+            gitWorktreeApi = git,
+            setupCommandRunner = WorktreeSetupCommandRunner { request ->
+                events += "setup:${request.worktreePath.value}"
+                WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
+            },
+            scope = this,
+        )
+        val request = WorktreeSetupRequest(
+            repoPath = repoPath,
+            worktreePath = worktreePath,
+            existingBranch = branch,
+            setupShell = "/bin/sh",
+            setupCommands = listOf("./setup"),
+        )
+
+        val result = withTimeout(1_000.milliseconds) { coordinator.setup(request).await() }
+
+        assertEquals(worktreePath, result.worktreePath)
+        assertEquals(listOf("reuse", "setup:${worktreePath.value}"), events)
+        assertEquals(1, git.checkoutExistingBranchWorktreeCalls)
+        assertEquals(0, git.createBranchWorktreeCalls)
+    }
+
+    @Test
     fun createBranchWorktreeRequestCreatesThenRunsSetupInNewWorktree() = runBlocking {
         val repoPath = "/repos/dev-lake-utils"
         val baseBranch = "feature/base-pr"

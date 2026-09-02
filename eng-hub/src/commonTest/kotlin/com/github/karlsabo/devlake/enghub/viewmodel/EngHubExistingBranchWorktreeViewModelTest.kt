@@ -2,12 +2,14 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.Worktree
+import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupCoordinator
 import com.github.karlsabo.git.buildWorktreePath
 import com.github.karlsabo.github.PullRequest
 import com.github.karlsabo.github.PullRequestHead
 import com.github.karlsabo.github.PullRequestRepository
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -266,7 +268,7 @@ class EngHubExistingBranchWorktreeViewModelTest {
             services = LocalRepositoryViewModelServices(worktreeSetupCoordinator = coordinator),
         )
 
-        viewModel.checkoutExistingBranch(ENGINEERING_DOCS_ROOT, branch)
+        viewModel.checkoutExistingBranch(ENGINEERING_DOCS_ROOT, branch, null)
         withTimeout(5.seconds) { setupRunner.awaitStarted(worktreePath) }
 
         assertEquals(
@@ -275,6 +277,52 @@ class EngHubExistingBranchWorktreeViewModelTest {
         )
         assertEquals(listOf("./docs/setup"), setupRunner.requestFor(worktreePath)?.setupCommands)
         setupRunner.complete(worktreePath)
+    }
+
+    @Test
+    fun globalRefreshKeepsDiscoveredWorktreePathAvailableForUseExistingWhileLoading() = runBlocking {
+        val branch = "feature/already-local"
+        val existingWorktreePath = "/tmp/dev-lake-utils-already-local"
+        val worktreeKey = WorktreePath(existingWorktreePath)
+        val blockedRefresh = BlockedSecondExistingBranchRefresh(branch)
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val git = alreadyLocalBranchGit(
+            branch = branch,
+            existingWorktreePath = existingWorktreePath,
+            existingBranchesForRepoPath = blockedRefresh::branchesForRepoPath,
+        )
+        val viewModel = globalUseExistingViewModel(git, setupRunner, this)
+
+        viewModel.discoverGlobalExistingBranches()
+        withTimeout(5.seconds) {
+            viewModel.globalExistingBranchDiscoveryStateFlow.first { discovery ->
+                val repository = discovery.repositories[DEV_LAKE_ROOT]
+                !discovery.isLoading && repository?.worktreePathsByBranch?.get(branch) == existingWorktreePath
+            }
+        }
+        viewModel.discoverGlobalExistingBranches()
+        withTimeout(5.seconds) { blockedRefresh.awaitSecondRefreshStarted() }
+
+        val loadingRepository = viewModel.globalExistingBranchDiscoveryStateFlow.value
+            .repositories.getValue(DEV_LAKE_ROOT)
+        assertEquals(true, loadingRepository.isLoading)
+        assertEquals(listOf("main", branch), loadingRepository.branches)
+        viewModel.checkoutExistingBranch(
+            DEV_LAKE_ROOT,
+            branch,
+            loadingRepository.worktreePathsByBranch.getValue(branch),
+        )
+        withTimeout(5.seconds) { setupRunner.awaitStarted(worktreeKey) }
+
+        assertEquals(
+            listOf(CheckoutExistingBranchWorktreeCall(DEV_LAKE_ROOT, branch)),
+            git.checkoutExistingBranchWorktreeCalls,
+        )
+        assertEquals(emptyList(), git.createBranchWorktreeCalls)
+        assertEquals(branch, setupRunner.requestFor(worktreeKey)?.existingBranch)
+
+        blockedRefresh.releaseSecondRefresh()
+        setupRunner.complete(worktreeKey)
     }
 
     @Test
@@ -313,7 +361,7 @@ class EngHubExistingBranchWorktreeViewModelTest {
         assertEquals(123, pullRequest.number)
         assertEquals(branch, pullRequest.branch)
 
-        viewModel.checkoutExistingBranch(DEV_LAKE_ROOT, pullRequest.branch)
+        viewModel.checkoutExistingBranch(DEV_LAKE_ROOT, pullRequest.branch, null)
         withTimeout(5.seconds) { setupRunner.awaitStarted(worktreePath) }
 
         assertEquals(
@@ -381,6 +429,68 @@ class EngHubExistingBranchWorktreeViewModelTest {
     }
 
     @Test
+    fun checkoutExistingSearchResultReusesDiscoveredWorktreeAndRunsSetupWithoutWarning() = runBlocking {
+        val branch = "feature/already-local"
+        val existingWorktreePath = "/tmp/dev-lake-utils-already-local"
+        val worktreeKey = WorktreePath(existingWorktreePath)
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val git = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(DEV_LAKE_ROOT, "main", "abc123"),
+                        Worktree(existingWorktreePath, branch, "def456"),
+                    ),
+                ),
+                existingBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to listOf("main", branch)),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onCheckoutExistingBranchWorktree = { call ->
+                    assertEquals(CheckoutExistingBranchWorktreeCall(DEV_LAKE_ROOT, branch), call)
+                    existingWorktreePath
+                },
+            ),
+        )
+        val coordinator = WorktreeSetupCoordinator(
+            gitWorktreeApi = git,
+            setupCommandRunner = setupRunner,
+            scope = this,
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = git,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(path = DEV_LAKE_ROOT, setupCommands = listOf("./gradlew setup")),
+            ),
+            services = LocalRepositoryViewModelServices(worktreeSetupCoordinator = coordinator),
+        )
+
+        viewModel.discoverExistingBranches(DEV_LAKE_ROOT)
+        val discovery = withTimeout(5.seconds) {
+            viewModel.existingBranchDiscoveryStateFlow.first { !it.isLoading && branch in it.branches }
+        }
+        viewModel.checkoutExistingBranch(
+            DEV_LAKE_ROOT,
+            branch,
+            discovery.worktreePathsByBranch.getValue(branch),
+        )
+        withTimeout(5.seconds) { setupRunner.awaitStarted(worktreeKey) }
+
+        assertEquals(mapOf(branch to existingWorktreePath, "main" to DEV_LAKE_ROOT), discovery.worktreePathsByBranch)
+        assertEquals(
+            listOf(CheckoutExistingBranchWorktreeCall(DEV_LAKE_ROOT, branch)),
+            git.checkoutExistingBranchWorktreeCalls,
+        )
+        assertEquals(emptyList(), git.createBranchWorktreeCalls)
+        assertNull(viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.value)
+        val setupRequest = requireNotNull(setupRunner.requestFor(worktreeKey))
+        assertEquals(branch, setupRequest.existingBranch)
+        assertEquals(listOf("./gradlew setup"), setupRequest.setupCommands)
+
+        setupRunner.complete(worktreeKey)
+    }
+
+    @Test
     fun checkoutExistingBranchCreatesWorktreeAndRunsConfiguredSetup() = runBlocking {
         val branch = "feature/existing-worktree"
         val worktreePath = buildWorktreePath(DEV_LAKE_ROOT, branch)
@@ -412,7 +522,7 @@ class EngHubExistingBranchWorktreeViewModelTest {
             services = LocalRepositoryViewModelServices(worktreeSetupCoordinator = coordinator),
         )
 
-        viewModel.checkoutExistingBranch(DEV_LAKE_ROOT, branch)
+        viewModel.checkoutExistingBranch(DEV_LAKE_ROOT, branch, null)
         withTimeout(5.seconds) { setupRunner.awaitStarted(worktreePath) }
 
         assertEquals(
@@ -426,6 +536,47 @@ class EngHubExistingBranchWorktreeViewModelTest {
 
         setupRunner.complete(worktreePath)
     }
+
+    private fun alreadyLocalBranchGit(
+        branch: String,
+        existingWorktreePath: String,
+        existingBranchesForRepoPath: (String) -> List<String>,
+    ) = RecordingGitWorktreeApi(
+        responses = RecordingGitWorktreeApiResponses(
+            worktreesByRepoPath = mapOf(
+                DEV_LAKE_ROOT to listOf(
+                    Worktree(DEV_LAKE_ROOT, "main", "abc123"),
+                    Worktree(existingWorktreePath, branch, "def456"),
+                ),
+            ),
+            existingBranchesForRepoPath = existingBranchesForRepoPath,
+        ),
+        callbacks = RecordingGitWorktreeApiCallbacks(
+            onCheckoutExistingBranchWorktree = { call ->
+                assertEquals(CheckoutExistingBranchWorktreeCall(DEV_LAKE_ROOT, branch), call)
+                existingWorktreePath
+            },
+        ),
+    )
+
+    private fun globalUseExistingViewModel(
+        git: RecordingGitWorktreeApi,
+        setupRunner: BlockingCoordinatorSetupRunner,
+        scope: CoroutineScope,
+    ) = createLocalRepositoryViewModel(
+        gitWorktreeApi = git,
+        configWriter = RecordingEngHubConfigWriter(),
+        localRepositoryConfigs = listOf(
+            LocalRepositoryConfig(path = DEV_LAKE_ROOT, setupCommands = listOf("./gradlew setup")),
+        ),
+        services = LocalRepositoryViewModelServices(
+            worktreeSetupCoordinator = WorktreeSetupCoordinator(
+                gitWorktreeApi = git,
+                setupCommandRunner = setupRunner,
+                scope = scope,
+            ),
+        ),
+    )
 
     private fun globalPullRequestGit(
         branch: String,
@@ -507,4 +658,30 @@ class EngHubExistingBranchWorktreeViewModelTest {
             ),
         ),
     )
+}
+
+private class BlockedSecondExistingBranchRefresh(
+    private val branch: String,
+) {
+    private val secondRefreshStarted = CompletableDeferred<Unit>()
+    private val releaseSecondRefreshSignal = CompletableDeferred<Unit>()
+    private var refreshCount = 0
+
+    fun branchesForRepoPath(repoPath: String): List<String> {
+        assertEquals(DEV_LAKE_ROOT, repoPath)
+        refreshCount += 1
+        if (refreshCount == 1) return listOf("main", branch)
+
+        secondRefreshStarted.complete(Unit)
+        runBlocking { releaseSecondRefreshSignal.await() }
+        return listOf("main", branch)
+    }
+
+    suspend fun awaitSecondRefreshStarted() {
+        secondRefreshStarted.await()
+    }
+
+    fun releaseSecondRefresh() {
+        releaseSecondRefreshSignal.complete(Unit)
+    }
 }

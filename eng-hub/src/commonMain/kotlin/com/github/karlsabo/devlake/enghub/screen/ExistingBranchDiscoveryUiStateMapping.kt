@@ -16,6 +16,7 @@ internal fun ExistingBranchDiscoveryState.toUiState(): ExistingBranchDiscoveryUi
     branches = branches,
     originBranches = originBranches,
     originBranchRefreshSucceeded = originBranchRefreshSucceeded,
+    worktreePathsByBranch = worktreePathsByBranch,
     isLoading = isLoading,
     pullRequestQuery = pullRequestQuery,
     pullRequest = pullRequest?.let { candidate ->
