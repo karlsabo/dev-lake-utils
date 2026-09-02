@@ -138,43 +138,6 @@ internal fun submitCreateWorktreeDialog(
     onCreateWorktree(state)
 }
 
-internal fun existingWorktreeResults(
-    discovery: ExistingBranchDiscoveryUiState,
-    query: String,
-): List<ExistingWorktreeResult> = buildList {
-    addAll(
-        filterExistingBranches(discovery.branches, query).map { branch ->
-            ExistingBranchWorktreeResult(discovery.repoRootPath, branch)
-        },
-    )
-    discovery.pullRequest
-        ?.takeIf { discovery.pullRequestQuery == query.trim() }
-        ?.takeIf { pullRequest -> discovery.canUsePullRequestHead(pullRequest.branch) }
-        ?.let(::add)
-}
-
-private fun ExistingBranchDiscoveryUiState.canUsePullRequestHead(
-    branch: String,
-): Boolean = when (originBranchRefreshSucceeded) {
-    true -> branch in originBranches
-    false -> true
-    null -> false
-}
-
-internal fun filterExistingBranches(branches: List<String>, query: String): List<String> = branches
-    .mapNotNull { branch ->
-        fuzzyMatchRank(query, listOf(branch) + branch.split('/'))?.let { rank ->
-            RankedExistingBranch(branch, rank)
-        }
-    }
-    .sortedWith(compareBy<RankedExistingBranch>({ it.rank.kind }, { it.rank.distance }, { it.branch }))
-    .map(RankedExistingBranch::branch)
-
-private data class RankedExistingBranch(
-    val branch: String,
-    val rank: FuzzyMatchRank,
-)
-
 internal fun confirmUseUnrelatedExistingBranchDialog(
     state: PendingUseUnrelatedExistingBranch,
     onConfirm: (PendingUseUnrelatedExistingBranch) -> Unit,

@@ -97,7 +97,7 @@ internal fun ExistingBranchWorktreeDialogContent(
     val activeDiscovery = discovery.takeIf { it.repoRootPath == request.repoRootPath }
         ?: ExistingBranchDiscoveryUiState(repoRootPath = request.repoRootPath)
     val results = existingWorktreeResults(activeDiscovery, request.existingBranchQuery)
-    val selectedResult = request.selectedExistingResult?.takeIf { it in results }
+    val selectedResult = selectedExistingWorktreeResult(request.selectedExistingResult, results)
     var highlightedIndex by remember(request.repoRootPath, request.existingBranchQuery) { mutableIntStateOf(0) }
     val activeHighlightedIndex = highlightedIndex.coerceToWorktreeResults(results)
     val keyboardCallbacks = ExistingWorktreeKeyboardCallbacks(
@@ -240,7 +240,7 @@ private fun ExistingWorktreeRows(
                     .semantics { selected = highlighted }
                     .onPreviewKeyEvent(actions.onKeyEvent),
             ) {
-                val selectedMarker = if (selectedResult == result) "Selected · " else ""
+                val selectedMarker = if (sameExistingWorktreeResult(selectedResult, result)) "Selected · " else ""
                 Text(selectedMarker + existingWorktreeResultLabel(result))
             }
         }

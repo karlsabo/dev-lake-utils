@@ -33,6 +33,76 @@ class ExistingBranchWorktreeDialogTest {
     }
 
     @Test
+    fun numericBranchAndPullRequestResultsRemainDistinct() {
+        val pullRequest = pullRequestResult(number = 123, branch = "feature/pr-123")
+        val discovery = ExistingBranchDiscoveryUiState(
+            repoRootPath = REPO_PATH,
+            branches = listOf("123"),
+            originBranches = listOf("feature/pr-123"),
+            originBranchRefreshSucceeded = true,
+            pullRequestQuery = "123",
+            pullRequest = pullRequest,
+        )
+
+        assertEquals(
+            listOf(ExistingBranchWorktreeResult(REPO_PATH, "123"), pullRequest),
+            existingWorktreeResults(discovery, "123"),
+        )
+    }
+
+    @Test
+    fun exactPullRequestMatchRanksBeforeFuzzyBranchMatch() {
+        val pullRequest = pullRequestResult(number = 123, branch = "feature/pr-123")
+        val discovery = ExistingBranchDiscoveryUiState(
+            repoRootPath = REPO_PATH,
+            branches = listOf("124"),
+            originBranches = listOf("feature/pr-123"),
+            originBranchRefreshSucceeded = true,
+            pullRequestQuery = "123",
+            pullRequest = pullRequest,
+        )
+
+        assertEquals(
+            listOf(pullRequest, ExistingBranchWorktreeResult(REPO_PATH, "124")),
+            existingWorktreeResults(discovery, "123"),
+        )
+    }
+
+    @Test
+    fun pullRequestResultIsNotDeduplicatedAgainstSameBranchResult() {
+        val pullRequest = pullRequestResult(number = 123, branch = "feature/pr-123")
+        val discovery = ExistingBranchDiscoveryUiState(
+            repoRootPath = REPO_PATH,
+            branches = listOf("feature/pr-123"),
+            originBranches = listOf("feature/pr-123"),
+            originBranchRefreshSucceeded = true,
+            pullRequestQuery = "123",
+            pullRequest = pullRequest,
+        )
+
+        assertEquals(
+            listOf(ExistingBranchWorktreeResult(REPO_PATH, "feature/pr-123"), pullRequest),
+            existingWorktreeResults(discovery, "123"),
+        )
+    }
+
+    @Test
+    fun selectedResultIsRetainedByIdentityWhenResultLabelsChange() {
+        val selected = pullRequestResult(
+            number = 123,
+            branch = "feature/pr-123",
+            repositoryFullName = "old-owner/dev-lake-utils",
+        )
+        val current = pullRequestResult(
+            number = 123,
+            branch = "feature/pr-123",
+            repositoryFullName = "owner/dev-lake-utils",
+        )
+
+        assertEquals(current, selectedExistingWorktreeResult(selected, listOf(current)))
+    }
+
+    @Test
     fun localBranchCannotMakeDeletedRemotePullRequestHeadSelectable() {
         val discovery = ExistingBranchDiscoveryUiState(
             repoRootPath = REPO_PATH,
@@ -68,6 +138,32 @@ class ExistingBranchWorktreeDialogTest {
         )
 
         assertEquals(listOf(pullRequest), existingWorktreeResults(discovery, "123"))
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun numericBranchAndPullRequestResultsRenderSeparateLabels() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                ExistingBranchWorktreeDialogContent(
+                    request = existingBranchRequest().copy(existingBranchQuery = "123"),
+                    discovery = ExistingBranchDiscoveryUiState(
+                        repoRootPath = REPO_PATH,
+                        branches = listOf("123"),
+                        originBranches = listOf("feature/pr-123"),
+                        originBranchRefreshSucceeded = true,
+                        pullRequestQuery = "123",
+                        pullRequest = pullRequestResult(number = 123, branch = "feature/pr-123"),
+                    ),
+                    onRequestChange = {},
+                    onConfirm = {},
+                    onDismiss = {},
+                )
+            }
+        }
+
+        onNodeWithText("Branch · dev-lake-utils · 123").assertIsDisplayed()
+        onNodeWithText("PR #123 · owner/dev-lake-utils · feature/pr-123").assertIsDisplayed()
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -280,6 +376,17 @@ class ExistingBranchWorktreeDialogTest {
     private fun loadedBranches(repoRootPath: String) = ExistingBranchDiscoveryUiState(
         repoRootPath = repoRootPath,
         branches = listOf("feature/existing-worktree"),
+    )
+
+    private fun pullRequestResult(
+        number: Int,
+        branch: String,
+        repositoryFullName: String = "owner/dev-lake-utils",
+    ) = ExistingPullRequestWorktreeResult(
+        repoRootPath = REPO_PATH,
+        repositoryFullName = repositoryFullName,
+        number = number,
+        branch = branch,
     )
 
     private companion object {
