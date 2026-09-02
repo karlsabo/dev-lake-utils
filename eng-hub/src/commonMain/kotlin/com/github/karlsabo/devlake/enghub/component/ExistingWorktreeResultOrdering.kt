@@ -54,17 +54,10 @@ private fun rankExistingWorktreeResult(
     query: String,
 ): FuzzyMatchRank? = when (result) {
     is ExistingBranchWorktreeResult -> fuzzyMatchRank(query, existingBranchSearchValues(result.branch))
-    is ExistingPullRequestWorktreeResult -> fuzzyMatchRank(query, existingPullRequestSearchValues(result))
+    is ExistingPullRequestWorktreeResult -> pullRequestMatchRank(result, query)
 }
 
 private fun existingBranchSearchValues(branch: String): List<String> = listOf(branch) + branch.split('/')
-
-private fun existingPullRequestSearchValues(result: ExistingPullRequestWorktreeResult): List<String> = listOf(
-    "#${result.number}",
-    result.number.toString(),
-    result.branch,
-    result.repositoryFullName,
-)
 
 private fun existingBranchComparator(): Comparator<RankedExistingBranch> = compareBy(
     { it.rank.kind },

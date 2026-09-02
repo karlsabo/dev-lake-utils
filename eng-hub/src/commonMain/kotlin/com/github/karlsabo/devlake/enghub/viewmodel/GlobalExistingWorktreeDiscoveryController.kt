@@ -3,6 +3,8 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.git.RefreshedExistingBranches
+import com.github.karlsabo.github.GitHubPullRequestReference
+import com.github.karlsabo.github.parseGitHubPullRequestReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -36,8 +38,8 @@ internal class GlobalExistingWorktreeDiscoveryController(
         val repoRootPaths = state.configuredGlobalRepoRootPaths()
         pullRequestDiscoveryJob?.cancel()
         val normalizedQuery = query.trim()
-        val number = plainPullRequestNumber(normalizedQuery)
-        if (number == null) {
+        val reference = parseGitHubPullRequestReference(normalizedQuery)
+        if (reference == null) {
             clearPullRequests(repoRootPaths, normalizedQuery)
             return
         }
@@ -48,7 +50,7 @@ internal class GlobalExistingWorktreeDiscoveryController(
         pullRequestDiscoveryJob = launchGitHubAction { services ->
             supervisorScope {
                 repoRootPaths.forEach { repoRootPath ->
-                    launch { discoverRepositoryPullRequest(request, repoRootPath, number, services) }
+                    launch { discoverRepositoryPullRequest(request, repoRootPath, reference, services) }
                 }
             }
         }
@@ -84,20 +86,22 @@ internal class GlobalExistingWorktreeDiscoveryController(
     private suspend fun discoverRepositoryPullRequest(
         request: GlobalExistingBranchDiscoveryState,
         repoRootPath: String,
-        number: Int,
+        reference: GitHubPullRequestReference,
         services: EngHubGitHubServices,
     ) {
         runCatching {
             discoverPullRequestWorktreeCandidate(
                 repoRootPath = repoRootPath,
-                number = number,
+                reference = reference,
                 gitWorktreeApi = worktreeServices.gitWorktreeApi,
                 services = services,
             )
         }.rethrowCancellation()
             .onSuccess { outcome -> finishPullRequestDiscovery(request, repoRootPath, outcome) }
             .onFailure { failure ->
-                logger.error(failure) { "Failed to discover pull request #$number for $repoRootPath" }
+                logger.error(failure) {
+                    "Failed to discover pull request #${reference.number} for $repoRootPath"
+                }
                 finishPullRequestDiscovery(request, repoRootPath, PullRequestDiscoveryOutcome.NoResult)
             }
     }

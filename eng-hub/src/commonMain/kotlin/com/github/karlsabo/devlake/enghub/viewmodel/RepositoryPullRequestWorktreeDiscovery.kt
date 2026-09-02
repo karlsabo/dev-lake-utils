@@ -1,8 +1,10 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.github.GitHubPullRequestReference
 import com.github.karlsabo.github.GitHubRepositoryIdentity
 import com.github.karlsabo.github.PullRequest
+import com.github.karlsabo.github.parseGitHubPullRequestReference
 import com.github.karlsabo.github.parseGitHubRepositoryIdentity
 import kotlinx.coroutines.Job
 
@@ -17,8 +19,8 @@ internal class RepositoryPullRequestWorktreeDiscovery(
         if (repoRootPath.isBlank()) return
         discoveryJob?.cancel()
         val normalizedQuery = query.trim()
-        val number = plainPullRequestNumber(normalizedQuery)
-        if (number == null) {
+        val reference = parseGitHubPullRequestReference(normalizedQuery)
+        if (reference == null) {
             clear(repoRootPath, normalizedQuery)
             return
         }
@@ -28,7 +30,7 @@ internal class RepositoryPullRequestWorktreeDiscovery(
             runCatching {
                 discoverPullRequestWorktreeCandidate(
                     repoRootPath = repoRootPath,
-                    number = number,
+                    reference = reference,
                     gitWorktreeApi = gitWorktreeApi,
                     services = services,
                 )
@@ -36,7 +38,9 @@ internal class RepositoryPullRequestWorktreeDiscovery(
                 .rethrowCancellation()
                 .onSuccess { outcome -> finish(request, outcome) }
                 .onFailure { failure ->
-                    logger.error(failure) { "Failed to discover pull request #$number for $repoRootPath" }
+                    logger.error(failure) {
+                        "Failed to discover pull request #${reference.number} for $repoRootPath"
+                    }
                     finish(request, PullRequestDiscoveryOutcome.NoResult)
                 }
         }
@@ -108,26 +112,24 @@ internal sealed interface PullRequestDiscoveryOutcome {
     data object NoResult : PullRequestDiscoveryOutcome
 }
 
-internal fun plainPullRequestNumber(query: String): Int? = query.trim()
-    .takeIf { it.isNotEmpty() && it.all(Char::isDigit) }
-    ?.toIntOrNull()
-    ?.takeIf { it > 0 }
-
 internal suspend fun discoverPullRequestWorktreeCandidate(
     repoRootPath: String,
-    number: Int,
+    reference: GitHubPullRequestReference,
     gitWorktreeApi: GitWorktreeApi,
     services: EngHubGitHubServices,
 ): PullRequestDiscoveryOutcome {
     val identity = gitWorktreeApi.originUrl(repoRootPath)
         ?.let(::parseGitHubRepositoryIdentity)
         ?: return PullRequestDiscoveryOutcome.NoResult
-    val pullRequest = services.pullRequestReviewApi.getPullRequest(
-        owner = identity.owner,
-        repository = identity.repository,
-        number = number,
-    )
-    return pullRequest.toDiscoveryOutcome(identity, number)
+    return if (reference.repository?.let { !identity.matches(it.fullName) } == true) {
+        PullRequestDiscoveryOutcome.NoResult
+    } else {
+        services.pullRequestReviewApi.getPullRequest(
+            owner = identity.owner,
+            repository = identity.repository,
+            number = reference.number,
+        ).toDiscoveryOutcome(identity, reference.number)
+    }
 }
 
 private fun PullRequest.toDiscoveryOutcome(
