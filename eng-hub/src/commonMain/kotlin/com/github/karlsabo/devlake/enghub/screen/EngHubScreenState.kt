@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.screen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.github.karlsabo.devlake.enghub.component.ExistingBranchDiscoveryUiState
 import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
@@ -107,6 +108,7 @@ internal fun collectEngHubScreenState(
     val forceArchiveRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
     val repositoryCreateWorktreeRequest by
         viewModel.lastCreateLocalWorktreeFromRepositoryRequestStateFlow.collectAsState()
+    val existingBranchDiscovery by viewModel.existingBranchDiscoveryStateFlow.collectAsState()
     val useUnrelatedExistingBranchRequest by
         viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.collectAsState()
     val rebaseConflictResolutionRequest by viewModel.rebaseConflictResolutionRequestStateFlow.collectAsState()
@@ -138,6 +140,11 @@ internal fun collectEngHubScreenState(
                     baseBranch = request.baseBranch,
                 )
             },
+            existingBranchDiscovery = ExistingBranchDiscoveryUiState(
+                repoRootPath = existingBranchDiscovery.repoRootPath,
+                branches = existingBranchDiscovery.branches,
+                isLoading = existingBranchDiscovery.isLoading,
+            ),
             useUnrelatedExistingBranchConfirmationRequest = useUnrelatedExistingBranchRequest?.toPendingConfirmation(),
             rebaseConflictResolutionRequest = rebaseConflictResolutionRequest?.toPendingResolution(),
         ),
@@ -198,6 +205,8 @@ internal fun engHubScreenActions(
         onToggleRepository = viewModel.toggleLocalRepositoryExpansion,
         onCreateWorktreeFromRepository = viewModel::requestCreateLocalWorktreeFromRepository,
         onRepositoryCreateWorktreeRequestHandled = viewModel::clearCreateLocalWorktreeFromRepositoryRequest,
+        onDiscoverExistingBranches = viewModel.discoverExistingBranches,
+        onCheckoutExistingBranch = viewModel.checkoutExistingBranch,
         onConfirmUseUnrelatedExistingBranch = { request ->
             viewModel.confirmUseUnrelatedExistingBranch(request.toViewModelRequest())
         },

@@ -11,6 +11,7 @@ interface GitRemoteCommandApi {
         repoPath: String,
         remote: String = "origin",
         vararg refSpecs: String,
+        prune: Boolean = false,
     )
 
     fun remoteBranchExists(
@@ -18,6 +19,11 @@ interface GitRemoteCommandApi {
         branch: String,
         remote: String = "origin",
     ): Boolean
+
+    fun listRemoteBranches(
+        repoPath: String,
+        remote: String = "origin",
+    ): List<String>
 
     fun currentBranchUpstreamRemote(repoPath: String): String?
 
@@ -32,6 +38,8 @@ interface GitBranchCommandApi {
         repoPath: String,
         branch: String,
     ): Boolean
+
+    fun listLocalBranches(repoPath: String): List<String>
 }
 
 interface GitAncestryCommandApi {

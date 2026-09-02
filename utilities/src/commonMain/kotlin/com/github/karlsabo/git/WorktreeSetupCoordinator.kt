@@ -23,6 +23,7 @@ data class WorktreeSetupRequest(
     val baseBranch: String? = null,
     val baseCommitIsh: String? = null,
     val targetBranch: String? = null,
+    val existingBranch: String? = null,
     val allowUnrelatedExistingBranch: Boolean = false,
     val setupShell: String = "",
     val setupCommands: List<String> = emptyList(),
@@ -47,6 +48,9 @@ data class WorktreeSetupRequest(
         require(cloneUrl == null || !hasBranchCreationFields) {
             "repository/worktree setup and branch worktree creation are mutually exclusive"
         }
+        require(existingBranch == null || (cloneUrl == null && !hasBranchCreationFields)) {
+            "existing branch checkout is mutually exclusive with other worktree creation modes"
+        }
         val hasBranchBasedCreationFields = baseWorktreePath != null && baseBranch != null && targetBranch != null
         require(!allowUnrelatedExistingBranch || hasBranchBasedCreationFields) {
             "allowUnrelatedExistingBranch requires branch-based worktree creation fields"
@@ -57,6 +61,7 @@ data class WorktreeSetupRequest(
         baseBranch?.let { require(it.isNotBlank()) { "baseBranch must not be blank" } }
         baseCommitIsh?.let { require(it.isNotBlank()) { "baseCommitIsh must not be blank" } }
         targetBranch?.let { require(it.isNotBlank()) { "targetBranch must not be blank" } }
+        existingBranch?.let { require(it.isNotBlank()) { "existingBranch must not be blank" } }
         if (setupCommands.isNotEmpty()) {
             require(setupShell.isNotBlank()) { "setupShell must not be blank when setupCommands are provided" }
         }
@@ -65,6 +70,7 @@ data class WorktreeSetupRequest(
     internal val shouldEnsureRepositoryAndWorktree: Boolean = cloneUrl != null
     internal val shouldCreateBranchWorktree: Boolean = baseWorktreePath != null
     internal val shouldCreateBranchWorktreeFromCommitIsh: Boolean = baseCommitIsh != null
+    internal val shouldCheckoutExistingBranch: Boolean = existingBranch != null
 }
 
 data class WorktreeSetupResult(
@@ -197,6 +203,15 @@ class WorktreeSetupCoordinator private constructor(
                     "ensureWorktree returned $ensuredPath, but request expected ${request.worktreePath}",
                 )
             }
+        } else if (request.shouldCheckoutExistingBranch) {
+            setStatus(request.worktreePath, WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE)
+            val createdPath = WorktreePath(
+                gitWorktreeApi.checkoutExistingBranchWorktree(
+                    repoPath = request.repoPath,
+                    branch = requireNotNull(request.existingBranch),
+                ),
+            )
+            verifyCreatedWorktreePath(request, createdPath, "checkoutExistingBranchWorktree")
         } else if (request.shouldCreateBranchWorktree) {
             setStatus(request.worktreePath, WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE)
             val createdPath = WorktreePath(
@@ -217,11 +232,7 @@ class WorktreeSetupCoordinator private constructor(
                     )
                 },
             )
-            if (createdPath != request.worktreePath) {
-                throw WorktreeSetupException(
-                    "createBranchWorktree returned $createdPath, but request expected ${request.worktreePath}",
-                )
-            }
+            verifyCreatedWorktreePath(request, createdPath, "createBranchWorktree")
         }
 
         val setupCommandResult = if (request.setupCommands.isEmpty()) {
@@ -237,14 +248,30 @@ class WorktreeSetupCoordinator private constructor(
         )
     }
 
+    private fun verifyCreatedWorktreePath(
+        request: WorktreeSetupRequest,
+        createdPath: WorktreePath,
+        operation: String,
+    ) {
+        if (createdPath != request.worktreePath) {
+            throw WorktreeSetupException(
+                "$operation returned $createdPath, but request expected ${request.worktreePath}",
+            )
+        }
+    }
+
     private suspend fun repositoryMutexFor(repoPath: String): Mutex = repositoryMutexesGuard.withLock {
         repositoryMutexes.getOrPut(repoPath) { Mutex() }
     }
 
     private fun WorktreeSetupRequest.initialStatus(): WorktreeSetupStatus? = when {
         shouldEnsureRepositoryAndWorktree -> WorktreeSetupStatus.WAITING_FOR_REPOSITORY
-        shouldCreateBranchWorktree -> WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE
+
+        shouldCheckoutExistingBranch || shouldCreateBranchWorktree ->
+            WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE
+
         setupCommands.isNotEmpty() -> WorktreeSetupStatus.RUNNING_SETUP_COMMANDS
+
         else -> null
     }
 

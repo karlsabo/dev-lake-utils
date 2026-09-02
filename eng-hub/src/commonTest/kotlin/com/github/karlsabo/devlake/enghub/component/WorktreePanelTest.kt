@@ -664,6 +664,8 @@ class WorktreePanelTest {
         onToggleRepository = {},
         onCreateWorktreeFromRepository = {},
         onRepositoryCreateWorktreeRequestHandled = {},
+        onDiscoverExistingBranches = {},
+        onCheckoutExistingBranch = { _, _ -> },
         onConfirmUseUnrelatedExistingBranch = {},
         onDismissUseUnrelatedExistingBranchConfirmation = {},
         onAbortRebaseConflict = {},

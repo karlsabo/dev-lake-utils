@@ -35,6 +35,7 @@ import org.jetbrains.compose.resources.painterResource
 internal data class WorktreeDialogState(
     val pendingArchive: PendingArchive?,
     val pendingCreateWorktree: PendingCreateWorktree?,
+    val existingBranchDiscovery: ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(),
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch?,
     val rebaseConflictResolutionRequest: PendingRebaseConflictResolution?,
     val forceArchiveRequest: ForceArchiveWorktreeUiState?,
@@ -45,6 +46,7 @@ internal data class WorktreeDialogActions(
     val onPendingCreateWorktreeChange: (PendingCreateWorktree?) -> Unit,
     val onArchiveWorktree: (PendingArchive) -> Unit,
     val onCreateWorktree: (PendingCreateWorktree) -> Unit,
+    val onCheckoutExistingBranch: (repoRootPath: String, branch: String) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val onAbortRebaseConflict: (PendingRebaseConflictResolution) -> Unit,
@@ -63,6 +65,13 @@ private data class CreateWorktreeDialogContentState(
     val targetBranchInput: TextFieldValue,
     val validationMessage: String?,
     val confirmEnabled: Boolean,
+)
+
+private data class CreateWorktreeDialogActions(
+    val onStateChange: (PendingCreateWorktree) -> Unit,
+    val onCreateNew: (PendingCreateWorktree) -> Unit,
+    val onCheckoutExisting: (repoRootPath: String, branch: String) -> Unit,
+    val onDismiss: () -> Unit,
 )
 
 private data class CreateWorktreeDialogContentActions(
@@ -118,14 +127,19 @@ internal fun WorktreeDialogHost(
     state.pendingCreateWorktree?.let { createWorktree ->
         CreateWorktreeDialog(
             state = createWorktree,
-            onTargetBranchChange = { targetBranch ->
-                actions.onPendingCreateWorktreeChange(createWorktree.copy(targetBranch = targetBranch))
-            },
-            onConfirm = { request ->
-                actions.onPendingCreateWorktreeChange(null)
-                actions.onCreateWorktree(request)
-            },
-            onDismiss = { actions.onPendingCreateWorktreeChange(null) },
+            discovery = state.existingBranchDiscovery,
+            actions = CreateWorktreeDialogActions(
+                onStateChange = actions.onPendingCreateWorktreeChange,
+                onCreateNew = { request ->
+                    actions.onPendingCreateWorktreeChange(null)
+                    actions.onCreateWorktree(request)
+                },
+                onCheckoutExisting = { repoRootPath, branch ->
+                    actions.onPendingCreateWorktreeChange(null)
+                    actions.onCheckoutExistingBranch(repoRootPath, branch)
+                },
+                onDismiss = { actions.onPendingCreateWorktreeChange(null) },
+            ),
         )
     }
 }
@@ -218,13 +232,12 @@ private fun UseUnrelatedExistingBranchConfirmationDialog(
 @Composable
 private fun CreateWorktreeDialog(
     state: PendingCreateWorktree,
-    onTargetBranchChange: (String) -> Unit,
-    onConfirm: (PendingCreateWorktree) -> Unit,
-    onDismiss: () -> Unit,
+    discovery: ExistingBranchDiscoveryUiState,
+    actions: CreateWorktreeDialogActions,
 ) {
     val model = rememberCreateWorktreeDialogModel(
         state = state,
-        onTargetBranchChange = onTargetBranchChange,
+        onTargetBranchChange = { targetBranch -> actions.onStateChange(state.copy(targetBranch = targetBranch)) },
     )
     val validationMessage = createWorktreeTargetBranchValidationMessage(
         targetBranch = state.targetBranch,
@@ -232,26 +245,42 @@ private fun CreateWorktreeDialog(
     )
 
     DialogWindow(
-        onCloseRequest = onDismiss,
+        onCloseRequest = actions.onDismiss,
         title = "Create Worktree",
         icon = painterResource(Res.drawable.icon),
         visible = true,
     ) {
         MaterialTheme {
             Surface {
-                CreateWorktreeDialogContent(
-                    state = CreateWorktreeDialogContentState(
+                if (state.mode == CreateWorktreeMode.NEW) {
+                    CreateWorktreeDialogContent(
+                        state = CreateWorktreeDialogContentState(
+                            request = state,
+                            targetBranchInput = model.targetBranchInput,
+                            validationMessage = validationMessage,
+                            confirmEnabled = isCreateWorktreeConfirmEnabled(model.validation),
+                        ),
+                        actions = CreateWorktreeDialogContentActions(
+                            onTargetBranchInputChange = model.onInputChange,
+                            onConfirm = { actions.onCreateNew(state) },
+                            onDismiss = actions.onDismiss,
+                        ),
+                        onModeChange = { mode -> actions.onStateChange(state.copy(mode = mode)) },
+                    )
+                } else {
+                    ExistingBranchWorktreeDialogContent(
                         request = state,
-                        targetBranchInput = model.targetBranchInput,
-                        validationMessage = validationMessage,
-                        confirmEnabled = isCreateWorktreeConfirmEnabled(model.validation),
-                    ),
-                    actions = CreateWorktreeDialogContentActions(
-                        onTargetBranchInputChange = model.onInputChange,
-                        onConfirm = { onConfirm(state) },
-                        onDismiss = onDismiss,
-                    ),
-                )
+                        discovery = discovery,
+                        onRequestChange = actions.onStateChange,
+                        onConfirm = {
+                            actions.onCheckoutExisting(
+                                state.repoRootPath,
+                                requireNotNull(state.selectedExistingBranch),
+                            )
+                        },
+                        onDismiss = actions.onDismiss,
+                    )
+                }
             }
         }
     }
@@ -317,6 +346,7 @@ private suspend fun finishValidationOnIo(
 private fun CreateWorktreeDialogContent(
     state: CreateWorktreeDialogContentState,
     actions: CreateWorktreeDialogContentActions,
+    onModeChange: (CreateWorktreeMode) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -325,6 +355,8 @@ private fun CreateWorktreeDialogContent(
             .wrapContentHeight(),
     ) {
         Text(text = "Create Worktree", style = MaterialTheme.typography.h6)
+        Spacer(modifier = Modifier.height(8.dp))
+        CreateWorktreeModeSelector(state.request.mode, onModeChange)
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = "Base: ${state.request.baseCommitIsh ?: state.request.baseBranch}")
         Spacer(modifier = Modifier.height(12.dp))

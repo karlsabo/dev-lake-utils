@@ -64,8 +64,15 @@ private class GitRemoteCommandService(
         repoPath: String,
         remote: String,
         vararg refSpecs: String,
+        prune: Boolean,
     ) {
-        commandRunner.run(gitRepoCommand(repoPath, listOf("fetch", remote) + refSpecs.toList()))
+        val args = buildList {
+            add("fetch")
+            if (prune) add("--prune")
+            add(remote)
+            addAll(refSpecs)
+        }
+        commandRunner.run(gitRepoCommand(repoPath, args))
     }
 
     override fun remoteBranchExists(
@@ -87,6 +94,21 @@ private class GitRemoteCommandService(
             2 -> false
             else -> throwGitCommandException(command, result)
         }
+    }
+
+    override fun listRemoteBranches(repoPath: String, remote: String): List<String> {
+        require(remote.isNotBlank()) { "remote must not be blank" }
+        return commandRunner.run(
+            gitRepoCommand(
+                repoPath,
+                "for-each-ref",
+                "--format=%(refname:strip=3)",
+                "refs/remotes/$remote",
+            ),
+        ).lineSequence()
+            .map(String::trim)
+            .filter { it.isNotEmpty() && it != "HEAD" }
+            .toList()
     }
 
     override fun currentBranchUpstreamRemote(repoPath: String): String? {
@@ -132,6 +154,13 @@ private class GitBranchCommandService(
             else -> throwGitCommandException(command, result)
         }
     }
+
+    override fun listLocalBranches(repoPath: String): List<String> = commandRunner.run(
+        gitRepoCommand(repoPath, "for-each-ref", "--format=%(refname:short)", "refs/heads"),
+    ).lineSequence()
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .toList()
 }
 
 private class GitAncestryCommandService(

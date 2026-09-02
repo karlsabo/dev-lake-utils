@@ -71,6 +71,8 @@ private fun buildGitWorktreeServiceParts(
     val ancestryChecker = GitBranchAncestryChecker(gitCommandApi, branchValidator)
     val planner = GitWorktreeBranchPlanner(gitCommandApi, lister, branchValidator)
     val creator = GitWorktreeCreator(gitCommandApi, branchValidator, planner, ancestryChecker)
+    val existingBranchCreator = GitExistingBranchWorktreeCreator(gitCommandApi, branchValidator, planner)
+    val existingBranchDiscovery = GitExistingBranchDiscovery(gitCommandApi, lister, logWarning)
     val defaultBranchRefResolver = GitDefaultBranchRefResolver(gitCommandApi)
     val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
     val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
@@ -78,9 +80,10 @@ private fun buildGitWorktreeServiceParts(
 
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
-        creationApi = GitWorktreeCreationService(creator, planner, ancestryChecker),
+        creationApi = GitWorktreeCreationService(creator, existingBranchCreator, planner, ancestryChecker),
         discoveryApi = GitWorktreeDiscoveryService(
             lister,
+            existingBranchDiscovery,
             defaultBranchRefResolver,
             parentInferer,
             ancestryChecker,
@@ -105,10 +108,16 @@ private class GitRepositoryService(
 
 private class GitWorktreeCreationService(
     private val creator: GitWorktreeCreator,
+    private val existingBranchCreator: GitExistingBranchWorktreeCreator,
     private val planner: GitWorktreeBranchPlanner,
     private val ancestryChecker: GitBranchAncestryChecker,
 ) : GitWorktreeCreationApi {
     override fun ensureWorktree(repoPath: String, branch: String): String = creator.ensureWorktree(repoPath, branch)
+
+    override fun checkoutExistingBranchWorktree(
+        repoPath: String,
+        branch: String,
+    ): String = existingBranchCreator.checkout(repoPath, branch)
 
     override fun createBranchWorktree(
         repoPath: String,
@@ -152,11 +161,16 @@ private class GitWorktreeCreationService(
 
 private class GitWorktreeDiscoveryService(
     private val lister: GitWorktreeLister,
+    private val existingBranches: GitExistingBranchDiscovery,
     private val defaultRefs: GitDefaultBranchRefResolver,
     private val parents: GitWorktreeParentInferer,
     private val ancestryChecker: GitBranchAncestryChecker,
 ) : GitWorktreeDiscoveryApi {
     override fun listWorktrees(repoPath: String): List<Worktree> = lister.listWorktrees(repoPath)
+
+    override fun refreshAndListExistingBranches(
+        repoPath: String,
+    ): List<String> = existingBranches.refreshAndList(repoPath)
 
     override fun inferDefaultBranchRef(repoPath: String): String? = defaultRefs.inferDefaultBranchRef(repoPath)
 
@@ -284,6 +298,76 @@ private class GitRepositoryResolver(
             "Could not resolve a worktree root for $selectedPath. Please add the repository root directory.",
             e,
         )
+    }
+}
+
+private class GitExistingBranchWorktreeCreator(
+    private val gitCommandApi: GitCommandApi,
+    private val branchValidator: GitWorktreeBranchValidator,
+    private val planner: GitWorktreeBranchPlanner,
+) {
+    fun checkout(repoPath: String, branch: String): String {
+        branchValidator.validate(branch)
+        val worktreePath = buildWorktreePath(repoPath, branch).value
+        planner.listWorktrees(repoPath).firstOrNull { it.branch == branch }?.let { existing ->
+            if (existing.path != worktreePath) {
+                throw GitWorktreeException("Branch $branch is already checked out elsewhere at ${existing.path}.")
+            }
+            return existing.path
+        }
+
+        if (localBranchExists(repoPath, branch)) {
+            addLocalBranch(repoPath, branch, worktreePath)
+        } else {
+            addRemoteBranch(repoPath, branch, worktreePath)
+        }
+        logger.info { "Created worktree at $worktreePath for existing branch $branch" }
+        return worktreePath
+    }
+
+    private fun addLocalBranch(
+        repoPath: String,
+        branch: String,
+        worktreePath: String,
+    ) {
+        try {
+            gitCommandApi.worktreeAdd(repoPath, worktreePath, branch)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to create worktree at $worktreePath for existing branch $branch: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+
+    private fun localBranchExists(repoPath: String, branch: String): Boolean = try {
+        gitCommandApi.localBranchExists(repoPath, branch)
+    } catch (e: GitCommandException) {
+        throw GitWorktreeException("Failed to check local branch $branch: ${e.gitOutput}", e)
+    }
+
+    private fun addRemoteBranch(
+        repoPath: String,
+        branch: String,
+        worktreePath: String,
+    ) {
+        if (branch !in remoteBranches(repoPath)) {
+            throw GitWorktreeException("Branch $branch does not exist locally or on origin.")
+        }
+        try {
+            gitCommandApi.worktreeAddNewBranch(repoPath, branch, worktreePath, "origin/$branch")
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to create worktree at $worktreePath for origin branch $branch: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+
+    private fun remoteBranches(repoPath: String): List<String> = try {
+        gitCommandApi.listRemoteBranches(repoPath, "origin")
+    } catch (e: GitCommandException) {
+        throw GitWorktreeException("Failed to list origin branches: ${e.gitOutput}", e)
     }
 }
 
@@ -494,6 +578,8 @@ private class GitWorktreeBranchPlanner(
         return lister.listWorktreeEntries(repoPath).any { it.path == worktreePath }
     }
 
+    fun listWorktrees(repoPath: String): List<Worktree> = lister.listWorktreeEntries(repoPath)
+
     private fun failIfBranchCheckedOutElsewhere(
         worktrees: List<Worktree>,
         targetBranch: String,
@@ -595,6 +681,33 @@ private class GitBranchAncestryChecker(
         startsWith("refs/") -> this
         endsWith("/HEAD") -> this
         else -> "refs/heads/$this"
+    }
+}
+
+private class GitExistingBranchDiscovery(
+    private val gitCommandApi: GitCommandApi,
+    private val lister: GitWorktreeLister,
+    private val logWarning: (message: String, cause: Throwable) -> Unit,
+) {
+    fun refreshAndList(repoPath: String): List<String> {
+        runCatching { gitCommandApi.fetch(repoPath, "origin", prune = true) }
+            .onFailure { logWarning("Failed to refresh origin branches for $repoPath", it) }
+
+        return buildList {
+            addBranches("worktrees", repoPath) { lister.listWorktreeEntries(repoPath).map(Worktree::branch) }
+            addBranches("local branches", repoPath) { gitCommandApi.listLocalBranches(repoPath) }
+            addBranches("origin branches", repoPath) { gitCommandApi.listRemoteBranches(repoPath, "origin") }
+        }.filter(String::isNotBlank).distinct().sorted()
+    }
+
+    private fun MutableList<String>.addBranches(
+        source: String,
+        repoPath: String,
+        load: () -> List<String>,
+    ) {
+        runCatching(load)
+            .onSuccess(::addAll)
+            .onFailure { logWarning("Failed to list $source for $repoPath", it) }
     }
 }
 

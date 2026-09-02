@@ -15,6 +15,7 @@ internal data class WorktreePanelState(
     val archivingWorktreePaths: Set<String>,
     val rebasingWorktreePaths: Set<String> = emptySet(),
     val repositoryCreateWorktreeRequest: PendingCreateWorktree? = null,
+    val existingBranchDiscovery: ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(),
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch? = null,
     val rebaseConflictResolutionRequest: PendingRebaseConflictResolution? = null,
 )
@@ -24,6 +25,8 @@ internal data class WorktreePanelActions(
     val onToggleRepository: (String) -> Unit,
     val onCreateWorktreeFromRepository: (String) -> Unit,
     val onRepositoryCreateWorktreeRequestHandled: () -> Unit,
+    val onDiscoverExistingBranches: (String) -> Unit,
+    val onCheckoutExistingBranch: (repoRootPath: String, branch: String) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val onAbortRebaseConflict: (PendingRebaseConflictResolution) -> Unit,
@@ -44,12 +47,26 @@ internal data class ForceArchiveWorktreeActions(
     val onDismiss: () -> Unit,
 )
 
+internal enum class CreateWorktreeMode {
+    NEW,
+    EXISTING,
+}
+
+internal data class ExistingBranchDiscoveryUiState(
+    val repoRootPath: String = "",
+    val branches: List<String> = emptyList(),
+    val isLoading: Boolean = false,
+)
+
 internal data class PendingCreateWorktree(
     val repoRootPath: String,
     val baseWorktreePath: String,
     val baseBranch: String,
     val baseCommitIsh: String? = null,
     val targetBranch: String = "",
+    val mode: CreateWorktreeMode = CreateWorktreeMode.NEW,
+    val existingBranchQuery: String = "",
+    val selectedExistingBranch: String? = null,
 )
 
 internal data class PendingUseUnrelatedExistingBranch(
@@ -96,6 +113,20 @@ internal fun submitCreateWorktreeDialog(
 ) {
     onCreateWorktree(state)
 }
+
+internal fun filterExistingBranches(branches: List<String>, query: String): List<String> = branches
+    .mapNotNull { branch ->
+        fuzzyMatchRank(query, listOf(branch) + branch.split('/'))?.let { rank ->
+            RankedExistingBranch(branch, rank)
+        }
+    }
+    .sortedWith(compareBy<RankedExistingBranch>({ it.rank.kind }, { it.rank.distance }, { it.branch }))
+    .map(RankedExistingBranch::branch)
+
+private data class RankedExistingBranch(
+    val branch: String,
+    val rank: FuzzyMatchRank,
+)
 
 internal fun confirmUseUnrelatedExistingBranchDialog(
     state: PendingUseUnrelatedExistingBranch,

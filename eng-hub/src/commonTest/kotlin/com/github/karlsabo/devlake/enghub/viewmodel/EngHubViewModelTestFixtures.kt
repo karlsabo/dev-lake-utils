@@ -399,6 +399,11 @@ class WorktreeSetupRunnerSignals {
     }
 }
 
+data class CheckoutExistingBranchWorktreeCall(
+    val repoPath: String,
+    val branch: String,
+)
+
 data class CreateBranchWorktreeCall(
     val repoPath: String,
     val baseWorktreePath: String,
@@ -433,6 +438,8 @@ data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
     val defaultBranchRefsByRepoPath: Map<String, String?> = emptyMap(),
+    val existingBranchesByRepoPath: Map<String, List<String>> = emptyMap(),
+    val existingBranchesForRepoPath: ((String) -> List<String>)? = null,
     val parentBranchesByRepoPath: Map<String, Map<String, String>> = emptyMap(),
     val branchNeedsRebaseByCall: Map<BranchNeedsRebaseCall, Boolean> = emptyMap(),
     val inferDefaultBranchRefFailure: RuntimeException? = null,
@@ -447,6 +454,9 @@ data class RecordingGitWorktreeApiCallbacks(
     val onListWorktrees: (String) -> Unit = {},
     val onInferWorktreeParentBranches: (String) -> Unit = {},
     val onArchiveWorktree: (String, String, Boolean) -> Unit = { _, _, _ -> },
+    val onCheckoutExistingBranchWorktree: (CheckoutExistingBranchWorktreeCall) -> String = {
+        error("Unexpected call")
+    },
     val onCreateBranchWorktree: (CreateBranchWorktreeCall) -> String = {
         error("Unexpected call")
     },
@@ -492,6 +502,7 @@ class RecordingGitWorktreeApi(
         get() = recordedListWorktreeRepoPaths.value
     val ensureRepositoryCalls = mutableListOf<Pair<String, String>>()
     val ensureWorktreeCalls = mutableListOf<Pair<String, String>>()
+    val checkoutExistingBranchWorktreeCalls = mutableListOf<CheckoutExistingBranchWorktreeCall>()
     val createBranchWorktreeCalls = mutableListOf<CreateBranchWorktreeCall>()
     val createBranchWorktreeFromCommitIshCalls = mutableListOf<CreateBranchWorktreeFromCommitIshCall>()
     val inferDefaultBranchRefCalls = mutableListOf<String>()
@@ -512,6 +523,12 @@ class RecordingGitWorktreeApi(
         val worktreePath = buildWorktreePath(repoPath, branch).value
         SystemFileSystem.createDirectories(Path(worktreePath))
         return worktreePath
+    }
+
+    override fun checkoutExistingBranchWorktree(repoPath: String, branch: String): String {
+        val call = CheckoutExistingBranchWorktreeCall(repoPath, branch)
+        checkoutExistingBranchWorktreeCalls += call
+        return callbacks.onCheckoutExistingBranchWorktree(call)
     }
 
     override fun createBranchWorktree(
@@ -568,6 +585,11 @@ class RecordingGitWorktreeApi(
         responses.listWorktreesFailure?.let { throw it }
         return responses.worktreesForRepoPath?.invoke(repoPath) ?: worktreesByRepoPath.getValue(repoPath)
     }
+
+    override fun refreshAndListExistingBranches(
+        repoPath: String,
+    ): List<String> = responses.existingBranchesForRepoPath?.invoke(repoPath)
+        ?: responses.existingBranchesByRepoPath.getValue(repoPath)
 
     override fun inferDefaultBranchRef(repoPath: String): String? {
         inferDefaultBranchRefCalls += repoPath

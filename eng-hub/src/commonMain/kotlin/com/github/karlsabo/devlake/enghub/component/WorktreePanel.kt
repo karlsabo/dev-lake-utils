@@ -30,6 +30,10 @@ internal fun WorktreePanel(
     var pendingArchive by remember { mutableStateOf<PendingArchive?>(null) }
     var pendingCreateWorktree by remember { mutableStateOf<PendingCreateWorktree?>(null) }
 
+    LaunchedEffect(pendingCreateWorktree?.repoRootPath) {
+        pendingCreateWorktree?.let { request -> actions.onDiscoverExistingBranches(request.repoRootPath) }
+    }
+
     LaunchedEffect(state.repositoryCreateWorktreeRequest) {
         state.repositoryCreateWorktreeRequest?.let { request ->
             pendingCreateWorktree = request
@@ -41,6 +45,7 @@ internal fun WorktreePanel(
         state = WorktreeDialogState(
             pendingArchive = pendingArchive,
             pendingCreateWorktree = pendingCreateWorktree,
+            existingBranchDiscovery = state.existingBranchDiscovery,
             useUnrelatedExistingBranchConfirmationRequest = state.useUnrelatedExistingBranchConfirmationRequest,
             rebaseConflictResolutionRequest = state.rebaseConflictResolutionRequest,
             forceArchiveRequest = state.forceArchiveRequest,
@@ -54,6 +59,7 @@ internal fun WorktreePanel(
             onCreateWorktree = { request ->
                 submitCreateWorktreeDialog(request, actions.worktrees.onCreateWorktree)
             },
+            onCheckoutExistingBranch = actions.onCheckoutExistingBranch,
             onConfirmUseUnrelatedExistingBranch = actions.onConfirmUseUnrelatedExistingBranch,
             onDismissUseUnrelatedExistingBranchConfirmation = actions.onDismissUseUnrelatedExistingBranchConfirmation,
             onAbortRebaseConflict = actions.onAbortRebaseConflict,

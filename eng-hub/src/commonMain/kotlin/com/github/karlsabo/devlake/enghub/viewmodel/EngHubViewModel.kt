@@ -59,6 +59,7 @@ class EngHubViewModel(
         viewModel = this,
         state = state,
         worktreeServices = worktreeServices,
+        localRepositories = localRepositoriesController,
         errorReporter = errorReporter,
     )
     private val archiveController = LocalWorktreeArchiveController(
@@ -101,6 +102,8 @@ class EngHubViewModel(
     internal val lastCreateLocalWorktreeFromRepositoryRequestStateFlow:
         StateFlow<CreateLocalWorktreeFromRepositoryRequest?> =
         state.lastCreateLocalWorktreeFromRepositoryRequest.asStateFlow()
+    internal val existingBranchDiscoveryStateFlow: StateFlow<ExistingBranchDiscoveryState> =
+        state.existingBranchDiscovery.asStateFlow()
     internal val useUnrelatedExistingBranchConfirmationRequestStateFlow:
         StateFlow<UseUnrelatedExistingBranchConfirmationRequest?> =
         state.useUnrelatedExistingBranchConfirmationRequest.asStateFlow()
@@ -193,6 +196,8 @@ class EngHubViewModel(
         localWorktreeCreateController.dismissUseUnrelatedExistingBranchConfirmation()
     }
 
+    val discoverExistingBranches: (String) -> Unit = existingWorktreeController::discoverExistingBranches
+    val checkoutExistingBranch: (String, String) -> Unit = existingWorktreeController::checkoutExistingBranch
     val openLocalWorktree: (String, String) -> Unit = existingWorktreeController::openLocalWorktree
 
     val archiveLocalWorktree: (String, String) -> Unit = archiveController::archiveLocalWorktree

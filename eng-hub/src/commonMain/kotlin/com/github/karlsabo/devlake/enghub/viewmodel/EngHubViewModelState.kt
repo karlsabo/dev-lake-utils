@@ -50,6 +50,13 @@ internal data class RebaseConflictResolutionRequest(
     val parentBranch: String,
 )
 
+internal data class ExistingBranchDiscoveryState(
+    val repoRootPath: String = "",
+    val branches: List<String> = emptyList(),
+    val isLoading: Boolean = false,
+    val requestId: Long = 0,
+)
+
 internal data class CreateLocalWorktreeFromRepositoryRequest(
     val repoRootPath: String,
     val baseWorktreePath: String,
@@ -85,6 +92,7 @@ internal class EngHubViewModelState(
         MutableStateFlow<CreateLocalWorktreeFromBaseRequest?>(null)
     val lastCreateLocalWorktreeFromRepositoryRequest =
         MutableStateFlow<CreateLocalWorktreeFromRepositoryRequest?>(null)
+    val existingBranchDiscovery = MutableStateFlow(ExistingBranchDiscoveryState())
     val useUnrelatedExistingBranchConfirmationRequest =
         MutableStateFlow<UseUnrelatedExistingBranchConfirmationRequest?>(null)
     val rebaseConflictResolutionRequests =

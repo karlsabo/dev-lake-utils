@@ -8,6 +8,58 @@ import kotlin.test.assertTrue
 
 class GitWorktreeServiceCreateTest {
     @Test
+    fun refreshAndListExistingBranchesFetchesOnceAndDeduplicatesAllBranchSources() {
+        val fake = FakeGitCommandApi().apply {
+            worktreeListResult = """
+                worktree /repos/dev-lake-utils
+                HEAD abc123
+                branch refs/heads/main
+            """.trimIndent()
+            listLocalBranchesAction = { listOf("main", "feature/local") }
+            listRemoteBranchesAction = { _, _ -> listOf("main", "feature/existing-worktree") }
+        }
+        val service = GitWorktreeService(fake)
+
+        val branches = service.refreshAndListExistingBranches("/repos/dev-lake-utils")
+
+        assertEquals(listOf("feature/existing-worktree", "feature/local", "main"), branches)
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("fetch", listOf("/repos/dev-lake-utils", "origin", "--prune"))),
+            fake.calls.filter { it.method == "fetch" },
+        )
+    }
+
+    @Test
+    fun checkoutExistingBranchWorktreeCreatesLocalBranchFromOriginBranch() {
+        val fake = FakeGitCommandApi().apply {
+            worktreeListResult = """
+                worktree /repos/dev-lake-utils
+                HEAD abc123
+                branch refs/heads/main
+            """.trimIndent()
+            listRemoteBranchesAction = { _, _ -> listOf("main", "feature/existing-worktree") }
+        }
+        val repoPath = "/repos/dev-lake-utils"
+        val branch = "feature/existing-worktree"
+        val worktreePath = buildWorktreePath(repoPath, branch).value
+        val service = GitWorktreeService(fake)
+
+        val result = service.checkoutExistingBranchWorktree(repoPath, branch)
+
+        assertEquals(worktreePath, result)
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call(
+                    "worktreeAddNewBranch",
+                    listOf(repoPath, branch, worktreePath, "origin/$branch"),
+                ),
+            ),
+            fake.calls.filter { it.method == "worktreeAddNewBranch" },
+        )
+        assertTrue(fake.calls.none { it.method == "remoteBranchExists" })
+    }
+
+    @Test
     fun createBranchWorktree_fromBranchBase_createsDerivedPathFromExplicitBase() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"

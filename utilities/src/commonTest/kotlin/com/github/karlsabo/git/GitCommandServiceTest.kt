@@ -137,6 +137,29 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun fetchWithPruneRemovesDeletedRemoteTrackingBranches() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            executeGit("-C", originDir, "branch", "feature/deleted")
+            service.clone(originDir, cloneDir)
+            assertTrue("feature/deleted" in service.listRemoteBranches(cloneDir))
+
+            executeGit("-C", originDir, "branch", "-D", "feature/deleted")
+            assertTrue("feature/deleted" in service.listRemoteBranches(cloneDir))
+
+            service.fetch(cloneDir, prune = true)
+
+            assertFalse("feature/deleted" in service.listRemoteBranches(cloneDir))
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
+        }
+    }
+
+    @Test
     fun remoteBranchExists_queriesRemoteWithoutLocalTrackingRef() {
         val originDir = createTempDir("origin")
         val cloneDir = createTempDir("clone")
@@ -165,6 +188,40 @@ class GitCommandServiceTest {
             assertFalse(service.localBranchExists(repoDir, "feature/missing-pr"))
         } finally {
             removeTempDir(repoDir)
+        }
+    }
+
+    @Test
+    fun listLocalBranches_returnsBranchNames() {
+        val repoDir = createTempDir("repo")
+        try {
+            initRepoWithCommit(repoDir)
+            executeGit("-C", repoDir, "branch", "feature/existing-worktree")
+
+            assertTrue("feature/existing-worktree" in service.listLocalBranches(repoDir))
+        } finally {
+            removeTempDir(repoDir)
+        }
+    }
+
+    @Test
+    fun listRemoteBranches_returnsFetchedOriginBranchesWithoutHead() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            service.clone(originDir, cloneDir)
+            executeGit("-C", originDir, "branch", "feature/existing-worktree")
+            service.fetch(cloneDir)
+
+            val branches = service.listRemoteBranches(cloneDir)
+
+            assertTrue("feature/existing-worktree" in branches)
+            assertFalse("HEAD" in branches)
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
         }
     }
 

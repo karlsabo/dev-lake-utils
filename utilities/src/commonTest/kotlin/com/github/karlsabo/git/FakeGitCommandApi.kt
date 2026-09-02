@@ -20,7 +20,9 @@ internal class FakeGitCommandApi : GitCommandApi {
     var isGitRepositoryResult: Boolean = true
     var fetchAction: (String, String, Array<out String>) -> Unit = { _, _, _ -> }
     var remoteBranchExistsAction: (String, String, String) -> Boolean = { _, _, _ -> false }
+    var listRemoteBranchesAction: (String, String) -> List<String> = { _, _ -> emptyList() }
     var localBranchExistsAction: (String, String) -> Boolean = { _, _ -> false }
+    var listLocalBranchesAction: (String) -> List<String> = { emptyList() }
     var currentBranchUpstreamRemoteAction: (String) -> String? = { null }
     var remoteDefaultBranchRefAction: (String, String) -> String? = { _, _ -> null }
     var isAncestorAction: (String, String, String) -> Boolean = { _, _, _ -> false }
@@ -50,8 +52,15 @@ internal class FakeGitCommandApi : GitCommandApi {
         repoPath: String,
         remote: String,
         vararg refSpecs: String,
+        prune: Boolean,
     ) {
-        calls.add(Call("fetch", listOf(repoPath, remote) + refSpecs.toList()))
+        val args = buildList {
+            add(repoPath)
+            add(remote)
+            if (prune) add("--prune")
+            addAll(refSpecs)
+        }
+        calls.add(Call("fetch", args))
         fetchAction(repoPath, remote, refSpecs)
     }
 
@@ -64,12 +73,22 @@ internal class FakeGitCommandApi : GitCommandApi {
         return remoteBranchExistsAction(repoPath, branch, remote)
     }
 
+    override fun listRemoteBranches(repoPath: String, remote: String): List<String> {
+        calls.add(Call("listRemoteBranches", listOf(repoPath, remote)))
+        return listRemoteBranchesAction(repoPath, remote)
+    }
+
     override fun localBranchExists(
         repoPath: String,
         branch: String,
     ): Boolean {
         calls.add(Call("localBranchExists", listOf(repoPath, branch)))
         return localBranchExistsAction(repoPath, branch)
+    }
+
+    override fun listLocalBranches(repoPath: String): List<String> {
+        calls.add(Call("listLocalBranches", listOf(repoPath)))
+        return listLocalBranchesAction(repoPath)
     }
 
     override fun currentBranchUpstreamRemote(repoPath: String): String? {

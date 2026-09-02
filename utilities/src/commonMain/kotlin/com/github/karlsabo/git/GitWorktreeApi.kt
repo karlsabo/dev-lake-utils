@@ -14,6 +14,10 @@ interface GitRepositoryApi {
 
 interface GitWorktreeCreationApi {
     fun ensureWorktree(repoPath: String, branch: String): String
+    fun checkoutExistingBranchWorktree(
+        repoPath: String,
+        branch: String,
+    ): String = throw UnsupportedOperationException("checkoutExistingBranchWorktree is not implemented")
     fun createBranchWorktree(
         repoPath: String,
         baseWorktreePath: String,
@@ -45,6 +49,9 @@ interface GitWorktreeCreationApi {
 
 interface GitWorktreeDiscoveryApi {
     fun listWorktrees(repoPath: String): List<Worktree>
+    fun refreshAndListExistingBranches(
+        repoPath: String,
+    ): List<String> = throw UnsupportedOperationException("refreshAndListExistingBranches is not implemented")
     fun inferDefaultBranchRef(repoPath: String): String?
     fun inferWorktreeParentBranches(repoPath: String): Map<String, String>
     fun branchNeedsRebase(
