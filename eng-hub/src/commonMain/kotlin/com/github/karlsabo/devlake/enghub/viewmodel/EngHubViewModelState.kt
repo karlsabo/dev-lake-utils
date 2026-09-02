@@ -11,6 +11,7 @@ import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupCoordinator
 import com.github.karlsabo.git.WorktreeSetupHandle
 import com.github.karlsabo.git.WorktreeSetupStatus
+import com.github.karlsabo.github.GitHubRepositoryIdentity
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.FlowCollector
@@ -58,6 +59,7 @@ internal data class ExistingPullRequestWorktreeCandidate(
 
 internal data class ExistingBranchDiscoveryState(
     val repoRootPath: String = "",
+    val repositoryIdentity: GitHubRepositoryIdentity? = null,
     val branches: List<String> = emptyList(),
     val originBranches: List<String> = emptyList(),
     val originBranchRefreshSucceeded: Boolean? = null,

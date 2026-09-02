@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.git.RefreshedExistingBranches
 import com.github.karlsabo.github.GitHubPullRequestReference
+import com.github.karlsabo.github.GitHubRepositoryIdentity
 import com.github.karlsabo.github.parseGitHubPullRequestReference
+import com.github.karlsabo.github.parseGitHubRepositoryIdentity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -60,12 +62,18 @@ internal class GlobalExistingWorktreeDiscoveryController(
         request: GlobalExistingBranchDiscoveryState,
         repoRootPath: String,
     ) {
+        val repositoryIdentity = runCatching {
+            worktreeServices.gitWorktreeApi.originUrl(repoRootPath)?.let(::parseGitHubRepositoryIdentity)
+        }.rethrowCancellation()
+            .onFailure { failure -> logger.error(failure) { "Failed to read origin for $repoRootPath" } }
+            .getOrNull()
         runCatching { worktreeServices.gitWorktreeApi.refreshAndListExistingBranches(repoRootPath) }
             .rethrowCancellation()
             .onSuccess { branches ->
                 finishBranchDiscovery(
                     request = request,
                     repoRootPath = repoRootPath,
+                    repositoryIdentity = repositoryIdentity,
                     branches = branches,
                 )
             }
@@ -74,6 +82,7 @@ internal class GlobalExistingWorktreeDiscoveryController(
                 finishBranchDiscovery(
                     request = request,
                     repoRootPath = repoRootPath,
+                    repositoryIdentity = repositoryIdentity,
                     branches = RefreshedExistingBranches(
                         branches = emptyList(),
                         originBranches = emptyList(),
@@ -188,12 +197,14 @@ internal class GlobalExistingWorktreeDiscoveryController(
     private fun finishBranchDiscovery(
         request: GlobalExistingBranchDiscoveryState,
         repoRootPath: String,
+        repositoryIdentity: GitHubRepositoryIdentity?,
         branches: RefreshedExistingBranches,
     ) {
         while (true) {
             val current = state.globalExistingBranchDiscovery.value
             if (current.requestId != request.requestId || repoRootPath !in current.repoRootPaths) return
             val repository = current.repositories.getValue(repoRootPath).copy(
+                repositoryIdentity = repositoryIdentity,
                 branches = branches.branches,
                 originBranches = branches.originBranches,
                 originBranchRefreshSucceeded = branches.originBranchRefreshSucceeded,

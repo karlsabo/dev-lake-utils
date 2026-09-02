@@ -5,6 +5,7 @@ import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
+import com.github.karlsabo.github.GitHubRepositoryIdentity
 
 internal typealias CreateWorktreeCallback = (PendingCreateWorktree) -> Unit
 
@@ -55,6 +56,7 @@ internal enum class CreateWorktreeMode {
 
 internal data class ExistingBranchDiscoveryUiState(
     val repoRootPath: String = "",
+    val repositoryIdentity: GitHubRepositoryIdentity? = null,
     val branches: List<String> = emptyList(),
     val originBranches: List<String> = emptyList(),
     val originBranchRefreshSucceeded: Boolean? = null,

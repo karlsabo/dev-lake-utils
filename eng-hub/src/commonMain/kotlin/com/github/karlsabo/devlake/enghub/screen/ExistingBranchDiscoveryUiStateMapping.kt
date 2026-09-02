@@ -13,6 +13,7 @@ internal fun GlobalExistingBranchDiscoveryState.toUiState() = GlobalExistingBran
 
 internal fun ExistingBranchDiscoveryState.toUiState(): ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(
     repoRootPath = repoRootPath,
+    repositoryIdentity = repositoryIdentity,
     branches = branches,
     originBranches = originBranches,
     originBranchRefreshSucceeded = originBranchRefreshSucceeded,
