@@ -73,6 +73,7 @@ private fun buildGitWorktreeServiceParts(
     val creator = GitWorktreeCreator(gitCommandApi, branchValidator, planner, ancestryChecker)
     val existingBranchCreator = GitExistingBranchWorktreeCreator(gitCommandApi, branchValidator, planner)
     val existingBranchDiscovery = GitExistingBranchDiscovery(gitCommandApi, lister, logWarning)
+    val originUrlResolver = GitOriginUrlResolver(gitCommandApi)
     val defaultBranchRefResolver = GitDefaultBranchRefResolver(gitCommandApi)
     val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
     val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
@@ -84,6 +85,7 @@ private fun buildGitWorktreeServiceParts(
         discoveryApi = GitWorktreeDiscoveryService(
             lister,
             existingBranchDiscovery,
+            originUrlResolver,
             defaultBranchRefResolver,
             parentInferer,
             ancestryChecker,
@@ -162,6 +164,7 @@ private class GitWorktreeCreationService(
 private class GitWorktreeDiscoveryService(
     private val lister: GitWorktreeLister,
     private val existingBranches: GitExistingBranchDiscovery,
+    private val originUrlResolver: GitOriginUrlResolver,
     private val defaultRefs: GitDefaultBranchRefResolver,
     private val parents: GitWorktreeParentInferer,
     private val ancestryChecker: GitBranchAncestryChecker,
@@ -170,7 +173,9 @@ private class GitWorktreeDiscoveryService(
 
     override fun refreshAndListExistingBranches(
         repoPath: String,
-    ): List<String> = existingBranches.refreshAndList(repoPath)
+    ): RefreshedExistingBranches = existingBranches.refreshAndList(repoPath)
+
+    override fun originUrl(repoPath: String): String? = originUrlResolver.resolve(repoPath)
 
     override fun inferDefaultBranchRef(repoPath: String): String? = defaultRefs.inferDefaultBranchRef(repoPath)
 
@@ -689,25 +694,47 @@ private class GitExistingBranchDiscovery(
     private val lister: GitWorktreeLister,
     private val logWarning: (message: String, cause: Throwable) -> Unit,
 ) {
-    fun refreshAndList(repoPath: String): List<String> {
-        runCatching { gitCommandApi.fetch(repoPath, "origin", prune = true) }
+    fun refreshAndList(repoPath: String): RefreshedExistingBranches {
+        val originFetch = runCatching { gitCommandApi.fetch(repoPath, "origin", prune = true) }
             .onFailure { logWarning("Failed to refresh origin branches for $repoPath", it) }
 
-        return buildList {
-            addBranches("worktrees", repoPath) { lister.listWorktreeEntries(repoPath).map(Worktree::branch) }
-            addBranches("local branches", repoPath) { gitCommandApi.listLocalBranches(repoPath) }
-            addBranches("origin branches", repoPath) { gitCommandApi.listRemoteBranches(repoPath, "origin") }
-        }.filter(String::isNotBlank).distinct().sorted()
+        val worktreeBranches = loadBranches("worktrees", repoPath) {
+            lister.listWorktreeEntries(repoPath).map(Worktree::branch)
+        }
+        val localBranches = loadBranches("local branches", repoPath) {
+            gitCommandApi.listLocalBranches(repoPath)
+        }
+        val originBranchListing = runCatching {
+            gitCommandApi.listRemoteBranches(repoPath, "origin")
+        }.onFailure { failure ->
+            logWarning("Failed to list origin branches for $repoPath", failure)
+        }
+        val originBranches = originBranchListing.getOrDefault(emptyList()).normalizedBranches()
+        return RefreshedExistingBranches(
+            branches = (worktreeBranches + localBranches + originBranches).normalizedBranches(),
+            originBranches = originBranches,
+            originBranchRefreshSucceeded = originFetch.isSuccess && originBranchListing.isSuccess,
+        )
     }
 
-    private fun MutableList<String>.addBranches(
+    private fun loadBranches(
         source: String,
         repoPath: String,
         load: () -> List<String>,
-    ) {
-        runCatching(load)
-            .onSuccess(::addAll)
-            .onFailure { logWarning("Failed to list $source for $repoPath", it) }
+    ): List<String> = runCatching(load)
+        .onFailure { logWarning("Failed to list $source for $repoPath", it) }
+        .getOrDefault(emptyList())
+
+    private fun List<String>.normalizedBranches(): List<String> = filter(String::isNotBlank).distinct().sorted()
+}
+
+private class GitOriginUrlResolver(
+    private val gitCommandApi: GitCommandApi,
+) {
+    fun resolve(repoPath: String): String? = try {
+        gitCommandApi.remoteUrl(repoPath, "origin")
+    } catch (e: GitCommandException) {
+        throw GitWorktreeException("Failed to read origin URL for $repoPath: ${e.gitOutput}", e)
     }
 }
 

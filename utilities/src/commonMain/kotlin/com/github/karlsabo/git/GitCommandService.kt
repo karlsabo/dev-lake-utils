@@ -111,6 +111,17 @@ private class GitRemoteCommandService(
             .toList()
     }
 
+    override fun remoteUrl(repoPath: String, remote: String): String? {
+        require(remote.isNotBlank()) { "remote must not be blank" }
+        val command = gitRepoCommand(repoPath, "config", "--get", "remote.$remote.url")
+        val result = commandRunner.runForResult(command)
+        return when (result.exitCode) {
+            0 -> result.stdout.trim().takeIf(String::isNotBlank)
+            1 -> null
+            else -> throwGitCommandException(command, result)
+        }
+    }
+
     override fun currentBranchUpstreamRemote(repoPath: String): String? {
         val currentBranch = commandRunner.run(gitRepoCommand(repoPath, "branch", "--show-current"))
             .takeIf { it.isNotBlank() }

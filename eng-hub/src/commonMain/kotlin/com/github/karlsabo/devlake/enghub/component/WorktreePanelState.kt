@@ -26,6 +26,7 @@ internal data class WorktreePanelActions(
     val onCreateWorktreeFromRepository: (String) -> Unit,
     val onRepositoryCreateWorktreeRequestHandled: () -> Unit,
     val onDiscoverExistingBranches: (String) -> Unit,
+    val onDiscoverExistingPullRequest: (repoRootPath: String, query: String) -> Unit,
     val onCheckoutExistingBranch: (repoRootPath: String, branch: String) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
@@ -55,8 +56,31 @@ internal enum class CreateWorktreeMode {
 internal data class ExistingBranchDiscoveryUiState(
     val repoRootPath: String = "",
     val branches: List<String> = emptyList(),
+    val originBranches: List<String> = emptyList(),
+    val originBranchRefreshSucceeded: Boolean? = null,
     val isLoading: Boolean = false,
+    val pullRequestQuery: String = "",
+    val pullRequest: ExistingPullRequestWorktreeResult? = null,
+    val isPullRequestLoading: Boolean = false,
+    val unsupportedPullRequestMessage: String? = null,
 )
+
+internal sealed interface ExistingWorktreeResult {
+    val repoRootPath: String
+    val branch: String
+}
+
+internal data class ExistingBranchWorktreeResult(
+    override val repoRootPath: String,
+    override val branch: String,
+) : ExistingWorktreeResult
+
+internal data class ExistingPullRequestWorktreeResult(
+    override val repoRootPath: String,
+    override val branch: String,
+    val repositoryFullName: String,
+    val number: Int,
+) : ExistingWorktreeResult
 
 internal data class PendingCreateWorktree(
     val repoRootPath: String,
@@ -66,7 +90,7 @@ internal data class PendingCreateWorktree(
     val targetBranch: String = "",
     val mode: CreateWorktreeMode = CreateWorktreeMode.NEW,
     val existingBranchQuery: String = "",
-    val selectedExistingBranch: String? = null,
+    val selectedExistingResult: ExistingWorktreeResult? = null,
 )
 
 internal data class PendingUseUnrelatedExistingBranch(
@@ -112,6 +136,29 @@ internal fun submitCreateWorktreeDialog(
     onCreateWorktree: CreateWorktreeCallback,
 ) {
     onCreateWorktree(state)
+}
+
+internal fun existingWorktreeResults(
+    discovery: ExistingBranchDiscoveryUiState,
+    query: String,
+): List<ExistingWorktreeResult> = buildList {
+    addAll(
+        filterExistingBranches(discovery.branches, query).map { branch ->
+            ExistingBranchWorktreeResult(discovery.repoRootPath, branch)
+        },
+    )
+    discovery.pullRequest
+        ?.takeIf { discovery.pullRequestQuery == query.trim() }
+        ?.takeIf { pullRequest -> discovery.canUsePullRequestHead(pullRequest.branch) }
+        ?.let(::add)
+}
+
+private fun ExistingBranchDiscoveryUiState.canUsePullRequestHead(
+    branch: String,
+): Boolean = when (originBranchRefreshSucceeded) {
+    true -> branch in originBranches
+    false -> true
+    null -> false
 }
 
 internal fun filterExistingBranches(branches: List<String>, query: String): List<String> = branches

@@ -32,6 +32,44 @@ class ExistingBranchWorktreeDialogTest {
         )
     }
 
+    @Test
+    fun localBranchCannotMakeDeletedRemotePullRequestHeadSelectable() {
+        val discovery = ExistingBranchDiscoveryUiState(
+            repoRootPath = REPO_PATH,
+            branches = listOf("main", "feature/missing"),
+            originBranches = listOf("main"),
+            originBranchRefreshSucceeded = true,
+            pullRequestQuery = "123",
+            pullRequest = ExistingPullRequestWorktreeResult(
+                repoRootPath = REPO_PATH,
+                repositoryFullName = "owner/dev-lake-utils",
+                number = 123,
+                branch = "feature/missing",
+            ),
+        )
+
+        assertTrue(existingWorktreeResults(discovery, "123").isEmpty())
+    }
+
+    @Test
+    fun staleOriginBranchListingDoesNotDiscardNewerPullRequestResult() {
+        val pullRequest = ExistingPullRequestWorktreeResult(
+            repoRootPath = REPO_PATH,
+            repositoryFullName = "owner/dev-lake-utils",
+            number = 123,
+            branch = "feature/pr-worktree",
+        )
+        val discovery = ExistingBranchDiscoveryUiState(
+            repoRootPath = REPO_PATH,
+            originBranches = listOf("main"),
+            originBranchRefreshSucceeded = false,
+            pullRequestQuery = "123",
+            pullRequest = pullRequest,
+        )
+
+        assertEquals(listOf(pullRequest), existingWorktreeResults(discovery, "123"))
+    }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun selectionDoesNotConfirmUntilConfirmationButtonIsClicked() = runComposeUiTest {
@@ -43,7 +81,7 @@ class ExistingBranchWorktreeDialogTest {
                     request = request,
                     discovery = loadedBranches(request.repoRootPath),
                     onRequestChange = { request = it },
-                    onConfirm = { confirmations += requireNotNull(request.selectedExistingBranch) },
+                    onConfirm = { confirmations += requireNotNull(request.selectedExistingResult).branch },
                     onDismiss = {},
                 )
             }
@@ -67,7 +105,7 @@ class ExistingBranchWorktreeDialogTest {
                     request = request,
                     discovery = loadedBranches(request.repoRootPath),
                     onRequestChange = { request = it },
-                    onConfirm = { confirmations += requireNotNull(request.selectedExistingBranch) },
+                    onConfirm = { confirmations += requireNotNull(request.selectedExistingResult).branch },
                     onDismiss = {},
                 )
             }
@@ -79,6 +117,46 @@ class ExistingBranchWorktreeDialogTest {
         onNodeWithTag("existing-branch-search").performKeyInput { pressKey(Key.Enter) }
 
         assertEquals(listOf("feature/existing-worktree"), confirmations)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun enterSelectsAndThenConfirmsLabeledPullRequestResult() = runComposeUiTest {
+        val confirmations = mutableListOf<String>()
+        setContent {
+            var request by remember {
+                mutableStateOf(existingBranchRequest().copy(existingBranchQuery = "123"))
+            }
+            MaterialTheme {
+                ExistingBranchWorktreeDialogContent(
+                    request = request,
+                    discovery = ExistingBranchDiscoveryUiState(
+                        repoRootPath = request.repoRootPath,
+                        branches = listOf("feature/pr-worktree"),
+                        originBranches = listOf("feature/pr-worktree"),
+                        originBranchRefreshSucceeded = true,
+                        pullRequestQuery = "123",
+                        pullRequest = ExistingPullRequestWorktreeResult(
+                            repoRootPath = request.repoRootPath,
+                            repositoryFullName = "owner/dev-lake-utils",
+                            number = 123,
+                            branch = "feature/pr-worktree",
+                        ),
+                    ),
+                    onRequestChange = { request = it },
+                    onConfirm = { confirmations += requireNotNull(request.selectedExistingResult).branch },
+                    onDismiss = {},
+                )
+            }
+        }
+
+        onNodeWithText("PR #123 · owner/dev-lake-utils · feature/pr-worktree").assertIsDisplayed()
+        onNodeWithTag("existing-branch-search").performClick()
+        onNodeWithTag("existing-branch-search").performKeyInput { pressKey(Key.Enter) }
+        assertTrue(confirmations.isEmpty())
+        onNodeWithTag("existing-branch-search").performKeyInput { pressKey(Key.Enter) }
+
+        assertEquals(listOf("feature/pr-worktree"), confirmations)
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -96,7 +174,7 @@ class ExistingBranchWorktreeDialogTest {
                         request = it
                         requestChanges += it
                     },
-                    onConfirm = { confirmations += requireNotNull(request.selectedExistingBranch) },
+                    onConfirm = { confirmations += requireNotNull(request.selectedExistingResult).branch },
                     onDismiss = {},
                 )
             }
@@ -105,7 +183,7 @@ class ExistingBranchWorktreeDialogTest {
         onNodeWithTag("new-worktree-mode").requestFocus().performKeyInput { pressKey(Key.Enter) }
 
         assertEquals(CreateWorktreeMode.NEW, requestChanges.single().mode)
-        assertEquals(null, requestChanges.single().selectedExistingBranch)
+        assertEquals(null, requestChanges.single().selectedExistingResult)
         assertTrue(confirmations.isEmpty())
     }
 
@@ -125,7 +203,7 @@ class ExistingBranchWorktreeDialogTest {
                         request = it
                         requestChanges += it
                     },
-                    onConfirm = { confirmations += requireNotNull(request.selectedExistingBranch) },
+                    onConfirm = { confirmations += requireNotNull(request.selectedExistingResult).branch },
                     onDismiss = { dismissals += 1 },
                 )
             }
@@ -154,7 +232,7 @@ class ExistingBranchWorktreeDialogTest {
                         branches = listOf("feature/existing-worktree", "feature/other"),
                     ),
                     onRequestChange = { request = it },
-                    onConfirm = { confirmations += requireNotNull(request.selectedExistingBranch) },
+                    onConfirm = { confirmations += requireNotNull(request.selectedExistingResult).branch },
                     onDismiss = {},
                 )
             }

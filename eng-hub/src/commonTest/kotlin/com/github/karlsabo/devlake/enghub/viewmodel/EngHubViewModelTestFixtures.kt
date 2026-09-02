@@ -7,6 +7,7 @@ import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.GitWorktreeApi
+import com.github.karlsabo.git.RefreshedExistingBranches
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.WorktreePath
@@ -440,6 +441,9 @@ data class RecordingGitWorktreeApiResponses(
     val defaultBranchRefsByRepoPath: Map<String, String?> = emptyMap(),
     val existingBranchesByRepoPath: Map<String, List<String>> = emptyMap(),
     val existingBranchesForRepoPath: ((String) -> List<String>)? = null,
+    val existingBranchDiscoveryFailure: RuntimeException? = null,
+    val originBranchesByRepoPath: Map<String, List<String>> = emptyMap(),
+    val originUrlsByRepoPath: Map<String, String?> = emptyMap(),
     val parentBranchesByRepoPath: Map<String, Map<String, String>> = emptyMap(),
     val branchNeedsRebaseByCall: Map<BranchNeedsRebaseCall, Boolean> = emptyMap(),
     val inferDefaultBranchRefFailure: RuntimeException? = null,
@@ -588,8 +592,17 @@ class RecordingGitWorktreeApi(
 
     override fun refreshAndListExistingBranches(
         repoPath: String,
-    ): List<String> = responses.existingBranchesForRepoPath?.invoke(repoPath)
-        ?: responses.existingBranchesByRepoPath.getValue(repoPath)
+    ): RefreshedExistingBranches {
+        responses.existingBranchDiscoveryFailure?.let { throw it }
+        return RefreshedExistingBranches(
+            branches = responses.existingBranchesForRepoPath?.invoke(repoPath)
+                ?: responses.existingBranchesByRepoPath.getValue(repoPath),
+            originBranches = responses.originBranchesByRepoPath[repoPath].orEmpty(),
+            originBranchRefreshSucceeded = true,
+        )
+    }
+
+    override fun originUrl(repoPath: String): String? = responses.originUrlsByRepoPath[repoPath]
 
     override fun inferDefaultBranchRef(repoPath: String): String? {
         inferDefaultBranchRefCalls += repoPath

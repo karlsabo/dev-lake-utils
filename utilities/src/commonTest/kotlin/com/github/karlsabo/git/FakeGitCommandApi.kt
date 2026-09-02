@@ -21,6 +21,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var fetchAction: (String, String, Array<out String>) -> Unit = { _, _, _ -> }
     var remoteBranchExistsAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var listRemoteBranchesAction: (String, String) -> List<String> = { _, _ -> emptyList() }
+    var remoteUrlAction: (String, String) -> String? = { _, _ -> null }
     var localBranchExistsAction: (String, String) -> Boolean = { _, _ -> false }
     var listLocalBranchesAction: (String) -> List<String> = { emptyList() }
     var currentBranchUpstreamRemoteAction: (String) -> String? = { null }
@@ -76,6 +77,11 @@ internal class FakeGitCommandApi : GitCommandApi {
     override fun listRemoteBranches(repoPath: String, remote: String): List<String> {
         calls.add(Call("listRemoteBranches", listOf(repoPath, remote)))
         return listRemoteBranchesAction(repoPath, remote)
+    }
+
+    override fun remoteUrl(repoPath: String, remote: String): String? {
+        calls.add(Call("remoteUrl", listOf(repoPath, remote)))
+        return remoteUrlAction(repoPath, remote)
     }
 
     override fun localBranchExists(

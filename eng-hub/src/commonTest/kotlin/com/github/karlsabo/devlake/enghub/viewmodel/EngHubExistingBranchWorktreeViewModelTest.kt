@@ -4,6 +4,9 @@ import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.WorktreeSetupCoordinator
 import com.github.karlsabo.git.buildWorktreePath
+import com.github.karlsabo.github.PullRequest
+import com.github.karlsabo.github.PullRequestHead
+import com.github.karlsabo.github.PullRequestRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -12,6 +15,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.seconds
 
 class EngHubExistingBranchWorktreeViewModelTest {
@@ -24,6 +28,7 @@ class EngHubExistingBranchWorktreeViewModelTest {
                     DEV_LAKE_ROOT to listOf(Worktree(DEV_LAKE_ROOT, "main", "abc123")),
                 ),
                 existingBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to listOf("main", branch)),
+                originBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to listOf("main", branch)),
             ),
         )
         val viewModel = createLocalRepositoryViewModel(
@@ -39,6 +44,8 @@ class EngHubExistingBranchWorktreeViewModelTest {
         }
         assertEquals(DEV_LAKE_ROOT, discovery.repoRootPath)
         assertEquals(listOf("main", branch), discovery.branches)
+        assertEquals(listOf("main", branch), discovery.originBranches)
+        assertEquals(true, discovery.originBranchRefreshSucceeded)
     }
 
     @Test
@@ -87,6 +94,109 @@ class EngHubExistingBranchWorktreeViewModelTest {
     }
 
     @Test
+    fun repositoryPullRequestDiscoveryResolvesBaseRepositoryHeadAndRunsSetup() = runBlocking {
+        val branch = "feature/pr-worktree"
+        val worktreePath = buildWorktreePath(DEV_LAKE_ROOT, branch)
+        val setupRunner = BlockingCoordinatorSetupRunner()
+        val git = pullRequestGit(branch, checkoutPath = worktreePath.value)
+        val gitHub = pullRequestApi(branch, headRepository = "owner/dev-lake-utils")
+        val coordinator = WorktreeSetupCoordinator(
+            gitWorktreeApi = git,
+            setupCommandRunner = setupRunner,
+            scope = this,
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = git,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(path = DEV_LAKE_ROOT, setupCommands = listOf("./gradlew setup")),
+            ),
+            services = LocalRepositoryViewModelServices(
+                gitHubApi = gitHub,
+                worktreeSetupCoordinator = coordinator,
+            ),
+        )
+
+        viewModel.discoverExistingBranches(DEV_LAKE_ROOT)
+        viewModel.discoverExistingPullRequest(DEV_LAKE_ROOT, "123")
+        val discovery = withTimeout(5.seconds) {
+            viewModel.existingBranchDiscoveryStateFlow.first {
+                !it.isLoading && !it.isPullRequestLoading && it.pullRequest != null
+            }
+        }
+        val pullRequest = requireNotNull(discovery.pullRequest)
+        assertEquals("owner/dev-lake-utils", pullRequest.repositoryFullName)
+        assertEquals(123, pullRequest.number)
+        assertEquals(branch, pullRequest.branch)
+
+        viewModel.checkoutExistingBranch(DEV_LAKE_ROOT, pullRequest.branch)
+        withTimeout(5.seconds) { setupRunner.awaitStarted(worktreePath) }
+
+        assertEquals(
+            listOf(CheckoutExistingBranchWorktreeCall(DEV_LAKE_ROOT, branch)),
+            git.checkoutExistingBranchWorktreeCalls,
+        )
+        assertEquals(listOf("./gradlew setup"), setupRunner.requestFor(worktreePath)?.setupCommands)
+        setupRunner.complete(worktreePath)
+    }
+
+    @Test
+    fun branchDiscoveryFailureDoesNotDiscardSuccessfulPullRequestDiscovery() = runBlocking {
+        val branch = "feature/pr-worktree"
+        val git = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                existingBranchDiscoveryFailure = IllegalStateException("branch discovery failed"),
+                originUrlsByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to "git@github.com:owner/dev-lake-utils.git",
+                ),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = git,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(LocalRepositoryConfig(path = DEV_LAKE_ROOT)),
+            services = LocalRepositoryViewModelServices(
+                gitHubApi = pullRequestApi(branch, headRepository = "owner/dev-lake-utils"),
+            ),
+        )
+
+        viewModel.discoverExistingBranches(DEV_LAKE_ROOT)
+        viewModel.discoverExistingPullRequest(DEV_LAKE_ROOT, "123")
+
+        val discovery = withTimeout(5.seconds) {
+            viewModel.existingBranchDiscoveryStateFlow.first {
+                !it.isLoading && !it.isPullRequestLoading && it.pullRequest != null
+            }
+        }
+        assertEquals(false, discovery.originBranchRefreshSucceeded)
+        assertEquals(branch, discovery.pullRequest?.branch)
+    }
+
+    @Test
+    fun forkPullRequestIsNotSelectableAndLeavesBranchResultsAvailable() = runBlocking {
+        val git = pullRequestGit("feature/fork")
+        val gitHub = pullRequestApi("feature/fork", headRepository = "contributor/dev-lake-utils")
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = git,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(LocalRepositoryConfig(path = DEV_LAKE_ROOT)),
+            services = LocalRepositoryViewModelServices(gitHubApi = gitHub),
+        )
+
+        viewModel.discoverExistingBranches(DEV_LAKE_ROOT)
+        viewModel.discoverExistingPullRequest(DEV_LAKE_ROOT, "123")
+
+        val discovery = withTimeout(5.seconds) {
+            viewModel.existingBranchDiscoveryStateFlow.first {
+                !it.isLoading && !it.isPullRequestLoading && it.unsupportedPullRequestMessage != null
+            }
+        }
+        assertNull(discovery.pullRequest)
+        assertEquals("Fork pull requests are not supported.", discovery.unsupportedPullRequestMessage)
+        assertEquals(listOf("main", "feature/fork"), discovery.branches)
+    }
+
+    @Test
     fun checkoutExistingBranchCreatesWorktreeAndRunsConfiguredSetup() = runBlocking {
         val branch = "feature/existing-worktree"
         val worktreePath = buildWorktreePath(DEV_LAKE_ROOT, branch)
@@ -132,4 +242,33 @@ class EngHubExistingBranchWorktreeViewModelTest {
 
         setupRunner.complete(worktreePath)
     }
+
+    private fun pullRequestGit(branch: String, checkoutPath: String? = null) = RecordingGitWorktreeApi(
+        responses = RecordingGitWorktreeApiResponses(
+            worktreesByRepoPath = mapOf(
+                DEV_LAKE_ROOT to listOf(Worktree(DEV_LAKE_ROOT, "main", "abc123")),
+            ),
+            existingBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to listOf("main", branch)),
+            originBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to listOf("main", branch)),
+            originUrlsByRepoPath = mapOf(
+                DEV_LAKE_ROOT to "git@github.com:owner/dev-lake-utils.git",
+            ),
+        ),
+        callbacks = RecordingGitWorktreeApiCallbacks(
+            onCheckoutExistingBranchWorktree = { checkoutPath ?: error("Unexpected checkout") },
+        ),
+    )
+
+    private fun pullRequestApi(branch: String, headRepository: String) = RecordingGitHubApi(
+        pullRequestsByUrl = mapOf(
+            "https://api.github.com/repos/owner/dev-lake-utils/pulls/123" to PullRequest(
+                number = 123,
+                state = "closed",
+                head = PullRequestHead(
+                    ref = branch,
+                    repo = PullRequestRepository(headRepository),
+                ),
+            ),
+        ),
+    )
 }

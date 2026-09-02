@@ -25,6 +25,11 @@ interface GitRemoteCommandApi {
         remote: String = "origin",
     ): List<String>
 
+    fun remoteUrl(
+        repoPath: String,
+        remote: String = "origin",
+    ): String?
+
     fun currentBranchUpstreamRemote(repoPath: String): String?
 
     fun remoteDefaultBranchRef(

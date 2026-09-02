@@ -34,6 +34,18 @@ internal fun WorktreePanel(
         pendingCreateWorktree?.let { request -> actions.onDiscoverExistingBranches(request.repoRootPath) }
     }
 
+    LaunchedEffect(
+        pendingCreateWorktree?.repoRootPath,
+        pendingCreateWorktree?.mode,
+        pendingCreateWorktree?.existingBranchQuery,
+    ) {
+        pendingCreateWorktree
+            ?.takeIf { it.mode == CreateWorktreeMode.EXISTING }
+            ?.let { request ->
+                actions.onDiscoverExistingPullRequest(request.repoRootPath, request.existingBranchQuery)
+            }
+    }
+
     LaunchedEffect(state.repositoryCreateWorktreeRequest) {
         state.repositoryCreateWorktreeRequest?.let { request ->
             pendingCreateWorktree = request

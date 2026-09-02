@@ -5,9 +5,16 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 @Serializable
+data class PullRequestRepository(
+    @SerialName("full_name")
+    val fullName: String? = null,
+)
+
+@Serializable
 data class PullRequestHead(
     val ref: String? = null,
     val sha: String? = null,
+    val repo: PullRequestRepository? = null,
 )
 
 @Serializable

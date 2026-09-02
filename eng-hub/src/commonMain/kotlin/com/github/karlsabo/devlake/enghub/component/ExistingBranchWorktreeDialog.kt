@@ -58,28 +58,31 @@ internal fun CreateWorktreeModeSelector(
     }
 }
 
-private data class ExistingBranchDialogState(
+private data class ExistingWorktreeDialogState(
     val request: PendingCreateWorktree,
-    val results: List<String>,
-    val isLoading: Boolean,
+    val results: List<ExistingWorktreeResult>,
+    val isBranchLoading: Boolean,
+    val isPullRequestLoading: Boolean,
+    val unsupportedPullRequestMessage: String?,
     val highlightedIndex: Int?,
+    val selectedResult: ExistingWorktreeResult?,
 )
 
-private data class ExistingBranchDialogActions(
+private data class ExistingWorktreeDialogActions(
     val onRequestChange: (PendingCreateWorktree) -> Unit,
     val onConfirm: () -> Unit,
     val onDismiss: () -> Unit,
     val onKeyEvent: (KeyEvent) -> Boolean,
 )
 
-private data class ExistingBranchKeyboardCallbacks(
+private data class ExistingWorktreeKeyboardCallbacks(
     val onHighlight: (Int) -> Unit,
-    val onSelect: (String) -> Unit,
+    val onSelect: (ExistingWorktreeResult) -> Unit,
     val onConfirm: () -> Unit,
 )
 
-private data class ExistingBranchRowActions(
-    val onSelect: (String) -> Unit,
+private data class ExistingWorktreeRowActions(
+    val onSelect: (ExistingWorktreeResult) -> Unit,
     val onKeyEvent: (KeyEvent) -> Boolean,
 )
 
@@ -91,38 +94,44 @@ internal fun ExistingBranchWorktreeDialogContent(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val branches = discovery.takeIf { it.repoRootPath == request.repoRootPath }?.branches.orEmpty()
-    val results = filterExistingBranches(branches, request.existingBranchQuery)
+    val activeDiscovery = discovery.takeIf { it.repoRootPath == request.repoRootPath }
+        ?: ExistingBranchDiscoveryUiState(repoRootPath = request.repoRootPath)
+    val results = existingWorktreeResults(activeDiscovery, request.existingBranchQuery)
+    val selectedResult = request.selectedExistingResult?.takeIf { it in results }
     var highlightedIndex by remember(request.repoRootPath, request.existingBranchQuery) { mutableIntStateOf(0) }
-    val activeHighlightedIndex = highlightedIndex.coerceToBranchResults(results)
-    val keyboardCallbacks = ExistingBranchKeyboardCallbacks(
+    val activeHighlightedIndex = highlightedIndex.coerceToWorktreeResults(results)
+    val keyboardCallbacks = ExistingWorktreeKeyboardCallbacks(
         onHighlight = { index ->
             highlightedIndex = index
-            if (request.selectedExistingBranch != results[index]) {
-                onRequestChange(request.copy(selectedExistingBranch = null))
+            if (selectedResult != results[index]) {
+                onRequestChange(request.copy(selectedExistingResult = null))
             }
         },
-        onSelect = { branch -> onRequestChange(request.copy(selectedExistingBranch = branch)) },
+        onSelect = { result -> onRequestChange(request.copy(selectedExistingResult = result)) },
         onConfirm = onConfirm,
     )
 
-    ExistingBranchDialogBody(
-        state = ExistingBranchDialogState(
+    ExistingWorktreeDialogBody(
+        state = ExistingWorktreeDialogState(
             request = request,
             results = results,
-            isLoading = discovery.repoRootPath == request.repoRootPath && discovery.isLoading,
+            isBranchLoading = activeDiscovery.isLoading,
+            isPullRequestLoading = activeDiscovery.isPullRequestLoading,
+            unsupportedPullRequestMessage = activeDiscovery.unsupportedPullRequestMessage
+                ?.takeIf { activeDiscovery.pullRequestQuery == request.existingBranchQuery.trim() },
             highlightedIndex = activeHighlightedIndex,
+            selectedResult = selectedResult,
         ),
-        actions = ExistingBranchDialogActions(
+        actions = ExistingWorktreeDialogActions(
             onRequestChange = onRequestChange,
             onConfirm = onConfirm,
             onDismiss = onDismiss,
             onKeyEvent = { event ->
-                handleExistingBranchKeyEvent(
+                handleExistingWorktreeKeyEvent(
                     event = event,
                     results = results,
                     highlightedIndex = activeHighlightedIndex,
-                    selectedBranch = request.selectedExistingBranch,
+                    selectedResult = selectedResult,
                     callbacks = keyboardCallbacks,
                 )
             },
@@ -131,9 +140,9 @@ internal fun ExistingBranchWorktreeDialogContent(
 }
 
 @Composable
-private fun ExistingBranchDialogBody(
-    state: ExistingBranchDialogState,
-    actions: ExistingBranchDialogActions,
+private fun ExistingWorktreeDialogBody(
+    state: ExistingWorktreeDialogState,
+    actions: ExistingWorktreeDialogActions,
 ) {
     val request = state.request
     Column(
@@ -151,33 +160,31 @@ private fun ExistingBranchDialogBody(
         OutlinedTextField(
             value = request.existingBranchQuery,
             onValueChange = { query ->
-                actions.onRequestChange(request.copy(existingBranchQuery = query, selectedExistingBranch = null))
+                actions.onRequestChange(request.copy(existingBranchQuery = query, selectedExistingResult = null))
             },
-            label = { Text("Search existing branches") },
+            label = { Text("Search existing branches or PR number") },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("existing-branch-search")
                 .onPreviewKeyEvent(actions.onKeyEvent),
         )
-        if (state.isLoading) {
+        ExistingWorktreeLoadingIndicators(state)
+        state.unsupportedPullRequestMessage?.let { message ->
             Spacer(modifier = Modifier.height(8.dp))
-            CircularProgressIndicator(
-                modifier = Modifier.semantics { contentDescription = "Loading existing branches" },
-            )
+            Text(message, color = MaterialTheme.colors.error)
         }
-        ExistingBranchRows(
-            repoRootPath = request.repoRootPath,
-            branches = state.results,
+        ExistingWorktreeRows(
+            results = state.results,
             highlightedIndex = state.highlightedIndex,
-            selectedBranch = request.selectedExistingBranch,
-            actions = ExistingBranchRowActions(
-                onSelect = { branch -> actions.onRequestChange(request.copy(selectedExistingBranch = branch)) },
+            selectedResult = state.selectedResult,
+            actions = ExistingWorktreeRowActions(
+                onSelect = { result -> actions.onRequestChange(request.copy(selectedExistingResult = result)) },
                 onKeyEvent = actions.onKeyEvent,
             ),
         )
         Spacer(modifier = Modifier.height(16.dp))
         Row {
-            Button(onClick = actions.onConfirm, enabled = request.selectedExistingBranch != null) {
+            Button(onClick = actions.onConfirm, enabled = state.selectedResult != null) {
                 Text("Use Existing")
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -192,18 +199,35 @@ private fun ExistingBranchDialogBody(
 }
 
 @Composable
-private fun ExistingBranchRows(
-    repoRootPath: String,
-    branches: List<String>,
+private fun ExistingWorktreeLoadingIndicators(state: ExistingWorktreeDialogState) {
+    Column {
+        if (state.isBranchLoading) {
+            Spacer(modifier = Modifier.height(8.dp))
+            CircularProgressIndicator(
+                modifier = Modifier.semantics { contentDescription = "Loading existing branches" },
+            )
+        }
+        if (state.isPullRequestLoading) {
+            Spacer(modifier = Modifier.height(8.dp))
+            CircularProgressIndicator(
+                modifier = Modifier.semantics { contentDescription = "Loading pull request" },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExistingWorktreeRows(
+    results: List<ExistingWorktreeResult>,
     highlightedIndex: Int?,
-    selectedBranch: String?,
-    actions: ExistingBranchRowActions,
+    selectedResult: ExistingWorktreeResult?,
+    actions: ExistingWorktreeRowActions,
 ) {
     LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp)) {
-        itemsIndexed(branches, key = { _, branch -> branch }) { index, branch ->
+        itemsIndexed(results, key = { _, result -> existingWorktreeResultKey(result) }) { index, result ->
             val highlighted = index == highlightedIndex
             TextButton(
-                onClick = { actions.onSelect(branch) },
+                onClick = { actions.onSelect(result) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
@@ -216,76 +240,73 @@ private fun ExistingBranchRows(
                     .semantics { selected = highlighted }
                     .onPreviewKeyEvent(actions.onKeyEvent),
             ) {
-                val selectedMarker = if (selectedBranch == branch) "Selected · " else ""
-                Text("${selectedMarker}Branch · ${repositoryLabel(repoRootPath)} · $branch")
+                val selectedMarker = if (selectedResult == result) "Selected · " else ""
+                Text(selectedMarker + existingWorktreeResultLabel(result))
             }
         }
     }
 }
 
-private sealed interface ExistingBranchKeyboardAction {
+private sealed interface ExistingWorktreeKeyboardAction {
     data class Highlight(
         val index: Int,
-    ) : ExistingBranchKeyboardAction
+    ) : ExistingWorktreeKeyboardAction
+
     data class Select(
-        val branch: String,
-    ) : ExistingBranchKeyboardAction
-    data object Confirm : ExistingBranchKeyboardAction
+        val result: ExistingWorktreeResult,
+    ) : ExistingWorktreeKeyboardAction
+
+    data object Confirm : ExistingWorktreeKeyboardAction
 }
 
-private fun handleExistingBranchKeyEvent(
+private fun handleExistingWorktreeKeyEvent(
     event: KeyEvent,
-    results: List<String>,
+    results: List<ExistingWorktreeResult>,
     highlightedIndex: Int?,
-    selectedBranch: String?,
-    callbacks: ExistingBranchKeyboardCallbacks,
+    selectedResult: ExistingWorktreeResult?,
+    callbacks: ExistingWorktreeKeyboardCallbacks,
 ): Boolean = when (
-    val action = existingBranchKeyboardAction(event, results, highlightedIndex, selectedBranch)
+    val action = existingWorktreeKeyboardAction(event, results, highlightedIndex, selectedResult)
 ) {
     null -> false
-    is ExistingBranchKeyboardAction.Highlight -> callbacks.onHighlight(action.index).let { true }
-    is ExistingBranchKeyboardAction.Select -> callbacks.onSelect(action.branch).let { true }
-    ExistingBranchKeyboardAction.Confirm -> callbacks.onConfirm().let { true }
+    is ExistingWorktreeKeyboardAction.Highlight -> callbacks.onHighlight(action.index).let { true }
+    is ExistingWorktreeKeyboardAction.Select -> callbacks.onSelect(action.result).let { true }
+    ExistingWorktreeKeyboardAction.Confirm -> callbacks.onConfirm().let { true }
 }
 
 private fun KeyEvent.isEnterKey(): Boolean = key == Key.Enter || key == Key.NumPadEnter
 
-private fun existingBranchKeyboardAction(
+private fun existingWorktreeKeyboardAction(
     event: KeyEvent,
-    results: List<String>,
+    results: List<ExistingWorktreeResult>,
     highlightedIndex: Int?,
-    selectedBranch: String?,
-): ExistingBranchKeyboardAction? {
+    selectedResult: ExistingWorktreeResult?,
+): ExistingWorktreeKeyboardAction? {
     if (event.type != KeyEventType.KeyDown) return null
 
     return when (event.key) {
-        Key.DirectionDown, Key.NumPadDirectionDown -> highlightBranchBy(highlightedIndex, 1, results.size)
+        Key.DirectionDown, Key.NumPadDirectionDown -> highlightResultBy(highlightedIndex, 1, results.size)
 
-        Key.DirectionUp, Key.NumPadDirectionUp -> highlightBranchBy(highlightedIndex, -1, results.size)
+        Key.DirectionUp, Key.NumPadDirectionUp -> highlightResultBy(highlightedIndex, -1, results.size)
 
-        Key.Enter, Key.NumPadEnter -> selectedBranch?.let { ExistingBranchKeyboardAction.Confirm }
-            ?: results.getOrNull(highlightedIndex ?: -1)?.let(ExistingBranchKeyboardAction::Select)
+        Key.Enter, Key.NumPadEnter -> selectedResult?.let { ExistingWorktreeKeyboardAction.Confirm }
+            ?: results.getOrNull(highlightedIndex ?: -1)?.let(ExistingWorktreeKeyboardAction::Select)
 
         else -> null
     }
 }
 
-private fun highlightBranchBy(
+private fun highlightResultBy(
     highlightedIndex: Int?,
     delta: Int,
     resultCount: Int,
-): ExistingBranchKeyboardAction.Highlight? {
+): ExistingWorktreeKeyboardAction.Highlight? {
     if (resultCount == 0) return null
     val currentIndex = highlightedIndex ?: if (delta > 0) -1 else 0
-    return ExistingBranchKeyboardAction.Highlight((currentIndex + delta + resultCount) % resultCount)
+    return ExistingWorktreeKeyboardAction.Highlight((currentIndex + delta + resultCount) % resultCount)
 }
 
-private fun Int.coerceToBranchResults(results: List<String>): Int? {
+private fun Int.coerceToWorktreeResults(results: List<ExistingWorktreeResult>): Int? {
     if (results.isEmpty()) return null
     return coerceIn(results.indices)
 }
-
-private fun repositoryLabel(repoRootPath: String): String = repoRootPath
-    .trimEnd('/', '\\')
-    .substringAfterLast('/')
-    .substringAfterLast('\\')

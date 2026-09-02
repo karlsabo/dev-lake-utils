@@ -50,11 +50,24 @@ internal data class RebaseConflictResolutionRequest(
     val parentBranch: String,
 )
 
+internal data class ExistingPullRequestWorktreeCandidate(
+    val branch: String,
+    val repositoryFullName: String,
+    val number: Int,
+)
+
 internal data class ExistingBranchDiscoveryState(
     val repoRootPath: String = "",
     val branches: List<String> = emptyList(),
+    val originBranches: List<String> = emptyList(),
+    val originBranchRefreshSucceeded: Boolean? = null,
     val isLoading: Boolean = false,
     val requestId: Long = 0,
+    val pullRequestQuery: String = "",
+    val pullRequest: ExistingPullRequestWorktreeCandidate? = null,
+    val isPullRequestLoading: Boolean = false,
+    val pullRequestRequestId: Long = 0,
+    val unsupportedPullRequestMessage: String? = null,
 )
 
 internal data class CreateLocalWorktreeFromRepositoryRequest(

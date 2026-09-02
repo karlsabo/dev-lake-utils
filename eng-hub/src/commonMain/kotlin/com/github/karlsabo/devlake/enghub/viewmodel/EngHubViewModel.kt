@@ -60,6 +60,13 @@ class EngHubViewModel(
         state = state,
         worktreeServices = worktreeServices,
         localRepositories = localRepositoriesController,
+        pullRequestDiscovery = RepositoryPullRequestWorktreeDiscovery(
+            state = state,
+            gitWorktreeApi = worktreeServices.gitWorktreeApi,
+            launchGitHubAction = { action ->
+                gitHubServiceActionTracker.launch(currentGitHubAccess.value.services, action)
+            },
+        ),
         errorReporter = errorReporter,
     )
     private val archiveController = LocalWorktreeArchiveController(
@@ -197,6 +204,7 @@ class EngHubViewModel(
     }
 
     val discoverExistingBranches: (String) -> Unit = existingWorktreeController::discoverExistingBranches
+    val discoverExistingPullRequest: (String, String) -> Unit = existingWorktreeController::discoverPullRequest
     val checkoutExistingBranch: (String, String) -> Unit = existingWorktreeController::checkoutExistingBranch
     val openLocalWorktree: (String, String) -> Unit = existingWorktreeController::openLocalWorktree
 

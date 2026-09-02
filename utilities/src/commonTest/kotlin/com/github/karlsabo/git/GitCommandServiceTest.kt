@@ -226,6 +226,23 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun remoteUrl_readsConfiguredOriginUrl() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            service.clone(originDir, cloneDir)
+
+            assertEquals(originDir, service.remoteUrl(cloneDir))
+            assertEquals(null, service.remoteUrl(cloneDir, "missing"))
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
+        }
+    }
+
+    @Test
     fun currentBranchUpstreamRemote_readsConfiguredTrackingRemote() {
         val originDir = createTempDir("origin")
         val cloneDir = createTempDir("clone")

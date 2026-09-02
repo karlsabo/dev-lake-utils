@@ -49,9 +49,12 @@ interface GitWorktreeCreationApi {
 
 interface GitWorktreeDiscoveryApi {
     fun listWorktrees(repoPath: String): List<Worktree>
+    fun originUrl(repoPath: String): String? = throw UnsupportedOperationException("originUrl is not implemented")
     fun refreshAndListExistingBranches(
         repoPath: String,
-    ): List<String> = throw UnsupportedOperationException("refreshAndListExistingBranches is not implemented")
+    ): RefreshedExistingBranches = throw UnsupportedOperationException(
+        "refreshAndListExistingBranches is not implemented",
+    )
     fun inferDefaultBranchRef(repoPath: String): String?
     fun inferWorktreeParentBranches(repoPath: String): Map<String, String>
     fun branchNeedsRebase(
@@ -84,6 +87,12 @@ interface GitWorktreeRebaseApi {
         "abortRebase is not implemented",
     )
 }
+
+data class RefreshedExistingBranches(
+    val branches: List<String>,
+    val originBranches: List<String>,
+    val originBranchRefreshSucceeded: Boolean,
+)
 
 data class RepositoryWorktrees(
     val rootPath: String,

@@ -16,6 +16,7 @@ internal class ExistingWorktreeController(
     private val state: EngHubViewModelState,
     private val worktreeServices: EngHubWorktreeServices,
     private val localRepositories: LocalRepositoryController,
+    private val pullRequestDiscovery: RepositoryPullRequestWorktreeDiscovery,
     private val errorReporter: ActionErrorReporter,
 ) {
     private var discoveryJob: Job? = null
@@ -27,19 +28,37 @@ internal class ExistingWorktreeController(
         discoveryJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching { worktreeServices.gitWorktreeApi.refreshAndListExistingBranches(repoRootPath) }
                 .rethrowCancellation()
-                .onSuccess { branches -> finishExistingBranchDiscovery(request, branches) }
+                .onSuccess { branches ->
+                    finishExistingBranchDiscovery(
+                        request = request,
+                        branches = branches.branches,
+                        originBranches = branches.originBranches,
+                        originBranchRefreshSucceeded = branches.originBranchRefreshSucceeded,
+                    )
+                }
                 .onFailure { failure ->
                     logger.error(failure) { "Failed to discover existing branches for $repoRootPath" }
-                    finishExistingBranchDiscovery(request, emptyList())
+                    finishExistingBranchDiscovery(
+                        request = request,
+                        branches = emptyList(),
+                        originBranches = emptyList(),
+                        originBranchRefreshSucceeded = false,
+                    )
                 }
         }
+    }
+
+    fun discoverPullRequest(repoRootPath: String, query: String) {
+        pullRequestDiscovery.discover(repoRootPath, query)
     }
 
     private fun startExistingBranchDiscovery(repoRootPath: String): ExistingBranchDiscoveryState {
         while (true) {
             val current = state.existingBranchDiscovery.value
-            val request = ExistingBranchDiscoveryState(
-                repoRootPath = repoRootPath,
+            val base = current.takeIf { it.repoRootPath == repoRootPath }
+                ?: ExistingBranchDiscoveryState(repoRootPath = repoRootPath)
+            val request = base.copy(
+                originBranchRefreshSucceeded = null,
                 isLoading = true,
                 requestId = current.requestId + 1,
             )
@@ -50,11 +69,20 @@ internal class ExistingWorktreeController(
     private fun finishExistingBranchDiscovery(
         request: ExistingBranchDiscoveryState,
         branches: List<String>,
+        originBranches: List<String>,
+        originBranchRefreshSucceeded: Boolean,
     ) {
-        state.existingBranchDiscovery.compareAndSet(
-            expect = request,
-            update = request.copy(branches = branches, isLoading = false),
-        )
+        while (true) {
+            val current = state.existingBranchDiscovery.value
+            if (current.repoRootPath != request.repoRootPath || current.requestId != request.requestId) return
+            val completed = current.copy(
+                branches = branches,
+                originBranches = originBranches,
+                originBranchRefreshSucceeded = originBranchRefreshSucceeded,
+                isLoading = false,
+            )
+            if (state.existingBranchDiscovery.compareAndSet(current, completed)) return
+        }
     }
 
     fun checkoutExistingBranch(repoRootPath: String, branch: String) {

@@ -22,10 +22,68 @@ class GitWorktreeServiceCreateTest {
 
         val branches = service.refreshAndListExistingBranches("/repos/dev-lake-utils")
 
-        assertEquals(listOf("feature/existing-worktree", "feature/local", "main"), branches)
+        assertEquals(listOf("feature/existing-worktree", "feature/local", "main"), branches.branches)
+        assertEquals(listOf("feature/existing-worktree", "main"), branches.originBranches)
+        assertTrue(branches.originBranchRefreshSucceeded)
         assertEquals(
             listOf(FakeGitCommandApi.Call("fetch", listOf("/repos/dev-lake-utils", "origin", "--prune"))),
             fake.calls.filter { it.method == "fetch" },
+        )
+    }
+
+    @Test
+    fun fetchFailureMarksListedOriginBranchesAsStale() {
+        val fake = FakeGitCommandApi().apply {
+            fetchAction = { _, _, _ ->
+                throw GitCommandException(
+                    command = listOf("git", "fetch", "origin", "--prune"),
+                    exitCode = 128,
+                    gitOutput = "fatal: transient failure",
+                )
+            }
+            listRemoteBranchesAction = { _, _ -> listOf("main") }
+        }
+        val service = GitWorktreeService(fake)
+
+        val branches = service.refreshAndListExistingBranches("/repos/dev-lake-utils")
+
+        assertEquals(listOf("main"), branches.originBranches)
+        assertFalse(branches.originBranchRefreshSucceeded)
+    }
+
+    @Test
+    fun originBranchListingFailurePreservesOtherBranchSources() {
+        val fake = FakeGitCommandApi().apply {
+            listLocalBranchesAction = { listOf("main", "feature/local") }
+            listRemoteBranchesAction = { _, _ ->
+                throw GitCommandException(
+                    command = listOf("git", "branch", "--remotes"),
+                    exitCode = 128,
+                    gitOutput = "fatal: transient failure",
+                )
+            }
+        }
+        val service = GitWorktreeService(fake)
+
+        val branches = service.refreshAndListExistingBranches("/repos/dev-lake-utils")
+
+        assertEquals(listOf("feature/local", "main"), branches.branches)
+        assertEquals(emptyList(), branches.originBranches)
+        assertFalse(branches.originBranchRefreshSucceeded)
+    }
+
+    @Test
+    fun originUrlReadsOriginThroughGitCommandApi() {
+        val expected = "git@github.com:owner/dev-lake-utils.git"
+        val fake = FakeGitCommandApi().apply {
+            remoteUrlAction = { _, _ -> expected }
+        }
+        val service = GitWorktreeService(fake)
+
+        assertEquals(expected, service.originUrl("/repos/dev-lake-utils"))
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("remoteUrl", listOf("/repos/dev-lake-utils", "origin"))),
+            fake.calls,
         )
     }
 

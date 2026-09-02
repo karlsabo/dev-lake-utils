@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.github.karlsabo.devlake.enghub.component.ExistingBranchDiscoveryUiState
+import com.github.karlsabo.devlake.enghub.component.ExistingPullRequestWorktreeResult
 import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
@@ -18,6 +19,7 @@ import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.ActionErrorUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
+import com.github.karlsabo.devlake.enghub.viewmodel.ExistingBranchDiscoveryState
 import com.github.karlsabo.devlake.enghub.viewmodel.RebaseConflictResolutionRequest
 import com.github.karlsabo.devlake.enghub.viewmodel.UseUnrelatedExistingBranchConfirmationRequest
 import com.github.karlsabo.git.WorktreePath
@@ -140,17 +142,32 @@ internal fun collectEngHubScreenState(
                     baseBranch = request.baseBranch,
                 )
             },
-            existingBranchDiscovery = ExistingBranchDiscoveryUiState(
-                repoRootPath = existingBranchDiscovery.repoRootPath,
-                branches = existingBranchDiscovery.branches,
-                isLoading = existingBranchDiscovery.isLoading,
-            ),
+            existingBranchDiscovery = existingBranchDiscovery.toUiState(),
             useUnrelatedExistingBranchConfirmationRequest = useUnrelatedExistingBranchRequest?.toPendingConfirmation(),
             rebaseConflictResolutionRequest = rebaseConflictResolutionRequest?.toPendingResolution(),
         ),
         settings = settings,
     )
 }
+
+private fun ExistingBranchDiscoveryState.toUiState(): ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(
+    repoRootPath = repoRootPath,
+    branches = branches,
+    originBranches = originBranches,
+    originBranchRefreshSucceeded = originBranchRefreshSucceeded,
+    isLoading = isLoading,
+    pullRequestQuery = pullRequestQuery,
+    pullRequest = pullRequest?.let { candidate ->
+        ExistingPullRequestWorktreeResult(
+            repoRootPath = repoRootPath,
+            branch = candidate.branch,
+            repositoryFullName = candidate.repositoryFullName,
+            number = candidate.number,
+        )
+    },
+    isPullRequestLoading = isPullRequestLoading,
+    unsupportedPullRequestMessage = unsupportedPullRequestMessage,
+)
 
 private data class ActivityPaneResults(
     val pullRequests: Result<List<PullRequestUiState>>?,
@@ -206,6 +223,7 @@ internal fun engHubScreenActions(
         onCreateWorktreeFromRepository = viewModel::requestCreateLocalWorktreeFromRepository,
         onRepositoryCreateWorktreeRequestHandled = viewModel::clearCreateLocalWorktreeFromRepositoryRequest,
         onDiscoverExistingBranches = viewModel.discoverExistingBranches,
+        onDiscoverExistingPullRequest = viewModel.discoverExistingPullRequest,
         onCheckoutExistingBranch = viewModel.checkoutExistingBranch,
         onConfirmUseUnrelatedExistingBranch = { request ->
             viewModel.confirmUseUnrelatedExistingBranch(request.toViewModelRequest())

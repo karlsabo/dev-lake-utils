@@ -275,7 +275,7 @@ private fun CreateWorktreeDialog(
                         onConfirm = {
                             actions.onCheckoutExisting(
                                 state.repoRootPath,
-                                requireNotNull(state.selectedExistingBranch),
+                                requireNotNull(state.selectedExistingResult).branch,
                             )
                         },
                         onDismiss = actions.onDismiss,
