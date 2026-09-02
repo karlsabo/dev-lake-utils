@@ -69,6 +69,11 @@ class EngHubViewModel(
         ),
         errorReporter = errorReporter,
     )
+    private val globalExistingWorktreeDiscoveryController = GlobalExistingWorktreeDiscoveryController(
+        viewModel = this,
+        state = state,
+        worktreeServices = worktreeServices,
+    )
     private val archiveController = LocalWorktreeArchiveController(
         viewModel = this,
         state = state,
@@ -111,6 +116,8 @@ class EngHubViewModel(
         state.lastCreateLocalWorktreeFromRepositoryRequest.asStateFlow()
     internal val existingBranchDiscoveryStateFlow: StateFlow<ExistingBranchDiscoveryState> =
         state.existingBranchDiscovery.asStateFlow()
+    internal val globalExistingBranchDiscoveryStateFlow: StateFlow<GlobalExistingBranchDiscoveryState> =
+        state.globalExistingBranchDiscovery.asStateFlow()
     internal val useUnrelatedExistingBranchConfirmationRequestStateFlow:
         StateFlow<UseUnrelatedExistingBranchConfirmationRequest?> =
         state.useUnrelatedExistingBranchConfirmationRequest.asStateFlow()
@@ -204,6 +211,7 @@ class EngHubViewModel(
     }
 
     val discoverExistingBranches: (String) -> Unit = existingWorktreeController::discoverExistingBranches
+    val discoverGlobalExistingBranches: () -> Unit = globalExistingWorktreeDiscoveryController::discoverExistingBranches
     val discoverExistingPullRequest: (String, String) -> Unit = existingWorktreeController::discoverPullRequest
     val checkoutExistingBranch: (String, String) -> Unit = existingWorktreeController::checkoutExistingBranch
     val openLocalWorktree: (String, String) -> Unit = existingWorktreeController::openLocalWorktree

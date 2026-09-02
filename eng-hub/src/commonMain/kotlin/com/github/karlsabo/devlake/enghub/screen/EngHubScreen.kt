@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.component.EngHubAction
 import com.github.karlsabo.devlake.enghub.component.EngHubActionPopup
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
+import com.github.karlsabo.devlake.enghub.component.GlobalExistingBranchWorktreeDialog
+import com.github.karlsabo.devlake.enghub.component.PendingGlobalCreateWorktree
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
@@ -92,6 +94,26 @@ private fun EngHubScreenContent(
     state: EngHubScreenState,
     actions: EngHubScreenActions,
 ) {
+    var pendingGlobalCreateWorktree by remember { mutableStateOf<PendingGlobalCreateWorktree?>(null) }
+
+    LaunchedEffect(pendingGlobalCreateWorktree != null) {
+        if (pendingGlobalCreateWorktree != null) actions.onDiscoverGlobalExistingBranches()
+    }
+
+    pendingGlobalCreateWorktree?.let { request ->
+        GlobalExistingBranchWorktreeDialog(
+            request = request,
+            discovery = state.globalExistingBranchDiscovery,
+            onRequestChange = { pendingGlobalCreateWorktree = it },
+            onConfirm = {
+                val selectedResult = requireNotNull(request.selectedExistingResult)
+                pendingGlobalCreateWorktree = null
+                actions.onCheckoutExistingBranch(selectedResult.repoRootPath, selectedResult.branch)
+            },
+            onDismiss = { pendingGlobalCreateWorktree = null },
+        )
+    }
+
     Row(modifier = Modifier.fillMaxSize()) {
         EngHubSidebar(
             selectedPane = state.selectedPane,
@@ -108,6 +130,7 @@ private fun EngHubScreenContent(
             EngHubScreenHeader(
                 selectedPane = state.selectedPane,
                 onPaneSelect = actions.onPaneSelected,
+                onCreateWorktree = { pendingGlobalCreateWorktree = PendingGlobalCreateWorktree() },
             )
             Spacer(modifier = Modifier.size(8.dp))
             EngHubPaneContent(
@@ -123,11 +146,17 @@ private fun EngHubScreenContent(
 internal fun EngHubScreenHeader(
     selectedPane: EngHubPane,
     onPaneSelect: (EngHubPane) -> Unit,
+    onCreateWorktree: () -> Unit = {},
 ) {
     var actionsExpanded by remember { mutableStateOf(false) }
     var restoreTriggerFocus by remember { mutableStateOf(false) }
     val actionTriggerFocusRequester = remember { FocusRequester() }
     val actions = listOf(
+        EngHubAction(
+            title = "Create Worktree",
+            keywords = listOf("branch", "checkout", "worktree"),
+            onInvoke = onCreateWorktree,
+        ),
         EngHubAction(title = "Settings") { onPaneSelect(EngHubPane.Settings) },
     )
 

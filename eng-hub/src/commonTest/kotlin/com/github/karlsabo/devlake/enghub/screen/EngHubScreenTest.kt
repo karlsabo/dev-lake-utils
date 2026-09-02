@@ -149,6 +149,29 @@ class EngHubScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun createWorktreeActionIsSearchableFromGlobalActionsMenu() = runComposeUiTest {
+        var createWorktreeRequests = 0
+        setContent {
+            var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
+            MaterialTheme {
+                EngHubScreenHeader(
+                    selectedPane = selectedPane,
+                    onPaneSelect = { selectedPane = it },
+                    onCreateWorktree = { createWorktreeRequests += 1 },
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Open actions").performClick()
+        onNodeWithText("Search actions…").performTextInput("create")
+        onNodeWithText("Create Worktree").assertIsDisplayed().performClick()
+
+        assertEquals(1, createWorktreeRequests)
+        onAllNodesWithText("Search actions…").assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun escapeDismissesActionPopupAndRestoresTriggerFocus() = runComposeUiTest {
         setContent {
             var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }

@@ -51,6 +51,27 @@ class ExistingBranchWorktreeDialogTest {
     }
 
     @Test
+    fun globalExistingBranchSearchReturnsConfiguredRepositoryBranch() {
+        val discovery = GlobalExistingBranchDiscoveryUiState(
+            repositories = listOf(
+                ExistingBranchDiscoveryUiState(
+                    repoRootPath = REPO_PATH,
+                    branches = listOf("feature/other"),
+                ),
+                ExistingBranchDiscoveryUiState(
+                    repoRootPath = ENGINEERING_DOCS_PATH,
+                    branches = listOf("feature/doc-search"),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf(ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, "feature/doc-search")),
+            globalExistingWorktreeResults(discovery, "doc-search"),
+        )
+    }
+
+    @Test
     fun exactPullRequestMatchRanksBeforeFuzzyBranchMatch() {
         val pullRequest = pullRequestResult(number = 123, branch = "feature/pr-123")
         val discovery = ExistingBranchDiscoveryUiState(
@@ -164,6 +185,45 @@ class ExistingBranchWorktreeDialogTest {
 
         onNodeWithText("Branch · dev-lake-utils · 123").assertIsDisplayed()
         onNodeWithText("PR #123 · owner/dev-lake-utils · feature/pr-123").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun globalExistingBranchDialogConfirmsSelectedRepositoryBranch() = runComposeUiTest {
+        val confirmations = mutableListOf<ExistingWorktreeResult>()
+        setContent {
+            var request by remember {
+                mutableStateOf(PendingGlobalCreateWorktree(existingBranchQuery = "doc-search"))
+            }
+            MaterialTheme {
+                GlobalExistingBranchWorktreeDialogContent(
+                    request = request,
+                    discovery = GlobalExistingBranchDiscoveryUiState(
+                        repositories = listOf(
+                            ExistingBranchDiscoveryUiState(
+                                repoRootPath = REPO_PATH,
+                                branches = listOf("feature/other"),
+                            ),
+                            ExistingBranchDiscoveryUiState(
+                                repoRootPath = ENGINEERING_DOCS_PATH,
+                                branches = listOf("feature/doc-search"),
+                            ),
+                        ),
+                    ),
+                    onRequestChange = { request = it },
+                    onConfirm = { confirmations += requireNotNull(request.selectedExistingResult) },
+                    onDismiss = {},
+                )
+            }
+        }
+
+        onNodeWithText("Branch · engineering-docs · feature/doc-search").performClick()
+        onNodeWithText("Use Existing").performClick()
+
+        assertEquals(
+            listOf<ExistingWorktreeResult>(ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, "feature/doc-search")),
+            confirmations,
+        )
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -391,5 +451,6 @@ class ExistingBranchWorktreeDialogTest {
 
     private companion object {
         const val REPO_PATH = "/repos/dev-lake-utils"
+        const val ENGINEERING_DOCS_PATH = "/repos/engineering-docs"
     }
 }

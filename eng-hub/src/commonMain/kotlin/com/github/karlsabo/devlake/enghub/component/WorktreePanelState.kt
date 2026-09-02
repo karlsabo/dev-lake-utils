@@ -65,6 +65,11 @@ internal data class ExistingBranchDiscoveryUiState(
     val unsupportedPullRequestMessage: String? = null,
 )
 
+internal data class GlobalExistingBranchDiscoveryUiState(
+    val repositories: List<ExistingBranchDiscoveryUiState> = emptyList(),
+    val isLoading: Boolean = false,
+)
+
 internal sealed interface ExistingWorktreeResult {
     val repoRootPath: String
     val branch: String
@@ -89,6 +94,11 @@ internal data class PendingCreateWorktree(
     val baseCommitIsh: String? = null,
     val targetBranch: String = "",
     val mode: CreateWorktreeMode = CreateWorktreeMode.NEW,
+    val existingBranchQuery: String = "",
+    val selectedExistingResult: ExistingWorktreeResult? = null,
+)
+
+internal data class PendingGlobalCreateWorktree(
     val existingBranchQuery: String = "",
     val selectedExistingResult: ExistingWorktreeResult? = null,
 )

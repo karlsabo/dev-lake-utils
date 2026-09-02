@@ -35,31 +35,11 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
-@Composable
-internal fun CreateWorktreeModeSelector(
-    mode: CreateWorktreeMode,
-    onModeChange: (CreateWorktreeMode) -> Unit,
-) {
-    Row {
-        Button(
-            onClick = { onModeChange(CreateWorktreeMode.NEW) },
-            modifier = Modifier.testTag("new-worktree-mode"),
-            enabled = mode != CreateWorktreeMode.NEW,
-        ) {
-            Text("New")
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Button(
-            onClick = { onModeChange(CreateWorktreeMode.EXISTING) },
-            enabled = mode != CreateWorktreeMode.EXISTING,
-        ) {
-            Text("Existing")
-        }
-    }
-}
-
-private data class ExistingWorktreeDialogState(
-    val request: PendingCreateWorktree,
+internal data class ExistingWorktreeDialogState(
+    val title: String,
+    val mode: CreateWorktreeMode?,
+    val query: String,
+    val searchLabel: String,
     val results: List<ExistingWorktreeResult>,
     val isBranchLoading: Boolean,
     val isPullRequestLoading: Boolean,
@@ -68,11 +48,27 @@ private data class ExistingWorktreeDialogState(
     val selectedResult: ExistingWorktreeResult?,
 )
 
-private data class ExistingWorktreeDialogActions(
-    val onRequestChange: (PendingCreateWorktree) -> Unit,
+internal data class ExistingWorktreeDialogActions(
+    val onModeChange: (CreateWorktreeMode) -> Unit,
+    val onQueryChange: (String) -> Unit,
+    val onSelectResult: (ExistingWorktreeResult) -> Unit,
     val onConfirm: () -> Unit,
     val onDismiss: () -> Unit,
     val onKeyEvent: (KeyEvent) -> Boolean,
+)
+
+internal data class ExistingWorktreeDialogCallbacks(
+    val onModeChange: (CreateWorktreeMode) -> Unit,
+    val onQueryChange: (String) -> Unit,
+    val onConfirm: () -> Unit,
+    val onDismiss: () -> Unit,
+    val selection: ExistingWorktreeSelectionCallbacks,
+)
+
+internal data class ExistingWorktreeSelectionCallbacks(
+    val onHighlight: (Int) -> Unit,
+    val onSelectResult: (ExistingWorktreeResult) -> Unit,
+    val onClearSelection: () -> Unit,
 )
 
 private data class ExistingWorktreeKeyboardCallbacks(
@@ -96,55 +92,105 @@ internal fun ExistingBranchWorktreeDialogContent(
 ) {
     val activeDiscovery = discovery.takeIf { it.repoRootPath == request.repoRootPath }
         ?: ExistingBranchDiscoveryUiState(repoRootPath = request.repoRootPath)
-    val results = existingWorktreeResults(activeDiscovery, request.existingBranchQuery)
+    val model = existingRepositoryDialogModel(
+        request = request,
+        discovery = activeDiscovery,
+        onRequestChange = onRequestChange,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+    )
+    ExistingWorktreeDialogBody(state = model.state, actions = model.actions)
+}
+
+internal data class ExistingWorktreeDialogModel(
+    val state: ExistingWorktreeDialogState,
+    val actions: ExistingWorktreeDialogActions,
+)
+
+@Composable
+private fun existingRepositoryDialogModel(
+    request: PendingCreateWorktree,
+    discovery: ExistingBranchDiscoveryUiState,
+    onRequestChange: (PendingCreateWorktree) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+): ExistingWorktreeDialogModel {
+    val results = existingWorktreeResults(discovery, request.existingBranchQuery)
     val selectedResult = selectedExistingWorktreeResult(request.selectedExistingResult, results)
     var highlightedIndex by remember(request.repoRootPath, request.existingBranchQuery) { mutableIntStateOf(0) }
     val activeHighlightedIndex = highlightedIndex.coerceToWorktreeResults(results)
-    val keyboardCallbacks = ExistingWorktreeKeyboardCallbacks(
-        onHighlight = { index ->
-            highlightedIndex = index
-            if (selectedResult != results[index]) {
-                onRequestChange(request.copy(selectedExistingResult = null))
-            }
-        },
-        onSelect = { result -> onRequestChange(request.copy(selectedExistingResult = result)) },
-        onConfirm = onConfirm,
-    )
-
-    ExistingWorktreeDialogBody(
+    return ExistingWorktreeDialogModel(
         state = ExistingWorktreeDialogState(
-            request = request,
+            title = "Create Worktree",
+            mode = request.mode,
+            query = request.existingBranchQuery,
+            searchLabel = "Search existing branches or PR number",
             results = results,
-            isBranchLoading = activeDiscovery.isLoading,
-            isPullRequestLoading = activeDiscovery.isPullRequestLoading,
-            unsupportedPullRequestMessage = activeDiscovery.unsupportedPullRequestMessage
-                ?.takeIf { activeDiscovery.pullRequestQuery == request.existingBranchQuery.trim() },
+            isBranchLoading = discovery.isLoading,
+            isPullRequestLoading = discovery.isPullRequestLoading,
+            unsupportedPullRequestMessage = discovery.unsupportedPullRequestMessage
+                ?.takeIf { discovery.pullRequestQuery == request.existingBranchQuery.trim() },
             highlightedIndex = activeHighlightedIndex,
             selectedResult = selectedResult,
         ),
-        actions = ExistingWorktreeDialogActions(
-            onRequestChange = onRequestChange,
-            onConfirm = onConfirm,
-            onDismiss = onDismiss,
-            onKeyEvent = { event ->
-                handleExistingWorktreeKeyEvent(
-                    event = event,
-                    results = results,
-                    highlightedIndex = activeHighlightedIndex,
-                    selectedResult = selectedResult,
-                    callbacks = keyboardCallbacks,
-                )
-            },
+        actions = existingWorktreeDialogActions(
+            results = results,
+            highlightedIndex = activeHighlightedIndex,
+            selectedResult = selectedResult,
+            callbacks = ExistingWorktreeDialogCallbacks(
+                onModeChange = { mode -> onRequestChange(request.copy(mode = mode)) },
+                onQueryChange = { query ->
+                    onRequestChange(request.copy(existingBranchQuery = query, selectedExistingResult = null))
+                },
+                onConfirm = onConfirm,
+                onDismiss = onDismiss,
+                selection = ExistingWorktreeSelectionCallbacks(
+                    onHighlight = { index -> highlightedIndex = index },
+                    onSelectResult = { result -> onRequestChange(request.copy(selectedExistingResult = result)) },
+                    onClearSelection = { onRequestChange(request.copy(selectedExistingResult = null)) },
+                ),
+            ),
         ),
     )
 }
 
+internal fun existingWorktreeDialogActions(
+    results: List<ExistingWorktreeResult>,
+    highlightedIndex: Int?,
+    selectedResult: ExistingWorktreeResult?,
+    callbacks: ExistingWorktreeDialogCallbacks,
+): ExistingWorktreeDialogActions {
+    val keyboardCallbacks = ExistingWorktreeKeyboardCallbacks(
+        onHighlight = { index ->
+            callbacks.selection.onHighlight(index)
+            if (selectedResult != results[index]) callbacks.selection.onClearSelection()
+        },
+        onSelect = callbacks.selection.onSelectResult,
+        onConfirm = callbacks.onConfirm,
+    )
+    return ExistingWorktreeDialogActions(
+        onModeChange = callbacks.onModeChange,
+        onQueryChange = callbacks.onQueryChange,
+        onSelectResult = callbacks.selection.onSelectResult,
+        onConfirm = callbacks.onConfirm,
+        onDismiss = callbacks.onDismiss,
+        onKeyEvent = { event ->
+            handleExistingWorktreeKeyEvent(
+                event = event,
+                results = results,
+                highlightedIndex = highlightedIndex,
+                selectedResult = selectedResult,
+                callbacks = keyboardCallbacks,
+            )
+        },
+    )
+}
+
 @Composable
-private fun ExistingWorktreeDialogBody(
+internal fun ExistingWorktreeDialogBody(
     state: ExistingWorktreeDialogState,
     actions: ExistingWorktreeDialogActions,
 ) {
-    val request = state.request
     Column(
         modifier = Modifier
             .padding(16.dp)
@@ -153,16 +199,16 @@ private fun ExistingWorktreeDialogBody(
                 if (event.isEnterKey()) false else actions.onKeyEvent(event)
             },
     ) {
-        Text(text = "Create Worktree", style = MaterialTheme.typography.h6)
-        Spacer(modifier = Modifier.height(8.dp))
-        CreateWorktreeModeSelector(request.mode) { mode -> actions.onRequestChange(request.copy(mode = mode)) }
+        Text(text = state.title, style = MaterialTheme.typography.h6)
+        state.mode?.let { mode ->
+            Spacer(modifier = Modifier.height(8.dp))
+            CreateWorktreeModeSelector(mode, actions.onModeChange)
+        }
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
-            value = request.existingBranchQuery,
-            onValueChange = { query ->
-                actions.onRequestChange(request.copy(existingBranchQuery = query, selectedExistingResult = null))
-            },
-            label = { Text("Search existing branches or PR number") },
+            value = state.query,
+            onValueChange = actions.onQueryChange,
+            label = { Text(state.searchLabel) },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("existing-branch-search")
@@ -178,7 +224,7 @@ private fun ExistingWorktreeDialogBody(
             highlightedIndex = state.highlightedIndex,
             selectedResult = state.selectedResult,
             actions = ExistingWorktreeRowActions(
-                onSelect = { result -> actions.onRequestChange(request.copy(selectedExistingResult = result)) },
+                onSelect = actions.onSelectResult,
                 onKeyEvent = actions.onKeyEvent,
             ),
         )
@@ -304,9 +350,4 @@ private fun highlightResultBy(
     if (resultCount == 0) return null
     val currentIndex = highlightedIndex ?: if (delta > 0) -1 else 0
     return ExistingWorktreeKeyboardAction.Highlight((currentIndex + delta + resultCount) % resultCount)
-}
-
-private fun Int.coerceToWorktreeResults(results: List<ExistingWorktreeResult>): Int? {
-    if (results.isEmpty()) return null
-    return coerceIn(results.indices)
 }

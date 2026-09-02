@@ -32,7 +32,7 @@ private fun ExistingBranchDiscoveryUiState.canUsePullRequestHead(
     null -> false
 }
 
-private fun List<ExistingWorktreeResult>.rankedByExistingWorktreeMatch(
+internal fun List<ExistingWorktreeResult>.rankedByExistingWorktreeMatch(
     query: String,
 ): List<ExistingWorktreeResult> = mapNotNull { result ->
     rankExistingWorktreeResult(result, query)?.let { rank ->

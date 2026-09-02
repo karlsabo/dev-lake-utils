@@ -70,6 +70,13 @@ internal data class ExistingBranchDiscoveryState(
     val unsupportedPullRequestMessage: String? = null,
 )
 
+internal data class GlobalExistingBranchDiscoveryState(
+    val repoRootPaths: List<String> = emptyList(),
+    val repositories: Map<String, ExistingBranchDiscoveryState> = emptyMap(),
+    val isLoading: Boolean = false,
+    val requestId: Long = 0,
+)
+
 internal data class CreateLocalWorktreeFromRepositoryRequest(
     val repoRootPath: String,
     val baseWorktreePath: String,
@@ -106,6 +113,7 @@ internal class EngHubViewModelState(
     val lastCreateLocalWorktreeFromRepositoryRequest =
         MutableStateFlow<CreateLocalWorktreeFromRepositoryRequest?>(null)
     val existingBranchDiscovery = MutableStateFlow(ExistingBranchDiscoveryState())
+    val globalExistingBranchDiscovery = MutableStateFlow(GlobalExistingBranchDiscoveryState())
     val useUnrelatedExistingBranchConfirmationRequest =
         MutableStateFlow<UseUnrelatedExistingBranchConfirmationRequest?>(null)
     val rebaseConflictResolutionRequests =

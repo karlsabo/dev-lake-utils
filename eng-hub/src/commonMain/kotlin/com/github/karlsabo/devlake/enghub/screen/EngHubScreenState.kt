@@ -3,9 +3,8 @@ package com.github.karlsabo.devlake.enghub.screen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import com.github.karlsabo.devlake.enghub.component.ExistingBranchDiscoveryUiState
-import com.github.karlsabo.devlake.enghub.component.ExistingPullRequestWorktreeResult
 import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
+import com.github.karlsabo.devlake.enghub.component.GlobalExistingBranchDiscoveryUiState
 import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
 import com.github.karlsabo.devlake.enghub.component.PendingRebaseConflictResolution
@@ -19,7 +18,6 @@ import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.ActionErrorUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
-import com.github.karlsabo.devlake.enghub.viewmodel.ExistingBranchDiscoveryState
 import com.github.karlsabo.devlake.enghub.viewmodel.RebaseConflictResolutionRequest
 import com.github.karlsabo.devlake.enghub.viewmodel.UseUnrelatedExistingBranchConfirmationRequest
 import com.github.karlsabo.git.WorktreePath
@@ -32,6 +30,7 @@ internal data class EngHubScreenState(
     val selectedPane: EngHubPane,
     val paneAvailability: Map<EngHubPane, EngHubPaneAvailability>,
     val actionError: ActionErrorUiState?,
+    val globalExistingBranchDiscovery: GlobalExistingBranchDiscoveryUiState,
     val pullRequests: PullRequestsPaneState,
     val notifications: NotificationsPaneState,
     val worktrees: WorktreePanelState,
@@ -54,6 +53,8 @@ internal data class EngHubScreenActions(
     val onPaneSelected: (EngHubPane) -> Unit,
     val onClearActionError: () -> Unit,
     val checkoutWorktreePath: CheckoutWorktreePath,
+    val onDiscoverGlobalExistingBranches: () -> Unit,
+    val onCheckoutExistingBranch: (repoRootPath: String, branch: String) -> Unit,
     val pullRequests: PullRequestPaneActions,
     val notifications: NotificationActions,
     val worktrees: WorktreePanelActions,
@@ -114,11 +115,13 @@ internal fun collectEngHubScreenState(
     val useUnrelatedExistingBranchRequest by
         viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.collectAsState()
     val rebaseConflictResolutionRequest by viewModel.rebaseConflictResolutionRequestStateFlow.collectAsState()
+    val globalExistingBranchDiscovery by viewModel.globalExistingBranchDiscoveryStateFlow.collectAsState()
 
     return EngHubScreenState(
         selectedPane = selectedPane,
         paneAvailability = paneAvailability,
         actionError = actionError,
+        globalExistingBranchDiscovery = globalExistingBranchDiscovery.toUiState(),
         pullRequests = PullRequestsPaneState(
             result = activityResults.pullRequests,
             organizationIdsEmpty = settings.committedConfig.organizationIds.isEmpty(),
@@ -149,25 +152,6 @@ internal fun collectEngHubScreenState(
         settings = settings,
     )
 }
-
-private fun ExistingBranchDiscoveryState.toUiState(): ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(
-    repoRootPath = repoRootPath,
-    branches = branches,
-    originBranches = originBranches,
-    originBranchRefreshSucceeded = originBranchRefreshSucceeded,
-    isLoading = isLoading,
-    pullRequestQuery = pullRequestQuery,
-    pullRequest = pullRequest?.let { candidate ->
-        ExistingPullRequestWorktreeResult(
-            repoRootPath = repoRootPath,
-            branch = candidate.branch,
-            repositoryFullName = candidate.repositoryFullName,
-            number = candidate.number,
-        )
-    },
-    isPullRequestLoading = isPullRequestLoading,
-    unsupportedPullRequestMessage = unsupportedPullRequestMessage,
-)
 
 private data class ActivityPaneResults(
     val pullRequests: Result<List<PullRequestUiState>>?,
@@ -202,6 +186,8 @@ internal fun engHubScreenActions(
     onPaneSelected = onPaneSelected,
     onClearActionError = viewModel.clearActionError,
     checkoutWorktreePath = viewModel.checkoutWorktreePath,
+    onDiscoverGlobalExistingBranches = viewModel.discoverGlobalExistingBranches,
+    onCheckoutExistingBranch = viewModel.checkoutExistingBranch,
     pullRequests = PullRequestPaneActions(
         onOpenInBrowser = viewModel.openInBrowser,
         onCheckoutAndOpen = { repoFullName, branch ->
@@ -217,44 +203,48 @@ internal fun engHubScreenActions(
         onMarkDone = viewModel.markNotificationDone,
         onUnsubscribe = viewModel.unsubscribeFromNotification,
     ),
-    worktrees = WorktreePanelActions(
-        onAddRepository = viewModel.pickAndAddLocalRepository,
-        onToggleRepository = viewModel.toggleLocalRepositoryExpansion,
-        onCreateWorktreeFromRepository = viewModel::requestCreateLocalWorktreeFromRepository,
-        onRepositoryCreateWorktreeRequestHandled = viewModel::clearCreateLocalWorktreeFromRepositoryRequest,
-        onDiscoverExistingBranches = viewModel.discoverExistingBranches,
-        onDiscoverExistingPullRequest = viewModel.discoverExistingPullRequest,
-        onCheckoutExistingBranch = viewModel.checkoutExistingBranch,
-        onConfirmUseUnrelatedExistingBranch = { request ->
-            viewModel.confirmUseUnrelatedExistingBranch(request.toViewModelRequest())
-        },
-        onDismissUseUnrelatedExistingBranchConfirmation = viewModel::dismissUseUnrelatedExistingBranchConfirmation,
-        onAbortRebaseConflict = { request ->
-            viewModel.abortRebaseAfterConflict(request.toViewModelRequest())
-        },
-        onLeaveRebaseConflictAsIs = { request ->
-            viewModel.leaveRebaseConflictAsIs(request.toViewModelRequest())
-        },
-        worktrees = LocalWorktreeActions(
-            onOpenWorktree = viewModel.openLocalWorktree,
-            onArchiveWorktree = viewModel.archiveLocalWorktree,
-            onCreateWorktree = { request ->
-                viewModel.createLocalWorktreeFromBase(
-                    repoRootPath = request.repoRootPath,
-                    baseWorktreePath = request.baseWorktreePath,
-                    baseBranch = request.baseBranch,
-                    targetBranch = request.targetBranch,
-                    baseCommitIsh = request.baseCommitIsh,
-                )
-            },
-            onRebaseOntoParent = viewModel.rebaseLocalWorktreeOntoParent,
-        ),
-        forceArchive = ForceArchiveWorktreeActions(
-            onConfirm = viewModel.confirmForceArchiveLocalWorktree,
-            onDismiss = viewModel.dismissForceArchiveWorktreeRequest,
-        ),
-    ),
+    worktrees = engHubWorktreePanelActions(viewModel),
     settings = engHubSettingsActions(settingsViewModel),
+)
+
+private fun engHubWorktreePanelActions(viewModel: EngHubViewModel) = WorktreePanelActions(
+    onAddRepository = viewModel.pickAndAddLocalRepository,
+    onToggleRepository = viewModel.toggleLocalRepositoryExpansion,
+    onCreateWorktreeFromRepository = viewModel::requestCreateLocalWorktreeFromRepository,
+    onRepositoryCreateWorktreeRequestHandled = viewModel::clearCreateLocalWorktreeFromRepositoryRequest,
+    onDiscoverExistingBranches = viewModel.discoverExistingBranches,
+    onDiscoverExistingPullRequest = viewModel.discoverExistingPullRequest,
+    onCheckoutExistingBranch = viewModel.checkoutExistingBranch,
+    onConfirmUseUnrelatedExistingBranch = { request ->
+        viewModel.confirmUseUnrelatedExistingBranch(request.toViewModelRequest())
+    },
+    onDismissUseUnrelatedExistingBranchConfirmation = viewModel::dismissUseUnrelatedExistingBranchConfirmation,
+    onAbortRebaseConflict = { request ->
+        viewModel.abortRebaseAfterConflict(request.toViewModelRequest())
+    },
+    onLeaveRebaseConflictAsIs = { request ->
+        viewModel.leaveRebaseConflictAsIs(request.toViewModelRequest())
+    },
+    worktrees = localWorktreeActions(viewModel),
+    forceArchive = ForceArchiveWorktreeActions(
+        onConfirm = viewModel.confirmForceArchiveLocalWorktree,
+        onDismiss = viewModel.dismissForceArchiveWorktreeRequest,
+    ),
+)
+
+private fun localWorktreeActions(viewModel: EngHubViewModel) = LocalWorktreeActions(
+    onOpenWorktree = viewModel.openLocalWorktree,
+    onArchiveWorktree = viewModel.archiveLocalWorktree,
+    onCreateWorktree = { request ->
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = request.repoRootPath,
+            baseWorktreePath = request.baseWorktreePath,
+            baseBranch = request.baseBranch,
+            targetBranch = request.targetBranch,
+            baseCommitIsh = request.baseCommitIsh,
+        )
+    },
+    onRebaseOntoParent = viewModel.rebaseLocalWorktreeOntoParent,
 )
 
 private fun engHubSettingsActions(viewModel: EngHubSettingsViewModel) = EngHubSettingsActions(
