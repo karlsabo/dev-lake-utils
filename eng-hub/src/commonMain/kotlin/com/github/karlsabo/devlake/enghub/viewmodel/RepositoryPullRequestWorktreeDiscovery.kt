@@ -17,10 +17,7 @@ internal class RepositoryPullRequestWorktreeDiscovery(
         if (repoRootPath.isBlank()) return
         discoveryJob?.cancel()
         val normalizedQuery = query.trim()
-        val number = normalizedQuery
-            .takeIf { it.isNotEmpty() && it.all(Char::isDigit) }
-            ?.toIntOrNull()
-            ?.takeIf { it > 0 }
+        val number = plainPullRequestNumber(normalizedQuery)
         if (number == null) {
             clear(repoRootPath, normalizedQuery)
             return
@@ -28,7 +25,14 @@ internal class RepositoryPullRequestWorktreeDiscovery(
 
         val request = start(repoRootPath, normalizedQuery)
         discoveryJob = launchGitHubAction { services ->
-            runCatching { load(repoRootPath, number, services) }
+            runCatching {
+                discoverPullRequestWorktreeCandidate(
+                    repoRootPath = repoRootPath,
+                    number = number,
+                    gitWorktreeApi = gitWorktreeApi,
+                    services = services,
+                )
+            }
                 .rethrowCancellation()
                 .onSuccess { outcome -> finish(request, outcome) }
                 .onFailure { failure ->
@@ -36,22 +40,6 @@ internal class RepositoryPullRequestWorktreeDiscovery(
                     finish(request, PullRequestDiscoveryOutcome.NoResult)
                 }
         }
-    }
-
-    private suspend fun load(
-        repoRootPath: String,
-        number: Int,
-        services: EngHubGitHubServices,
-    ): PullRequestDiscoveryOutcome {
-        val identity = gitWorktreeApi.originUrl(repoRootPath)
-            ?.let(::parseGitHubRepositoryIdentity)
-            ?: return PullRequestDiscoveryOutcome.NoResult
-        val pullRequest = services.pullRequestReviewApi.getPullRequest(
-            owner = identity.owner,
-            repository = identity.repository,
-            number = number,
-        )
-        return pullRequest.toDiscoveryOutcome(identity, number)
     }
 
     private fun start(repoRootPath: String, query: String): ExistingBranchDiscoveryState {
@@ -111,13 +99,35 @@ internal class RepositoryPullRequestWorktreeDiscovery(
     }
 }
 
-private sealed interface PullRequestDiscoveryOutcome {
+internal sealed interface PullRequestDiscoveryOutcome {
     data class Candidate(
         val value: ExistingPullRequestWorktreeCandidate,
     ) : PullRequestDiscoveryOutcome
 
     data object UnsupportedFork : PullRequestDiscoveryOutcome
     data object NoResult : PullRequestDiscoveryOutcome
+}
+
+internal fun plainPullRequestNumber(query: String): Int? = query.trim()
+    .takeIf { it.isNotEmpty() && it.all(Char::isDigit) }
+    ?.toIntOrNull()
+    ?.takeIf { it > 0 }
+
+internal suspend fun discoverPullRequestWorktreeCandidate(
+    repoRootPath: String,
+    number: Int,
+    gitWorktreeApi: GitWorktreeApi,
+    services: EngHubGitHubServices,
+): PullRequestDiscoveryOutcome {
+    val identity = gitWorktreeApi.originUrl(repoRootPath)
+        ?.let(::parseGitHubRepositoryIdentity)
+        ?: return PullRequestDiscoveryOutcome.NoResult
+    val pullRequest = services.pullRequestReviewApi.getPullRequest(
+        owner = identity.owner,
+        repository = identity.repository,
+        number = number,
+    )
+    return pullRequest.toDiscoveryOutcome(identity, number)
 }
 
 private fun PullRequest.toDiscoveryOutcome(

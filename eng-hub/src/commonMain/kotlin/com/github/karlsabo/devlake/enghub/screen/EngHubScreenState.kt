@@ -54,6 +54,7 @@ internal data class EngHubScreenActions(
     val onClearActionError: () -> Unit,
     val checkoutWorktreePath: CheckoutWorktreePath,
     val onDiscoverGlobalExistingBranches: () -> Unit,
+    val onDiscoverGlobalExistingPullRequests: (query: String) -> Unit,
     val onCheckoutExistingBranch: (repoRootPath: String, branch: String) -> Unit,
     val pullRequests: PullRequestPaneActions,
     val notifications: NotificationActions,
@@ -187,6 +188,7 @@ internal fun engHubScreenActions(
     onClearActionError = viewModel.clearActionError,
     checkoutWorktreePath = viewModel.checkoutWorktreePath,
     onDiscoverGlobalExistingBranches = viewModel.discoverGlobalExistingBranches,
+    onDiscoverGlobalExistingPullRequests = viewModel.discoverGlobalExistingPullRequests,
     onCheckoutExistingBranch = viewModel.checkoutExistingBranch,
     pullRequests = PullRequestPaneActions(
         onOpenInBrowser = viewModel.openInBrowser,

@@ -11,22 +11,43 @@ internal class GlobalExistingWorktreeDiscoveryController(
     private val viewModel: ViewModel,
     private val state: EngHubViewModelState,
     private val worktreeServices: EngHubWorktreeServices,
+    private val launchGitHubAction: (suspend (EngHubGitHubServices) -> Unit) -> Job,
 ) {
-    private var discoveryJob: Job? = null
+    private var branchDiscoveryJob: Job? = null
+    private var pullRequestDiscoveryJob: Job? = null
 
     fun discoverExistingBranches() {
-        val repoRootPaths = state.currentConfig.localRepositories
-            .map { it.path }
-            .filter(String::isNotBlank)
-            .distinct()
-        discoveryJob?.cancel()
-        val request = startDiscovery(repoRootPaths)
+        val repoRootPaths = state.configuredGlobalRepoRootPaths()
+        branchDiscoveryJob?.cancel()
+        val request = startBranchDiscovery(repoRootPaths)
         if (repoRootPaths.isEmpty()) return
 
-        discoveryJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
+        branchDiscoveryJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
             supervisorScope {
                 repoRootPaths.forEach { repoRootPath ->
                     launch { discoverRepositoryBranches(request, repoRootPath) }
+                }
+            }
+        }
+    }
+
+    fun discoverPullRequests(query: String) {
+        val repoRootPaths = state.configuredGlobalRepoRootPaths()
+        pullRequestDiscoveryJob?.cancel()
+        val normalizedQuery = query.trim()
+        val number = plainPullRequestNumber(normalizedQuery)
+        if (number == null) {
+            clearPullRequests(repoRootPaths, normalizedQuery)
+            return
+        }
+
+        val request = startPullRequestDiscovery(repoRootPaths, normalizedQuery)
+        if (repoRootPaths.isEmpty()) return
+
+        pullRequestDiscoveryJob = launchGitHubAction { services ->
+            supervisorScope {
+                repoRootPaths.forEach { repoRootPath ->
+                    launch { discoverRepositoryPullRequest(request, repoRootPath, number, services) }
                 }
             }
         }
@@ -39,7 +60,7 @@ internal class GlobalExistingWorktreeDiscoveryController(
         runCatching { worktreeServices.gitWorktreeApi.refreshAndListExistingBranches(repoRootPath) }
             .rethrowCancellation()
             .onSuccess { branches ->
-                finishDiscovery(
+                finishBranchDiscovery(
                     request = request,
                     repoRootPath = repoRootPath,
                     branches = branches.branches,
@@ -49,7 +70,7 @@ internal class GlobalExistingWorktreeDiscoveryController(
             }
             .onFailure { failure ->
                 logger.error(failure) { "Failed to discover existing branches for $repoRootPath" }
-                finishDiscovery(
+                finishBranchDiscovery(
                     request = request,
                     repoRootPath = repoRootPath,
                     branches = emptyList(),
@@ -59,14 +80,35 @@ internal class GlobalExistingWorktreeDiscoveryController(
             }
     }
 
-    private fun startDiscovery(
+    private suspend fun discoverRepositoryPullRequest(
+        request: GlobalExistingBranchDiscoveryState,
+        repoRootPath: String,
+        number: Int,
+        services: EngHubGitHubServices,
+    ) {
+        runCatching {
+            discoverPullRequestWorktreeCandidate(
+                repoRootPath = repoRootPath,
+                number = number,
+                gitWorktreeApi = worktreeServices.gitWorktreeApi,
+                services = services,
+            )
+        }.rethrowCancellation()
+            .onSuccess { outcome -> finishPullRequestDiscovery(request, repoRootPath, outcome) }
+            .onFailure { failure ->
+                logger.error(failure) { "Failed to discover pull request #$number for $repoRootPath" }
+                finishPullRequestDiscovery(request, repoRootPath, PullRequestDiscoveryOutcome.NoResult)
+            }
+    }
+
+    private fun startBranchDiscovery(
         repoRootPaths: List<String>,
     ): GlobalExistingBranchDiscoveryState {
         while (true) {
             val current = state.globalExistingBranchDiscovery.value
             val requestId = current.requestId + 1
-            val repositories = loadingRepositories(repoRootPaths, requestId)
-            val request = GlobalExistingBranchDiscoveryState(
+            val repositories = loadingBranchRepositories(repoRootPaths, current.repositories, requestId)
+            val request = current.copy(
                 repoRootPaths = repoRootPaths,
                 repositories = repositories,
                 isLoading = repositories.isNotEmpty(),
@@ -76,19 +118,69 @@ internal class GlobalExistingWorktreeDiscoveryController(
         }
     }
 
-    private fun loadingRepositories(
+    private fun loadingBranchRepositories(
         repoRootPaths: List<String>,
+        currentRepositories: Map<String, ExistingBranchDiscoveryState>,
         requestId: Long,
     ): Map<String, ExistingBranchDiscoveryState> = repoRootPaths.associateWith { repoRootPath ->
-        ExistingBranchDiscoveryState(
-            repoRootPath = repoRootPath,
+        currentRepositories[repoRootPath].orEmptyRepository(repoRootPath).copy(
             originBranchRefreshSucceeded = null,
             isLoading = true,
             requestId = requestId,
         )
     }
 
-    private fun finishDiscovery(
+    private fun startPullRequestDiscovery(
+        repoRootPaths: List<String>,
+        query: String,
+    ): GlobalExistingBranchDiscoveryState {
+        while (true) {
+            val current = state.globalExistingBranchDiscovery.value
+            val requestId = current.pullRequestRequestId + 1
+            val repositories = repoRootPaths.associateWith { repoRootPath ->
+                current.repositories[repoRootPath].orEmptyRepository(repoRootPath).copy(
+                    pullRequestQuery = query,
+                    pullRequest = null,
+                    isPullRequestLoading = true,
+                    pullRequestRequestId = requestId,
+                    unsupportedPullRequestMessage = null,
+                )
+            }
+            val request = current.copy(
+                repoRootPaths = repoRootPaths,
+                repositories = repositories,
+                pullRequestRequestId = requestId,
+            )
+            if (state.globalExistingBranchDiscovery.compareAndSet(current, request)) return request
+        }
+    }
+
+    private fun clearPullRequests(
+        repoRootPaths: List<String>,
+        query: String,
+    ) {
+        while (true) {
+            val current = state.globalExistingBranchDiscovery.value
+            val requestId = current.pullRequestRequestId + 1
+            val repositories = repoRootPaths.associateWith { repoRootPath ->
+                current.repositories[repoRootPath].orEmptyRepository(repoRootPath).copy(
+                    pullRequestQuery = query,
+                    pullRequest = null,
+                    isPullRequestLoading = false,
+                    pullRequestRequestId = requestId,
+                    unsupportedPullRequestMessage = null,
+                )
+            }
+            val cleared = current.copy(
+                repoRootPaths = repoRootPaths,
+                repositories = repositories,
+                pullRequestRequestId = requestId,
+            )
+            if (state.globalExistingBranchDiscovery.compareAndSet(current, cleared)) return
+        }
+    }
+
+    private fun finishBranchDiscovery(
         request: GlobalExistingBranchDiscoveryState,
         repoRootPath: String,
         branches: List<String>,
@@ -98,13 +190,13 @@ internal class GlobalExistingWorktreeDiscoveryController(
         while (true) {
             val current = state.globalExistingBranchDiscovery.value
             if (current.requestId != request.requestId || repoRootPath !in current.repoRootPaths) return
-            val repositories = updateCompletedRepository(
-                state = current,
-                repoRootPath = repoRootPath,
+            val repository = current.repositories.getValue(repoRootPath).copy(
                 branches = branches,
                 originBranches = originBranches,
                 originBranchRefreshSucceeded = originBranchRefreshSucceeded,
+                isLoading = false,
             )
+            val repositories = current.repositories + (repoRootPath to repository)
             val completed = current.copy(
                 repositories = repositories,
                 isLoading = repositories.values.any { it.isLoading },
@@ -113,19 +205,39 @@ internal class GlobalExistingWorktreeDiscoveryController(
         }
     }
 
-    private fun updateCompletedRepository(
-        state: GlobalExistingBranchDiscoveryState,
+    private fun finishPullRequestDiscovery(
+        request: GlobalExistingBranchDiscoveryState,
         repoRootPath: String,
-        branches: List<String>,
-        originBranches: List<String>,
-        originBranchRefreshSucceeded: Boolean,
-    ): Map<String, ExistingBranchDiscoveryState> {
-        val repository = state.repositories.getValue(repoRootPath).copy(
-            branches = branches,
-            originBranches = originBranches,
-            originBranchRefreshSucceeded = originBranchRefreshSucceeded,
-            isLoading = false,
-        )
-        return state.repositories + (repoRootPath to repository)
+        outcome: PullRequestDiscoveryOutcome,
+    ) {
+        while (true) {
+            val current = state.globalExistingBranchDiscovery.value
+            if (
+                current.pullRequestRequestId != request.pullRequestRequestId ||
+                repoRootPath !in current.repoRootPaths
+            ) {
+                return
+            }
+            val repository = current.repositories.getValue(repoRootPath).copy(
+                pullRequest = (outcome as? PullRequestDiscoveryOutcome.Candidate)?.value,
+                isPullRequestLoading = false,
+                unsupportedPullRequestMessage = if (outcome == PullRequestDiscoveryOutcome.UnsupportedFork) {
+                    "Fork pull requests are not supported."
+                } else {
+                    null
+                },
+            )
+            val completed = current.copy(repositories = current.repositories + (repoRootPath to repository))
+            if (state.globalExistingBranchDiscovery.compareAndSet(current, completed)) return
+        }
     }
 }
+
+private fun EngHubViewModelState.configuredGlobalRepoRootPaths(): List<String> = currentConfig.localRepositories
+    .map { it.path }
+    .filter(String::isNotBlank)
+    .distinct()
+
+private fun ExistingBranchDiscoveryState?.orEmptyRepository(
+    repoRootPath: String,
+): ExistingBranchDiscoveryState = this ?: ExistingBranchDiscoveryState(repoRootPath = repoRootPath)

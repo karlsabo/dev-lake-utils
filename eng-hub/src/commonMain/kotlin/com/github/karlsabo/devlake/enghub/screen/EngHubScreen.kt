@@ -100,6 +100,12 @@ private fun EngHubScreenContent(
         if (pendingGlobalCreateWorktree != null) actions.onDiscoverGlobalExistingBranches()
     }
 
+    LaunchedEffect(pendingGlobalCreateWorktree?.existingBranchQuery) {
+        pendingGlobalCreateWorktree?.let { request ->
+            actions.onDiscoverGlobalExistingPullRequests(request.existingBranchQuery)
+        }
+    }
+
     pendingGlobalCreateWorktree?.let { request ->
         GlobalExistingBranchWorktreeDialog(
             request = request,

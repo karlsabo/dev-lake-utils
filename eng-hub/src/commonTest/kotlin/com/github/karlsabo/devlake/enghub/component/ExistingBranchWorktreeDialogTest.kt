@@ -7,9 +7,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -48,6 +50,39 @@ class ExistingBranchWorktreeDialogTest {
         assertEquals(
             listOf(ExistingBranchWorktreeResult(REPO_PATH, "123"), pullRequest),
             existingWorktreeResults(discovery, "123"),
+        )
+    }
+
+    @Test
+    fun globalNumericSearchPreservesConfiguredRepositoryBranchAndPullRequestResults() {
+        val pullRequest = pullRequestResult(
+            repoRootPath = ENGINEERING_DOCS_PATH,
+            number = 456,
+            branch = "feature/pr-search",
+            repositoryFullName = "owner/engineering-docs",
+        )
+        val discovery = GlobalExistingBranchDiscoveryUiState(
+            repositories = listOf(
+                ExistingBranchDiscoveryUiState(
+                    repoRootPath = REPO_PATH,
+                    branches = listOf("456"),
+                ),
+                ExistingBranchDiscoveryUiState(
+                    repoRootPath = ENGINEERING_DOCS_PATH,
+                    originBranches = listOf("feature/pr-search"),
+                    originBranchRefreshSucceeded = true,
+                    pullRequestQuery = "456",
+                    pullRequest = pullRequest,
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf(
+                ExistingBranchWorktreeResult(REPO_PATH, "456"),
+                pullRequest,
+            ),
+            globalExistingWorktreeResults(discovery, "456"),
         )
     }
 
@@ -223,6 +258,83 @@ class ExistingBranchWorktreeDialogTest {
 
         onNodeWithText("Branch · dev-lake-utils · 123").assertIsDisplayed()
         onNodeWithText("PR #123 · owner/dev-lake-utils · feature/pr-123").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun globalExistingBranchDialogShowsPullRequestResultsAndLoading() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                GlobalExistingBranchWorktreeDialogContent(
+                    request = PendingGlobalCreateWorktree(existingBranchQuery = "456"),
+                    discovery = GlobalExistingBranchDiscoveryUiState(
+                        repositories = listOf(
+                            ExistingBranchDiscoveryUiState(
+                                repoRootPath = ENGINEERING_DOCS_PATH,
+                                originBranches = listOf("feature/pr-search"),
+                                originBranchRefreshSucceeded = true,
+                                pullRequestQuery = "456",
+                                pullRequest = pullRequestResult(
+                                    repoRootPath = ENGINEERING_DOCS_PATH,
+                                    number = 456,
+                                    branch = "feature/pr-search",
+                                    repositoryFullName = "owner/engineering-docs",
+                                ),
+                            ),
+                            ExistingBranchDiscoveryUiState(
+                                repoRootPath = REPO_PATH,
+                                isPullRequestLoading = true,
+                            ),
+                        ),
+                    ),
+                    onRequestChange = {},
+                    onConfirm = {},
+                    onDismiss = {},
+                )
+            }
+        }
+
+        onNodeWithText("PR #456 · owner/engineering-docs · feature/pr-search").assertIsDisplayed()
+        onNodeWithContentDescription("Loading pull request").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun globalExistingBranchDialogHidesUnsupportedForkMessageWhenAnotherRepositoryHasPullRequest() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                GlobalExistingBranchWorktreeDialogContent(
+                    request = PendingGlobalCreateWorktree(existingBranchQuery = "456"),
+                    discovery = GlobalExistingBranchDiscoveryUiState(
+                        repositories = listOf(
+                            ExistingBranchDiscoveryUiState(
+                                repoRootPath = REPO_PATH,
+                                pullRequestQuery = "456",
+                                unsupportedPullRequestMessage = "Fork pull requests are not supported.",
+                            ),
+                            ExistingBranchDiscoveryUiState(
+                                repoRootPath = ENGINEERING_DOCS_PATH,
+                                originBranches = listOf("feature/pr-search"),
+                                originBranchRefreshSucceeded = true,
+                                pullRequestQuery = "456",
+                                pullRequest = pullRequestResult(
+                                    repoRootPath = ENGINEERING_DOCS_PATH,
+                                    number = 456,
+                                    branch = "feature/pr-search",
+                                    repositoryFullName = "owner/engineering-docs",
+                                ),
+                            ),
+                        ),
+                    ),
+                    onRequestChange = {},
+                    onConfirm = {},
+                    onDismiss = {},
+                )
+            }
+        }
+
+        onNodeWithText("PR #456 · owner/engineering-docs · feature/pr-search").assertIsDisplayed()
+        onAllNodesWithText("Fork pull requests are not supported.").assertCountEquals(0)
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -524,8 +636,9 @@ class ExistingBranchWorktreeDialogTest {
         number: Int,
         branch: String,
         repositoryFullName: String = "owner/dev-lake-utils",
+        repoRootPath: String = REPO_PATH,
     ) = ExistingPullRequestWorktreeResult(
-        repoRootPath = REPO_PATH,
+        repoRootPath = repoRootPath,
         repositoryFullName = repositoryFullName,
         number = number,
         branch = branch,

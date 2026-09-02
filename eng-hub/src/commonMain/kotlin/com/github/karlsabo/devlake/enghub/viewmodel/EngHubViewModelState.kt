@@ -75,6 +75,7 @@ internal data class GlobalExistingBranchDiscoveryState(
     val repositories: Map<String, ExistingBranchDiscoveryState> = emptyMap(),
     val isLoading: Boolean = false,
     val requestId: Long = 0,
+    val pullRequestRequestId: Long = 0,
 )
 
 internal data class CreateLocalWorktreeFromRepositoryRequest(

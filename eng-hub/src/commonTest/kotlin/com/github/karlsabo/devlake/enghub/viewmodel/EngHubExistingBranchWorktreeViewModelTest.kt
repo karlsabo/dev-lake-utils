@@ -143,6 +143,96 @@ class EngHubExistingBranchWorktreeViewModelTest {
     }
 
     @Test
+    fun globalPullRequestDiscoveryPublishesCandidateDuringBranchLoading() = runBlocking {
+        val branch = "feature/pr-search"
+        val devLakeStarted = CompletableDeferred<Unit>()
+        val releaseDevLake = CompletableDeferred<Unit>()
+        val git = globalPullRequestGit(
+            branch = branch,
+            devLakeStarted = devLakeStarted,
+            releaseDevLake = releaseDevLake,
+        )
+        val gitHub = engineeringDocsPullRequestApi(branch)
+        val viewModel = globalPullRequestViewModel(git, gitHub)
+
+        viewModel.discoverGlobalExistingBranches()
+        withTimeout(5.seconds) { devLakeStarted.await() }
+        viewModel.discoverGlobalExistingPullRequests("456")
+
+        val discovery = withTimeout(5.seconds) {
+            viewModel.globalExistingBranchDiscoveryStateFlow.first {
+                it.repositories[ENGINEERING_DOCS_ROOT]?.pullRequest?.branch == branch
+            }
+        }
+        val pullRequest = discovery.repositories.getValue(ENGINEERING_DOCS_ROOT).pullRequest
+        assertEquals(true, discovery.isLoading)
+        assertEquals(true, discovery.repositories.getValue(DEV_LAKE_ROOT).isLoading)
+        assertEquals("owner/engineering-docs", pullRequest?.repositoryFullName)
+        assertEquals(456, pullRequest?.number)
+        assertEquals(branch, pullRequest?.branch)
+        assertEquals(
+            listOf("https://api.github.com/repos/owner/engineering-docs/pulls/456"),
+            gitHub.pullRequestByUrlCalls,
+        )
+
+        releaseDevLake.complete(Unit)
+        Unit
+    }
+
+    @Test
+    fun globalPullRequestDiscoveryFiltersForksWithoutDiscardingBaseRepositoryResults() = runBlocking {
+        val branch = "feature/pr-search"
+        val git = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                originUrlsByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to "git@github.com:owner/dev-lake-utils.git",
+                    ENGINEERING_DOCS_ROOT to "git@github.com:owner/engineering-docs.git",
+                ),
+            ),
+        )
+        val gitHub = RecordingGitHubApi(
+            pullRequestsByUrl = mapOf(
+                "https://api.github.com/repos/owner/dev-lake-utils/pulls/456" to PullRequest(
+                    number = 456,
+                    head = PullRequestHead(
+                        ref = "feature/fork",
+                        repo = PullRequestRepository("contributor/dev-lake-utils"),
+                    ),
+                ),
+                "https://api.github.com/repos/owner/engineering-docs/pulls/456" to PullRequest(
+                    number = 456,
+                    head = PullRequestHead(
+                        ref = branch,
+                        repo = PullRequestRepository("owner/engineering-docs"),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = git,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = listOf(
+                LocalRepositoryConfig(path = DEV_LAKE_ROOT),
+                LocalRepositoryConfig(path = ENGINEERING_DOCS_ROOT),
+            ),
+            services = LocalRepositoryViewModelServices(gitHubApi = gitHub),
+        )
+
+        viewModel.discoverGlobalExistingPullRequests("456")
+
+        val discovery = withTimeout(5.seconds) {
+            viewModel.globalExistingBranchDiscoveryStateFlow.first { state ->
+                state.repositories.size == 2 && state.repositories.values.none { it.isPullRequestLoading }
+            }
+        }
+        val devLake = discovery.repositories.getValue(DEV_LAKE_ROOT)
+        val engineeringDocs = discovery.repositories.getValue(ENGINEERING_DOCS_ROOT)
+        assertNull(devLake.pullRequest)
+        assertEquals("Fork pull requests are not supported.", devLake.unsupportedPullRequestMessage)
+        assertEquals(branch, engineeringDocs.pullRequest?.branch)
+    }
+
+    @Test
     fun globalBranchCheckoutRunsSelectedRepositorySetupCommands() = runBlocking {
         val branch = "feature/doc-search"
         val worktreePath = buildWorktreePath(ENGINEERING_DOCS_ROOT, branch)
@@ -336,6 +426,58 @@ class EngHubExistingBranchWorktreeViewModelTest {
 
         setupRunner.complete(worktreePath)
     }
+
+    private fun globalPullRequestGit(
+        branch: String,
+        devLakeStarted: CompletableDeferred<Unit>,
+        releaseDevLake: CompletableDeferred<Unit>,
+    ) = RecordingGitWorktreeApi(
+        responses = RecordingGitWorktreeApiResponses(
+            existingBranchesForRepoPath = { repoPath ->
+                when (repoPath) {
+                    DEV_LAKE_ROOT -> {
+                        devLakeStarted.complete(Unit)
+                        runBlocking { releaseDevLake.await() }
+                        listOf("main")
+                    }
+
+                    ENGINEERING_DOCS_ROOT -> listOf("main", branch)
+
+                    else -> error("Unexpected repository $repoPath")
+                }
+            },
+            originBranchesByRepoPath = mapOf(ENGINEERING_DOCS_ROOT to listOf(branch)),
+            originUrlsByRepoPath = mapOf(
+                ENGINEERING_DOCS_ROOT to "https://github.com/owner/engineering-docs.git",
+            ),
+        ),
+    )
+
+    private fun engineeringDocsPullRequestApi(branch: String) = RecordingGitHubApi(
+        pullRequestsByUrl = mapOf(
+            "https://api.github.com/repos/owner/engineering-docs/pulls/456" to PullRequest(
+                number = 456,
+                state = "closed",
+                head = PullRequestHead(
+                    ref = branch,
+                    repo = PullRequestRepository("owner/engineering-docs"),
+                ),
+            ),
+        ),
+    )
+
+    private fun globalPullRequestViewModel(
+        git: RecordingGitWorktreeApi,
+        gitHub: RecordingGitHubApi,
+    ) = createLocalRepositoryViewModel(
+        gitWorktreeApi = git,
+        configWriter = RecordingEngHubConfigWriter(),
+        localRepositoryConfigs = listOf(
+            LocalRepositoryConfig(path = DEV_LAKE_ROOT),
+            LocalRepositoryConfig(path = ENGINEERING_DOCS_ROOT),
+        ),
+        services = LocalRepositoryViewModelServices(gitHubApi = gitHub),
+    )
 
     private fun pullRequestGit(branch: String, checkoutPath: String? = null) = RecordingGitWorktreeApi(
         responses = RecordingGitWorktreeApiResponses(

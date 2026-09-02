@@ -75,11 +75,15 @@ private fun globalExistingDialogModel(
             title = "Create Worktree",
             mode = null,
             query = request.existingBranchQuery,
-            searchLabel = "Search existing branches",
+            searchLabel = "Search existing branches or PR number",
             results = results,
             isBranchLoading = discovery.isLoading,
-            isPullRequestLoading = false,
-            unsupportedPullRequestMessage = null,
+            isPullRequestLoading = discovery.repositories.any { it.isPullRequestLoading },
+            unsupportedPullRequestMessage = globalUnsupportedPullRequestMessage(
+                discovery = discovery,
+                query = request.existingBranchQuery,
+                results = results,
+            ),
             highlightedIndex = activeHighlightedIndex,
             selectedResult = selectedResult,
         ),
@@ -92,6 +96,19 @@ private fun globalExistingDialogModel(
             ),
         ),
     )
+}
+
+private fun globalUnsupportedPullRequestMessage(
+    discovery: GlobalExistingBranchDiscoveryUiState,
+    query: String,
+    results: List<ExistingWorktreeResult>,
+): String? {
+    if (results.any { it is ExistingPullRequestWorktreeResult }) return null
+    val pullRequestQuery = query.trim()
+    return discovery.repositories.firstNotNullOfOrNull { repository ->
+        repository.unsupportedPullRequestMessage
+            ?.takeIf { repository.pullRequestQuery == pullRequestQuery }
+    }
 }
 
 private data class GlobalExistingDialogCallbacks(
