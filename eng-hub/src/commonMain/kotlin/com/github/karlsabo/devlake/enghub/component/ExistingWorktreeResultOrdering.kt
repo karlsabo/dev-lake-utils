@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
+
 internal fun existingWorktreeResults(
     discovery: ExistingBranchDiscoveryUiState,
     query: String,
@@ -68,7 +70,7 @@ private fun existingWorktreeResultComparator(): Comparator<RankedExistingWorktre
     { it.rank.kind },
     { it.rank.distance },
     { it.result.typeSortRank() },
-    { it.result.repoRootPath.trimEnd('/', '\\') },
+    { it.result.repoRootPath.normalizedRepositoryPath() },
     { existingWorktreeResultLabel(it.result) },
 )
 

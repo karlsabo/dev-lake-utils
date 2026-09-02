@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -69,6 +70,43 @@ class ExistingBranchWorktreeDialogTest {
             listOf(ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, "feature/doc-search")),
             globalExistingWorktreeResults(discovery, "doc-search"),
         )
+    }
+
+    @Test
+    fun globalExistingBranchSearchKeepsSameBranchFromEachRepositoryInStableOrder() {
+        val branch = "release/123"
+        val discovery = GlobalExistingBranchDiscoveryUiState(
+            repositories = listOf(
+                ExistingBranchDiscoveryUiState(
+                    repoRootPath = ENGINEERING_DOCS_PATH,
+                    branches = listOf(branch),
+                ),
+                ExistingBranchDiscoveryUiState(
+                    repoRootPath = REPO_PATH,
+                    branches = listOf(branch),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf(
+                ExistingBranchWorktreeResult(REPO_PATH, branch),
+                ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, branch),
+            ),
+            globalExistingWorktreeResults(discovery, branch),
+        )
+    }
+
+    @Test
+    fun sameBranchSelectionIsScopedToRepositoryIdentity() {
+        val branch = "release/123"
+        val selected = ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, branch)
+        val currentResults = listOf(
+            ExistingBranchWorktreeResult(REPO_PATH, branch),
+            ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, branch),
+        )
+
+        assertEquals(selected, selectedExistingWorktreeResult(selected, currentResults))
     }
 
     @Test
@@ -222,6 +260,50 @@ class ExistingBranchWorktreeDialogTest {
 
         assertEquals(
             listOf<ExistingWorktreeResult>(ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, "feature/doc-search")),
+            confirmations,
+        )
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun globalExistingBranchDialogRequiresSelectionForSameNamedBranches() = runComposeUiTest {
+        val confirmations = mutableListOf<ExistingWorktreeResult>()
+        val branch = "release/123"
+        setContent {
+            var request by remember {
+                mutableStateOf(PendingGlobalCreateWorktree(existingBranchQuery = branch))
+            }
+            MaterialTheme {
+                GlobalExistingBranchWorktreeDialogContent(
+                    request = request,
+                    discovery = GlobalExistingBranchDiscoveryUiState(
+                        repositories = listOf(
+                            ExistingBranchDiscoveryUiState(
+                                repoRootPath = ENGINEERING_DOCS_PATH,
+                                branches = listOf(branch),
+                            ),
+                            ExistingBranchDiscoveryUiState(
+                                repoRootPath = REPO_PATH,
+                                branches = listOf(branch),
+                            ),
+                        ),
+                    ),
+                    onRequestChange = { request = it },
+                    onConfirm = { confirmations += requireNotNull(request.selectedExistingResult) },
+                    onDismiss = {},
+                )
+            }
+        }
+
+        onNodeWithText("Branch · dev-lake-utils · release/123").assertIsDisplayed()
+        onNodeWithText("Branch · engineering-docs · release/123").assertIsDisplayed()
+        onNodeWithText("Use Existing").assertIsNotEnabled()
+
+        onNodeWithText("Branch · engineering-docs · release/123").performClick()
+        onNodeWithText("Use Existing").performClick()
+
+        assertEquals(
+            listOf<ExistingWorktreeResult>(ExistingBranchWorktreeResult(ENGINEERING_DOCS_PATH, branch)),
             confirmations,
         )
     }
