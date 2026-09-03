@@ -40,9 +40,19 @@ Name it based on the feature (e.g., `oauth-rate-limiting.md`, `bulk-user-invite.
 
 Start the doc with:
 
-- **Goal**: one sentence describing the feature
-- **Context**: relevant background, links, constraints
-- Cite repo evidence in **Context** with exact file paths whenever the plan relies on local code or config.
+- **Goal**: one sentence
+- **Context**: background, links, constraints, decisions, and exact repo paths
+- **Open Questions**: every unresolved question, written before asking in chat
+
+Recommend an answer instead of giving an unranked menu:
+
+```markdown
+## Open Questions
+
+1. **{Decision}:** {Question}
+   - Recommendation: {Answer and brief reason}
+   - Answer: awaiting confirmation.
+```
 
 ### Step 3: Enumerate acceptance tests
 
@@ -95,6 +105,15 @@ This is conversational.
 - Ask about trade-offs or sequencing
 
 Update the planning doc as you go. The doc is the artifact — keep it current.
+
+After answers:
+
+1. Resolve contradictions.
+2. Move decisions into **Context** with rationale and evidence.
+3. Delete answered questions; add recommended follow-ups if needed.
+4. Update acceptance tests and stories. Remove the section when empty.
+
+In chat, summarize changes and point to new questions.
 
 ## Principles
 

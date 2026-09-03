@@ -57,6 +57,7 @@ class EngHubSettingsScreenTest {
         assertField("repository-0-command-0", "cp .env.example .env")
         assertField("repository-0-command-1", "direnv allow")
         assertField("repository-1-path", "/workspace/web")
+        assertField("alert-triage-where-to-look", "- PagerDuty: inspect the active incident")
         assertField("planning-markdown-dir", "/workspace/plans")
         assertField("setup-shell", "/bin/bash")
         onAllNodesWithText("github_pat_private", substring = true).assertCountEquals(0)
@@ -515,6 +516,34 @@ class EngHubSettingsScreenTest {
         onNodeWithTag("worktree-poll-interval").performScrollTo().performTextReplacement("60")
 
         assertEquals("60", editedInterval)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun editsMultilineAlertTriageGuidance() = runComposeUiTest {
+        val state = createEngHubSettingsUiState(
+            engHubConfig = representativeEngHubConfig(),
+            gitHubConfig = GitHubConfig(tokenPath = "/secrets/github.json"),
+            gitHubSecret = GitHubSecret(githubToken = "github_pat_private"),
+        )
+        var editedGuidance: String? = null
+        setContent {
+            MaterialTheme {
+                EngHubSettingsScreen(
+                    state = state,
+                    actions = EngHubSettingsActions(
+                        onAlertTriageWhereToLookChange = { editedGuidance = it },
+                    ),
+                    modifier = Modifier.size(800.dp, 600.dp),
+                )
+            }
+        }
+
+        val guidance = "- PagerDuty: inspect the incident\n- Grafana: inspect service health"
+        onNodeWithTag("alert-triage-where-to-look").performScrollTo().performTextReplacement(guidance)
+
+        assertEquals(guidance, editedGuidance)
+        onAllNodesWithText("LLM skill templates").assertCountEquals(1)
     }
 
     @OptIn(ExperimentalTestApi::class)

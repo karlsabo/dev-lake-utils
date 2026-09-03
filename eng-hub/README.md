@@ -112,6 +112,9 @@ Example:
   "repositoriesBaseDir": "/Users/you/git",
   "gitHubAuthor": "your-github-login",
   "planningMarkdownDir": "/Users/you/notebook/llm-planning",
+  "llmTemplateValues": {
+    "ALERT_TRIAGE_WHERE_TO_LOOK": "- Incident management: inspect the active incident.\n- Observability: compare service health with the alert window."
+  },
   "localRepositories": [
     {
       "path": "/Users/you/git/example-repo",
@@ -133,8 +136,13 @@ Field meanings:
 - `repositoriesBaseDir`: where repos are cloned if missing
 - `gitHubAuthor`: GitHub login used for the pull request query
 - `planningMarkdownDir`: absolute directory used when syncing LLM markdown templates that contain `${PLANNING_MARKDOWN_DIR}`
+- `llmTemplateValues`: Markdown fragments for Eng Hub's known template keys, currently `ALERT_TRIAGE_WHERE_TO_LOOK`. Known tokens are substituted while syncing skill Markdown, nested Markdown references, guidelines, and notes; unrelated tokens such as shell variables remain unchanged. Values are inserted without reformatting. Non-Markdown files are copied unchanged. `PLANNING_MARKDOWN_DIR` is reserved for the dedicated setting above and cannot be overridden through this map. If a known template value is absent or blank, synchronization logs an error and installs corrective guidance in place of that token; configure the named value in Eng Hub Settings and rerun `syncLlmFiles`.
 - `localRepositories`: local repository roots managed by Eng Hub; each entry has an absolute `path` and optional `setupCommands`. Duplicate checks resolve separators plus lexical `.` and `..` segments without accessing the filesystem, while the configured spelling is preserved. Path identity is case-insensitive on Windows and macOS and case-sensitive on Linux. macOS uses the conservative case-insensitive identity because detecting a case-sensitive volume would require filesystem access that Settings intentionally avoids.
 - `setupShell`: login shell used to run setup commands
+
+Settings provides fixed fields for templates used by bundled skills under **LLM skill templates**. Editing **Alert triage: Where to look** saves multiline Markdown to `llmTemplateValues.ALERT_TRIAGE_WHERE_TO_LOOK` after 750 ms, or when leaving Settings or exiting. Saving does not reinstall skills; rerun `syncLlmFiles` to apply the new guidance.
+
+Synchronization installs the published `eh-alert-triage` skill in each selected tool target. After that replacement is copied successfully, it removes only the retired `wip-eh-alert-triage` directory from the same target; destination-only skills are preserved.
 
 Setup commands run from the created worktree directory. Before the shell runs, Eng Hub expands these literal placeholders:
 

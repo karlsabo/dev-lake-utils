@@ -7,7 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.rememberDialogState
 import dev_lake_utils.shared_resources.generated.resources.Res
 import dev_lake_utils.shared_resources.generated.resources.icon
 import org.jetbrains.compose.resources.painterResource
@@ -25,6 +27,7 @@ internal fun GlobalExistingBranchWorktreeDialog(
         title = "Create Worktree",
         icon = painterResource(Res.drawable.icon),
         visible = true,
+        state = rememberDialogState(width = 600.dp, height = 520.dp),
     ) {
         MaterialTheme {
             Surface {

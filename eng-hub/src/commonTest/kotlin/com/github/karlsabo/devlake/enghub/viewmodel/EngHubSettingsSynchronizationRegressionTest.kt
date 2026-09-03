@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY
 import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.FilePicker
@@ -237,6 +238,33 @@ class EngHubSettingsSynchronizationRegressionTest {
 
         assertTrue(configState.current.localRepositories.first().setupCommands.isEmpty())
         assertEquals(external, configState.current.localRepositories.last())
+    }
+
+    @Test
+    fun alertTriageEditPreservesAnUnknownTemplateAddedByAnExternalConfigUpdate() = runTest {
+        val configState = SynchronizationConfigState(
+            EngHubConfig(
+                llmTemplateValues = mapOf(ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY to "old guidance"),
+            ),
+        )
+        val viewModel = synchronizationViewModel(configState = configState)
+
+        viewModel.llmTemplateSettings.updateAlertTriageWhereToLook("new guidance")
+        configState.current = configState.current.copy(
+            llmTemplateValues = configState.current.llmTemplateValues + ("UNKNOWN_TEMPLATE" to "keep me"),
+        )
+        runCurrent()
+        advanceTimeBy(750.milliseconds)
+        runCurrent()
+
+        assertEquals(
+            mapOf(
+                ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY to "new guidance",
+                "UNKNOWN_TEMPLATE" to "keep me",
+            ),
+            configState.current.llmTemplateValues,
+        )
+        assertEquals("new guidance", viewModel.uiState.value.alertTriageWhereToLook)
     }
 
     @Test

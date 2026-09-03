@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.state
 
+import com.github.karlsabo.devlake.enghub.ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
@@ -33,6 +34,7 @@ data class EngHubSettingsUiState(
     val repositoriesBaseDir: String,
     val gitHubAuthor: String,
     val planningMarkdownDir: String,
+    val alertTriageWhereToLook: String,
     val localRepositories: List<SettingsLocalRepositoryUiState>,
     val localRepositoryDraft: String = "",
     val localRepositoryError: String? = null,
@@ -66,6 +68,7 @@ internal fun createEngHubSettingsUiState(
     repositoriesBaseDir = engHubConfig.repositoriesBaseDir,
     gitHubAuthor = engHubConfig.gitHubAuthor,
     planningMarkdownDir = engHubConfig.planningMarkdownDir,
+    alertTriageWhereToLook = engHubConfig.llmTemplateValues[ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY].orEmpty(),
     localRepositories = engHubConfig.localRepositories.map { repository ->
         SettingsLocalRepositoryUiState(
             path = repository.path,

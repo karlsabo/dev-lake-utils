@@ -18,6 +18,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlin.time.Duration.Companion.minutes
 
+internal const val ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY = "ALERT_TRIAGE_WHERE_TO_LOOK"
+internal val LLM_TEMPLATE_KEYS = setOf(ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY)
+
 @Serializable
 data class EngHubConfig(
     val organizationIds: List<String> = emptyList(),
@@ -26,6 +29,7 @@ data class EngHubConfig(
     val repositoriesBaseDir: String = "",
     val gitHubAuthor: String = "",
     val planningMarkdownDir: String = "",
+    val llmTemplateValues: Map<String, String> = emptyMap(),
     val localRepositories: List<LocalRepositoryConfig> = emptyList(),
     val setupShell: String = defaultSetupShell(),
 )

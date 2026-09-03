@@ -11,7 +11,12 @@ fun main(args: Array<String>) {
     val homeDir = Path(home)
     val config = loadEngHubConfig()
 
-    val results = LlmSkillSync().syncAll(sourceLlmDir, homeDir, config.planningMarkdownDir)
+    val results = LlmSkillSync().syncAll(
+        sourceLlmDir,
+        homeDir,
+        config.planningMarkdownDir,
+        config.llmTemplateValues,
+    )
 
     for (result in results) {
         println("${result.target.name}: ${result.skillsCopied.size} skills synced")

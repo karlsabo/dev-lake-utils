@@ -31,6 +31,9 @@ class EngHubConfigTest {
             repositoriesBaseDir = "/tmp/example/repos",
             gitHubAuthor = "example-author",
             planningMarkdownDir = "/tmp/example/llm-planning",
+            llmTemplateValues = mapOf(
+                "ALERT_TRIAGE_WHERE_TO_LOOK" to "- Incident management: inspect the active incident",
+            ),
             localRepositories = listOf(
                 LocalRepositoryConfig(
                     path = "/tmp/example/repos/example-web",
@@ -52,6 +55,7 @@ class EngHubConfigTest {
         assertFalse(json.contains("\"setupCommands\":[]"))
         assertTrue(json.contains("\"setupShell\""))
         assertTrue(json.contains("\"planningMarkdownDir\""))
+        assertTrue(json.contains("\"llmTemplateValues\""))
         assertTrue(json.contains("\"localRepositories\""))
         assertTrue(json.contains("\"worktreePollIntervalMs\""))
     }
@@ -128,6 +132,7 @@ class EngHubConfigTest {
         assertEquals(expectedSetupShell, EngHubConfig().setupShell)
         assertEquals(expectedSetupShell, decoded.setupShell)
         assertEquals("", decoded.planningMarkdownDir)
+        assertEquals(emptyMap(), decoded.llmTemplateValues)
         assertEquals(emptyList(), decoded.localRepositories)
         assertEquals(120_000, decoded.worktreePollIntervalMs)
     }

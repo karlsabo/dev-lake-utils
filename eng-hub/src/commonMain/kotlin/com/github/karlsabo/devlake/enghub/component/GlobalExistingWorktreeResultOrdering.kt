@@ -7,6 +7,8 @@ internal fun globalExistingWorktreeResults(
     discovery: GlobalExistingBranchDiscoveryUiState,
     query: String,
 ): List<ExistingWorktreeResult> {
+    if (query.isBlank()) return emptyList()
+
     val branchReference = parseGitHubBranchReference(query)
     val branchQuery = branchReference?.branch ?: query
     return discovery.repositories

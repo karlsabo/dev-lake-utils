@@ -72,6 +72,7 @@ internal fun EngHubSettingsScreen(
         }
         GitHubActivitySettings(state = state, actions = actions)
         RepositoriesSettings(state = state, actions = actions)
+        LlmSkillTemplateSettings(state = state, actions = actions)
         SettingsSection("Planning and setup") {
             DirectorySettingsField(
                 label = "Planning markdown directory",
@@ -321,7 +322,7 @@ private fun PickerSettingsField(
 }
 
 @Composable
-private fun SettingsSection(
+internal fun SettingsSection(
     title: String,
     content: @Composable () -> Unit,
 ) {
@@ -331,13 +332,14 @@ private fun SettingsSection(
     }
 }
 
-private data class SettingsFieldPresentation(
+internal data class SettingsFieldPresentation(
     val password: Boolean = false,
     val error: String? = null,
+    val singleLine: Boolean = true,
 )
 
 @Composable
-private fun SettingsField(
+internal fun SettingsField(
     label: String,
     value: String,
     tag: String,
@@ -351,7 +353,7 @@ private fun SettingsField(
             label = { Text(label) },
             readOnly = onValueChange == null,
             isError = presentation.error != null,
-            singleLine = true,
+            singleLine = presentation.singleLine,
             visualTransformation = if (presentation.password) {
                 PasswordVisualTransformation()
             } else {

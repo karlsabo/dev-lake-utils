@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.state
 
+import com.github.karlsabo.devlake.enghub.ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.github.config.GitHubConfig
@@ -22,6 +23,7 @@ class EngHubSettingsUiStateTest {
         assertEquals("/workspace", state.repositoriesBaseDir)
         assertEquals("octocat", state.gitHubAuthor)
         assertEquals("/workspace/plans", state.planningMarkdownDir)
+        assertEquals("- PagerDuty: inspect the active incident", state.alertTriageWhereToLook)
         assertEquals("/bin/bash", state.setupShell)
         assertEquals("/secrets/github.json", state.gitHubTokenPath)
         assertEquals("••••••••", state.gitHubToken.maskedValue)
@@ -50,6 +52,10 @@ internal fun representativeEngHubConfig() = EngHubConfig(
     repositoriesBaseDir = "/workspace",
     gitHubAuthor = "octocat",
     planningMarkdownDir = "/workspace/plans",
+    llmTemplateValues = mapOf(
+        ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY to "- PagerDuty: inspect the active incident",
+        "UNKNOWN_TEMPLATE" to "keep me",
+    ),
     localRepositories = listOf(
         LocalRepositoryConfig(
             path = "/workspace/api",

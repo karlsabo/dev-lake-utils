@@ -50,6 +50,11 @@ class EngHubSettingsViewModel(
         mutableUiState = mutableUiState,
         configPersistence = configPersistence,
     )
+    internal val llmTemplateSettings = EngHubLlmTemplateSettingsController(
+        coroutineScope = coroutineScope,
+        mutableUiState = mutableUiState,
+        configPersistence = configPersistence,
+    )
     internal val gitHubTokenSettings = EngHubGitHubTokenController(
         coroutineScope = coroutineScope,
         operationTracker = operationTracker,
@@ -156,6 +161,7 @@ class EngHubSettingsViewModel(
         operationTracker.awaitIdle()
         configPersistence.retryPendingUpdates()
         generalTextSettings.flushPendingEdits()
+        llmTemplateSettings.flushPendingEdits()
         directorySettings.flushPendingEdits()
         localRepositorySettings.flushPendingEdits()
         setupCommandSettings.flushPendingEdits()
@@ -275,12 +281,12 @@ internal class EngHubGeneralTextSettingsController(
     }
 }
 
-private fun CoroutineScope.scheduleSettingsCommit(commit: suspend () -> Unit): Job = launch {
+internal fun CoroutineScope.scheduleSettingsCommit(commit: suspend () -> Unit): Job = launch {
     delay(TEXT_COMMIT_DEBOUNCE_MS.milliseconds)
     commit()
 }
 
-private suspend fun Job?.cancelAndClear(commit: suspend () -> Unit) {
+internal suspend fun Job?.cancelAndClear(commit: suspend () -> Unit) {
     this?.cancelAndJoin()
     commit()
 }

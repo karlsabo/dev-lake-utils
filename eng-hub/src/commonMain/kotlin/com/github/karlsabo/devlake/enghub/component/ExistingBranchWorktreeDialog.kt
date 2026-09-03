@@ -1,9 +1,13 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -11,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material.Button
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.MaterialTheme
@@ -22,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -194,7 +201,7 @@ internal fun ExistingWorktreeDialogBody(
     Column(
         modifier = Modifier
             .padding(16.dp)
-            .fillMaxWidth()
+            .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 if (event.isEnterKey()) false else actions.onKeyEvent(event)
             },
@@ -227,6 +234,7 @@ internal fun ExistingWorktreeDialogBody(
                 onSelect = actions.onSelectResult,
                 onKeyEvent = actions.onKeyEvent,
             ),
+            modifier = Modifier.weight(1f),
         )
         Spacer(modifier = Modifier.height(16.dp))
         Row {
@@ -271,28 +279,44 @@ private fun ExistingWorktreeRows(
     highlightedIndex: Int?,
     selectedResult: ExistingWorktreeResult?,
     actions: ExistingWorktreeRowActions,
+    modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp)) {
-        itemsIndexed(results, key = { _, result -> existingWorktreeResultKey(result) }) { index, result ->
-            val highlighted = index == highlightedIndex
-            TextButton(
-                onClick = { actions.onSelect(result) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        if (highlighted) {
-                            MaterialTheme.colors.primary.copy(alpha = 0.16f)
-                        } else {
-                            MaterialTheme.colors.surface
-                        },
-                    )
-                    .semantics { selected = highlighted }
-                    .onPreviewKeyEvent(actions.onKeyEvent),
-            ) {
-                val selectedMarker = if (sameExistingWorktreeResult(selectedResult, result)) "Selected · " else ""
-                Text(selectedMarker + existingWorktreeResultLabel(result))
+    val listState = rememberLazyListState()
+    Box(modifier = modifier.fillMaxWidth().heightIn(max = 240.dp)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(end = 12.dp),
+        ) {
+            itemsIndexed(results, key = { _, result -> existingWorktreeResultKey(result) }) { index, result ->
+                val highlighted = index == highlightedIndex
+                TextButton(
+                    onClick = { actions.onSelect(result) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (highlighted) {
+                                MaterialTheme.colors.primary.copy(alpha = 0.16f)
+                            } else {
+                                MaterialTheme.colors.surface
+                            },
+                        )
+                        .semantics { selected = highlighted }
+                        .onPreviewKeyEvent(actions.onKeyEvent),
+                ) {
+                    val selectedMarker = if (sameExistingWorktreeResult(selectedResult, result)) "Selected · " else ""
+                    Text(selectedMarker + existingWorktreeResultLabel(result))
+                }
             }
         }
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(listState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(12.dp)
+                .background(MaterialTheme.colors.onSurface.copy(alpha = 0.08f))
+                .semantics { contentDescription = "Branch and pull request results scrollbar" },
+        )
     }
 }
 
