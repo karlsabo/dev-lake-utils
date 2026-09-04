@@ -55,9 +55,14 @@ internal class GitHubServiceActionTracker(
         services: EngHubGitHubServices,
         action: suspend (EngHubGitHubServices) -> Unit,
     ): Job {
-        val job = coroutineScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) { action(services) }
+        val job = coroutineScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            try {
+                action(services)
+            } finally {
+                complete(services, coroutineContext[Job] ?: error("Tracked action has no job"))
+            }
+        }
         register(services, job)
-        job.invokeOnCompletion { complete(services, job) }
         job.start()
         return job
     }
