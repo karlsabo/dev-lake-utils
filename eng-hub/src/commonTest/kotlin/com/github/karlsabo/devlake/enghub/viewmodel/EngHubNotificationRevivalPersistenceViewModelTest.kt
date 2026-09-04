@@ -41,6 +41,7 @@ class EngHubNotificationRevivalPersistenceViewModelTest {
                 ignoredThread(
                     threadId = "thread-1",
                     reason = NotificationIgnoreReason.DONE,
+                    ignoredAtEpochMs = Instant.parse("2026-05-29T10:00:01Z").toEpochMilliseconds(),
                     notificationUpdatedAtEpochMs = Instant.parse("2026-05-29T10:00:00Z").toEpochMilliseconds(),
                 ),
             ),
@@ -71,6 +72,7 @@ class EngHubNotificationRevivalPersistenceViewModelTest {
                 ignoredThread(
                     threadId = "thread-3",
                     reason = NotificationIgnoreReason.UNSUBSCRIBED,
+                    ignoredAtEpochMs = Instant.parse("2026-05-29T10:00:01Z").toEpochMilliseconds(),
                     notificationUpdatedAtEpochMs = Instant.parse("2026-05-29T10:00:00Z").toEpochMilliseconds(),
                 ),
             ),
@@ -114,6 +116,7 @@ class EngHubNotificationRevivalPersistenceViewModelTest {
                 ignoredThread(
                     threadId = "thread-2",
                     reason = NotificationIgnoreReason.DONE,
+                    ignoredAtEpochMs = Instant.parse("2026-05-29T10:00:01Z").toEpochMilliseconds(),
                     notificationUpdatedAtEpochMs = Instant.parse("2026-05-29T10:00:00Z").toEpochMilliseconds(),
                 ),
             ),

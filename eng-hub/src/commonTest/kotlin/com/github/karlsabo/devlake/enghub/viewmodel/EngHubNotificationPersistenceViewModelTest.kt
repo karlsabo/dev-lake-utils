@@ -147,13 +147,14 @@ fun SaveIgnoredNotificationThreadRequest.toSavedThread(): SavedThread = SavedThr
 fun ignoredThread(
     threadId: String,
     reason: NotificationIgnoreReason,
+    ignoredAtEpochMs: Long = Clock.System.now().toEpochMilliseconds(),
     notificationUpdatedAtEpochMs: Long? = null,
 ): IgnoredNotificationThread = IgnoredNotificationThread(
     threadId = threadId,
     repositoryFullName = "test-org/test-repo",
     subjectType = "PullRequest",
     reason = reason,
-    ignoredAtEpochMs = Clock.System.now().toEpochMilliseconds(),
+    ignoredAtEpochMs = ignoredAtEpochMs,
     notificationUpdatedAtEpochMs = notificationUpdatedAtEpochMs,
 )
 
@@ -189,14 +190,16 @@ data class NotificationActionFailures(
 )
 
 class NotificationPersistenceGitHubApi(
-    private val notifications: List<Notification> = emptyList(),
+    notifications: List<Notification> = emptyList(),
     listNotificationFailuresBeforeSuccess: List<Throwable> = emptyList(),
     private val pullRequestsByUrl: Map<String, PullRequest> = emptyMap(),
     private val pullRequestFailureUrls: Set<String> = emptySet(),
     private val approvedReviewUrls: Set<String> = emptySet(),
     private val actionFailures: NotificationActionFailures = NotificationActionFailures(),
 ) : GitHubApi {
+    private val queuedNotificationPolls = mutableListOf(notifications)
     private val queuedListNotificationFailures = listNotificationFailuresBeforeSuccess.toMutableList()
+    private var lastNotificationPoll = emptyList<Notification>()
     val pullRequestByUrlCalls = mutableListOf<String>()
     val approvedPullRequestUrls = MutableStateFlow<List<String>>(emptyList())
     val unsubscribedThreadIds = MutableStateFlow<List<String>>(emptyList())
@@ -238,9 +241,14 @@ class NotificationPersistenceGitHubApi(
         error("Unexpected call")
     }
 
+    fun enqueueNotificationPoll(notifications: List<Notification>) {
+        queuedNotificationPolls.add(notifications)
+    }
+
     override suspend fun listNotifications(): List<Notification> {
         if (queuedListNotificationFailures.isNotEmpty()) throw queuedListNotificationFailures.removeAt(0)
-        return notifications
+        if (queuedNotificationPolls.isNotEmpty()) lastNotificationPoll = queuedNotificationPolls.removeAt(0)
+        return lastNotificationPoll
     }
 
     override suspend fun getPullRequestByUrl(url: String): PullRequest {

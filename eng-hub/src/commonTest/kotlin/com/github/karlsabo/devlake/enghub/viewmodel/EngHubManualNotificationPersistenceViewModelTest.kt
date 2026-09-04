@@ -97,15 +97,19 @@ class EngHubManualNotificationPersistenceViewModelTest {
     }
 
     @Test
-    fun approvePersistsDoneThreadAndFiltersAfterRestart() = runBlocking {
+    fun approveKeepsApprovalGeneratedRefreshUpdateHiddenAfterRestart() = runBlocking {
         val pullRequestUrl = "https://api.github.com/repos/test-org/test-repo/pulls/22"
-        val notification = testNotification(
-            id = "thread-2",
+        val notificationBeforeApproval = testNotification(
+            id = "thread-22",
             subjectType = "PullRequest",
             subjectUrl = pullRequestUrl,
+            updatedAt = kotlin.time.Instant.parse("2026-05-29T10:00:00Z"),
+        )
+        val notificationAfterApproval = notificationBeforeApproval.copy(
+            updatedAt = kotlin.time.Instant.parse("2026-05-29T10:00:01Z"),
         )
         val api = NotificationPersistenceGitHubApi(
-            notifications = listOf(notification),
+            notifications = listOf(notificationBeforeApproval),
             pullRequestsByUrl = mapOf(
                 pullRequestUrl to PullRequest(
                     number = 22,
@@ -114,33 +118,38 @@ class EngHubManualNotificationPersistenceViewModelTest {
                 ),
             ),
         )
+        api.enqueueNotificationPoll(listOf(notificationAfterApproval))
         val store = RecordingNotificationIgnoreStore()
         val viewModel = createViewModel(api, store)
         val notificationUiState = withTimeout(2_000.milliseconds) {
             viewModel.notifications
                 .filterNotNull()
                 .map { it.getOrThrow() }
-                .first { notifications -> notifications.any { it.notificationThreadId == "thread-2" } }
-                .single { it.notificationThreadId == "thread-2" }
+                .first { notifications -> notifications.any { it.notificationThreadId == "thread-22" } }
+                .single { it.notificationThreadId == "thread-22" }
         }
 
         viewModel.approvePullRequest(notificationUiState)
 
         assertEquals(listOf(pullRequestUrl), api.approvedPullRequestUrls.awaitValue())
-        assertEquals(listOf("thread-2"), api.markedDoneThreadIds.awaitValue())
-        val savedThreads = store.savedThreads.awaitValue()
+        assertEquals(listOf("thread-22"), api.markedDoneThreadIds.awaitValue())
+        val savedThread = store.savedThreads.awaitValue().single()
         assertEquals(
-            listOf(
-                SavedThread(
-                    threadId = "thread-2",
-                    repositoryFullName = "test-org/test-repo",
-                    subjectType = "PullRequest",
-                    reason = NotificationIgnoreReason.DONE,
-                ),
+            SavedThread(
+                threadId = "thread-22",
+                repositoryFullName = "test-org/test-repo",
+                subjectType = "PullRequest",
+                reason = NotificationIgnoreReason.DONE,
             ),
-            savedThreads.map { it.withoutTimestamp() },
+            savedThread.withoutTimestamp(),
         )
-        assertEquals(notification.updatedAt.toEpochMilliseconds(), savedThreads.single().notificationUpdatedAtEpochMs)
+        assertEquals(
+            notificationBeforeApproval.updatedAt.toEpochMilliseconds(),
+            savedThread.notificationUpdatedAtEpochMs,
+        )
+        assertTrue(
+            requireNotNull(savedThread.ignoredAtEpochMs) >= notificationAfterApproval.updatedAt.toEpochMilliseconds(),
+        )
 
         val restartedViewModel = createViewModel(api, store)
         val restartedNotifications = withTimeout(2_000.milliseconds) {

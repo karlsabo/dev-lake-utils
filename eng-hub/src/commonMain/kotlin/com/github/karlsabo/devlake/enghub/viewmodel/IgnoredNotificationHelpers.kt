@@ -26,8 +26,7 @@ private fun IgnoredNotificationThread.hides(notificationUpdatedAtEpochMs: Long):
     NotificationIgnoreReason.UNSUBSCRIBED -> true
 
     NotificationIgnoreReason.DONE ->
-        this.notificationUpdatedAtEpochMs
-            ?.let { it >= notificationUpdatedAtEpochMs } == true
+        maxOf(ignoredAtEpochMs, this.notificationUpdatedAtEpochMs ?: Long.MIN_VALUE) >= notificationUpdatedAtEpochMs
 }
 
 internal fun NotificationUiState.toIgnoredNotificationThread(
