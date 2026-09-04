@@ -13,7 +13,6 @@
 
 # TODO
 
-* [ ] Need to be able to create a worktree from an existing PR/branch
 * [ ] After hitting the approve button on a Notification, once the notifications refresh again all those notifications reappear.
 * [ ] Worktrees should start expanded
     * In the worktree view, have a highlight hover effect so you know what row you're on

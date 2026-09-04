@@ -31,6 +31,8 @@ class LlmSkillSyncTest {
 
     private fun readFile(path: Path): String = fs.source(path).buffered().use { it.readString() }
 
+    private fun String.normalizeLineEndings(): String = replace("\r\n", "\n").replace('\r', '\n')
+
     private fun deleteRecursively(path: Path) {
         if (!fs.exists(path)) return
         val meta = fs.metadataOrNull(path)
@@ -270,7 +272,7 @@ class LlmSkillSyncTest {
         val sourceDir = Path("..", "llm")
         val sourceSkill = readFile(
             Path(sourceDir, ".agents", "skills", "eh-alert-triage", "SKILL.md"),
-        )
+        ).normalizeLineEndings()
         val homeDir = createTempDir()
         val planningDir = Path(homeDir, "planning")
         val guidance = """
@@ -304,7 +306,7 @@ class LlmSkillSyncTest {
 
             val installedSkill = readFile(
                 Path(homeDir, ".pi", "agent", "skills", "eh-alert-triage", "SKILL.md"),
-            )
+            ).normalizeLineEndings()
             assertTrue(installedSkill.contains("## Where to look\n\n$guidance\n\n## Correlate evidence"))
             assertFalse(installedSkill.contains("\${ALERT_TRIAGE_WHERE_TO_LOOK}"))
         } finally {
