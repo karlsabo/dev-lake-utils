@@ -1,0 +1,15 @@
+{
+  "name": "wip-eh-implement-extension",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test *.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@types/node": "22.18.1",
+    "typescript": "5.9.2"
+  }
+}

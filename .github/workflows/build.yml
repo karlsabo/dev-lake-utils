@@ -10,6 +10,31 @@ permissions:
   contents: read
 
 jobs:
+  test-implementation-extension:
+    name: test-implementation-extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install implementation extension dependencies
+        working-directory: llm/wip-eh-implement-extension
+        run: npm ci
+
+      - name: Type-check implementation extension
+        working-directory: llm/wip-eh-implement-extension
+        run: npm run typecheck
+
+      - name: Test implementation extension
+        working-directory: llm/wip-eh-implement-extension
+        run: npm test
+
   build-linux:
     name: build-linux
     runs-on: ubuntu-latest

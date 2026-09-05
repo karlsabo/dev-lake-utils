@@ -7,8 +7,6 @@ allowed-tools: Bash, Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *
 
 # Implementation Skill
 
-Implement one story at a time: one acceptance test, one PR, one thin end-to-end slice.
-
 ## Required context
 
 Before changing code, read:
@@ -19,14 +17,13 @@ Expect input to be one of:
 
 - A story or planning doc
 - A ticket or freeform request that clearly names one story / acceptance test
-
-If the input still contains multiple acceptance tests or unrelated behavior, stop.
+- Review comments
 
 ## Workflow
 
 ### Step 1: Lock the slice
 
-- Identify the single acceptance test being implemented.
+- Identify the acceptance tests being implemented.
 - Restate the observable behavior, what is in scope, and what is explicitly out of scope.
 - Prefer the smallest tracer-bullet path that proves the behavior end to end.
 
