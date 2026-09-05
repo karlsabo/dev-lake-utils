@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {runImplementationWorkflow, type StateAgent, type WorkflowState} from "./workflow.ts";
 
-const COMPLETED = '{"outcome":"completed","summary":"done"}';
+const COMPLETED = '{"outcome":"completed","workPerformed":true,"summary":"done"}';
+const NO_WORK = '{"outcome":"completed","workPerformed":false,"summary":"no work needed"}';
 const CLEAN_REVIEW = '{"findings":[],"summary":"clean"}';
 const PASSING = '{"passed":true,"summary":"tests passed"}';
 const GUIDANCE_PATH = "/repo/llm/notes.md";
@@ -19,7 +20,7 @@ function options(overrides: Partial<Parameters<typeof runImplementationWorkflow>
 	return { guidancePath: GUIDANCE_PATH, initialChanges: [], ...overrides };
 }
 
-test("runs every clean implementation state through a separate agent invocation", async () => {
+test("runs each required clean implementation state through a separate agent invocation", async () => {
 	const calls: Array<{ state: WorkflowState; prompt: string }> = [];
 	const agent: StateAgent = async (state, prompt) => {
 		calls.push({ state, prompt });
@@ -34,12 +35,10 @@ test("runs every clean implementation state through a separate agent invocation"
 			"create-contract",
 			"write-black-box-tests",
 			"review-black-box-tests",
-			"fix-black-box-test-findings",
 			"implement",
 			"verify-tests",
 			"write-white-box-tests",
 			"review-white-box-tests",
-			"fix-white-box-test-findings",
 			"review-changes",
 			"verify-tests",
 		],
@@ -53,6 +52,83 @@ test("runs every clean implementation state through a separate agent invocation"
 		calls.find((call) => call.state === "review-changes")?.prompt ?? "",
 		/git status --short --untracked-files=all/,
 	);
+});
+
+test("skips black-box test review when the test-writing state reports no work", async () => {
+	const states: WorkflowState[] = [];
+
+	await runImplementationWorkflow(
+		"implement behavior already covered by black-box tests",
+		async (state) => {
+			states.push(state);
+			if (state === "write-black-box-tests") return NO_WORK;
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(states.includes("review-black-box-tests"), false);
+	assert.equal(states.includes("fix-black-box-test-findings"), false);
+	assert.ok(states.indexOf("implement") > states.indexOf("write-black-box-tests"));
+});
+
+test("skips white-box test review when the test-writing state reports no work", async () => {
+	const states: WorkflowState[] = [];
+
+	await runImplementationWorkflow(
+		"implement behavior with sufficient internal coverage",
+		async (state) => {
+			states.push(state);
+			if (state === "write-white-box-tests") return NO_WORK;
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(states.includes("review-white-box-tests"), false);
+	assert.equal(states.includes("fix-white-box-test-findings"), false);
+	assert.ok(states.indexOf("review-changes") > states.indexOf("write-white-box-tests"));
+});
+
+test("runs test-finding fixes only when test review returns findings", async () => {
+	const states: WorkflowState[] = [];
+
+	await runImplementationWorkflow(
+		"implement behavior",
+		async (state) => {
+			states.push(state);
+			if (state === "review-black-box-tests") {
+				return '{"findings":["strengthen black-box assertion"],"summary":"one finding"}';
+			}
+			if (state === "review-white-box-tests") {
+				return '{"findings":["cover internal branch"],"summary":"one finding"}';
+			}
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(states.filter((state) => state === "fix-black-box-test-findings").length, 1);
+	assert.equal(states.filter((state) => state === "fix-white-box-test-findings").length, 1);
+});
+
+test("treats planned comments as a review-remediation batch", async () => {
+	const prompts = new Map<WorkflowState, string>();
+
+	await runImplementationWorkflow(
+		"fixes if reasonable /repo/planning/uncommitted-main-planned-comments.md",
+		async (state, prompt) => {
+			prompts.set(state, prompt);
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.match(prompts.get("create-contract") ?? "", /review-remediation batch/);
+	assert.match(prompts.get("create-contract") ?? "", /Do not block it merely because it has multiple comments/);
+	assert.match(prompts.get("create-contract") ?? "", /existing contracts already express the required behavior/);
+	assert.match(prompts.get("write-black-box-tests") ?? "", /cover each supported comment independently/);
+	assert.match(prompts.get("write-black-box-tests") ?? "", /expected to fail until the implementation state/);
 });
 
 test("reviews only the workflow delta in paths that were dirty before it started", async () => {
@@ -180,7 +256,7 @@ test("stops when the contract agent reports a multi-slice task", async () => {
 	await assert.rejects(
 		runImplementationWorkflow(
 			"implement two unrelated behaviors",
-			async () => '{"outcome":"blocked","summary":"task has two acceptance tests"}',
+			async () => '{"outcome":"blocked","workPerformed":false,"summary":"task has two acceptance tests"}',
 			options(),
 		),
 		/create-contract blocked: task has two acceptance tests/,

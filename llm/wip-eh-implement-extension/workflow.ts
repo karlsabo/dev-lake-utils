@@ -38,6 +38,7 @@ export type StateAgent = (state: WorkflowState, prompt: string) => Promise<strin
 
 interface Completion {
 	outcome: "completed" | "blocked";
+	workPerformed: boolean;
 	summary: string;
 }
 
@@ -83,20 +84,28 @@ class WorkflowExecution {
 
 	async run(): Promise<WorkflowResult> {
 		await this.complete("create-contract", createContractPrompt(this.context()));
-		await this.complete("write-black-box-tests", writeBlackBoxTestsPrompt(this.context()));
-		const blackBoxReview = await this.review("review-black-box-tests", reviewBlackBoxTestsPrompt(this.context()));
-		await this.complete(
-			"fix-black-box-test-findings",
-			fixTestFindingsPrompt(this.context(), "black-box", blackBoxReview.findings),
-		);
+		const blackBoxTests = await this.complete("write-black-box-tests", writeBlackBoxTestsPrompt(this.context()));
+		if (blackBoxTests.workPerformed) {
+			const review = await this.review("review-black-box-tests", reviewBlackBoxTestsPrompt(this.context()));
+			if (review.findings.length > 0) {
+				await this.complete(
+					"fix-black-box-test-findings",
+					fixTestFindingsPrompt(this.context(), "black-box", review.findings),
+				);
+			}
+		}
 		await this.complete("implement", implementPrompt(this.context()));
 		await this.verifyUntilPassing();
-		await this.complete("write-white-box-tests", writeWhiteBoxTestsPrompt(this.context()));
-		const whiteBoxReview = await this.review("review-white-box-tests", reviewWhiteBoxTestsPrompt(this.context()));
-		await this.complete(
-			"fix-white-box-test-findings",
-			fixTestFindingsPrompt(this.context(), "white-box", whiteBoxReview.findings),
-		);
+		const whiteBoxTests = await this.complete("write-white-box-tests", writeWhiteBoxTestsPrompt(this.context()));
+		if (whiteBoxTests.workPerformed) {
+			const review = await this.review("review-white-box-tests", reviewWhiteBoxTestsPrompt(this.context()));
+			if (review.findings.length > 0) {
+				await this.complete(
+					"fix-white-box-test-findings",
+					fixTestFindingsPrompt(this.context(), "white-box", review.findings),
+				);
+			}
+		}
 		await this.reviewUntilClean();
 		await this.verifyUntilPassing();
 
@@ -176,7 +185,11 @@ function basePrompt(context: PromptContext, responsibility: string): string {
 Task:
 ${context.task}
 
-Before acting, read the repository's applicable AGENTS.md files and ${context.guidancePath}. Work directly in the current repository. Stay within the single acceptance-test slice; if the task contains multiple acceptance tests or unrelated behavior, do not edit files and report a blocked outcome.
+Before acting, read the repository's applicable AGENTS.md files and ${context.guidancePath}. Work directly in the current repository.
+
+For a normal implementation request, stay within one acceptance-test slice. If a normal request contains multiple acceptance tests or unrelated behavior, do not edit files and report a blocked outcome.
+
+A request to address a planned-comments or review-comments artifact is a review-remediation batch, not a normal implementation request. It may contain multiple independent comments from the same review. Do not block it merely because it has multiple comments or acceptance-test slices. Evaluate each comment independently, implement every reasonable and supported fix, and skip unsupported comments with the reason recorded in your summary.
 
 Your responsibility:
 ${responsibility}
@@ -185,7 +198,7 @@ Do not delegate this state unless its responsibility explicitly requires a skept
 }
 
 function completionContract(): string {
-	return '{"outcome":"completed","summary":"concise description of work performed"}\nUse outcome "blocked" when the slice is invalid or this state cannot proceed safely.';
+	return '{"outcome":"completed","workPerformed":true,"summary":"concise description of work performed or why none was needed"}\nSet workPerformed=false when no repository files were changed because this state needed no work. Use outcome "blocked" with workPerformed=false only when the state cannot proceed safely.';
 }
 
 function reviewContract(): string {
@@ -193,11 +206,11 @@ function reviewContract(): string {
 }
 
 function createContractPrompt(context: PromptContext): string {
-	return `${basePrompt(context, "Inspect the existing seams and flesh out the smallest classes, interfaces, or functions needed to express the new contract. Edit production files only as needed to establish those contracts; do not implement the behavior yet.")}\n\nFinal response schema:\n${completionContract()}`;
+	return `${basePrompt(context, "Inspect the existing seams and flesh out the smallest classes, interfaces, or functions needed to express the new contract. Edit production files only as needed to establish those contracts; do not implement the behavior yet. If the existing contracts already express the required behavior, make no speculative contract changes and report completion so the test-writing state can proceed.")}\n\nFinal response schema:\n${completionContract()}`;
 }
 
 function writeBlackBoxTestsPrompt(context: PromptContext): string {
-	return `${basePrompt(context, "Inspect the contracts now present in the worktree and write black-box unit tests for their externally observable behavior. Keep this to the one acceptance-test slice. Do not implement production behavior beyond minimal compile-time scaffolding.")}\n\nFinal response schema:\n${completionContract()}`;
+	return `${basePrompt(context, "Inspect the contracts now present in the worktree and write black-box unit tests for their externally observable behavior. Keep normal implementation requests to one acceptance-test slice; for a review-remediation batch, cover each supported comment independently. Do not implement production behavior beyond minimal compile-time scaffolding. New tests are expected to fail until the implementation state; do not block merely because production behavior does not satisfy them yet.")}\n\nFinal response schema:\n${completionContract()}`;
 }
 
 function reviewBlackBoxTestsPrompt(context: PromptContext): string {
@@ -260,7 +273,14 @@ function parseCompletion(response: string): Completion {
 	if (value.outcome !== "completed" && value.outcome !== "blocked") {
 		throw new Error('completion.outcome must be "completed" or "blocked"');
 	}
-	return { outcome: value.outcome, summary: requireString(value.summary, "completion.summary") };
+	if (typeof value.workPerformed !== "boolean") {
+		throw new Error("completion.workPerformed must be a boolean");
+	}
+	return {
+		outcome: value.outcome,
+		workPerformed: value.workPerformed,
+		summary: requireString(value.summary, "completion.summary"),
+	};
 }
 
 function parseReview(response: string): Review {
