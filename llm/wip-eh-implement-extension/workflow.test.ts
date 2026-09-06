@@ -252,6 +252,201 @@ test("loops through change review until no findings remain", async () => {
 	assert.match(reviewPrompts[0], /Handle the error path/);
 });
 
+test("asks for a JSON-only final response once in each initial state prompt", async () => {
+	const prompts: string[] = [];
+
+	await runImplementationWorkflow(
+		"implement command",
+		async (state, prompt) => {
+			prompts.push(prompt);
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	for (const prompt of prompts) {
+		assert.equal(prompt.match(/return only the requested JSON object/gi)?.length, 1);
+		assert.match(prompt, /with no prose before or after it/);
+	}
+});
+
+test("parses a JSON object embedded in prose without a correction pass", async () => {
+	const calls: Array<{ state: WorkflowState; prompt: string }> = [];
+
+	await runImplementationWorkflow(
+		"implement command",
+		async (state, prompt) => {
+			calls.push({ state, prompt });
+			if (state === "create-contract") {
+				return `I've reviewed the existing contracts.\n{"outcome":"completed","workPerformed":false,"summary":"contracts cover an escaped \\"quote {with braces}\\" safely"}\nNo changes were needed {after review}.`;
+			}
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(calls.filter((call) => call.state === "create-contract").length, 1);
+});
+
+test("parses a valid completion after an unmatched opening brace in prose", async () => {
+	let createContractCalls = 0;
+
+	await runImplementationWorkflow(
+		"implement command",
+		async (state) => {
+			if (state === "create-contract") {
+				createContractCalls += 1;
+				return `I started describing an object { but did not finish it.\nResult: ${COMPLETED}`;
+			}
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(createContractCalls, 1);
+});
+
+test("records the summary from a later valid completion after unrelated JSON", async () => {
+	let createContractCalls = 0;
+
+	const result = await runImplementationWorkflow(
+		"implement command",
+		async (state) => {
+			if (state === "create-contract") {
+				createContractCalls += 1;
+				return createContractCalls === 1
+					? `I loaded config {"summary":"loaded"}. Result: ${COMPLETED}`
+					: COMPLETED;
+			}
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(createContractCalls, 1);
+	assert.equal(
+		result.states.find((state) => state.state === "create-contract")?.summary,
+		"done",
+	);
+});
+
+test("does not treat schema-shaped nested JSON as the state response", async () => {
+	let createContractCalls = 0;
+	const example = '{"example":{"outcome":"blocked","workPerformed":false,"summary":"sample"}}';
+
+	await runImplementationWorkflow(
+		"implement command",
+		async (state) => {
+			if (state === "create-contract") {
+				createContractCalls += 1;
+				return `${example}\nActual result: ${COMPLETED}`;
+			}
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(createContractCalls, 1);
+});
+
+test("correction retry tells the agent to finish work missing after a non-JSON response", async () => {
+	const createContractPrompts: string[] = [];
+
+	await runImplementationWorkflow(
+		"implement command",
+		async (state, prompt) => {
+			if (state === "create-contract") {
+				createContractPrompts.push(prompt);
+				if (createContractPrompts.length === 1) {
+					return "I stopped before inspecting the repository.";
+				}
+				return COMPLETED;
+			}
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(createContractPrompts.length, 2);
+	assert.match(createContractPrompts[1], /Check the repository state before responding/);
+	assert.match(createContractPrompts[1], /do not redo it/);
+	assert.match(createContractPrompts[1], /If it is incomplete or missing, finish it/);
+	assert.match(createContractPrompts[1], /I stopped before inspecting the repository/);
+	assert.match(createContractPrompts[1], /Original instructions/);
+	assert.match(createContractPrompts[1], /implement command/);
+	assert.match(
+		createContractPrompts[1],
+		/"outcome":"completed","workPerformed":true,"summary":"concise description/,
+	);
+});
+
+test("retries valid JSON that violates the state response contract", async () => {
+	const createContractPrompts: string[] = [];
+
+	await runImplementationWorkflow(
+		"implement command",
+		async (state, prompt) => {
+			if (state === "create-contract") {
+				createContractPrompts.push(prompt);
+				if (createContractPrompts.length === 1) {
+					return '{"outcome":"completed","summary":"workPerformed is missing"}';
+				}
+				return COMPLETED;
+			}
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	assert.equal(createContractPrompts.length, 2);
+	assert.match(createContractPrompts[1], /workPerformed is missing/);
+});
+
+test("retries malformed review and verification responses", async () => {
+	const prompts = new Map<WorkflowState, string[]>();
+
+	await runImplementationWorkflow(
+		"implement command",
+		async (state, prompt) => {
+			const statePrompts = prompts.get(state) ?? [];
+			statePrompts.push(prompt);
+			prompts.set(state, statePrompts);
+			if (state === "review-changes" && statePrompts.length === 1) return "The changes look clean.";
+			if (state === "verify-tests" && statePrompts.length === 1) return "All tests passed.";
+			return standardResponse(state);
+		},
+		options(),
+	);
+
+	const reviewPrompts = prompts.get("review-changes") ?? [];
+	assert.equal(reviewPrompts.length, 2);
+	assert.match(reviewPrompts[1], /previous final response for the review-changes state/i);
+
+	const verificationPrompts = prompts.get("verify-tests") ?? [];
+	assert.equal(verificationPrompts.length, 3);
+	assert.match(verificationPrompts[1], /previous final response for the verify-tests state/i);
+});
+
+test("fails with the state name when the corrected response is still not JSON", async () => {
+	let createContractCalls = 0;
+
+	await assert.rejects(
+		runImplementationWorkflow(
+			"implement command",
+			async (state) => {
+				if (state === "create-contract") {
+					createContractCalls += 1;
+					return "I've reviewed the contracts.";
+				}
+				return standardResponse(state);
+			},
+			options(),
+		),
+		/create-contract returned an invalid response after correction/,
+	);
+	assert.equal(createContractCalls, 2);
+});
+
 test("stops when the contract agent reports a multi-slice task", async () => {
 	await assert.rejects(
 		runImplementationWorkflow(

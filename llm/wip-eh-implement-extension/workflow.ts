@@ -150,25 +150,50 @@ class WorkflowExecution {
 	}
 
 	private async complete(state: WorkflowState, prompt: string): Promise<Completion> {
-		const completion = parseCompletion(await this.call(state, prompt));
+		const completion = await this.parse(state, prompt, parseCompletion);
 		if (completion.outcome === "blocked") throw new Error(`${state} blocked: ${completion.summary}`);
 		return completion;
 	}
 
 	private async review(state: WorkflowState, prompt: string): Promise<Review> {
-		return parseReview(await this.call(state, prompt));
+		return this.parse(state, prompt, parseReview);
 	}
 
 	private async verify(): Promise<Verification> {
-		return parseVerification(await this.call("verify-tests", verifyTestsPrompt(this.context())));
+		return this.parse("verify-tests", verifyTestsPrompt(this.context()), parseVerification);
+	}
+
+	private async parse<T extends { summary: string }>(
+		state: WorkflowState,
+		prompt: string,
+		parser: (response: string) => T,
+	): Promise<T> {
+		const response = await this.call(state, prompt);
+		try {
+			return this.recordParsed(state, parser(response));
+		} catch {
+			this.states.push({ state, summary: "Invalid state response" });
+			const corrected = await this.call(state, correctionPrompt(state, prompt, response));
+			try {
+				return this.recordParsed(state, parser(corrected));
+			} catch (error) {
+				this.states.push({ state, summary: "Invalid state response" });
+				const reason = error instanceof Error ? error.message : String(error);
+				throw new Error(
+					`${state} returned an invalid response after correction: ${reason}; response: ${truncate(corrected)}`,
+				);
+			}
+		}
+	}
+
+	private recordParsed<T extends { summary: string }>(state: WorkflowState, parsed: T): T {
+		this.states.push({ state, summary: parsed.summary });
+		return parsed;
 	}
 
 	private async call(state: WorkflowState, prompt: string): Promise<string> {
 		this.options.onTransition?.(state);
-		const response = await this.runAgent(state, prompt);
-		const summary = responseSummary(response);
-		this.states.push({ state, summary });
-		return response;
+		return this.runAgent(state, prompt);
 	}
 }
 
@@ -194,7 +219,7 @@ A request to address a planned-comments or review-comments artifact is a review-
 Your responsibility:
 ${responsibility}
 
-Do not delegate this state unless its responsibility explicitly requires a skeptic subagent pass. Finish the repository work for this state, then return only the requested JSON object in your final response.`;
+Do not delegate this state unless its responsibility explicitly requires a skeptic subagent pass. Finish the repository work for this state, then return only the requested JSON object in your final response, with no prose before or after it.`;
 }
 
 function completionContract(): string {
@@ -269,38 +294,116 @@ function formatFindings(findings: string[]): string {
 }
 
 function parseCompletion(response: string): Completion {
-	const value = requireRecord(parseJson(response), "completion");
-	if (value.outcome !== "completed" && value.outcome !== "blocked") {
-		throw new Error('completion.outcome must be "completed" or "blocked"');
-	}
-	if (typeof value.workPerformed !== "boolean") {
-		throw new Error("completion.workPerformed must be a boolean");
-	}
-	return {
-		outcome: value.outcome,
-		workPerformed: value.workPerformed,
-		summary: requireString(value.summary, "completion.summary"),
-	};
+	return parseJson(response, (parsed) => {
+		const value = requireRecord(parsed, "completion");
+		if (value.outcome !== "completed" && value.outcome !== "blocked") {
+			throw new Error('completion.outcome must be "completed" or "blocked"');
+		}
+		if (typeof value.workPerformed !== "boolean") {
+			throw new Error("completion.workPerformed must be a boolean");
+		}
+		return {
+			outcome: value.outcome,
+			workPerformed: value.workPerformed,
+			summary: requireString(value.summary, "completion.summary"),
+		};
+	});
 }
 
 function parseReview(response: string): Review {
-	const value = requireRecord(parseJson(response), "review");
-	return {
-		findings: requireStringArray(value.findings, "review.findings"),
-		summary: requireString(value.summary, "review.summary"),
-	};
+	return parseJson(response, (parsed) => {
+		const value = requireRecord(parsed, "review");
+		return {
+			findings: requireStringArray(value.findings, "review.findings"),
+			summary: requireString(value.summary, "review.summary"),
+		};
+	});
 }
 
 function parseVerification(response: string): Verification {
-	const value = requireRecord(parseJson(response), "verification");
-	if (typeof value.passed !== "boolean") throw new Error("verification.passed must be a boolean");
-	return { passed: value.passed, summary: requireString(value.summary, "verification.summary") };
+	return parseJson(response, (parsed) => {
+		const value = requireRecord(parsed, "verification");
+		if (typeof value.passed !== "boolean") throw new Error("verification.passed must be a boolean");
+		return { passed: value.passed, summary: requireString(value.summary, "verification.summary") };
+	});
 }
 
-function parseJson(response: string): unknown {
+function correctionPrompt(state: WorkflowState, originalPrompt: string, response: string): string {
+	return `Your previous final response for the ${state} state was not the required JSON object, so it could not be processed.
+
+Previous response:
+${response}
+
+Check the repository state before responding. If the work for this state is already complete, do not redo it. If it is incomplete or missing, finish it. Then return only the required JSON object in your final response, summarizing the work performed.
+
+Original instructions:
+${originalPrompt}`;
+}
+
+function truncate(text: string, limit = 200): string {
+	return text.length <= limit ? text : `${text.slice(0, limit)}…`;
+}
+
+function parseJson<T>(response: string, parser: (value: unknown) => T): T {
 	const trimmed = response.trim();
 	const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-	return JSON.parse(fenced?.[1] ?? trimmed);
+	const candidate = fenced?.[1] ?? trimmed;
+	let parsedCandidate: unknown;
+	let parsedExactly: boolean;
+	try {
+		parsedCandidate = JSON.parse(candidate);
+		parsedExactly = true;
+	} catch {
+		parsedExactly = false;
+	}
+	if (parsedExactly) return parser(parsedCandidate);
+
+	let lastError: unknown = new Error("no JSON object found in response");
+	for (const object of extractJsonObjects(candidate)) {
+		try {
+			return parser(JSON.parse(object));
+		} catch (error) {
+			lastError = error;
+		}
+	}
+	throw lastError;
+}
+
+function extractJsonObjects(text: string): string[] {
+	const objects: string[] = [];
+	let start = text.indexOf("{");
+	while (start !== -1) {
+		const object = extractJsonObject(text, start);
+		if (object === undefined) {
+			start = text.indexOf("{", start + 1);
+			continue;
+		}
+		objects.push(object);
+		start = text.indexOf("{", start + object.length);
+	}
+	return objects;
+}
+
+function extractJsonObject(text: string, start: number): string | undefined {
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let index = start; index < text.length; index += 1) {
+		const char = text[index];
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (char === "\\") escaped = true;
+			else if (char === '"') inString = false;
+			continue;
+		}
+		if (char === '"') inString = true;
+		else if (char === "{") depth += 1;
+		else if (char === "}") {
+			depth -= 1;
+			if (depth === 0) return text.slice(start, index + 1);
+		}
+	}
+	return undefined;
 }
 
 function requireRecord(value: unknown, field: string): Record<string, unknown> {
@@ -318,15 +421,6 @@ function requireStringArray(value: unknown, field: string): string[] {
 		throw new Error(`${field} must be an array of non-empty strings`);
 	}
 	return value.map((item) => item.trim());
-}
-
-function responseSummary(response: string): string {
-	try {
-		const value = requireRecord(parseJson(response), "response");
-		return typeof value.summary === "string" ? value.summary.trim() : "State completed";
-	} catch {
-		return "Invalid state response";
-	}
 }
 
 function assertNonNegativeInteger(value: number, field: string): void {
