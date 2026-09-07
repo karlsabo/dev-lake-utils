@@ -23,6 +23,7 @@ Parse the argument to determine the PR number:
 - If a URL is given (e.g., `https://github.com/org/repo/pull/12345`), extract the number
 - If reviewing uncommitted/local changes, use `uncommitted` and gather context with `git diff`, `git diff --name-only`, and full changed-file reads
 - If no argument is given, auto-detect via `gh pr view --json number -q .number` on the current branch
+- If no pr is found, look at uncommitted changes
 
 Store the PR number as `{number}` for all later steps.
 
