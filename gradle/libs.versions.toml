@@ -28,6 +28,7 @@ junitPlatform = "1.10.0"
 foojayResolver = "0.8.0"
 lifecycleViewModel = "2.10.0"
 sqldelight = "2.3.2"
+odfdom = "0.13.0"
 
 [libraries]
 # Existing
@@ -92,6 +93,9 @@ compose-rules-ktlint = { module = "io.nlopez.compose.rules:ktlint", version.ref 
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+
+# OpenDocument
+odfdom-java = { module = "org.odftoolkit:odfdom-java", version.ref = "odfdom" }
 
 # Gradle Plugins (for buildSrc)
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }

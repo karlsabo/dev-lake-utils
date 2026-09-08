@@ -45,6 +45,7 @@ internal class LinearIssueQueryBuilder(
         selection: String,
         cursor: String? = null,
         orderBy: String? = null,
+        includeArchived: Boolean = false,
     ): String = buildString {
         append("query {")
         append("\n  issues(first: ")
@@ -53,6 +54,9 @@ internal class LinearIssueQueryBuilder(
         if (!orderBy.isNullOrBlank()) {
             append(", orderBy: ")
             append(orderBy)
+        }
+        if (includeArchived) {
+            append(", includeArchived: true")
         }
         append(", filter: ")
         append(filter)

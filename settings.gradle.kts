@@ -14,6 +14,8 @@ plugins {
 rootProject.name = "dev-lake-utils"
 rootProject.buildFileName = "dev-lake-utils.gradle.kts"
 
+include("issue-triage")
+project(":issue-triage").buildFileName = "issue-triage.gradle.kts"
 include("summary-publisher")
 project(":summary-publisher").buildFileName = "summary-publisher.gradle.kts"
 include("utilities")

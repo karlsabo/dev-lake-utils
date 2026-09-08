@@ -24,4 +24,16 @@ data class Issue(
     val parent: IssueParent? = null,
     val project: IssueProject? = null,
     val projectMilestone: ProjectMilestone? = null,
+    val labels: IssueLabels? = null,
+)
+
+@Serializable
+data class IssueLabels(
+    val nodes: List<IssueLabel> = emptyList(),
+)
+
+@Serializable
+data class IssueLabel(
+    val id: String,
+    val name: String,
 )

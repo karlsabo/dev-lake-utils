@@ -13,14 +13,6 @@
 
 # TODO
 
-* [ ] Worktrees should start expanded
-    * In the worktree view, have a highlight hover effect so you know what row you're on
-    * Clicking on the worktree to expand, it sometimes takes too long to expand
-    * Should be able to expand anywhere with a double click
-    * Should be able to right-click to get all the menu options
-    * Should have PR information if there's a PR connected to the branch
-        * Should have menu options to open the PR in the web
-  * Should have shortcut style buttons, open, and archive, use emojis to keep it small
 * [ ] Need buttons on worktrees to rebase or merge in origin
 * [ ] When archiving a worktree, don't prompt, move it into some archiving bucket, delayed by 60 seconds or so, with a cancel archive button.
   * Play a nice animation that moves it into a recycle bin in the bottom right of the screen, then you can click that bin and undo (stop the archive) withing 60 seconds. If archiving already began, grey out the button and have a hover text helper that says it's being removed. If there's a remote branch or some other way to recover it we should support that.

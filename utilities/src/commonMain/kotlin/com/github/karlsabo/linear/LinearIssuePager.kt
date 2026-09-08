@@ -34,9 +34,10 @@ internal class LinearIssuePager(
         filter: String,
         selection: String,
         orderBy: String? = null,
+        includeArchived: Boolean = false,
     ): List<Issue> = collectCursorPaginated(
         fetchPage = { cursor ->
-            graphQlClient.execute(queryBuilder.issuesByFilter(filter, selection, cursor, orderBy))
+            graphQlClient.execute(queryBuilder.issuesByFilter(filter, selection, cursor, orderBy, includeArchived))
         },
         extractPage = { data -> data.extractCursorPage("issues") },
         transform = ::decodeIssue,

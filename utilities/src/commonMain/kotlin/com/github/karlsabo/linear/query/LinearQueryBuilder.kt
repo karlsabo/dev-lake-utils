@@ -34,7 +34,8 @@ class LinearQueryBuilder(
         selection: String,
         cursor: String? = null,
         orderBy: String? = null,
-    ): String = issueQueries.issuesByFilter(filter, selection, cursor, orderBy)
+        includeArchived: Boolean = false,
+    ): String = issueQueries.issuesByFilter(filter, selection, cursor, orderBy, includeArchived)
 
     fun projectMilestones(
         projectId: String,

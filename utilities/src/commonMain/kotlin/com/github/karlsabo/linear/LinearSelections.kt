@@ -49,6 +49,12 @@ internal val LINEAR_ISSUE_FIELDS = """
               id
               name
             }
+            labels {
+              nodes {
+                id
+                name
+              }
+            }
 """.trimIndent()
 
 internal val LINEAR_ISSUE_ID_FIELDS = """

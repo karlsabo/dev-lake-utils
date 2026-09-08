@@ -37,6 +37,20 @@ internal class LinearIssueFilterBuilder {
         }
     }
 
+    fun triageScopeFilter(
+        teamKey: String,
+        projectName: String? = null,
+        labelName: String? = null,
+    ): String {
+        require((projectName == null) != (labelName == null)) {
+            "Exactly one project or label selector is required"
+        }
+        val selector = projectName?.let {
+            "project: { name: { eq: \"${escapeLinearGraphQlString(it)}\" } }"
+        } ?: "labels: { name: { eq: \"${escapeLinearGraphQlString(requireNotNull(labelName))}\" } }"
+        return "{ team: { key: { eq: \"${escapeLinearGraphQlString(teamKey)}\" } }, $selector }"
+    }
+
     fun milestoneIssuesFilter(milestoneId: String): String {
         val escapedMilestoneId = escapeLinearGraphQlString(milestoneId)
         return "{ projectMilestone: { id: { eq: \"$escapedMilestoneId\" } } }"

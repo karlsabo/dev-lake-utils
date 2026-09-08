@@ -95,7 +95,9 @@ class ConfigDrivenPollingTest {
         try {
             awaitGitHubCalls(initialApi)
             withTimeout(2_000.milliseconds) {
-                while (viewModel.pullRequests.value == null || viewModel.notifications.value == null) delay(10.milliseconds)
+                while (viewModel.pullRequests.value == null || viewModel.notifications.value == null) {
+                    delay(10.milliseconds)
+                }
             }
 
             viewModel.updateGitHubAccess(replacementApi.services(), isReady = true)

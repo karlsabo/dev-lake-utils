@@ -2,6 +2,7 @@ package com.github.karlsabo.linear
 
 import com.github.karlsabo.dto.User
 import com.github.karlsabo.linear.conversion.toProjectIssue
+import com.github.karlsabo.linear.query.LinearIssueFilterBuilder
 import com.github.karlsabo.linear.query.LinearQueryBuilder
 import com.github.karlsabo.projectmanagement.ProjectIssue
 import com.github.karlsabo.tools.lenientJson
@@ -13,6 +14,7 @@ internal class LinearIssueReader(
     private val queryBuilder: LinearQueryBuilder,
 ) {
     private val pager = LinearIssuePager(graphQlClient, queryBuilder)
+    private val filterBuilder = LinearIssueFilterBuilder()
 
     suspend fun getIssues(issueKeys: List<String>): List<ProjectIssue> {
         if (issueKeys.isEmpty()) return emptyList()
@@ -82,10 +84,54 @@ internal class LinearIssueReader(
         return pager.fetchIssuesByFilter(filter, LINEAR_ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
+    suspend fun getTriageIssues(
+        teamKey: String,
+        projectName: String?,
+        labelName: String?,
+    ): List<LinearTriageIssue> {
+        require(projectName != null || labelName != null) { "A project or label selector is required" }
+
+        val projectIssues = projectName?.let { fetchTriageIssues(teamKey, projectName = it) }.orEmpty()
+        val labelIssues = labelName?.let { fetchTriageIssues(teamKey, labelName = it) }.orEmpty()
+        return (projectIssues + labelIssues)
+            .distinctBy(Issue::id)
+            .map(Issue::toLinearTriageIssue)
+    }
+
     suspend fun getMilestoneIssues(milestoneId: String): List<ProjectIssue> {
         val filter = queryBuilder.milestoneIssuesFilter(milestoneId)
         return pager.fetchIssuesByFilter(filter, LINEAR_ISSUE_FIELDS, "updatedAt").map { it.toProjectIssue() }
     }
 
+    private suspend fun fetchTriageIssues(
+        teamKey: String,
+        projectName: String? = null,
+        labelName: String? = null,
+    ): List<Issue> {
+        val filter = filterBuilder.triageScopeFilter(teamKey, projectName, labelName)
+        return pager.fetchIssuesByFilter(
+            filter = filter,
+            selection = LINEAR_ISSUE_FIELDS,
+            orderBy = "updatedAt",
+            includeArchived = true,
+        )
+    }
+
     private fun isIssueIdentifier(key: String): Boolean = key.contains(Regex("^[A-Za-z]+-\\d+$"))
 }
+
+private fun Issue.toLinearTriageIssue(): LinearTriageIssue = LinearTriageIssue(
+    id = id,
+    identifier = requireNotNull(identifier) { "Linear issue $id has no identifier" },
+    title = requireNotNull(title) { "Linear issue $id has no title" },
+    description = description,
+    url = url,
+    stateName = state?.name,
+    stateType = state?.type,
+    projectName = project?.name,
+    labelNames = labels?.nodes.orEmpty().mapTo(mutableSetOf()) { it.name },
+    updatedAt = updatedAt,
+    completedAt = completedAt,
+    canceledAt = canceledAt,
+    archivedAt = archivedAt,
+)
