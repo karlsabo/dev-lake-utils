@@ -10,6 +10,7 @@ import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.WorktreeSetupCoordinator
+import com.github.karlsabo.github.GitHubRepositoryIdentity
 import com.github.karlsabo.system.OsFamily
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -167,7 +168,7 @@ class EngHubLocalRepositoryViewModelTest {
         val viewModel = createLocalRepositoryViewModel(
             gitWorktreeApi = api,
             configWriter = RecordingEngHubConfigWriter(),
-            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+            testConfig = startedWorktreePollingConfig(intervalMs = 25),
         )
         val pollingJobs = pollingJobs(viewModel)
 
@@ -393,6 +394,49 @@ class EngHubLocalRepositoryViewModelTest {
                 "/workspace/example-worker",
             ),
             repositories.map { it.path },
+        )
+    }
+
+    @Test
+    fun repositoryDiscoveryResolvesGitHubOriginAndConfigRefreshPreservesIt() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "feature/login", commitHash = "abc123"),
+                    ),
+                ),
+                originUrlsByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to "git@github.com:acme/widgets.git",
+                ),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+
+        val resolvedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().repositoryIdentity != null && !repositories.single().isLoading
+            }.single()
+        }
+        assertEquals(GitHubRepositoryIdentity("acme", "widgets"), resolvedRepository.repositoryIdentity)
+
+        viewModel.updateConfig { config ->
+            config.copy(
+                localRepositories = listOf(
+                    LocalRepositoryConfig(path = DEV_LAKE_ROOT, setupCommands = listOf("direnv allow")),
+                ),
+            )
+        }
+
+        assertEquals(
+            GitHubRepositoryIdentity("acme", "widgets"),
+            viewModel.localRepositoriesStateFlow.value.single().repositoryIdentity,
         )
     }
 
@@ -649,7 +693,7 @@ class EngHubLocalRepositoryRefreshViewModelTest {
                     setupCommands = listOf("direnv exec . idea ./"),
                 ),
             ),
-            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+            testConfig = startedWorktreePollingConfig(intervalMs = 25),
             services = LocalRepositoryViewModelServices(
                 gitHubApi = gitHubApi,
             ),
@@ -711,7 +755,7 @@ class EngHubLocalRepositoryRefreshViewModelTest {
             ),
             configWriter = RecordingEngHubConfigWriter(),
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
-            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 250),
+            testConfig = startedWorktreePollingConfig(intervalMs = 250),
         )
         val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
 
@@ -805,7 +849,7 @@ class EngHubLocalRepositoryRefreshViewModelTest {
             ),
             configWriter = RecordingEngHubConfigWriter(),
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
-            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+            testConfig = startedWorktreePollingConfig(intervalMs = 25),
         )
         val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
 
@@ -876,7 +920,7 @@ class EngHubLocalRepositoryRefreshViewModelTest {
             gitWorktreeApi = api,
             configWriter = RecordingEngHubConfigWriter(),
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
-            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+            testConfig = startedWorktreePollingConfig(intervalMs = 25),
         )
         val pollingJobs = pollingJobs(viewModel)
 
@@ -936,7 +980,7 @@ class EngHubLocalRepositoryRefreshViewModelTest {
             ),
             configWriter = RecordingEngHubConfigWriter(),
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
-            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+            testConfig = startedWorktreePollingConfig(intervalMs = 25),
         )
         val pollingJobs = viewModel.viewModelScope.coroutineContext[Job]!!.children.toSet()
 
@@ -1131,7 +1175,7 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
             gitWorktreeApi = api,
             configWriter = RecordingEngHubConfigWriter(),
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
-            testConfig = LocalRepositoryViewModelTestConfig(worktreePollIntervalMs = 25),
+            testConfig = startedWorktreePollingConfig(intervalMs = 25),
         )
         val pollingJobs = pollingJobs(viewModel)
         withTimeout(2_000.milliseconds) { refreshEnrichmentStarted.await() }
@@ -1441,4 +1485,9 @@ private fun stackedPollWorktrees(isDirty: Boolean = false): List<Worktree> = lis
         commitHash = "feature",
         isDirty = isDirty,
     ),
+)
+
+private fun startedWorktreePollingConfig(intervalMs: Long) = LocalRepositoryViewModelTestConfig(
+    worktreePollIntervalMs = intervalMs,
+    startConfiguredRepositoryPolling = true,
 )

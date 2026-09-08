@@ -12,6 +12,7 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.text.TextRange
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
+import com.github.karlsabo.devlake.enghub.viewmodel.sharedProgressPullRequest
 import com.github.karlsabo.git.WorktreeBranchNameValidator
 import com.github.karlsabo.git.WorktreeSetupStatus
 import kotlin.test.Test
@@ -54,9 +55,7 @@ class WorktreePanelTest {
             MaterialTheme {
                 LocalWorktreeRow(
                     state = rebaseNeededRow(),
-                    onOpen = {},
-                    onArchive = {},
-                    onOpenCreateWorktreeDialog = {},
+                    actions = emptyLocalWorktreeRowActions(),
                 )
             }
         }
@@ -71,9 +70,7 @@ class WorktreePanelTest {
             MaterialTheme {
                 LocalWorktreeRow(
                     state = upToDateRow().copy(isRebasing = true),
-                    onOpen = {},
-                    onArchive = {},
-                    onOpenCreateWorktreeDialog = {},
+                    actions = emptyLocalWorktreeRowActions(),
                 )
             }
         }
@@ -88,9 +85,7 @@ class WorktreePanelTest {
             MaterialTheme {
                 LocalWorktreeRow(
                     state = upToDateRow(),
-                    onOpen = {},
-                    onArchive = {},
-                    onOpenCreateWorktreeDialog = {},
+                    actions = emptyLocalWorktreeRowActions(),
                 )
             }
         }
@@ -191,6 +186,26 @@ class WorktreePanelTest {
         )
     }
 
+    @Test
+    fun worktreeMenuExposesOpenPullRequestOnlyForConnectedPullRequest() {
+        val worktree = LocalWorktreeUiState(
+            branch = "feature/login",
+            path = "/repos/widgets-feature-login",
+        )
+        val pullRequest = sharedProgressPullRequest("acme/widgets", "feature/login")
+
+        assertEquals(
+            listOf(
+                WorktreeMenuAction.Open,
+                WorktreeMenuAction.OpenPullRequest,
+                WorktreeMenuAction.CreateWorktree,
+                WorktreeMenuAction.Archive,
+            ),
+            visibleWorktreeMenuActions(worktree, pullRequest),
+        )
+        assertFalse(WorktreeMenuAction.OpenPullRequest in visibleWorktreeMenuActions(worktree))
+    }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun choosingRebaseOntoParentCallsRowBoundary() = runComposeUiTest {
@@ -207,10 +222,9 @@ class WorktreePanelTest {
                         setupStatus = null,
                         isArchiving = false,
                     ),
-                    onOpen = {},
-                    onArchive = {},
-                    onOpenCreateWorktreeDialog = {},
-                    onRebaseOntoParent = { rebaseRequests += Unit },
+                    actions = emptyLocalWorktreeRowActions().copy(
+                        onRebaseOntoParent = { rebaseRequests += Unit },
+                    ),
                 )
             }
         }
@@ -658,30 +672,6 @@ class WorktreePanelTest {
     fun archiveActionIsEnabledWhenWorktreeIsIdle() {
         assertTrue(isWorktreeArchiveEnabled(setupStatus = null, isArchiving = false))
     }
-
-    private fun emptyPanelActions(): WorktreePanelActions = WorktreePanelActions(
-        onAddRepository = {},
-        onToggleRepository = {},
-        onCreateWorktreeFromRepository = {},
-        onRepositoryCreateWorktreeRequestHandled = {},
-        onDiscoverExistingBranches = {},
-        onDiscoverExistingPullRequest = { _, _ -> },
-        onCheckoutExistingBranch = { _, _, _ -> },
-        onConfirmUseUnrelatedExistingBranch = {},
-        onDismissUseUnrelatedExistingBranchConfirmation = {},
-        onAbortRebaseConflict = {},
-        onLeaveRebaseConflictAsIs = {},
-        worktrees = LocalWorktreeActions(
-            onOpenWorktree = { _, _ -> },
-            onArchiveWorktree = { _, _ -> },
-            onCreateWorktree = {},
-            onRebaseOntoParent = { _, _, _ -> },
-        ),
-        forceArchive = ForceArchiveWorktreeActions(
-            onConfirm = { _, _ -> },
-            onDismiss = {},
-        ),
-    )
 
     private fun rebaseNeededRow(): LocalWorktreeRowState = worktreeRow(needsRebase = true)
 

@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.enghub.component
 
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
@@ -13,6 +14,7 @@ internal enum class RepositoryMenuAction {
 
 internal enum class WorktreeMenuAction {
     Open,
+    OpenPullRequest,
     CreateWorktree,
     RebaseOntoParent,
     Archive,
@@ -23,6 +25,7 @@ internal data class WorktreeRowsState(
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
     val rebasingWorktreePaths: Set<String> = emptySet(),
+    val authoredOpenPullRequests: List<PullRequestUiState> = emptyList(),
 )
 
 internal data class LocalWorktreeRowState(
@@ -31,6 +34,7 @@ internal data class LocalWorktreeRowState(
     val isArchiving: Boolean,
     val isRebasing: Boolean = false,
     val nestingDepth: Int = 0,
+    val connectedPullRequest: PullRequestUiState? = null,
 )
 
 internal data class VisibleWorktreeRow(
@@ -48,12 +52,22 @@ internal fun isRepositoryCreateWorktreeEnabled(
     isArchiving: Boolean,
 ): Boolean = repository.path.isNotBlank() && setupStatus == null && !isArchiving
 
-internal fun visibleWorktreeMenuActions(worktree: LocalWorktreeUiState): List<WorktreeMenuAction> = buildList {
+internal fun visibleWorktreeMenuActions(
+    worktree: LocalWorktreeUiState,
+    connectedPullRequest: PullRequestUiState? = null,
+): List<WorktreeMenuAction> = buildList {
     add(WorktreeMenuAction.Open)
+    if (connectedPullRequest != null) add(WorktreeMenuAction.OpenPullRequest)
     add(WorktreeMenuAction.CreateWorktree)
     if (!worktree.parentBranch.isNullOrBlank()) add(WorktreeMenuAction.RebaseOntoParent)
     if (!worktree.isRoot) add(WorktreeMenuAction.Archive)
 }
+
+internal fun isWorktreeOpenEnabled(
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+    isRebasing: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing
 
 internal fun isWorktreeCreateEnabled(
     worktree: LocalWorktreeUiState,

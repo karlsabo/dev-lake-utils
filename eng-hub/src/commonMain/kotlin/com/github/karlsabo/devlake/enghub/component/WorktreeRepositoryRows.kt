@@ -1,13 +1,18 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.Card
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenu
@@ -23,11 +28,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
+import com.github.karlsabo.devlake.enghub.viewmodel.connectedPullRequest
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
@@ -66,12 +75,23 @@ private fun LocalRepositoryHeader(
     onCreateWorktreeFromRepository: () -> Unit,
 ) {
     val repository = state.repository
+    val hoverInteractionSource = remember { MutableInteractionSource() }
+    val isHovered by hoverInteractionSource.collectIsHoveredAsState()
+    val backgroundColor = if (isHovered) {
+        MaterialTheme.colors.onSurface.copy(alpha = 0.08f)
+    } else {
+        Color.Transparent
+    }
     val normalizedRepositoryPath = repository.normalizedPathOrNull()
     val repositoryStatus = state.setupStatuses[WorktreePath(repository.path)]
     val isRepositoryArchiving = normalizedRepositoryPath != null &&
         normalizedRepositoryPath in state.archivingWorktreePaths
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(backgroundColor)
+            .hoverable(hoverInteractionSource)
+            .testTag("repository-header-${repository.name}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(
@@ -85,12 +105,22 @@ private fun LocalRepositoryHeader(
                 style = MaterialTheme.typography.button,
             )
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = repository.name,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.subtitle1,
-        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(32.dp)
+                .pointerInput(onToggleRepository) {
+                    detectTapGestures(onDoubleTap = { onToggleRepository() })
+                }
+                .testTag("repository-header-content-${repository.name}"),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                text = repository.name,
+                modifier = Modifier.padding(start = 8.dp),
+                style = MaterialTheme.typography.subtitle1,
+            )
+        }
         LocalRepositoryActionMenu(
             repository = repository,
             setupStatus = repositoryStatus,
@@ -182,6 +212,7 @@ private fun LocalWorktreeRows(
             visibleWorktreeRows(state.repository.worktrees).forEach { row ->
                 val worktree = row.worktree
                 val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
+                val connectedPullRequest = state.connectedPullRequestFor(worktree.branch)
                 key(normalizedWorktreePath) {
                     LocalWorktreeRow(
                         state = LocalWorktreeRowState(
@@ -190,27 +221,41 @@ private fun LocalWorktreeRows(
                             isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
                             isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
                             nestingDepth = row.nestingDepth,
+                            connectedPullRequest = connectedPullRequest,
                         ),
-                        onOpen = { panelActions.worktrees.onOpenWorktree(state.repository.path, worktree.path) },
-                        onArchive = { onArchiveRequest(PendingArchive(state.repository.path, worktree.path)) },
-                        onOpenCreateWorktreeDialog = {
-                            onCreateRequest(createWorktreeDialogState(state.repository.path, worktree))
-                        },
-                        onRebaseOntoParent = {
-                            worktree.parentBranch?.let { parentBranch ->
-                                panelActions.worktrees.onRebaseOntoParent(
-                                    state.repository.path,
-                                    worktree.path,
-                                    parentBranch,
-                                )
-                            }
-                        },
+                        actions = LocalWorktreeRowActions(
+                            onOpen = {
+                                panelActions.worktrees.onOpenWorktree(state.repository.path, worktree.path)
+                            },
+                            onOpenPullRequest = panelActions.worktrees.onOpenPullRequest,
+                            onArchive = {
+                                onArchiveRequest(PendingArchive(state.repository.path, worktree.path))
+                            },
+                            onOpenCreateWorktreeDialog = {
+                                onCreateRequest(createWorktreeDialogState(state.repository.path, worktree))
+                            },
+                            onRebaseOntoParent = {
+                                worktree.parentBranch?.let { parentBranch ->
+                                    panelActions.worktrees.onRebaseOntoParent(
+                                        state.repository.path,
+                                        worktree.path,
+                                        parentBranch,
+                                    )
+                                }
+                            },
+                        ),
                     )
                 }
             }
         }
     }
 }
+
+private fun WorktreeRowsState.connectedPullRequestFor(branch: String) = connectedPullRequest(
+    repositoryIdentity = repository.repositoryIdentity,
+    branch = branch,
+    pullRequests = authoredOpenPullRequests,
+)
 
 private fun repositoryToggleDescription(repository: LocalRepositoryUiState): String = if (repository.isExpanded) {
     "Collapse ${repository.name}"

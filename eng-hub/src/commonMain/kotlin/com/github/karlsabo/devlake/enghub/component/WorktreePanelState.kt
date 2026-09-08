@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.component
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.github.GitHubRepositoryIdentity
@@ -15,6 +16,7 @@ internal data class WorktreePanelState(
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
     val rebasingWorktreePaths: Set<String> = emptySet(),
+    val authoredOpenPullRequests: List<PullRequestUiState> = emptyList(),
     val repositoryCreateWorktreeRequest: PendingCreateWorktree? = null,
     val existingBranchDiscovery: ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(),
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch? = null,
@@ -39,6 +41,7 @@ internal data class WorktreePanelActions(
 
 internal data class LocalWorktreeActions(
     val onOpenWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
+    val onOpenPullRequest: (url: String) -> Unit,
     val onArchiveWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     val onCreateWorktree: CreateWorktreeCallback,
     val onRebaseOntoParent: (repoRootPath: String, worktreePath: String, parentBranch: String) -> Unit,

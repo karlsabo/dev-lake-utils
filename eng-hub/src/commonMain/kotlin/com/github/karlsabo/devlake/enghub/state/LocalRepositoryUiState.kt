@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.state
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.git.Worktree
+import com.github.karlsabo.github.GitHubRepositoryIdentity
 
 class LocalRepositoryWorktreeRequest internal constructor()
 
@@ -13,6 +14,7 @@ data class LocalRepositoryUiState(
     val isLoading: Boolean = false,
     val operationRequest: LocalRepositoryWorktreeRequest? = null,
     val refreshRequest: LocalRepositoryWorktreeRequest? = null,
+    val repositoryIdentity: GitHubRepositoryIdentity? = null,
     val worktrees: List<LocalWorktreeUiState> = emptyList(),
 )
 
@@ -31,13 +33,17 @@ data class ForceArchiveWorktreeUiState(
     val worktreePath: String,
 )
 
-fun List<LocalRepositoryConfig>.toLocalRepositoryUiStates(): List<LocalRepositoryUiState> = asSequence()
+fun List<LocalRepositoryConfig>.toLocalRepositoryUiStates(
+    initiallyExpanded: Boolean = true,
+): List<LocalRepositoryUiState> = asSequence()
     .map { it.path.trim() }
     .filter { it.isNotEmpty() }
     .map { path ->
         LocalRepositoryUiState(
             name = path.repositoryFolderName(),
             path = path,
+            isExpanded = initiallyExpanded,
+            isLoading = initiallyExpanded,
         )
     }
     .sortedWith(

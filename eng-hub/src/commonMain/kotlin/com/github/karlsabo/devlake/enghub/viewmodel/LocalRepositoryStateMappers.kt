@@ -3,6 +3,8 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.github.GitHubRepositoryIdentity
 
 internal fun List<LocalRepositoryUiState>.withPreservedWorktrees(
     previousRepositories: List<LocalRepositoryUiState>,
@@ -28,6 +30,23 @@ internal fun List<LocalRepositoryUiState>.withPreservedWorktrees(
         } else {
             previousRepository?.isExpanded ?: repository.isExpanded
         }
-        repository.copy(isExpanded = isExpanded, worktrees = worktrees)
+        repository.copy(
+            isExpanded = isExpanded,
+            repositoryIdentity = previousRepository?.repositoryIdentity,
+            worktrees = worktrees,
+        )
     }
+}
+
+internal fun connectedPullRequest(
+    repositoryIdentity: GitHubRepositoryIdentity?,
+    branch: String,
+    pullRequests: List<PullRequestUiState>,
+): PullRequestUiState? = repositoryIdentity?.let { identity ->
+    pullRequests
+        .asSequence()
+        .filter { pullRequest ->
+            identity.matches(pullRequest.repositoryFullName) && pullRequest.headRef == branch
+        }
+        .maxByOrNull(PullRequestUiState::number)
 }

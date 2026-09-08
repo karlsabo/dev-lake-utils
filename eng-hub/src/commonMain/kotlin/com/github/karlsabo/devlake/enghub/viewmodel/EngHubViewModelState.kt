@@ -92,6 +92,7 @@ internal class EngHubViewModelState(
     configWriter: EngHubConfigWriter,
     worktreeSetupCoordinator: WorktreeSetupCoordinator,
     notificationIgnoreStore: NotificationIgnoreStore,
+    private val startConfiguredRepositoriesExpanded: Boolean = false,
 ) {
     private val configState = EngHubConfigState(config, configWriter)
     private val configUpdateMutex = Mutex()
@@ -111,7 +112,9 @@ internal class EngHubViewModelState(
     val setupStatusesStateFlow: StateFlow<Map<WorktreePath, WorktreeSetupStatus>> =
         worktreeSetupCoordinator.statuses
 
-    val localRepositories = MutableStateFlow(config.localRepositories.toLocalRepositoryUiStates())
+    val localRepositories = MutableStateFlow(
+        config.localRepositories.toLocalRepositoryUiStates(startConfiguredRepositoriesExpanded),
+    )
     val lastCreateLocalWorktreeFromBaseRequest =
         MutableStateFlow<CreateLocalWorktreeFromBaseRequest?>(null)
     val lastCreateLocalWorktreeFromRepositoryRequest =
@@ -130,12 +133,14 @@ internal class EngHubViewModelState(
 
     private fun refreshLocalRepositories(config: EngHubConfig) {
         val previousByPath = localRepositories.value.associateBy { it.path.normalizedRepositoryPath() }
-        localRepositories.value = config.localRepositories.toLocalRepositoryUiStates().map { configuredRepository ->
-            previousByPath[configuredRepository.path.normalizedRepositoryPath()]?.copy(
-                name = configuredRepository.name,
-                path = configuredRepository.path,
-            ) ?: configuredRepository
-        }
+        localRepositories.value = config.localRepositories
+            .toLocalRepositoryUiStates(startConfiguredRepositoriesExpanded)
+            .map { configuredRepository ->
+                previousByPath[configuredRepository.path.normalizedRepositoryPath()]?.copy(
+                    name = configuredRepository.name,
+                    path = configuredRepository.path,
+                ) ?: configuredRepository
+            }
     }
 }
 

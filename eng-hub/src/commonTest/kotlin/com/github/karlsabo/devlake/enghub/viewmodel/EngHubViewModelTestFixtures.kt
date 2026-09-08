@@ -260,6 +260,9 @@ data class LocalRepositoryViewModelTestConfig(
     val worktreePollIntervalMs: Long = 120_000,
     val repositoriesBaseDir: String = "",
     val setupShell: String = "/bin/zsh",
+    val startConfiguredRepositoryPolling: Boolean = false,
+    val startConfiguredRepositoriesExpanded: Boolean = false,
+    val pollConfiguredRepositoriesImmediately: Boolean = false,
 )
 
 fun localRepositoryConfigs(vararg paths: String) = paths.map { LocalRepositoryConfig(path = it) }
@@ -296,6 +299,11 @@ fun createLocalRepositoryViewModel(
         setupShell = testConfig.setupShell,
     ),
     notificationIgnoreStore = NoOpNotificationIgnoreStore(),
+    configuredRepositoryStartup = ConfiguredRepositoryStartup(
+        startPolling = testConfig.startConfiguredRepositoryPolling,
+        initiallyExpanded = testConfig.startConfiguredRepositoriesExpanded,
+        pollImmediately = testConfig.pollConfiguredRepositoriesImmediately,
+    ),
 )
 
 fun createWorktreeSetupViewModel(

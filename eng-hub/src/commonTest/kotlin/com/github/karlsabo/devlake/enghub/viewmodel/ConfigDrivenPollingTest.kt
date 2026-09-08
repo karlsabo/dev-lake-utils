@@ -94,8 +94,8 @@ class ConfigDrivenPollingTest {
 
         try {
             awaitGitHubCalls(initialApi)
-            withTimeout(2_000) {
-                while (viewModel.pullRequests.value == null || viewModel.notifications.value == null) delay(10)
+            withTimeout(2_000.milliseconds) {
+                while (viewModel.pullRequests.value == null || viewModel.notifications.value == null) delay(10.milliseconds)
             }
 
             viewModel.updateGitHubAccess(replacementApi.services(), isReady = true)
@@ -139,9 +139,9 @@ class ConfigDrivenPollingTest {
                 isReady = false,
             )
             assertEquals(0, blankTokenApiCloseCalls)
-            delay(100)
+            delay(100.milliseconds)
             val callsAfterRevocation = initialApi.totalPollingCalls()
-            delay(100)
+            delay(100.milliseconds)
 
             assertEquals(callsAfterRevocation, initialApi.totalPollingCalls())
             assertEquals(0, blankTokenApi.totalPollingCalls())
@@ -178,7 +178,7 @@ class ConfigDrivenPollingTest {
     }
 
     @Test
-    fun committedWorktreeIntervalReplacesTheObsoletePollingDelay() = runTest {
+    fun worktreePollingStartsImmediatelyAndCommittedIntervalReplacesTheObsoleteDelay() = runTest {
         val configs = MutableStateFlow(EngHubConfig(worktreePollIntervalMs = 120_000))
         val pollTimes = mutableListOf<Long>()
 
@@ -188,24 +188,26 @@ class ConfigDrivenPollingTest {
         }
         runCurrent()
 
+        assertEquals(listOf(0L), pollTimes)
+
         advanceTimeBy(10_000.milliseconds)
         configs.value = configs.value.copy(worktreePollIntervalMs = 60_000)
         runCurrent()
+        assertEquals(listOf(0L, 10_000L), pollTimes)
+
         advanceTimeBy(59_999.milliseconds)
         runCurrent()
-        assertEquals(emptyList(), pollTimes)
-
         advanceTimeBy(1.milliseconds)
         runCurrent()
         advanceTimeBy(60_000.milliseconds)
         runCurrent()
 
-        assertEquals(listOf(70_000L, 130_000L), pollTimes)
+        assertEquals(listOf(0L, 10_000L, 70_000L, 130_000L), pollTimes)
     }
 
     private suspend fun awaitGitHubCalls(api: RecordingGitHubApi) {
-        withTimeout(2_000) {
-            while (api.openPullRequestCalls == 0 || api.notificationListCalls == 0) delay(10)
+        withTimeout(2_000.milliseconds) {
+            while (api.openPullRequestCalls == 0 || api.notificationListCalls == 0) delay(10.milliseconds)
         }
     }
 

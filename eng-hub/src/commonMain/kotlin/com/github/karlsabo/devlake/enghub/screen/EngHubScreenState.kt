@@ -140,6 +140,7 @@ internal fun collectEngHubScreenState(
             setupStatuses = setupStatuses,
             archivingWorktreePaths = archivingPaths,
             rebasingWorktreePaths = rebasingPaths,
+            authoredOpenPullRequests = activityResults.pullRequests?.getOrNull().orEmpty(),
             repositoryCreateWorktreeRequest = repositoryCreateWorktreeRequest?.let { request ->
                 createRepositoryWorktreeDialogState(
                     repoRootPath = request.repoRootPath,
@@ -237,6 +238,7 @@ private fun engHubWorktreePanelActions(viewModel: EngHubViewModel) = WorktreePan
 
 private fun localWorktreeActions(viewModel: EngHubViewModel) = LocalWorktreeActions(
     onOpenWorktree = viewModel.openLocalWorktree,
+    onOpenPullRequest = viewModel.openInBrowser,
     onArchiveWorktree = viewModel.archiveLocalWorktree,
     onCreateWorktree = { request ->
         viewModel.createLocalWorktreeFromBase(

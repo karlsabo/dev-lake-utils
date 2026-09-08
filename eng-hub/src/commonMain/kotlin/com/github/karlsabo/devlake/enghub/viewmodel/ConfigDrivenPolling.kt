@@ -31,15 +31,17 @@ internal fun <T> fixedIntervalPollingFlow(
 
 internal fun <T> worktreePollingFlow(
     configs: Flow<EngHubConfig>,
+    pollImmediately: Boolean = true,
     poll: suspend () -> T,
 ): Flow<T> = configs
     .map { config -> config.worktreePollIntervalMs.coerceAtLeast(1) }
     .distinctUntilChanged()
     .flatMapLatest { intervalMs ->
         flow {
+            if (!pollImmediately) delay(intervalMs.milliseconds)
             while (true) {
-                delay(intervalMs.milliseconds)
                 emit(poll())
+                delay(intervalMs.milliseconds)
             }
         }
     }

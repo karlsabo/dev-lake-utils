@@ -19,19 +19,45 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import me.tatarka.inject.annotations.Inject
 
-@Inject
-class EngHubViewModel(
+internal data class ConfiguredRepositoryStartup(
+    val startPolling: Boolean,
+    val initiallyExpanded: Boolean,
+    val pollImmediately: Boolean,
+)
+
+class EngHubViewModel internal constructor(
     gitHubServices: EngHubGitHubServices,
     worktreeServices: EngHubWorktreeServices,
     desktopServices: EngHubDesktopServices,
     config: EngHubConfig,
     notificationIgnoreStore: NotificationIgnoreStore,
+    private val configuredRepositoryStartup: ConfiguredRepositoryStartup,
 ) : ViewModel() {
+    @Inject
+    constructor(
+        gitHubServices: EngHubGitHubServices,
+        worktreeServices: EngHubWorktreeServices,
+        desktopServices: EngHubDesktopServices,
+        config: EngHubConfig,
+        notificationIgnoreStore: NotificationIgnoreStore,
+    ) : this(
+        gitHubServices = gitHubServices,
+        worktreeServices = worktreeServices,
+        desktopServices = desktopServices,
+        config = config,
+        notificationIgnoreStore = notificationIgnoreStore,
+        configuredRepositoryStartup = ConfiguredRepositoryStartup(
+            startPolling = true,
+            initiallyExpanded = true,
+            pollImmediately = true,
+        ),
+    )
     private val state = EngHubViewModelState(
         config = config,
         configWriter = worktreeServices.configWriter,
         worktreeSetupCoordinator = worktreeServices.worktreeSetupCoordinator,
         notificationIgnoreStore = notificationIgnoreStore,
+        startConfiguredRepositoriesExpanded = configuredRepositoryStartup.initiallyExpanded,
     )
     private val errorReporter = ActionErrorReporter(state)
     private val currentGitHubAccess = MutableStateFlow(CommittedGitHubAccess(gitHubServices, isReady = true))
@@ -162,8 +188,12 @@ class EngHubViewModel(
     )
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            localRepositoriesController.pollConfiguredLocalRepositoryWorktrees()
+        if (configuredRepositoryStartup.startPolling) {
+            viewModelScope.launch(Dispatchers.IO) {
+                localRepositoriesController.pollConfiguredLocalRepositoryWorktrees(
+                    pollImmediately = configuredRepositoryStartup.pollImmediately,
+                )
+            }
         }
     }
 

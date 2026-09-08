@@ -23,6 +23,8 @@ class LocalRepositoryUiStateTest {
             listOf("atlas-tooling", "cedar-worker", "orion-platform", "zephyr-service"),
             uiStates.map { it.name },
         )
+        assertEquals(listOf(true, true, true, true), uiStates.map { it.isExpanded })
+        assertEquals(listOf(true, true, true, true), uiStates.map { it.isLoading })
         assertEquals(
             listOf(
                 "/workspace/atlas-tooling",
@@ -39,7 +41,14 @@ class LocalRepositoryUiStateTest {
         val uiStates = listOf(LocalRepositoryConfig(path = "/workspace/atlas-tooling/")).toLocalRepositoryUiStates()
 
         assertEquals(
-            listOf(LocalRepositoryUiState(name = "atlas-tooling", path = "/workspace/atlas-tooling/")),
+            listOf(
+                LocalRepositoryUiState(
+                    name = "atlas-tooling",
+                    path = "/workspace/atlas-tooling/",
+                    isExpanded = true,
+                    isLoading = true,
+                ),
+            ),
             uiStates,
         )
     }
