@@ -1067,6 +1067,11 @@ private class GitWorktreeArchiver(
         worktreePath: String,
         force: Boolean,
     ) {
+        if (!SystemFileSystem.exists(Path(worktreePath, ".git"))) {
+            logger.info { "Skipping removal for worktree without Git metadata at $worktreePath" }
+            return
+        }
+
         removeWorktree(worktreePath) {
             if (force) {
                 gitCommandApi.execute(repoPath, "worktree", "remove", "--force", worktreePath)

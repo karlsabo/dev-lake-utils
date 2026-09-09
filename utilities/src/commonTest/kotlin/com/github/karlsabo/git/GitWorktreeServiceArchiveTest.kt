@@ -56,9 +56,8 @@ class GitWorktreeServiceArchiveTest {
         val fake = FakeGitCommandApi()
         val service = GitWorktreeService(fake)
         val worktreePath = createArchiveWorktreeTempDir()
-        SystemFileSystem.sink(Path(worktreePath, "leftover.txt")).buffered().use { sink ->
-            sink.writeString("leftover")
-        }
+        writeFile(worktreePath, ".git", "gitdir: /tmp/repo/.git/worktrees/repo-feature")
+        writeFile(worktreePath, "leftover.txt", "leftover")
 
         service.archiveWorktree("/tmp/repo", worktreePath, force = false)
 
@@ -77,9 +76,8 @@ class GitWorktreeServiceArchiveTest {
         val fake = FakeGitCommandApi()
         val service = GitWorktreeService(fake)
         val worktreePath = createArchiveWorktreeTempDir()
-        SystemFileSystem.sink(Path(worktreePath, "leftover.txt")).buffered().use { sink ->
-            sink.writeString("leftover")
-        }
+        writeFile(worktreePath, ".git", "gitdir: /tmp/repo/.git/worktrees/repo-feature")
+        writeFile(worktreePath, "leftover.txt", "leftover")
 
         service.archiveWorktree("/tmp/repo", worktreePath, force = true)
 
@@ -97,6 +95,22 @@ class GitWorktreeServiceArchiveTest {
     }
 
     @Test
+    fun archiveWorktree_withoutGitMetadataDeletesDirectoryAndPrunes() {
+        val fake = FakeGitCommandApi()
+        val service = GitWorktreeService(fake)
+        val worktreePath = createArchiveWorktreeTempDir()
+        writeFile(worktreePath, "leftover.txt", "leftover")
+
+        service.archiveWorktree("/tmp/repo", worktreePath, force = false)
+
+        assertFalse(SystemFileSystem.exists(Path(worktreePath)))
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("execute", listOf("/tmp/repo", "worktree", "prune"))),
+            fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" },
+        )
+    }
+
+    @Test
     fun archiveWorktree_deleteFailureStillPrunes() {
         val fake = FakeGitCommandApi()
         val service = GitWorktreeService(
@@ -105,7 +119,8 @@ class GitWorktreeServiceArchiveTest {
                 throw IllegalStateException("delete failed")
             },
         )
-        val worktreePath = "/tmp/repo-feature"
+        val worktreePath = createArchiveWorktreeTempDir()
+        writeFile(worktreePath, ".git", "gitdir: /tmp/repo/.git/worktrees/repo-feature")
 
         val ex = assertFailsWith<GitWorktreeException> {
             service.archiveWorktree("/tmp/repo", worktreePath, force = false)
@@ -120,6 +135,7 @@ class GitWorktreeServiceArchiveTest {
             ),
             fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" },
         )
+        removeTempDir(worktreePath)
     }
 
     @Test
@@ -134,6 +150,7 @@ class GitWorktreeServiceArchiveTest {
                 gitOutput = "fatal: contains modified files",
             )
         }
+        writeFile(worktreePath, ".git", "gitdir: /tmp/repo/.git/worktrees/repo-feature")
         val service = GitWorktreeService(fake)
 
         val ex = assertFailsWith<GitWorktreeException> {
@@ -147,5 +164,15 @@ class GitWorktreeServiceArchiveTest {
             fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" },
         )
         removeTempDir(worktreePath)
+    }
+
+    private fun writeFile(
+        directory: String,
+        name: String,
+        contents: String,
+    ) {
+        SystemFileSystem.sink(Path(directory, name)).buffered().use { sink ->
+            sink.writeString(contents)
+        }
     }
 }
