@@ -1,6 +1,7 @@
 package com.github.karlsabo.devlake.triage
 
 import com.github.karlsabo.devlake.triage.assessment.ASSESSMENT_PROMPT_VERSION
+import com.github.karlsabo.devlake.triage.assessment.IssueAssessment
 import com.github.karlsabo.devlake.triage.assessment.PiIssueAssessor
 import com.github.karlsabo.devlake.triage.assessment.PiProcessRunner
 import com.github.karlsabo.devlake.triage.assessment.ProcessResult
@@ -14,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.odftoolkit.odfdom.doc.OdfSpreadsheetDocument
+import java.io.IOException
 import java.nio.file.Files
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -23,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 class PartialAssessmentFailureTest {
@@ -35,8 +38,8 @@ class PartialAssessmentFailureTest {
         val workbook = RecordingWorkbook(process.activeCount)
         val reports = mutableListOf<String>()
         val command = IssueTriageCommand(
-            source = LinearInventorySource { _, _, _ -> sixIssues() },
-            commentSource = LinearCommentSource { _, _ -> emptyList() },
+            source = { _, _, _ -> sixIssues() },
+            commentSource = { _, _ -> emptyList() },
             assessor = PiIssueAssessor(processRunner = process),
             workbook = workbook,
             execution = AssessmentExecution(concurrency = concurrency, failureReporter = reports::add),
@@ -61,8 +64,8 @@ class PartialAssessmentFailureTest {
         val workbook = RecordingWorkbook(process.activeCount)
         val reports = mutableListOf<String>()
         val command = IssueTriageCommand(
-            source = LinearInventorySource { _, _, _ -> sixIssues().filterNot { it.identifier == "TST-2" } },
-            commentSource = LinearCommentSource { identifier, _ ->
+            source = { _, _, _ -> sixIssues().filterNot { it.identifier == "TST-2" } },
+            commentSource = { identifier, _ ->
                 check(identifier != "TST-3") { "comments unavailable" }
                 emptyList()
             },
@@ -82,6 +85,26 @@ class PartialAssessmentFailureTest {
     }
 
     @Test
+    fun `unexpected assessor exception saves an error row alongside successful assessments`() = runTest {
+        val directory = Files.createTempDirectory("unexpected-assessor-failure")
+        val output = directory.resolve("inventory.ods")
+        val command = IssueTriageCommand(
+            source = { _, _, _ -> sixIssues().take(2) },
+            commentSource = { _, _ -> emptyList() },
+            assessor = { row, _, _ ->
+                if (row.identifier == "TST-2") throw IOException("repository unavailable")
+                IssueAssessment.parse(assessmentJson())
+            },
+            workbook = OdsTriageWorkbook(),
+        )
+
+        val result = command.run(arguments(directory, output))
+
+        assertEquals(listOf(AssessmentFailure("TST-2", "repository unavailable")), result.failures)
+        assertWorkbookRows(output, expectedTickets = setOf(1, 2), errorTickets = setOf(2))
+    }
+
+    @Test
     fun `cancellation terminates the running pi process without saving`() = runBlocking {
         val directory = Files.createTempDirectory("cancel-assessment")
         val output = directory.resolve("inventory.ods")
@@ -89,16 +112,16 @@ class PartialAssessmentFailureTest {
         val executable = directory.resolve("fake-pi-cancel")
         Files.writeString(
             executable,
-            """#!/bin/sh
-printf '%s' "${'$'}${'$'}" > '$pidFile'
+            $$"""#!/bin/sh
+printf '%s' "$$" > '$$pidFile'
 cat > /dev/null
 sleep 30
 """,
         )
         assertTrue(executable.toFile().setExecutable(true))
         val command = IssueTriageCommand(
-            source = LinearInventorySource { _, _, _ -> sixIssues().take(1) },
-            commentSource = LinearCommentSource { _, _ -> emptyList() },
+            source = { _, _, _ -> sixIssues().take(1) },
+            commentSource = { _, _ -> emptyList() },
             assessor = PiIssueAssessor(
                 piExecutable = executable.toString(),
                 timeout = Duration.ofSeconds(30),
@@ -107,8 +130,8 @@ sleep 30
         )
 
         val job = launch { command.run(arguments(directory, output)) }
-        withTimeout(5_000) {
-            while (!Files.exists(pidFile)) delay(10)
+        withTimeout(5_000.milliseconds) {
+            while (!Files.exists(pidFile)) delay(10.milliseconds)
         }
         job.cancelAndJoin()
 
@@ -154,7 +177,7 @@ sleep 30
             command: List<String>,
             prompt: String,
             workingDirectory: java.nio.file.Path,
-            timeout: java.time.Duration,
+            timeout: Duration,
         ): ProcessResult {
             val identifier = requireNotNull(IDENTIFIER.find(prompt)).groupValues[1]
             attempts.merge(identifier, 1, Int::plus)

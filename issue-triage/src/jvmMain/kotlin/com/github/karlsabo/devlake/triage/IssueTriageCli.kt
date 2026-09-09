@@ -1,7 +1,6 @@
 package com.github.karlsabo.devlake.triage
 
 import com.github.karlsabo.devlake.triage.assessment.AssessmentConfiguration
-import com.github.karlsabo.devlake.triage.assessment.AssessmentException
 import com.github.karlsabo.devlake.triage.assessment.IssueAssessor
 import com.github.karlsabo.devlake.triage.assessment.MAX_ASSESSMENT_COMMENTS
 import com.github.karlsabo.devlake.triage.assessment.PiIssueAssessor
@@ -119,23 +118,21 @@ internal class IssueTriageCommand(
         configuration: AssessmentConfiguration,
     ): AssessmentOutcome {
         val comments = fetchComments(row).getOrElse { failure ->
-            return commentFetchFailure(row, failure)
+            return recoverableFailure(row, failure)
         }
-        return try {
-            val assessment = runInterruptible { assessor.assess(row, comments, configuration) }
-            AssessmentOutcome(row.copy(assessment = assessment.toCells()))
-        } catch (failure: CancellationException) {
-            throw failure
-        } catch (failure: AssessmentException) {
-            failedOutcome(row, failure)
-        }
+        return runCatching {
+            runInterruptible { assessor.assess(row, comments, configuration) }
+        }.fold(
+            onSuccess = { assessment -> AssessmentOutcome(row.copy(assessment = assessment.toCells())) },
+            onFailure = { failure -> recoverableFailure(row, failure) },
+        )
     }
 
     private suspend fun fetchComments(row: TriageRow): Result<List<ProjectComment>> = runCatching {
         commentSource.getRecentComments(row.identifier, MAX_ASSESSMENT_COMMENTS)
     }
 
-    private fun commentFetchFailure(row: TriageRow, failure: Throwable): AssessmentOutcome = when (failure) {
+    private fun recoverableFailure(row: TriageRow, failure: Throwable): AssessmentOutcome = when (failure) {
         is CancellationException -> throw failure
         is Error -> throw failure
         else -> failedOutcome(row, failure)
