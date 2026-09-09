@@ -16,14 +16,17 @@ export default function (pi: ExtensionAPI) {
         type: "string",
     });
 
-    const configuredRoots = pi.getFlag("triage-roots");
-    if (typeof configuredRoots !== "string") {
-        throw new Error("--triage-roots is required");
-    }
-    const roots = (JSON.parse(configuredRoots) as string[]).map((root) => realpathSync(root));
-    if (roots.length === 0) {
-        throw new Error("--triage-roots must contain at least one path");
-    }
+    let roots: string[] | undefined;
+    pi.on("session_start", () => {
+        const configuredRoots = pi.getFlag("triage-roots");
+        if (typeof configuredRoots !== "string") {
+            throw new Error("--triage-roots is required");
+        }
+        roots = (JSON.parse(configuredRoots) as string[]).map((root) => realpathSync(root));
+        if (roots.length === 0) {
+            throw new Error("--triage-roots must contain at least one path");
+        }
+    });
 
     pi.on("tool_call", (event, context) => {
         if (!GUARDED_TOOLS.has(event.toolName)) return;
@@ -36,7 +39,7 @@ export default function (pi: ExtensionAPI) {
         } catch {
             return { block: true, reason: `Path is unavailable: ${requestedPath}` };
         }
-        if (!roots.some((root) => isWithinRoot(canonicalPath, root))) {
+        if (!roots?.some((root) => isWithinRoot(canonicalPath, root))) {
             return { block: true, reason: `Path is outside configured repository roots: ${requestedPath}` };
         }
     });
