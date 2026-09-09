@@ -135,14 +135,6 @@ class PiIssueAssessorTest {
         assertTrue(processHandle.isEmpty || !processHandle.get().isAlive)
     }
 
-    private fun fakePiCommand(mode: String, vararg files: java.nio.file.Path): List<String> = listOf(
-        java.nio.file.Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-        "-cp",
-        FakePiProcess::class.java.protectionDomain.codeSource.location.toURI().let(java.nio.file.Path::of).toString(),
-        FakePiProcess::class.java.name,
-        mode,
-    ) + files.map(java.nio.file.Path::toString)
-
     private fun expectedProcessArguments(
         extensionPath: java.nio.file.Path,
         root: java.nio.file.Path,

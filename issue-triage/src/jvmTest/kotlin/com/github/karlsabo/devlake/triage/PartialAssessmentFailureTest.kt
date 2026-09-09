@@ -1,11 +1,11 @@
 package com.github.karlsabo.devlake.triage
 
 import com.github.karlsabo.devlake.triage.assessment.ASSESSMENT_PROMPT_VERSION
-import com.github.karlsabo.devlake.triage.assessment.FakePiProcess
 import com.github.karlsabo.devlake.triage.assessment.IssueAssessment
 import com.github.karlsabo.devlake.triage.assessment.PiIssueAssessor
 import com.github.karlsabo.devlake.triage.assessment.PiProcessRunner
 import com.github.karlsabo.devlake.triage.assessment.ProcessResult
+import com.github.karlsabo.devlake.triage.assessment.fakePiCommand
 import com.github.karlsabo.devlake.triage.spreadsheet.OdsTriageWorkbook
 import com.github.karlsabo.devlake.triage.spreadsheet.TriageWorkbook
 import com.github.karlsabo.linear.LinearTriageIssue
@@ -165,15 +165,7 @@ class PartialAssessmentFailureTest {
         val directory = Files.createTempDirectory("cancel-assessment")
         val output = directory.resolve("inventory.ods")
         val pidFile = directory.resolve("pid.txt")
-        val piCommand = listOf(
-            java.nio.file.Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-            "-cp",
-            FakePiProcess::class.java.protectionDomain.codeSource.location.toURI()
-                .let(java.nio.file.Path::of).toString(),
-            FakePiProcess::class.java.name,
-            "sleep",
-            pidFile.toString(),
-        )
+        val piCommand = fakePiCommand("sleep", pidFile)
         val command = IssueTriageCommand(
             source = { _, _, _ -> sixIssues().take(1) },
             commentSource = { _, _ -> emptyList() },
