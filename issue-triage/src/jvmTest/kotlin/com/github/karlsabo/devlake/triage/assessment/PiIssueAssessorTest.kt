@@ -5,6 +5,7 @@ import com.github.karlsabo.devlake.triage.DEFAULT_THINKING_LEVEL
 import com.github.karlsabo.devlake.triage.TriageProgressEvent
 import com.github.karlsabo.devlake.triage.TriageRow
 import com.github.karlsabo.projectmanagement.ProjectComment
+import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
@@ -125,7 +126,7 @@ class PiIssueAssessorTest {
         val failure = assertFailsWith<PiProcessException> {
             PiIssueAssessor(
                 piCommandPrefix = fakePiCommand("sleep", pidFile),
-                timeout = Duration.ofSeconds(1),
+                timeout = Duration.ofSeconds(5),
                 transientRetries = 0,
             ).assess(triageRow(), emptyList(), configuration(root))
         }
@@ -151,7 +152,7 @@ class PiIssueAssessorTest {
         "--extension",
         extensionPath.toString(),
         "--triage-roots",
-        "[\"${root.toRealPath()}\"]",
+        Json.encodeToString(listOf(root.toRealPath().toString())),
         "--no-skills",
         "--no-prompt-templates",
         "--no-context-files",
