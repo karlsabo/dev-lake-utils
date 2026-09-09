@@ -1,5 +1,8 @@
 package com.github.karlsabo.devlake.triage.assessment
 
+import com.github.karlsabo.devlake.triage.NoOpTriageProgressReporter
+import com.github.karlsabo.devlake.triage.TriageProgressEvent
+import com.github.karlsabo.devlake.triage.TriageProgressReporter
 import com.github.karlsabo.devlake.triage.TriageRow
 import com.github.karlsabo.projectmanagement.ProjectComment
 import kotlinx.serialization.SerializationException
@@ -25,6 +28,7 @@ internal data class AssessmentConfiguration(
     val model: String,
     val thinking: String,
     val repositoryRoots: List<Path>,
+    val progressReporter: TriageProgressReporter = NoOpTriageProgressReporter,
 )
 
 internal data class ProcessResult(
@@ -83,7 +87,7 @@ internal class PiIssueAssessor(
         configuration: AssessmentConfiguration,
     ): IssueAssessment {
         var lastFailure: AssessmentException? = null
-        repeat(transientRetries + 1) {
+        repeat(transientRetries + 1) { attemptIndex ->
             try {
                 val result = processRunner.run(command, prompt, workingDirectory, timeout)
                 if (result.exitCode != 0) {
@@ -95,6 +99,11 @@ internal class PiIssueAssessor(
                 return parseAndValidate(result.stdout, row, configuration)
             } catch (failure: AssessmentException) {
                 lastFailure = failure
+                if (attemptIndex < transientRetries) {
+                    configuration.progressReporter.report(
+                        TriageProgressEvent.AssessmentRetrying(row.identifier, attempt = attemptIndex + 2),
+                    )
+                }
             }
         }
         throw requireNotNull(lastFailure)

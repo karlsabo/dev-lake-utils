@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.triage.assessment
 
 import com.github.karlsabo.devlake.triage.DEFAULT_ASSESSMENT_MODEL
 import com.github.karlsabo.devlake.triage.DEFAULT_THINKING_LEVEL
+import com.github.karlsabo.devlake.triage.TriageProgressEvent
 import com.github.karlsabo.devlake.triage.TriageRow
 import com.github.karlsabo.projectmanagement.ProjectComment
 import java.nio.file.Files
@@ -60,6 +61,7 @@ printf '%s\n' '{"difficulty":3,"prNeeded":"Unclear","prReason":"Ticket is ambigu
     fun `retries one transient process failure`() {
         val root = Files.createTempDirectory("pi-assessor-retry")
         val attempts = AtomicInteger()
+        val progressEvents = mutableListOf<TriageProgressEvent>()
         val runner = PiProcessRunner { _, _, _, timeout ->
             assertEquals(Duration.ofSeconds(2), timeout)
             if (attempts.incrementAndGet() == 1) {
@@ -72,10 +74,18 @@ printf '%s\n' '{"difficulty":3,"prNeeded":"Unclear","prReason":"Ticket is ambigu
         val assessment = PiIssueAssessor(
             processRunner = runner,
             timeout = Duration.ofSeconds(2),
-        ).assess(triageRow(), emptyList(), configuration(root))
+        ).assess(
+            triageRow(),
+            emptyList(),
+            configuration(root).copy(progressReporter = progressEvents::add),
+        )
 
         assertEquals(2, attempts.get())
         assertEquals(3, assessment.difficulty)
+        assertEquals(
+            listOf<TriageProgressEvent>(TriageProgressEvent.AssessmentRetrying("TST-123", 2)),
+            progressEvents,
+        )
     }
 
     @Test

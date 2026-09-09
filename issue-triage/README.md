@@ -78,6 +78,12 @@ No source change is needed to generate a workbook for another team or repository
 
 Each assessment runs in an ephemeral pi session with only `read`, `grep`, `find`, and `ls`. A mandatory pi extension confines those tools to the configured repository roots, including resolving symlinks before access. Linear issue text and comments are passed as untrusted data. The workbook records the configured scope, model, thinking level, and prompt version on `Summary`. If an assessment still fails after one retry, successful rows and an `Error` row are saved before the command exits nonzero.
 
+## Run progress
+
+The command writes INFO progress to the console while it fetches and merges the Linear inventory, assesses queued tickets, and saves the workbook. Assessment messages identify only the ticket, attempt, elapsed time, terminal outcome, and completed/total count. Retries are announced before the next pi attempt, and every normal run ends with success and failure totals. Prompts, comments, credentials, and pi output are never included in progress messages.
+
+The durable-save message currently describes the final atomic workbook write. Assessments are not checkpointed individually, so interrupting a run before that message completes can still lose work from that invocation.
+
 ## Workbook editing and smoke test
 
 LibreOffice Calc is the supported editor. Other ODS-compatible editors may work, but must preserve ODS links, filters, cell types, styles, and view settings when saving. Avoid converting the workbook to XLSX or CSV because those formats do not preserve the refresh metadata contract.
