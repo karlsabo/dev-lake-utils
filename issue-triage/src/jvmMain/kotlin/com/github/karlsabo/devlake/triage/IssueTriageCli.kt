@@ -12,14 +12,15 @@ import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.projectmanagement.ProjectComment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.time.Clock
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.system.exitProcess
 import kotlinx.io.files.Path as KotlinPath
 
@@ -49,6 +50,8 @@ internal data class TriageRunResult(
 internal data class AssessmentExecution(
     val concurrency: Int = DEFAULT_ASSESSMENT_CONCURRENCY,
     val failureReporter: (String) -> Unit = System.err::println,
+    val progressReporter: TriageProgressReporter = NoOpTriageProgressReporter,
+    val nanoTime: () -> Long = System::nanoTime,
 ) {
     init {
         require(concurrency > 0) { "Assessment concurrency must be positive" }
@@ -64,23 +67,53 @@ internal class IssueTriageCommand(
     private val execution: AssessmentExecution = AssessmentExecution(),
 ) {
 
-    suspend fun run(arguments: TriageArguments): TriageRunResult {
+    suspend fun run(arguments: TriageArguments): TriageRunResult = executeRun(arguments, execution.nanoTime())
+
+    private suspend fun executeRun(arguments: TriageArguments, startedAt: Long): TriageRunResult {
+        execution.progressReporter.report(TriageProgressEvent.ScopeFetchStarted)
         val issues = source.getIssues(arguments.team, arguments.project, arguments.label)
+        execution.progressReporter.report(TriageProgressEvent.ScopeFetched(issues.size))
         val refresh = buildRefresh(issues, arguments, clock.instant().toString())
         validateRetriageIdentifiers(arguments.retriage, refresh.inventory.rows)
+
+        execution.progressReporter.report(TriageProgressEvent.InventoryMergeStarted)
         val inventory = workbook.mergeExisting(refresh, arguments.output)
-        val configuration = AssessmentConfiguration(arguments.model, arguments.thinking, arguments.repositoryRoots)
         val preparedRows = inventory.rows.map { row -> prepareExistingAssessment(row, inventory, arguments) }
+        execution.progressReporter.report(
+            TriageProgressEvent.InventoryMerged(
+                activeCount = preparedRows.size,
+                archivedCount = inventory.archivedRows.size,
+                assessedCount = preparedRows.count { it.assessment != null },
+            ),
+        )
         val rowsToAssess = preparedRows.filter { row ->
             row.assessment == null || row.assessment.isError() || arguments.retriage.requestsRetriage(row.identifier)
         }
-        val outcomes = assessRows(rowsToAssess, configuration)
-        val outcomesById = outcomes.associateBy { it.row.linearId }
-        val finalRows = preparedRows.map { row -> outcomesById[row.linearId]?.row ?: row }
-        val failures = outcomes.mapNotNull(AssessmentOutcome::failure)
+        execution.progressReporter.report(
+            TriageProgressEvent.AssessmentQueueCreated(rowsToAssess.size, execution.concurrency),
+        )
+        val configuration = AssessmentConfiguration(
+            arguments.model,
+            arguments.thinking,
+            arguments.repositoryRoots,
+            execution.progressReporter,
+        )
+        val outcomesById = checkpointAssessments(
+            inventory.copy(rows = preparedRows),
+            rowsToAssess,
+            configuration,
+            TriageCheckpointWriter(workbook, arguments.output, execution.progressReporter),
+        )
+        val failures = rowsToAssess.mapNotNull { row -> outcomesById[row.linearId]?.failure }
 
-        workbook.write(inventory.copy(rows = finalRows), arguments.output)
         if (failures.isNotEmpty()) execution.failureReporter(failureSummary(failures))
+        execution.progressReporter.report(
+            TriageProgressEvent.RunFinished(
+                succeeded = outcomesById.size - failures.size,
+                failed = failures.size,
+                elapsedMillis = elapsedMillisSince(startedAt),
+            ),
+        )
         return TriageRunResult(failures)
     }
 
@@ -101,16 +134,68 @@ internal class IssueTriageCommand(
         }
     }
 
-    private suspend fun assessRows(
+    private suspend fun checkpointAssessments(
+        initialInventory: TriageInventory,
         rows: List<TriageRow>,
         configuration: AssessmentConfiguration,
-    ): List<AssessmentOutcome> = coroutineScope {
+        checkpointWriter: TriageCheckpointWriter,
+    ): Map<String, AssessmentOutcome> = coroutineScope {
+        var currentInventory = initialInventory
+        val outcomes = mutableMapOf<String, AssessmentOutcome>()
+        checkpointWriter.write(currentInventory, completed = 0, total = rows.size)
+
         val permits = Semaphore(execution.concurrency)
-        rows.map { row ->
-            async(Dispatchers.IO) {
-                permits.withPermit { assessRow(row, configuration) }
+        val completedAssessments = Channel<CompletedAssessment>(Channel.UNLIMITED)
+        rows.forEach { row ->
+            launch(Dispatchers.IO) {
+                permits.withPermit {
+                    completedAssessments.send(assessRowWithProgress(row, configuration))
+                }
             }
-        }.awaitAll()
+        }
+        repeat(rows.size) { completedIndex ->
+            val completed = completedAssessments.receive()
+            outcomes[completed.outcome.row.linearId] = completed.outcome
+            currentInventory = currentInventory.copy(
+                rows = currentInventory.rows.map { row ->
+                    if (row.linearId == completed.outcome.row.linearId) completed.outcome.row else row
+                },
+            )
+            execution.progressReporter.report(
+                TriageProgressEvent.AssessmentFinished(
+                    identifier = completed.outcome.row.identifier,
+                    attempt = completed.attempt,
+                    succeeded = completed.outcome.failure == null,
+                    elapsedMillis = completed.elapsedMillis,
+                    completed = completedIndex + 1,
+                    total = rows.size,
+                ),
+            )
+            checkpointWriter.write(currentInventory, completedIndex + 1, rows.size)
+        }
+        completedAssessments.close()
+        outcomes
+    }
+
+    private suspend fun assessRowWithProgress(
+        row: TriageRow,
+        configuration: AssessmentConfiguration,
+    ): CompletedAssessment {
+        execution.progressReporter.report(TriageProgressEvent.AssessmentStarted(row.identifier, attempt = 1))
+        val attempt = AtomicInteger(1)
+        val rowConfiguration = configuration.copy(
+            progressReporter = TriageProgressReporter { event ->
+                if (event is TriageProgressEvent.AssessmentRetrying) attempt.set(event.attempt)
+                execution.progressReporter.report(event)
+            },
+        )
+        val startedAt = execution.nanoTime()
+        val outcome = assessRow(row, rowConfiguration)
+        return CompletedAssessment(
+            outcome = outcome,
+            attempt = attempt.get(),
+            elapsedMillis = elapsedMillisSince(startedAt),
+        )
     }
 
     private suspend fun assessRow(
@@ -144,12 +229,39 @@ internal class IssueTriageCommand(
         ),
         failure = AssessmentFailure(row.identifier, failure.message.orEmpty()),
     )
+
+    private fun elapsedMillisSince(startedAt: Long): Long {
+        val elapsedNanos = (execution.nanoTime() - startedAt).coerceAtLeast(0)
+        return elapsedNanos / NANOS_PER_MILLISECOND
+    }
 }
 
 private data class AssessmentOutcome(
     val row: TriageRow,
     val failure: AssessmentFailure? = null,
 )
+
+private data class CompletedAssessment(
+    val outcome: AssessmentOutcome,
+    val attempt: Int,
+    val elapsedMillis: Long,
+)
+
+private class TriageCheckpointWriter(
+    private val workbook: TriageWorkbook,
+    private val output: java.nio.file.Path,
+    private val progressReporter: TriageProgressReporter,
+) {
+    fun write(
+        inventory: TriageInventory,
+        completed: Int,
+        total: Int,
+    ) {
+        progressReporter.report(TriageProgressEvent.DurableSaveStarted(completed, total))
+        workbook.write(inventory, output)
+        progressReporter.report(TriageProgressEvent.DurableSaveFinished)
+    }
+}
 
 private fun failureSummary(failures: List<AssessmentFailure>): String {
     val identifiers = failures.joinToString { it.identifier }
@@ -168,14 +280,20 @@ private fun validateRetriageIdentifiers(requested: Set<String>, rows: List<Triag
 fun main(rawArguments: Array<String>) {
     val arguments = TriageArguments.parse(rawArguments)
     val reader = LinearTriageReader(loadLinearConfig(KotlinPath(arguments.linearConfig.toString())))
+    val progressReporter = ConsoleTriageProgressReporter()
     val command = IssueTriageCommand(
         source = LinearInventorySource(reader::getIssues),
         commentSource = LinearCommentSource(reader::getRecentComments),
         assessor = PiIssueAssessor(),
         workbook = OdsTriageWorkbook(),
-        execution = AssessmentExecution(concurrency = arguments.assessmentConcurrency),
+        execution = AssessmentExecution(
+            concurrency = arguments.assessmentConcurrency,
+            progressReporter = progressReporter,
+        ),
     )
     val result = runBlocking { command.run(arguments) }
     println("Exported Linear inventory to ${arguments.output}")
     if (result.exitCode != 0) exitProcess(result.exitCode)
 }
+
+private const val NANOS_PER_MILLISECOND = 1_000_000L

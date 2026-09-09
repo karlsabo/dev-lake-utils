@@ -7,6 +7,7 @@ import com.github.karlsabo.devlake.triage.assessment.IssueAssessment
 import com.github.karlsabo.devlake.triage.assessment.IssueAssessor
 import com.github.karlsabo.devlake.triage.assessment.PrNeeded
 import com.github.karlsabo.devlake.triage.spreadsheet.OdsTriageWorkbook
+import com.github.karlsabo.devlake.triage.spreadsheet.TriageWorkbook
 import com.github.karlsabo.linear.LinearTriageIssue
 import com.github.karlsabo.projectmanagement.ProjectComment
 import kotlinx.coroutines.test.runTest
@@ -84,6 +85,51 @@ class IssueTriageCommandTest {
             assertEquals(DEFAULT_ASSESSMENT_MODEL, ranking.getCellByPosition(12, 1).stringValue)
             assertEquals("Assessed", ranking.getCellByPosition(16, 1).stringValue)
         }
+    }
+
+    @Test
+    fun `reports actionable progress without exposing assessment payloads`() = runTest {
+        val directory = Files.createTempDirectory("issue-triage-progress-test")
+        val output = directory.resolve("inventory.ods")
+        val iamIssues = listOf(
+            issue("id-101", "IAM-101", "IAM KTLO", emptySet()),
+            issue("id-102", "IAM-102", "IAM KTLO", emptySet()),
+            issue("id-103", "IAM-103", "IAM KTLO", emptySet()),
+        )
+        val messages = Collections.synchronizedList(mutableListOf<String>())
+        val progressReporter = ConsoleTriageProgressReporter(messages::add)
+        val workbook = workbookWithAssessment("IAM-103")
+        val command = IssueTriageCommand(
+            source = { _, _, _ -> iamIssues },
+            commentSource = { _, _ -> listOf(ProjectComment("secret-comment", "DO_NOT_LOG_COMMENT")) },
+            assessor = { row, _, configuration ->
+                if (row.identifier == "IAM-102") {
+                    configuration.progressReporter.report(TriageProgressEvent.AssessmentRetrying("IAM-102", 2))
+                }
+                assessment(row.updatedAt).copy(rationale = "DO_NOT_LOG_MODEL_OUTPUT")
+            },
+            workbook = workbook,
+            execution = AssessmentExecution(
+                concurrency = 2,
+                progressReporter = progressReporter,
+                nanoTime = { 0L },
+            ),
+        )
+
+        val result = command.run(
+            TriageArguments(
+                linearConfig = directory.resolve("DO_NOT_LOG_CREDENTIALS.json"),
+                output = output,
+                team = "IAM",
+                project = "IAM KTLO",
+                label = null,
+                repositoryRoots = listOf(directory),
+                assessmentConcurrency = 2,
+            ),
+        )
+
+        assertEquals(0, result.exitCode)
+        assertActionableProgress(messages)
     }
 
     @Test
@@ -403,6 +449,55 @@ class IssueTriageCommandTest {
 
         assertEquals(0, assessmentCount)
         assertTrue(error.message.orEmpty().contains("TST-2006"))
+    }
+
+    private fun workbookWithAssessment(identifier: String): TriageWorkbook {
+        val delegate = OdsTriageWorkbook()
+        return object : TriageWorkbook {
+            override fun mergeExisting(
+                refresh: TriageRefresh,
+                output: java.nio.file.Path,
+            ): TriageInventory {
+                val inventory = delegate.mergeExisting(refresh, output)
+                return inventory.copy(
+                    rows = inventory.rows.map { row ->
+                        val existingAssessment = assessment(row.updatedAt).toCells()
+                        if (row.identifier == identifier) row.copy(assessment = existingAssessment) else row
+                    },
+                )
+            }
+
+            override fun write(inventory: TriageInventory, output: java.nio.file.Path) {
+                delegate.write(inventory, output)
+            }
+        }
+    }
+
+    private fun assertActionableProgress(messages: List<String>) {
+        val expectedMessages = listOf(
+            "[INFO] Fetching Linear issue scope",
+            "[INFO] Fetched 3 issue(s)",
+            "[INFO] Merging fetched scope with existing workbook",
+            "[INFO] Inventory ready: 3 active, 0 archived, 1 already assessed",
+            "[INFO] Assessment queue: 2 ticket(s), concurrency 2",
+            "[INFO] IAM-101 assessment started (attempt 1)",
+            "[INFO] IAM-102 assessment started (attempt 1)",
+            "[INFO] IAM-102 assessment retrying (attempt 2)",
+            "[INFO] Saving durable workbook (2/2 complete)",
+            "[INFO] Durable workbook save complete",
+            "[INFO] Run finished: 2 succeeded, 0 failed in 0ms",
+        )
+        assertTrue(messages.containsAll(expectedMessages))
+        mapOf("IAM-101" to 1, "IAM-102" to 2).forEach { (identifier, attempt) ->
+            val terminalMessage =
+                Regex("\\[INFO] $identifier assessed in 0ms \\(attempt $attempt, \\d/2 complete\\)")
+            assertTrue(messages.any(terminalMessage::matches))
+        }
+        val completionCounts = messages.filter { " assessed in " in it }.map { message ->
+            requireNotNull(Regex(", (\\d)/2 complete\\)").find(message)).groupValues[1].toInt()
+        }
+        assertEquals(setOf(1, 2), completionCounts.toSet())
+        assertTrue(messages.none { message -> "DO_NOT_LOG" in message })
     }
 
     private fun assertArchivedRows(
