@@ -120,7 +120,7 @@ private fun createArchivedTable(document: OdfSpreadsheetDocument, rows: List<Arc
     val values = buildList {
         add(TriageColumn.entries.map(TriageColumn::header) + ARCHIVE_HEADERS)
         rows.forEach { archived ->
-            add(archived.row.values(allowMissingAssessment = true) + listOf(archived.reason.value, archived.archivedAt))
+            add(archived.row.values() + listOf(archived.reason.value, archived.archivedAt))
         }
     }
     val table = createTable(document, "Archived", values)
@@ -131,12 +131,8 @@ private fun hideLinearId(table: OdfTable) {
     table.getColumnByIndex(TriageColumn.LINEAR_ID.ordinal).odfElement.setTableVisibilityAttribute("collapse")
 }
 
-private fun TriageRow.values(allowMissingAssessment: Boolean = false): List<String> {
-    val assessmentValues = assessment?.values() ?: if (allowMissingAssessment) {
-        List(ASSESSMENT_COLUMN_COUNT) { "" }
-    } else {
-        error("Triage row $identifier has not been assessed")
-    }
+private fun TriageRow.values(): List<String> {
+    val assessmentValues = assessment?.values() ?: List(ASSESSMENT_COLUMN_COUNT) { "" }
     return listOf(
         linearId,
         identifier,

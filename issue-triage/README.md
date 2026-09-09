@@ -82,7 +82,7 @@ Each assessment runs in an ephemeral pi session with only `read`, `grep`, `find`
 
 The command writes INFO progress to the console while it fetches and merges the Linear inventory, assesses queued tickets, and saves the workbook. Assessment messages identify only the ticket, attempt, elapsed time, terminal outcome, and completed/total count. Retries are announced before the next pi attempt, and every normal run ends with success and failure totals. Prompts, comments, credentials, and pi output are never included in progress messages.
 
-The durable-save message currently describes the final atomic workbook write. Assessments are not checkpointed individually, so interrupting a run before that message completes can still lose work from that invocation.
+The command atomically saves the merged inventory before assessment starts and again after each terminal assessment. If a run is interrupted, the last valid workbook retains completed assessments and blank assessment cells identify unfinished rows. Restarting normally skips successful rows and retries unfinished or `Error` rows. Restarting with `--retriage` preserves force semantics and reassesses every explicitly requested target.
 
 ## Workbook editing and smoke test
 

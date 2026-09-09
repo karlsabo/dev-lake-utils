@@ -30,12 +30,12 @@ import kotlin.time.Instant
 
 class PartialAssessmentFailureTest {
     @Test
-    fun `saves successful and error rows once before returning a nonzero result`() = runTest {
+    fun `checkpoints successful and error rows before returning a nonzero result`() = runTest {
         val directory = Files.createTempDirectory("partial-assessment-failure")
         val output = directory.resolve("inventory.ods")
         val concurrency = 2
         val process = BoundedFakePiProcess(concurrency)
-        val workbook = RecordingWorkbook(process.activeCount)
+        val workbook = RecordingWorkbook()
         val reports = mutableListOf<String>()
         val command = IssueTriageCommand(
             source = { _, _, _ -> sixIssues() },
@@ -51,7 +51,7 @@ class PartialAssessmentFailureTest {
         assertEquals(listOf("TST-2"), result.failures.map(AssessmentFailure::identifier))
         assertEquals(2, process.attempts.getValue("TST-2"))
         assertEquals(concurrency, process.maximumActive.get())
-        assertEquals(1, workbook.writeCount.get())
+        assertEquals(7, workbook.writeCount.get())
         assertEquals(listOf("1 assessment(s) failed after retry: TST-2"), reports)
         assertWorkbookRows(output)
     }
@@ -61,7 +61,7 @@ class PartialAssessmentFailureTest {
         val directory = Files.createTempDirectory("partial-comment-failure")
         val output = directory.resolve("inventory.ods")
         val process = BoundedFakePiProcess(concurrency = 2)
-        val workbook = RecordingWorkbook(process.activeCount)
+        val workbook = RecordingWorkbook()
         val reports = mutableListOf<String>()
         val command = IssueTriageCommand(
             source = { _, _, _ -> sixIssues().filterNot { it.identifier == "TST-2" } },
@@ -79,7 +79,7 @@ class PartialAssessmentFailureTest {
         assertEquals(1, result.exitCode)
         assertEquals(listOf(AssessmentFailure("TST-3", "comments unavailable")), result.failures)
         assertTrue(!process.attempts.containsKey("TST-3"))
-        assertEquals(1, workbook.writeCount.get())
+        assertEquals(6, workbook.writeCount.get())
         assertEquals(listOf("1 assessment(s) failed after retry: TST-3"), reports)
         assertWorkbookRows(output, expectedTickets = setOf(1, 3, 4, 5, 6), errorTickets = setOf(3))
     }
@@ -105,7 +105,62 @@ class PartialAssessmentFailureTest {
     }
 
     @Test
-    fun `cancellation terminates the running pi process without saving`() = runBlocking {
+    fun `restart assesses only unfinished rows from the last durable checkpoint`() = runBlocking {
+        val directory = Files.createTempDirectory("resume-assessments")
+        val output = directory.resolve("inventory.ods")
+        val allWorkersStarted = CountDownLatch(3)
+        val releaseThird = CountDownLatch(1)
+        val twoRowsPersisted = CountDownLatch(1)
+        val firstRunAssessments = ConcurrentHashMap.newKeySet<String>()
+        val checkpointWorkbook = CheckpointWorkbook(twoRowsPersisted)
+        val firstCommand = IssueTriageCommand(
+            source = { _, _, _ -> sixIssues().take(3) },
+            commentSource = { _, _ -> emptyList() },
+            assessor = { row, _, _ ->
+                firstRunAssessments += row.identifier
+                allWorkersStarted.countDown()
+                assertTrue(allWorkersStarted.await(5, TimeUnit.SECONDS))
+                if (row.identifier == "TST-3") releaseThird.await()
+                IssueAssessment.parse(assessmentJson())
+            },
+            workbook = checkpointWorkbook,
+            execution = AssessmentExecution(concurrency = 3),
+        )
+
+        val interruptedRun = launch { firstCommand.run(arguments(directory, output)) }
+        withTimeout(10_000.milliseconds) {
+            while (twoRowsPersisted.count > 0) delay(10.milliseconds)
+        }
+        interruptedRun.cancelAndJoin()
+
+        assertEquals(setOf("TST-1", "TST-2", "TST-3"), firstRunAssessments)
+        assertWorkbookRows(
+            output,
+            expectedTickets = setOf(1, 2, 3),
+            errorTickets = emptySet(),
+            pendingTickets = setOf(3),
+        )
+
+        val restartedAssessments = mutableListOf<String>()
+        val restartedCommand = IssueTriageCommand(
+            source = { _, _, _ -> sixIssues().take(3) },
+            commentSource = { _, _ -> emptyList() },
+            assessor = { row, _, _ ->
+                restartedAssessments += row.identifier
+                IssueAssessment.parse(assessmentJson())
+            },
+            workbook = OdsTriageWorkbook(),
+        )
+
+        val result = restartedCommand.run(arguments(directory, output))
+
+        assertEquals(0, result.exitCode)
+        assertEquals(listOf("TST-3"), restartedAssessments)
+        assertWorkbookRows(output, expectedTickets = setOf(1, 2, 3), errorTickets = emptySet())
+    }
+
+    @Test
+    fun `cancellation terminates the running pi process and leaves a pending checkpoint`() = runBlocking {
         val directory = Files.createTempDirectory("cancel-assessment")
         val output = directory.resolve("inventory.ods")
         val pidFile = directory.resolve("pid.txt")
@@ -137,13 +192,19 @@ sleep 30
 
         val processHandle = ProcessHandle.of(Files.readString(pidFile).toLong())
         assertTrue(processHandle.isEmpty || !processHandle.get().isAlive)
-        assertTrue(!Files.exists(output))
+        assertTrue(Files.exists(output))
+        OdfSpreadsheetDocument.loadDocument(output.toFile()).use { document ->
+            val ranking = document.spreadsheetTables.single { it.tableName == "Ranking" }
+            assertEquals(2, ranking.rowCount)
+            assertEquals("", ranking.getCellByPosition(TriageColumn.ASSESSMENT_STATUS.ordinal, 1).stringValue)
+        }
     }
 
     private fun assertWorkbookRows(
         output: java.nio.file.Path,
         expectedTickets: Set<Int> = (1..6).toSet(),
         errorTickets: Set<Int> = setOf(2),
+        pendingTickets: Set<Int> = emptySet(),
     ) {
         OdfSpreadsheetDocument.loadDocument(output.toFile()).use { document ->
             val ranking = document.spreadsheetTables.single { it.tableName == "Ranking" }
@@ -157,7 +218,12 @@ sleep 30
                 val status = ranking.getCellByPosition(TriageColumn.ASSESSMENT_STATUS.ordinal, errorRow).stringValue
                 assertEquals("Error", status)
             }
-            (expectedTickets - errorTickets).forEach { number ->
+            pendingTickets.forEach { number ->
+                val row = requireNotNull(rowsByTicket["TST-$number"])
+                val status = ranking.getCellByPosition(TriageColumn.ASSESSMENT_STATUS.ordinal, row).stringValue
+                assertEquals("", status)
+            }
+            (expectedTickets - errorTickets - pendingTickets).forEach { number ->
                 val row = requireNotNull(rowsByTicket["TST-$number"])
                 val status = ranking.getCellByPosition(TriageColumn.ASSESSMENT_STATUS.ordinal, row).stringValue
                 assertEquals("Assessed", status)
@@ -197,10 +263,25 @@ sleep 30
         }
     }
 
-    private class RecordingWorkbook(
-        private val activeProcesses: AtomicInteger,
+    private class CheckpointWorkbook(
+        private val twoRowsPersisted: CountDownLatch,
     ) : TriageWorkbook {
         private val delegate = OdsTriageWorkbook()
+
+        override fun mergeExisting(
+            refresh: TriageRefresh,
+            output: java.nio.file.Path,
+        ): TriageInventory = delegate.mergeExisting(refresh, output)
+
+        override fun write(inventory: TriageInventory, output: java.nio.file.Path) {
+            delegate.write(inventory, output)
+            if (inventory.rows.count { it.assessment != null } == 2) twoRowsPersisted.countDown()
+        }
+    }
+
+    private class RecordingWorkbook : TriageWorkbook {
+        private val delegate = OdsTriageWorkbook()
+        private val activeWrites = AtomicInteger()
         val writeCount = AtomicInteger()
 
         override fun mergeExisting(
@@ -209,9 +290,13 @@ sleep 30
         ): TriageInventory = delegate.mergeExisting(refresh, output)
 
         override fun write(inventory: TriageInventory, output: java.nio.file.Path) {
-            assertEquals(0, activeProcesses.get())
-            writeCount.incrementAndGet()
-            delegate.write(inventory, output)
+            assertEquals(1, activeWrites.incrementAndGet())
+            try {
+                writeCount.incrementAndGet()
+                delegate.write(inventory, output)
+            } finally {
+                activeWrites.decrementAndGet()
+            }
         }
     }
 

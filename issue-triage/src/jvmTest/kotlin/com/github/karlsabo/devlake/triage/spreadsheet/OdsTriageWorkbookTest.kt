@@ -52,6 +52,30 @@ class OdsTriageWorkbookTest {
     }
 
     @Test
+    fun `writes and reloads active rows with pending assessments`() {
+        val output = Files.createTempDirectory("ods-pending-test").resolve("ranking.ods")
+        val workbook = OdsTriageWorkbook()
+        val pendingInventory = inventory().copy(
+            rows = inventory().rows + row("id-21", "TST-21", "").copy(assessment = null),
+        )
+
+        workbook.write(pendingInventory, output)
+        val merged = workbook.mergeExisting(TriageRefresh(pendingInventory, emptyMap()), output)
+
+        val pending = merged.rows.single { it.linearId == "id-21" }
+        assertEquals(null, pending.assessment)
+        OdfSpreadsheetDocument.loadDocument(output.toFile()).use { document ->
+            val ranking = document.spreadsheetTables.single { it.tableName == "Ranking" }
+            val rowIndex = (1 until ranking.rowCount).single { index ->
+                ranking.getCellByPosition(TriageColumn.LINEAR_ID.ordinal, index).stringValue == "id-21"
+            }
+            TriageColumn.entries.drop(TriageColumn.DIFFICULTY.ordinal).forEach { column ->
+                assertEquals("", ranking.getCellByPosition(column.ordinal, rowIndex).stringValue)
+            }
+        }
+    }
+
+    @Test
     fun `refresh rejects a workbook created for a different scope`() {
         val output = Files.createTempDirectory("ods-scope-mismatch-test").resolve("ranking.ods")
         val workbook = OdsTriageWorkbook()

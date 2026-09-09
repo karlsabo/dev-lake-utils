@@ -12,9 +12,9 @@ import com.github.karlsabo.linear.config.loadLinearConfig
 import com.github.karlsabo.projectmanagement.ProjectComment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
@@ -98,18 +98,18 @@ internal class IssueTriageCommand(
             arguments.repositoryRoots,
             execution.progressReporter,
         )
-        val outcomes = assessRows(rowsToAssess, configuration)
-        val outcomesById = outcomes.associateBy { it.row.linearId }
-        val finalRows = preparedRows.map { row -> outcomesById[row.linearId]?.row ?: row }
-        val failures = outcomes.mapNotNull(AssessmentOutcome::failure)
+        val outcomesById = checkpointAssessments(
+            inventory.copy(rows = preparedRows),
+            rowsToAssess,
+            configuration,
+            TriageCheckpointWriter(workbook, arguments.output, execution.progressReporter),
+        )
+        val failures = rowsToAssess.mapNotNull { row -> outcomesById[row.linearId]?.failure }
 
-        execution.progressReporter.report(TriageProgressEvent.DurableSaveStarted(outcomes.size, rowsToAssess.size))
-        workbook.write(inventory.copy(rows = finalRows), arguments.output)
-        execution.progressReporter.report(TriageProgressEvent.DurableSaveFinished)
         if (failures.isNotEmpty()) execution.failureReporter(failureSummary(failures))
         execution.progressReporter.report(
             TriageProgressEvent.RunFinished(
-                succeeded = outcomes.size - failures.size,
+                succeeded = outcomesById.size - failures.size,
                 failed = failures.size,
                 elapsedMillis = elapsedMillisSince(startedAt),
             ),
@@ -134,25 +134,53 @@ internal class IssueTriageCommand(
         }
     }
 
-    private suspend fun assessRows(
+    private suspend fun checkpointAssessments(
+        initialInventory: TriageInventory,
         rows: List<TriageRow>,
         configuration: AssessmentConfiguration,
-    ): List<AssessmentOutcome> = coroutineScope {
+        checkpointWriter: TriageCheckpointWriter,
+    ): Map<String, AssessmentOutcome> = coroutineScope {
+        var currentInventory = initialInventory
+        val outcomes = mutableMapOf<String, AssessmentOutcome>()
+        checkpointWriter.write(currentInventory, completed = 0, total = rows.size)
+
         val permits = Semaphore(execution.concurrency)
-        val completed = AtomicInteger()
-        rows.map { row ->
-            async(Dispatchers.IO) {
-                permits.withPermit { assessRowWithProgress(row, configuration, completed, rows.size) }
+        val completedAssessments = Channel<CompletedAssessment>(Channel.UNLIMITED)
+        rows.forEach { row ->
+            launch(Dispatchers.IO) {
+                permits.withPermit {
+                    completedAssessments.send(assessRowWithProgress(row, configuration))
+                }
             }
-        }.awaitAll()
+        }
+        repeat(rows.size) { completedIndex ->
+            val completed = completedAssessments.receive()
+            outcomes[completed.outcome.row.linearId] = completed.outcome
+            currentInventory = currentInventory.copy(
+                rows = currentInventory.rows.map { row ->
+                    if (row.linearId == completed.outcome.row.linearId) completed.outcome.row else row
+                },
+            )
+            execution.progressReporter.report(
+                TriageProgressEvent.AssessmentFinished(
+                    identifier = completed.outcome.row.identifier,
+                    attempt = completed.attempt,
+                    succeeded = completed.outcome.failure == null,
+                    elapsedMillis = completed.elapsedMillis,
+                    completed = completedIndex + 1,
+                    total = rows.size,
+                ),
+            )
+            checkpointWriter.write(currentInventory, completedIndex + 1, rows.size)
+        }
+        completedAssessments.close()
+        outcomes
     }
 
     private suspend fun assessRowWithProgress(
         row: TriageRow,
         configuration: AssessmentConfiguration,
-        completed: AtomicInteger,
-        total: Int,
-    ): AssessmentOutcome {
+    ): CompletedAssessment {
         execution.progressReporter.report(TriageProgressEvent.AssessmentStarted(row.identifier, attempt = 1))
         val attempt = AtomicInteger(1)
         val rowConfiguration = configuration.copy(
@@ -163,17 +191,11 @@ internal class IssueTriageCommand(
         )
         val startedAt = execution.nanoTime()
         val outcome = assessRow(row, rowConfiguration)
-        execution.progressReporter.report(
-            TriageProgressEvent.AssessmentFinished(
-                identifier = row.identifier,
-                attempt = attempt.get(),
-                succeeded = outcome.failure == null,
-                elapsedMillis = elapsedMillisSince(startedAt),
-                completed = completed.incrementAndGet(),
-                total = total,
-            ),
+        return CompletedAssessment(
+            outcome = outcome,
+            attempt = attempt.get(),
+            elapsedMillis = elapsedMillisSince(startedAt),
         )
-        return outcome
     }
 
     private suspend fun assessRow(
@@ -218,6 +240,28 @@ private data class AssessmentOutcome(
     val row: TriageRow,
     val failure: AssessmentFailure? = null,
 )
+
+private data class CompletedAssessment(
+    val outcome: AssessmentOutcome,
+    val attempt: Int,
+    val elapsedMillis: Long,
+)
+
+private class TriageCheckpointWriter(
+    private val workbook: TriageWorkbook,
+    private val output: java.nio.file.Path,
+    private val progressReporter: TriageProgressReporter,
+) {
+    fun write(
+        inventory: TriageInventory,
+        completed: Int,
+        total: Int,
+    ) {
+        progressReporter.report(TriageProgressEvent.DurableSaveStarted(completed, total))
+        workbook.write(inventory, output)
+        progressReporter.report(TriageProgressEvent.DurableSaveFinished)
+    }
+}
 
 private fun failureSummary(failures: List<AssessmentFailure>): String {
     val identifiers = failures.joinToString { it.identifier }
