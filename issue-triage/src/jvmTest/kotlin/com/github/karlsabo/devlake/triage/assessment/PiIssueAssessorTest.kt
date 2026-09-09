@@ -17,24 +17,33 @@ class PiIssueAssessorTest {
     @Test
     fun `runs an ephemeral one-shot pi process with only read-only tools`() {
         val root = Files.createTempDirectory("pi-assessor-root")
-        val executable = root.resolve("fake-pi")
         val argumentsFile = root.resolve("arguments.txt")
         val promptFile = root.resolve("prompt.txt")
+        val responseFile = root.resolve("response.json")
         Files.writeString(
-            executable,
-            """#!/bin/sh
-printf '%s\n' "${'$'}@" > '$argumentsFile'
-cat > '$promptFile'
-printf '%s\n' '{"difficulty":3,"prNeeded":"Unclear","prReason":"Ticket is ambiguous","rationale":"src/auth.kt:42 shows the relevant path","confidence":"Medium","model":"$DEFAULT_ASSESSMENT_MODEL","thinking":"$DEFAULT_THINKING_LEVEL","sourceUpdatedAt":"2026-04-02T00:00:00Z","promptVersion":"$ASSESSMENT_PROMPT_VERSION","status":"Assessed"}'
-""",
+            responseFile,
+            """
+                {
+                  "difficulty": 3,
+                  "prNeeded": "Unclear",
+                  "prReason": "Ticket is ambiguous",
+                  "rationale": "src/auth.kt:42 shows the relevant path",
+                  "confidence": "Medium",
+                  "model": "$DEFAULT_ASSESSMENT_MODEL",
+                  "thinking": "$DEFAULT_THINKING_LEVEL",
+                  "sourceUpdatedAt": "2026-04-02T00:00:00Z",
+                  "promptVersion": "$ASSESSMENT_PROMPT_VERSION",
+                  "status": "Assessed"
+                }
+            """.trimIndent(),
         )
-        assertTrue(executable.toFile().setExecutable(true))
         val row = triageRow()
         val comments = List(12) { index ->
             ProjectComment(id = "comment-$index", body = "Comment body $index")
         }
 
-        val assessment = PiIssueAssessor(piExecutable = executable.toString()).assess(
+        val piCommand = fakePiCommand("assessment", argumentsFile, promptFile, responseFile)
+        val assessment = PiIssueAssessor(piCommandPrefix = piCommand).assess(
             row = row,
             comments = comments,
             configuration = AssessmentConfiguration(
@@ -111,21 +120,11 @@ printf '%s\n' '{"difficulty":3,"prNeeded":"Unclear","prReason":"Ticket is ambigu
     @Test
     fun `terminates a timed out process before returning`() {
         val root = Files.createTempDirectory("pi-assessor-timeout")
-        val executable = root.resolve("fake-pi-timeout")
         val pidFile = root.resolve("pid.txt")
-        Files.writeString(
-            executable,
-            """#!/bin/sh
-printf '%s' "${'$'}${'$'}" > '$pidFile'
-cat > /dev/null
-sleep 30
-""",
-        )
-        assertTrue(executable.toFile().setExecutable(true))
 
         val failure = assertFailsWith<PiProcessException> {
             PiIssueAssessor(
-                piExecutable = executable.toString(),
+                piCommandPrefix = fakePiCommand("sleep", pidFile),
                 timeout = Duration.ofSeconds(1),
                 transientRetries = 0,
             ).assess(triageRow(), emptyList(), configuration(root))
@@ -135,6 +134,14 @@ sleep 30
         val processHandle = ProcessHandle.of(Files.readString(pidFile).toLong())
         assertTrue(processHandle.isEmpty || !processHandle.get().isAlive)
     }
+
+    private fun fakePiCommand(mode: String, vararg files: java.nio.file.Path): List<String> = listOf(
+        java.nio.file.Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+        "-cp",
+        FakePiProcess::class.java.protectionDomain.codeSource.location.toURI().let(java.nio.file.Path::of).toString(),
+        FakePiProcess::class.java.name,
+        mode,
+    ) + files.map(java.nio.file.Path::toString)
 
     private fun expectedProcessArguments(
         extensionPath: java.nio.file.Path,

@@ -48,11 +48,12 @@ internal fun interface PiProcessRunner {
 
 internal class PiIssueAssessor(
     private val processRunner: PiProcessRunner = JvmPiProcessRunner(),
-    private val piExecutable: String = "pi",
+    private val piCommandPrefix: List<String> = listOf("pi"),
     private val timeout: Duration = DEFAULT_TIMEOUT,
     private val transientRetries: Int = DEFAULT_TRANSIENT_RETRIES,
 ) : IssueAssessor {
     init {
+        require(piCommandPrefix.isNotEmpty()) { "pi command must not be empty" }
         require(!timeout.isNegative && !timeout.isZero) { "pi timeout must be positive" }
         require(transientRetries >= 0) { "Transient retry count must not be negative" }
     }
@@ -123,8 +124,7 @@ internal class PiIssueAssessor(
         throw AssessmentException("pi returned an invalid assessment: ${failure.message}", failure)
     }
 
-    private fun piCommand(configuration: AssessmentConfiguration): List<String> = listOf(
-        piExecutable,
+    private fun piCommand(configuration: AssessmentConfiguration): List<String> = piCommandPrefix + listOf(
         "--print",
         "--no-session",
         "--model",
