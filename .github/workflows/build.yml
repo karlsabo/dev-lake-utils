@@ -53,7 +53,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build
-        run: ./gradlew clean build --no-build-cache -PtaskTiming=true
+        run: xvfb-run --auto-servernum ./gradlew clean build --no-build-cache -PtaskTiming=true
 
       - name: Upload task timing reports
         if: always()
