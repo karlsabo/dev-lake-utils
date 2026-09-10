@@ -8,8 +8,17 @@ import java.nio.file.Path
 internal object FakePiProcess {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args[0] == "sleep") { "Unknown fake pi mode: ${args[0]}" }
-        sleep(args)
+        when (args[0]) {
+            "assessment" -> assess(args)
+            "sleep" -> sleep(args)
+            else -> error("Unknown fake pi mode: ${args[0]}")
+        }
+    }
+
+    private fun assess(args: Array<String>) {
+        Files.write(Path.of(args[1]), args.slice(4 until args.size))
+        Files.copy(System.`in`, Path.of(args[2]))
+        print(Files.readString(Path.of(args[3])))
     }
 
     private fun sleep(args: Array<String>) {

@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
@@ -136,13 +137,18 @@ internal class PiIssueAssessor(
         "--no-extensions",
         "--extension",
         ROOT_GUARD_EXTENSION.toString(),
-        "--triage-roots",
-        Json.encodeToString(configuration.repositoryRoots.map { root -> root.toRealPath().toString() }),
+        "--triage-roots-base64",
+        encodedRepositoryRoots(configuration.repositoryRoots),
         "--no-skills",
         "--no-prompt-templates",
         "--no-context-files",
         "--no-approve",
     )
+
+    private fun encodedRepositoryRoots(repositoryRoots: List<Path>): String {
+        val json = Json.encodeToString(repositoryRoots.map { root -> root.toRealPath().toString() })
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray(StandardCharsets.UTF_8))
+    }
 
     private fun validateMetadata(
         assessment: IssueAssessment,
