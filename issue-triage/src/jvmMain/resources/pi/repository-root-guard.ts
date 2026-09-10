@@ -1,4 +1,5 @@
 import type {ExtensionAPI} from "@earendil-works/pi-coding-agent";
+import {Buffer} from "node:buffer";
 import {realpathSync} from "node:fs";
 import {isAbsolute, relative, resolve, sep} from "node:path";
 
@@ -11,20 +12,21 @@ function isWithinRoot(path: string, root: string): boolean {
 }
 
 export default function (pi: ExtensionAPI) {
-    pi.registerFlag("triage-roots", {
-        description: "JSON array of repository roots available to issue triage tools",
+    pi.registerFlag("triage-roots-base64", {
+        description: "Base64url-encoded JSON array of repository roots available to issue triage tools",
         type: "string",
     });
 
     let roots: string[] | undefined;
     pi.on("session_start", () => {
-        const configuredRoots = pi.getFlag("triage-roots");
+        const configuredRoots = pi.getFlag("triage-roots-base64");
         if (typeof configuredRoots !== "string") {
-            throw new Error("--triage-roots is required");
+            throw new Error("--triage-roots-base64 is required");
         }
-        roots = (JSON.parse(configuredRoots) as string[]).map((root) => realpathSync(root));
+        const decodedRoots = Buffer.from(configuredRoots, "base64url").toString("utf8");
+        roots = (JSON.parse(decodedRoots) as string[]).map((root) => realpathSync(root));
         if (roots.length === 0) {
-            throw new Error("--triage-roots must contain at least one path");
+            throw new Error("--triage-roots-base64 must contain at least one path");
         }
     });
 

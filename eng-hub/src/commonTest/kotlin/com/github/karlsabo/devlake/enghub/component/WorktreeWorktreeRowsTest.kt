@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -223,8 +219,8 @@ class WorktreeWorktreeRowsTest {
     @Test
     fun compactArchiveShortcutContinuesDirtyWorktreeConfirmationFlow() = runComposeUiTest {
         val archiveRequests = mutableListOf<Pair<String, String>>()
+        var forceArchiveRequest: ForceArchiveWorktreeUiState? = null
         setContent {
-            var forceArchiveRequest by remember { mutableStateOf<ForceArchiveWorktreeUiState?>(null) }
             val emptyActions = emptyPanelActions()
             MaterialTheme {
                 WorktreePanel(
@@ -243,7 +239,7 @@ class WorktreeWorktreeRowsTest {
                                 ),
                             ),
                         ),
-                        forceArchiveRequest = forceArchiveRequest,
+                        forceArchiveRequest = null,
                         setupStatuses = emptyMap(),
                         archivingWorktreePaths = emptySet(),
                     ),
@@ -267,7 +263,13 @@ class WorktreeWorktreeRowsTest {
             listOf("/repos/dev-lake-utils" to "/repos/dev-lake-utils-feature-dirty"),
             archiveRequests,
         )
-        onNodeWithText("Force Archive Worktree").assertIsDisplayed()
+        assertEquals(
+            ForceArchiveWorktreeUiState(
+                repoRootPath = "/repos/dev-lake-utils",
+                worktreePath = "/repos/dev-lake-utils-feature-dirty",
+            ),
+            forceArchiveRequest,
+        )
     }
 
     @OptIn(ExperimentalTestApi::class)

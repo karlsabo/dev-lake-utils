@@ -8,6 +8,7 @@ import com.github.karlsabo.projectmanagement.ProjectComment
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.time.Duration
+import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -135,8 +136,10 @@ class PiIssueAssessorTest {
         "--no-extensions",
         "--extension",
         extensionPath.toString(),
-        "--triage-roots",
-        Json.encodeToString(listOf(root.toRealPath().toString())),
+        "--triage-roots-base64",
+        Base64.getUrlEncoder().withoutPadding().encodeToString(
+            Json.encodeToString(listOf(root.toRealPath().toString())).encodeToByteArray(),
+        ),
         "--no-skills",
         "--no-prompt-templates",
         "--no-context-files",
