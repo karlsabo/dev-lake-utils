@@ -21,7 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
@@ -55,14 +55,12 @@ internal data class WorktreeDialogActions(
 )
 
 private data class CreateWorktreeDialogModel(
-    val targetBranchInput: TextFieldValue,
     val validation: CreateWorktreeTargetBranchValidation,
-    val onInputChange: (TextFieldValue) -> Unit,
+    val onInputChange: (String) -> Unit,
 )
 
 private data class CreateWorktreeDialogContentState(
     val request: PendingCreateWorktree,
-    val targetBranchInput: TextFieldValue,
     val validationMessage: String?,
     val confirmEnabled: Boolean,
 )
@@ -75,7 +73,7 @@ private data class CreateWorktreeDialogActions(
 )
 
 private data class CreateWorktreeDialogContentActions(
-    val onTargetBranchInputChange: (TextFieldValue) -> Unit,
+    val onTargetBranchInputChange: (String) -> Unit,
     val onConfirm: () -> Unit,
     val onDismiss: () -> Unit,
 )
@@ -256,7 +254,6 @@ private fun CreateWorktreeDialog(
                     CreateWorktreeDialogContent(
                         state = CreateWorktreeDialogContentState(
                             request = state,
-                            targetBranchInput = model.targetBranchInput,
                             validationMessage = validationMessage,
                             confirmEnabled = isCreateWorktreeConfirmEnabled(model.validation),
                         ),
@@ -287,14 +284,6 @@ private fun rememberCreateWorktreeDialogModel(
     onTargetBranchChange: (String) -> Unit,
 ): CreateWorktreeDialogModel {
     val branchNameValidator = remember { WorktreeBranchNameValidator() }
-    var targetBranchInput by remember(
-        state.repoRootPath,
-        state.baseWorktreePath,
-        state.baseBranch,
-        state.baseCommitIsh,
-    ) {
-        mutableStateOf(createTargetBranchInputValue(state.targetBranch))
-    }
     var targetBranchValidation by remember(state.baseBranch, state.baseCommitIsh, state.targetBranch) {
         mutableStateOf(startValidation(state, branchNameValidator))
     }
@@ -306,12 +295,8 @@ private fun rememberCreateWorktreeDialogModel(
     }
 
     return CreateWorktreeDialogModel(
-        targetBranchInput = targetBranchInput,
         validation = targetBranchValidation,
-        onInputChange = { input ->
-            targetBranchInput = input
-            onTargetBranchChange(input.text)
-        },
+        onInputChange = onTargetBranchChange,
     )
 }
 
@@ -355,26 +340,33 @@ private fun CreateWorktreeDialogContent(
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = "Base: ${state.request.baseCommitIsh ?: state.request.baseBranch}")
         Spacer(modifier = Modifier.height(12.dp))
-        CreateWorktreeTargetBranchField(state, actions.onTargetBranchInputChange)
+        CreateWorktreeTargetBranchField(
+            targetBranch = state.request.targetBranch,
+            validationMessage = state.validationMessage,
+            onTargetBranchInputChange = actions.onTargetBranchInputChange,
+        )
         Spacer(modifier = Modifier.height(16.dp))
         CreateWorktreeDialogButtons(state, actions)
     }
 }
 
 @Composable
-private fun CreateWorktreeTargetBranchField(
-    state: CreateWorktreeDialogContentState,
-    onTargetBranchInputChange: (TextFieldValue) -> Unit,
+internal fun CreateWorktreeTargetBranchField(
+    targetBranch: String,
+    validationMessage: String?,
+    onTargetBranchInputChange: (String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
-            value = state.targetBranchInput,
+            value = targetBranch,
             onValueChange = onTargetBranchInputChange,
             label = { Text("Target branch") },
-            isError = state.validationMessage != null,
-            modifier = Modifier.fillMaxWidth(),
+            isError = validationMessage != null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("create-worktree-target-branch"),
         )
-        state.validationMessage?.let { message ->
+        validationMessage?.let { message ->
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = message,

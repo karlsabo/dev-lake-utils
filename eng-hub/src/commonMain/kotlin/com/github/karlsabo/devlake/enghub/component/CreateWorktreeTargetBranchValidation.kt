@@ -1,7 +1,5 @@
 package com.github.karlsabo.devlake.enghub.component
 
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import com.github.karlsabo.git.WorktreeBranchNameValidationResult
 import com.github.karlsabo.git.WorktreeBranchNameValidator
 
@@ -80,11 +78,6 @@ internal fun isCreateWorktreeConfirmEnabled(
 ): Boolean = !validation.isCheckingGitRefFormat &&
     validation.result.isValid &&
     !validation.targetBranchMatchesBase
-
-internal fun createTargetBranchInputValue(targetBranch: String): TextFieldValue = TextFieldValue(
-    text = targetBranch,
-    selection = TextRange(targetBranch.length),
-)
 
 private data class BaseComparison(
     val ref: String,

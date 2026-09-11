@@ -9,7 +9,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
-import androidx.compose.ui.text.TextRange
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.sharedProgressPullRequest
@@ -314,15 +313,6 @@ class WorktreePanelTest {
                 baseBranch = "main",
             ),
         )
-    }
-
-    @Test
-    fun createWorktreeDialogInitializesTargetBranchInputCaretAtEnd() {
-        val targetBranch = "feature/stacked-pr"
-        val input = createTargetBranchInputValue(targetBranch)
-
-        assertEquals(targetBranch, input.text)
-        assertEquals(TextRange(targetBranch.length), input.selection)
     }
 
     @Test
