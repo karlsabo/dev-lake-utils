@@ -17,12 +17,36 @@ private val logger = KotlinLogging.logger {}
 internal class GitHubPullRequestReviewRestApi(
     private val restClient: GitHubRestClient,
 ) : GitHubPullRequestReviewApi {
-    override suspend fun getPullRequestByUrl(url: String): PullRequest {
+    override suspend fun getPullRequestByUrl(url: String): PullRequest = getPullRequestByUrl(
+        url = url,
+        logNotFound = true,
+    )
+
+    override suspend fun findPullRequest(
+        owner: String,
+        repository: String,
+        number: Int,
+    ): PullRequest? = try {
+        getPullRequestByUrl(
+            url = gitHubPullRequestApiUrl(owner, repository, number),
+            logNotFound = false,
+        )
+    } catch (failure: GitHubApiException) {
+        if (failure.statusCode == HTTP_NOT_FOUND) null else throw failure
+    }
+
+    private suspend fun getPullRequestByUrl(
+        url: String,
+        logNotFound: Boolean,
+    ): PullRequest {
         val response = restClient.client.get(url)
         val responseText = response.bodyAsText()
         if (response.status.value !in successStatusCodes) {
-            logger.error {
-                "Failed to get pull request $url response.status=${response.status} responseText=```$responseText```"
+            if (logNotFound || response.status.value != HTTP_NOT_FOUND) {
+                logger.error {
+                    "Failed to get pull request $url response.status=${response.status} " +
+                        "responseText=```$responseText```"
+                }
             }
             throwGitHubApiException(
                 operation = "get pull request",

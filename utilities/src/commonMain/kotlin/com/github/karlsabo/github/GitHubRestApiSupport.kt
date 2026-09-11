@@ -11,7 +11,8 @@ internal const val COMMIT_STATUS_PER_PAGE = 100
 
 internal val successStatusCodes = HTTP_SUCCESS_MIN..HTTP_SUCCESS_MAX
 
-internal class GitHubApiException(
+class GitHubApiException internal constructor(
+    val statusCode: Int,
     message: String,
 ) : IllegalStateException(message)
 
@@ -23,7 +24,8 @@ internal fun throwGitHubApiException(
 ): Nothing {
     val contextSuffix = context.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
     throw GitHubApiException(
-        "Failed to $operation: $statusCode$contextSuffix responseText=```$responseText```",
+        statusCode = statusCode,
+        message = "Failed to $operation: $statusCode$contextSuffix responseText=```$responseText```",
     )
 }
 

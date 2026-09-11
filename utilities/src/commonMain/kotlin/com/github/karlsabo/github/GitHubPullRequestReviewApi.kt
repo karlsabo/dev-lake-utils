@@ -9,6 +9,16 @@ interface GitHubPullRequestReviewApi {
         number: Int,
     ): PullRequest = getPullRequestByUrl(gitHubPullRequestApiUrl(owner, repository, number))
 
+    suspend fun findPullRequest(
+        owner: String,
+        repository: String,
+        number: Int,
+    ): PullRequest? = try {
+        getPullRequest(owner, repository, number)
+    } catch (failure: GitHubApiException) {
+        if (failure.statusCode == HTTP_NOT_FOUND) null else throw failure
+    }
+
     suspend fun approvePullRequestByUrl(url: String, body: String? = null)
 
     suspend fun hasAnyApprovedReview(url: String): Boolean

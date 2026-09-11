@@ -5,10 +5,13 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class GitHubRestApiPullRequestTest {
     @Test
@@ -40,5 +43,43 @@ class GitHubRestApiPullRequestTest {
         assertEquals("feature/pr-worktree", pullRequest.head?.ref)
         assertEquals("owner/dev-lake-utils", pullRequest.head?.repo?.fullName)
         assertEquals(true, pullRequest.isMerged)
+    }
+
+    @Test
+    fun findPullRequestReturnsNullWhenPullRequestDoesNotExist() = runBlocking {
+        val client = HttpClient(
+            MockEngine {
+                respond(
+                    content = """{"message":"Not Found"}""",
+                    status = HttpStatusCode.NotFound,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            },
+        )
+        val api = GitHubRestApi(GitHubApiRestConfig(token = "test-token"), client)
+
+        val pullRequest = api.findPullRequest("owner", "dev-lake-utils", 404)
+
+        assertNull(pullRequest)
+    }
+
+    @Test
+    fun findPullRequestRethrowsNonNotFoundFailure() = runBlocking {
+        val client = HttpClient(
+            MockEngine {
+                respond(
+                    content = """{"message":"Service Unavailable"}""",
+                    status = HttpStatusCode.ServiceUnavailable,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            },
+        )
+        val api = GitHubRestApi(GitHubApiRestConfig(token = "test-token"), client)
+
+        val failure = assertFailsWith<GitHubApiException> {
+            api.findPullRequest("owner", "dev-lake-utils", 123)
+        }
+
+        assertEquals(HttpStatusCode.ServiceUnavailable.value, failure.statusCode)
     }
 }

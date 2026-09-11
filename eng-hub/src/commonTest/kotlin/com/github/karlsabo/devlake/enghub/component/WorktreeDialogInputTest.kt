@@ -16,29 +16,33 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class WorktreeDialogInputTest {
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun createWorktreeDialogKeepsCaretAfterEachTypedCharacter() = runComposeUiTest {
+    fun createWorktreeDialogKeepsRapidInputAndCaretPosition() = runComposeUiTest {
+        var publishedTargetBranch = ""
         setContent {
             var targetBranch by remember { mutableStateOf("") }
             MaterialTheme {
                 CreateWorktreeTargetBranchField(
                     targetBranch = targetBranch,
                     validationMessage = null,
-                    onTargetBranchInputChange = { targetBranch = it },
+                    onTargetBranchInputChange = {
+                        targetBranch = it
+                        publishedTargetBranch = it
+                    },
                 )
             }
         }
 
         onNodeWithTag("create-worktree-target-branch").performClick()
-        onNodeWithTag("create-worktree-target-branch").performTextInput("a")
-        onNodeWithTag("create-worktree-target-branch").performTextInput("b")
-        onNodeWithTag("create-worktree-target-branch").performTextInput("c")
+        onNodeWithTag("create-worktree-target-branch").performTextInput("1234")
 
         onNodeWithTag("create-worktree-target-branch")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("abc")))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(3)))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("1234")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(4)))
+        runOnIdle { assertEquals("1234", publishedTargetBranch) }
     }
 }

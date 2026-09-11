@@ -124,11 +124,11 @@ internal suspend fun discoverPullRequestWorktreeCandidate(
     return if (reference.repository?.let { !identity.matches(it.fullName) } == true) {
         PullRequestDiscoveryOutcome.NoResult
     } else {
-        services.pullRequestReviewApi.getPullRequest(
+        services.pullRequestReviewApi.findPullRequest(
             owner = identity.owner,
             repository = identity.repository,
             number = reference.number,
-        ).toDiscoveryOutcome(identity, reference.number)
+        )?.toDiscoveryOutcome(identity, reference.number) ?: PullRequestDiscoveryOutcome.NoResult
     }
 }
 

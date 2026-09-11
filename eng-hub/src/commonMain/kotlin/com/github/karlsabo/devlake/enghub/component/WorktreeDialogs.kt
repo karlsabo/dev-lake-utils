@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
@@ -19,7 +20,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -29,6 +32,7 @@ import com.github.karlsabo.git.WorktreeBranchNameValidator
 import dev_lake_utils.shared_resources.generated.resources.Res
 import dev_lake_utils.shared_resources.generated.resources.icon
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
@@ -356,10 +360,18 @@ internal fun CreateWorktreeTargetBranchField(
     validationMessage: String?,
     onTargetBranchInputChange: (String) -> Unit,
 ) {
+    val targetBranchInput = rememberTextFieldState(initialText = targetBranch)
+    val currentOnTargetBranchInputChange by rememberUpdatedState(onTargetBranchInputChange)
+
+    LaunchedEffect(targetBranchInput) {
+        snapshotFlow { targetBranchInput.text.toString() }
+            .distinctUntilChanged()
+            .collect { currentOnTargetBranchInputChange(it) }
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
-            value = targetBranch,
-            onValueChange = onTargetBranchInputChange,
+            state = targetBranchInput,
             label = { Text("Target branch") },
             isError = validationMessage != null,
             modifier = Modifier
