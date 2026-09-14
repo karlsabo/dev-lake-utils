@@ -253,13 +253,13 @@ class LlmSkillSyncTest {
             )
             assertTrue(
                 installedSkill.contains(
-                    "Create a running log at `$planningDir/alert-triage/{descriptive-name}.md`",
+                    "Create a running log at " +
+                        "`$planningDir/alert-triage/{descriptive-name}/{descriptive-name}.md`",
                 ),
             )
             assertTrue(
                 installedSkill.contains(
-                    "Choose `{descriptive-name}` as a short kebab-case alert or incident name, " +
-                        "such as `checkout-api-latency-2025-04-10`.",
+                    "Choose a short kebab-case name, such as `checkout-api-latency-2025-04-10`.",
                 ),
             )
         } finally {
