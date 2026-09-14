@@ -32,15 +32,23 @@ ${ALERT_TRIAGE_WHERE_TO_LOOK}
 
 Stop when impact, measurement boundary, likely cause, and confidence are established, or further progress requires another owner or system.
 
-Add a short, shareable section:
+Add a short, skimmable section. Keep evidence links in separate bullets and embed screenshots directly in the summary:
 
 ```markdown
 ## Summary
-- Impact:
-- Cause:
-- Confidence:
-- Evidence:
-- Follow-ups:
+- **Impact:**
+- **Cause:**
+- **Confidence:**
+- **Evidence:**
+  - [Fixed-range dashboard](...)
+  - [Fixed-range logs](...)
+  - [Relevant owner/entity page](...)
+  - [Source instrumentation](...)
+- **Follow-ups:**
+
+### Screenshots
+![Dashboard evidence](./dashboard.png)
+![Log evidence](./logs.png)
 ```
 
-Use exact UTC timestamps and fixed-range evidence links. Save relevant screenshots beside the log and embed them with relative paths.
+Use exact UTC timestamps and fixed-range links. Save screenshots beside the log; include ownership/entity links when they establish blast radius.
