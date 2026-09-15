@@ -20,6 +20,8 @@ Goal: identify what happened, establish blast radius, and maintain a durable evi
 
 ${ALERT_TRIAGE_WHERE_TO_LOOK}
 
+If browser tools encounter an authentication wall, notify the user and wait for them to authenticate in the affected tool before continuing. Do not attempt to bypass the authentication wall.
+
 ## Correlate evidence
 
 1. Plot the alert metric and relevant correlated signals: caller/internal-client errors, downstream latency/errors, traffic, replicas, CPU, connections, pod health, and change events.
