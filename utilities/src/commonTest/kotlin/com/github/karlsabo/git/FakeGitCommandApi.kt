@@ -32,6 +32,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var worktreeAddNewBranchAction: (WorktreeAddNewBranchCall) -> Unit = {}
     var rebaseAction: (String, String) -> Unit = { _, _ -> }
     var abortRebaseAction: (String) -> Unit = {}
+    var mergeAction: (String, String) -> Unit = { _, _ -> }
     var worktreeListResult: String = ""
     var worktreeListAction: (String) -> String = { worktreeListResult }
     var worktreeRemoveAction: (String, String) -> Unit = { _, _ -> }
@@ -169,6 +170,11 @@ internal class FakeGitCommandApi : GitCommandApi {
     override fun abortRebase(repoPath: String) {
         calls.add(Call("abortRebase", listOf(repoPath)))
         abortRebaseAction(repoPath)
+    }
+
+    override fun merge(repoPath: String, sourceRef: String) {
+        calls.add(Call("merge", listOf(repoPath, sourceRef)))
+        mergeAction(repoPath, sourceRef)
     }
 
     override fun checkout(repoPath: String, ref: String) {

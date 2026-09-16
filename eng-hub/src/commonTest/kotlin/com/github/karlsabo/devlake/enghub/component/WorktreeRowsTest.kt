@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.component
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WorktreeRowsTest {
@@ -70,6 +71,38 @@ class WorktreeRowsTest {
 
         assertEquals(listOf("branch-a", "branch-b"), rows.map { it.worktree.branch })
         assertEquals(listOf(0, 0), rows.map { it.nestingDepth })
+    }
+
+    @Test
+    fun worktreeMenuExposesMergeOntoParentAlongsideRebaseWhenParentIsKnown() {
+        val worktree = LocalWorktreeUiState(
+            branch = "feature/stacked-pr",
+            path = "/repos/dev-lake-utils-feature-stacked-pr",
+            parentBranch = "feature/base-pr",
+        )
+
+        assertEquals(
+            listOf(
+                WorktreeMenuAction.Open,
+                WorktreeMenuAction.CreateWorktree,
+                WorktreeMenuAction.RebaseOntoParent,
+                WorktreeMenuAction.MergeOntoParent,
+                WorktreeMenuAction.Archive,
+            ),
+            visibleWorktreeMenuActions(worktree),
+        )
+    }
+
+    @Test
+    fun mergeActionIsExcludedWhileAnotherIntegrationIsInProgress() {
+        assertFalse(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false, isRebasing = true))
+        assertFalse(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false, isMerging = true))
+        assertTrue(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false))
+    }
+
+    @Test
+    fun rebaseActionIsExcludedWhileMergeIsInProgress() {
+        assertFalse(isWorktreeRebaseEnabled(setupStatus = null, isArchiving = false, isMerging = true))
     }
 
     @Test

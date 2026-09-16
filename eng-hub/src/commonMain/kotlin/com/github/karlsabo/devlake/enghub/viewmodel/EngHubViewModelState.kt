@@ -127,6 +127,7 @@ internal class EngHubViewModelState(
         MutableStateFlow<List<RebaseConflictResolutionRequest>>(emptyList())
     val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val rebasingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
+    val mergingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val forceArchiveWorktreeRequest = MutableStateFlow<ForceArchiveWorktreeUiState?>(null)
     val actingOnThreadIds = MutableStateFlow<Set<String>>(emptySet())
     val ignoredThreads = MutableStateFlow(loadIgnoredThreads(notificationIgnoreStore))

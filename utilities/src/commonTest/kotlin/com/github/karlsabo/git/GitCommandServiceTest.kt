@@ -346,6 +346,35 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun merge_mergesSourceRefIntoCurrentWorktreeWithAutostash() {
+        val repoDir = createTempDir("repo")
+        val worktreeDir = createTempDir("wt")
+        removeTempDir(worktreeDir)
+        try {
+            initRepoWithCommit(repoDir)
+            executeGit("-C", repoDir, "branch", "feature/base-pr")
+            executeGit("-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr")
+            writeFixtureFile(repoDir, "child.txt", "child\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "child")
+            executeGit("-C", repoDir, "checkout", "feature/base-pr")
+            writeFixtureFile(repoDir, "parent.txt", "parent\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "parent")
+            service.worktreeAdd(repoDir, worktreeDir, "feature/stacked-pr")
+            writeFixtureFile(worktreeDir, "child.txt", "child dirty\n")
+
+            service.merge(worktreeDir, "feature/base-pr")
+
+            assertTrue(service.isAncestor(worktreeDir, "feature/base-pr", "feature/stacked-pr"))
+            assertTrue(service.status(worktreeDir).contains("child.txt"))
+        } finally {
+            removeTempDir(repoDir)
+            removeTempDir(worktreeDir)
+        }
+    }
+
+    @Test
     fun abortRebase_abortsRebaseInCurrentWorktree() {
         val repoDir = createTempDir("repo")
         val worktreeDir = createTempDir("wt")

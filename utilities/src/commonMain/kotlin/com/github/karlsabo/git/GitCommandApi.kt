@@ -84,6 +84,10 @@ interface GitRebaseCommandApi {
     fun abortRebase(repoPath: String)
 }
 
+interface GitMergeCommandApi {
+    fun merge(repoPath: String, sourceRef: String)
+}
+
 interface GitWorkingTreeCommandApi {
     fun status(repoPath: String): String
 }
@@ -105,6 +109,7 @@ interface GitCommandApi :
     GitAncestryCommandApi,
     GitWorktreeCommandApi,
     GitRebaseCommandApi,
+    GitMergeCommandApi,
     GitWorkingTreeCommandApi,
     GitHistoryCommandApi,
     GitRawCommandExecutor

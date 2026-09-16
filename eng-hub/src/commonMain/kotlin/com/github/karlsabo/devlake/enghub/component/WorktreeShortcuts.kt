@@ -30,7 +30,12 @@ internal fun OpenWorktreeShortcut(
     ) {
         IconButton(
             onClick = onOpen,
-            enabled = isWorktreeOpenEnabled(state.setupStatus, state.isArchiving, state.isRebasing),
+            enabled = isWorktreeOpenEnabled(
+                setupStatus = state.setupStatus,
+                isArchiving = state.isArchiving,
+                isRebasing = state.isRebasing,
+                isMerging = state.isMerging,
+            ),
             modifier = Modifier
                 .size(32.dp)
                 .semantics { contentDescription = description },
@@ -58,7 +63,12 @@ internal fun ArchiveWorktreeShortcut(
     ) {
         IconButton(
             onClick = onArchive,
-            enabled = isWorktreeArchiveEnabled(state.setupStatus, state.isArchiving, state.isRebasing),
+            enabled = isWorktreeArchiveEnabled(
+                setupStatus = state.setupStatus,
+                isArchiving = state.isArchiving,
+                isRebasing = state.isRebasing,
+                isMerging = state.isMerging,
+            ),
             modifier = Modifier
                 .size(32.dp)
                 .semantics { contentDescription = description },

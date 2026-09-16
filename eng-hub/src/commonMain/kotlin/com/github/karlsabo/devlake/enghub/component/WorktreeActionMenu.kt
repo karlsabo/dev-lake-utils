@@ -27,7 +27,7 @@ internal fun LocalWorktreeActionMenuButton(
 ) {
     IconButton(
         onClick = onClick,
-        enabled = !state.isArchiving && !state.isRebasing,
+        enabled = !state.isArchiving && !state.isRebasing && !state.isMerging,
         modifier = Modifier
             .size(32.dp)
             .onGloballyPositioned { coordinates -> onPositionUpdate(coordinates.boundsInWindow().bottomLeft) }
@@ -77,6 +77,7 @@ private fun LocalWorktreeMenuItem(
         WorktreeMenuAction.OpenPullRequest -> OpenPullRequestMenuItem(state, rowActions, onMenuDismiss)
         WorktreeMenuAction.CreateWorktree -> CreateWorktreeMenuItem(state, rowActions, onMenuDismiss)
         WorktreeMenuAction.RebaseOntoParent -> RebaseOntoParentMenuItem(state, rowActions, onMenuDismiss)
+        WorktreeMenuAction.MergeOntoParent -> MergeOntoParentMenuItem(state, rowActions, onMenuDismiss)
         WorktreeMenuAction.Archive -> ArchiveWorktreeMenuItem(state, rowActions, onMenuDismiss)
     }
 }
@@ -92,7 +93,7 @@ private fun OpenWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onOpen()
         },
-        enabled = isWorktreeOpenEnabled(state.setupStatus, state.isArchiving, state.isRebasing),
+        enabled = isWorktreeOpenEnabled(state.setupStatus, state.isArchiving, state.isRebasing, state.isMerging),
     ) {
         Text(setupActionLabel(defaultLabel = "Open", setupStatus = state.setupStatus))
     }
@@ -126,7 +127,13 @@ private fun CreateWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onOpenCreateWorktreeDialog()
         },
-        enabled = isWorktreeCreateEnabled(state.worktree, state.setupStatus, state.isArchiving, state.isRebasing),
+        enabled = isWorktreeCreateEnabled(
+            worktree = state.worktree,
+            setupStatus = state.setupStatus,
+            isArchiving = state.isArchiving,
+            isRebasing = state.isRebasing,
+            isMerging = state.isMerging,
+        ),
     ) {
         Text("Create worktree")
     }
@@ -143,9 +150,36 @@ private fun RebaseOntoParentMenuItem(
             onMenuDismiss()
             rowActions.onRebaseOntoParent()
         },
-        enabled = isWorktreeRebaseEnabled(state.setupStatus, state.isArchiving, state.isRebasing),
+        enabled = isWorktreeRebaseEnabled(
+            setupStatus = state.setupStatus,
+            isArchiving = state.isArchiving,
+            isRebasing = state.isRebasing,
+            isMerging = state.isMerging,
+        ),
     ) {
         Text("Rebase onto parent")
+    }
+}
+
+@Composable
+private fun MergeOntoParentMenuItem(
+    state: LocalWorktreeRowState,
+    rowActions: LocalWorktreeRowActions,
+    onMenuDismiss: () -> Unit,
+) {
+    DropdownMenuItem(
+        onClick = {
+            onMenuDismiss()
+            rowActions.onMergeOntoParent()
+        },
+        enabled = isWorktreeMergeEnabled(
+            setupStatus = state.setupStatus,
+            isArchiving = state.isArchiving,
+            isRebasing = state.isRebasing,
+            isMerging = state.isMerging,
+        ),
+    ) {
+        Text("Merge parent into worktree")
     }
 }
 
@@ -160,7 +194,12 @@ private fun ArchiveWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onArchive()
         },
-        enabled = isWorktreeArchiveEnabled(state.setupStatus, state.isArchiving, state.isRebasing),
+        enabled = isWorktreeArchiveEnabled(
+            setupStatus = state.setupStatus,
+            isArchiving = state.isArchiving,
+            isRebasing = state.isRebasing,
+            isMerging = state.isMerging,
+        ),
     ) {
         Text("Archive")
     }

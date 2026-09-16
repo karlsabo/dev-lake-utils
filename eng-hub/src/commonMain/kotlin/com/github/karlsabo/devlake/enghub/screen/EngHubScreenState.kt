@@ -110,6 +110,7 @@ internal fun collectEngHubScreenState(
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
     val archivingPaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
     val rebasingPaths by viewModel.rebasingLocalWorktreePathsStateFlow.collectAsState()
+    val mergingPaths by viewModel.mergingLocalWorktreePathsStateFlow.collectAsState()
     val forceArchiveRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
     val repositoryCreateWorktreeRequest by
         viewModel.lastCreateLocalWorktreeFromRepositoryRequestStateFlow.collectAsState()
@@ -140,6 +141,7 @@ internal fun collectEngHubScreenState(
             setupStatuses = setupStatuses,
             archivingWorktreePaths = archivingPaths,
             rebasingWorktreePaths = rebasingPaths,
+            mergingWorktreePaths = mergingPaths,
             authoredOpenPullRequests = activityResults.pullRequests?.getOrNull().orEmpty(),
             repositoryCreateWorktreeRequest = repositoryCreateWorktreeRequest?.let { request ->
                 createRepositoryWorktreeDialogState(
@@ -250,6 +252,7 @@ private fun localWorktreeActions(viewModel: EngHubViewModel) = LocalWorktreeActi
         )
     },
     onRebaseOntoParent = viewModel.rebaseLocalWorktreeOntoParent,
+    onMergeOntoParent = viewModel.mergeLocalWorktreeWithParent,
 )
 
 private fun engHubSettingsActions(viewModel: EngHubSettingsViewModel) = EngHubSettingsActions(

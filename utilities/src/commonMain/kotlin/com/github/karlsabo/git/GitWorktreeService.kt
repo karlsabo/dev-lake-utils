@@ -45,7 +45,8 @@ class GitWorktreeService private constructor(
     GitWorktreeCreationApi by parts.creationApi,
     GitWorktreeDiscoveryApi by parts.discoveryApi,
     GitWorktreeArchiveApi by parts.archiveApi,
-    GitWorktreeRebaseApi by parts.rebaseApi {
+    GitWorktreeRebaseApi by parts.rebaseApi,
+    GitWorktreeMergeApi by parts.mergeApi {
     constructor(
         gitCommandApi: GitCommandApi = GitCommandService(),
         deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
@@ -69,6 +70,7 @@ private data class GitWorktreeServiceParts(
     val discoveryApi: GitWorktreeDiscoveryApi,
     val archiveApi: GitWorktreeArchiveApi,
     val rebaseApi: GitWorktreeRebaseApi,
+    val mergeApi: GitWorktreeMergeApi,
 )
 
 private fun buildGitWorktreeServiceParts(
@@ -89,8 +91,9 @@ private fun buildGitWorktreeServiceParts(
     val defaultBranchRefResolver = GitDefaultBranchRefResolver(gitCommandApi)
     val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
     val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
-    val rebaseUpstreamResolver = GitWorktreeRebaseUpstreamResolver(gitCommandApi, branchValidator)
-    val rebaser = GitWorktreeRebaser(gitCommandApi, rebaseUpstreamResolver)
+    val integrationRefResolver = GitWorktreeIntegrationRefResolver(gitCommandApi, branchValidator)
+    val rebaser = GitWorktreeRebaser(gitCommandApi, integrationRefResolver)
+    val merger = GitWorktreeMerger(gitCommandApi, integrationRefResolver)
 
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
@@ -105,6 +108,7 @@ private fun buildGitWorktreeServiceParts(
         ),
         archiveApi = GitWorktreeArchiveService(archiver),
         rebaseApi = GitWorktreeRebaseService(rebaser),
+        mergeApi = GitWorktreeMergeService(merger),
     )
 }
 
@@ -216,6 +220,17 @@ private class GitWorktreeRebaseService(
 
     override fun abortRebase(worktreePath: String) {
         rebaser.abortRebase(worktreePath)
+    }
+}
+
+private class GitWorktreeMergeService(
+    private val merger: GitWorktreeMerger,
+) : GitWorktreeMergeApi {
+    override fun mergeWorktreeWithParent(
+        worktreePath: String,
+        parentBranch: String,
+    ) {
+        merger.mergeWorktreeWithParent(worktreePath, parentBranch)
     }
 }
 
@@ -655,7 +670,7 @@ private fun divergedParentBranchFailureMessage(
     parentBranch: String,
     remoteTrackingRef: String,
 ): String = "Local branch $parentBranch has diverged from $remoteTrackingRef. " +
-    "Reconcile $parentBranch with $remoteTrackingRef before rebasing."
+    "Reconcile $parentBranch with $remoteTrackingRef before integrating it."
 
 private fun originFetchFailureMessage(
     worktreePath: String,
@@ -998,7 +1013,7 @@ private class GitWorktreeLister(
     }
 }
 
-private class GitWorktreeRebaseUpstreamResolver(
+private class GitWorktreeIntegrationRefResolver(
     private val gitCommandApi: GitCommandApi,
     private val branchValidator: GitWorktreeBranchValidator,
 ) {
@@ -1077,7 +1092,7 @@ private class GitWorktreeRebaseUpstreamResolver(
 
 private class GitWorktreeRebaser(
     private val gitCommandApi: GitCommandApi,
-    private val upstreamResolver: GitWorktreeRebaseUpstreamResolver,
+    private val upstreamResolver: GitWorktreeIntegrationRefResolver,
 ) {
     fun rebaseWorktreeOntoParent(
         worktreePath: String,
@@ -1129,6 +1144,27 @@ private class GitWorktreeRebaser(
     }
 
     private fun String.isAbsolutePath(): Boolean = startsWith("/") || matches(Regex("^[A-Za-z]:[\\\\/].*"))
+}
+
+private class GitWorktreeMerger(
+    private val gitCommandApi: GitCommandApi,
+    private val integrationRefResolver: GitWorktreeIntegrationRefResolver,
+) {
+    fun mergeWorktreeWithParent(
+        worktreePath: String,
+        parentBranch: String,
+    ) {
+        require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
+        val sourceRef = integrationRefResolver.resolve(worktreePath, parentBranch)
+        try {
+            gitCommandApi.merge(worktreePath, sourceRef)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to merge $sourceRef into worktree $worktreePath: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
 }
 
 private class GitWorktreeArchiver(

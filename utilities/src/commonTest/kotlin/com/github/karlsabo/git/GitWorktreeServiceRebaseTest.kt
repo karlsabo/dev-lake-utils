@@ -128,7 +128,7 @@ class GitWorktreeServiceRebaseTest {
 
         assertEquals(
             "Local branch $parentBranch has diverged from origin/$parentBranch. " +
-                "Reconcile $parentBranch with origin/$parentBranch before rebasing.",
+                "Reconcile $parentBranch with origin/$parentBranch before integrating it.",
             ex.message,
         )
         assertEquals(parentBranch, ex.parentBranch)

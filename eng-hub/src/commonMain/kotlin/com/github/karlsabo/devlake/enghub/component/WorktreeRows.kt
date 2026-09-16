@@ -17,6 +17,7 @@ internal enum class WorktreeMenuAction {
     OpenPullRequest,
     CreateWorktree,
     RebaseOntoParent,
+    MergeOntoParent,
     Archive,
 }
 
@@ -25,6 +26,7 @@ internal data class WorktreeRowsState(
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
     val rebasingWorktreePaths: Set<String> = emptySet(),
+    val mergingWorktreePaths: Set<String> = emptySet(),
     val authoredOpenPullRequests: List<PullRequestUiState> = emptyList(),
 )
 
@@ -33,6 +35,7 @@ internal data class LocalWorktreeRowState(
     val setupStatus: WorktreeSetupStatus?,
     val isArchiving: Boolean,
     val isRebasing: Boolean = false,
+    val isMerging: Boolean = false,
     val nestingDepth: Int = 0,
     val connectedPullRequest: PullRequestUiState? = null,
 )
@@ -59,7 +62,10 @@ internal fun visibleWorktreeMenuActions(
     add(WorktreeMenuAction.Open)
     if (connectedPullRequest != null) add(WorktreeMenuAction.OpenPullRequest)
     add(WorktreeMenuAction.CreateWorktree)
-    if (!worktree.parentBranch.isNullOrBlank()) add(WorktreeMenuAction.RebaseOntoParent)
+    if (!worktree.parentBranch.isNullOrBlank()) {
+        add(WorktreeMenuAction.RebaseOntoParent)
+        add(WorktreeMenuAction.MergeOntoParent)
+    }
     if (!worktree.isRoot) add(WorktreeMenuAction.Archive)
 }
 
@@ -67,25 +73,36 @@ internal fun isWorktreeOpenEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
     isRebasing: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing
+    isMerging: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging
 
 internal fun isWorktreeCreateEnabled(
     worktree: LocalWorktreeUiState,
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
     isRebasing: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing && worktree.hasCreatableBase()
+    isMerging: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging && worktree.hasCreatableBase()
 
 internal fun isWorktreeArchiveEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
     isRebasing: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing
+    isMerging: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging
 
 internal fun isWorktreeRebaseEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
     isRebasing: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing
+    isMerging: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging
+
+internal fun isWorktreeMergeEnabled(
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+    isRebasing: Boolean = false,
+    isMerging: Boolean = false,
+): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging
 
 private fun LocalWorktreeUiState.hasCreatableBase(): Boolean = branch != DETACHED || !baseCommitHash.isNullOrBlank()

@@ -247,6 +247,7 @@ class WorktreePanelTest {
                 WorktreeMenuAction.Open,
                 WorktreeMenuAction.CreateWorktree,
                 WorktreeMenuAction.RebaseOntoParent,
+                WorktreeMenuAction.MergeOntoParent,
                 WorktreeMenuAction.Archive,
             ),
             visibleWorktreeMenuActions(worktree),

@@ -306,6 +306,21 @@ class WorktreeWorktreeRowsTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun mergingWorktreeRowRendersProgressAndDisablesActions() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                WorktreeRow(state = worktreeRowState().copy(isMerging = true))
+            }
+        }
+
+        onNodeWithText("Merging...").assertIsDisplayed()
+        onNodeWithContentDescription("Open worktree feature/login").assertIsNotEnabled()
+        onNodeWithContentDescription("Archive worktree feature/login").assertIsNotEnabled()
+        onNodeWithContentDescription("Worktree actions for feature/login").assertIsNotEnabled()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun constrainedRowKeepsProgressAndMenuVisibleWithLongPullRequestDetails() = runComposeUiTest {
         setContent {
             MaterialTheme {
@@ -389,9 +404,10 @@ class WorktreeWorktreeRowsTest {
             rightClick(position = Offset(1f, center.y))
         }
 
-        listOf("Open", "Create worktree", "Rebase onto parent", "Archive").forEach { label ->
-            onNodeWithText(label).assertIsDisplayed().assertIsEnabled()
-        }
+        listOf("Open", "Create worktree", "Rebase onto parent", "Merge parent into worktree", "Archive")
+            .forEach { label ->
+                onNodeWithText(label).assertIsDisplayed().assertIsEnabled()
+            }
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -417,9 +433,10 @@ class WorktreeWorktreeRowsTest {
 
         onNodeWithTag("worktree-row-feature/login").performMouseInput { rightClick() }
 
-        listOf("Open", "Create worktree", "Rebase onto parent", "Archive").forEach { label ->
-            onNodeWithText(label).assertIsDisplayed().assertIsNotEnabled()
-        }
+        listOf("Open", "Create worktree", "Rebase onto parent", "Merge parent into worktree", "Archive")
+            .forEach { label ->
+                onNodeWithText(label).assertIsDisplayed().assertIsNotEnabled()
+            }
     }
 
     @OptIn(ExperimentalTestApi::class)

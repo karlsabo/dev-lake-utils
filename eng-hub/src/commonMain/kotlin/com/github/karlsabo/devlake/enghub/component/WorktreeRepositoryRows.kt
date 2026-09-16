@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
+import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.connectedPullRequest
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
@@ -210,46 +211,72 @@ private fun LocalWorktreeRows(
         if (state.repository.worktrees.isNotEmpty()) {
             Spacer(modifier = Modifier.size(8.dp))
             visibleWorktreeRows(state.repository.worktrees).forEach { row ->
-                val worktree = row.worktree
-                val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
-                val connectedPullRequest = state.connectedPullRequestFor(worktree.branch)
-                key(normalizedWorktreePath) {
-                    LocalWorktreeRow(
-                        state = LocalWorktreeRowState(
-                            worktree = worktree,
-                            setupStatus = state.setupStatuses[WorktreePath(worktree.path)],
-                            isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
-                            isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
-                            nestingDepth = row.nestingDepth,
-                            connectedPullRequest = connectedPullRequest,
-                        ),
-                        actions = LocalWorktreeRowActions(
-                            onOpen = {
-                                panelActions.worktrees.onOpenWorktree(state.repository.path, worktree.path)
-                            },
-                            onOpenPullRequest = panelActions.worktrees.onOpenPullRequest,
-                            onArchive = {
-                                onArchiveRequest(PendingArchive(state.repository.path, worktree.path))
-                            },
-                            onOpenCreateWorktreeDialog = {
-                                onCreateRequest(createWorktreeDialogState(state.repository.path, worktree))
-                            },
-                            onRebaseOntoParent = {
-                                worktree.parentBranch?.let { parentBranch ->
-                                    panelActions.worktrees.onRebaseOntoParent(
-                                        state.repository.path,
-                                        worktree.path,
-                                        parentBranch,
-                                    )
-                                }
-                            },
-                        ),
-                    )
-                }
+                WorktreeRowEntry(
+                    row = row,
+                    state = state,
+                    panelActions = panelActions,
+                    onArchiveRequest = onArchiveRequest,
+                    onCreateRequest = onCreateRequest,
+                )
             }
         }
     }
 }
+
+@Composable
+private fun WorktreeRowEntry(
+    row: VisibleWorktreeRow,
+    state: WorktreeRowsState,
+    panelActions: WorktreePanelActions,
+    onArchiveRequest: (PendingArchive) -> Unit,
+    onCreateRequest: (PendingCreateWorktree) -> Unit,
+) {
+    val worktree = row.worktree
+    val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
+    key(normalizedWorktreePath) {
+        LocalWorktreeRow(
+            state = LocalWorktreeRowState(
+                worktree = worktree,
+                setupStatus = state.setupStatuses[WorktreePath(worktree.path)],
+                isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
+                isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
+                isMerging = normalizedWorktreePath in state.mergingWorktreePaths,
+                nestingDepth = row.nestingDepth,
+                connectedPullRequest = state.connectedPullRequestFor(worktree.branch),
+            ),
+            actions = worktreeRowActions(
+                worktree = worktree,
+                repositoryPath = state.repository.path,
+                panelActions = panelActions,
+                onArchiveRequest = onArchiveRequest,
+                onCreateRequest = onCreateRequest,
+            ),
+        )
+    }
+}
+
+private fun worktreeRowActions(
+    worktree: LocalWorktreeUiState,
+    repositoryPath: String,
+    panelActions: WorktreePanelActions,
+    onArchiveRequest: (PendingArchive) -> Unit,
+    onCreateRequest: (PendingCreateWorktree) -> Unit,
+): LocalWorktreeRowActions = LocalWorktreeRowActions(
+    onOpen = { panelActions.worktrees.onOpenWorktree(repositoryPath, worktree.path) },
+    onOpenPullRequest = panelActions.worktrees.onOpenPullRequest,
+    onArchive = { onArchiveRequest(PendingArchive(repositoryPath, worktree.path)) },
+    onOpenCreateWorktreeDialog = { onCreateRequest(createWorktreeDialogState(repositoryPath, worktree)) },
+    onRebaseOntoParent = {
+        worktree.parentBranch?.let { parentBranch ->
+            panelActions.worktrees.onRebaseOntoParent(repositoryPath, worktree.path, parentBranch)
+        }
+    },
+    onMergeOntoParent = {
+        worktree.parentBranch?.let { parentBranch ->
+            panelActions.worktrees.onMergeOntoParent(repositoryPath, worktree.path, parentBranch)
+        }
+    },
+)
 
 private fun WorktreeRowsState.connectedPullRequestFor(branch: String) = connectedPullRequest(
     repositoryIdentity = repository.repositoryIdentity,

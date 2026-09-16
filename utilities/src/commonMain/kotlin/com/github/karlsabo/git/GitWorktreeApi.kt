@@ -5,7 +5,8 @@ interface GitWorktreeApi :
     GitWorktreeCreationApi,
     GitWorktreeDiscoveryApi,
     GitWorktreeArchiveApi,
-    GitWorktreeRebaseApi
+    GitWorktreeRebaseApi,
+    GitWorktreeMergeApi
 
 interface GitRepositoryApi {
     fun ensureRepository(repoPath: String, cloneUrl: String)
@@ -85,6 +86,15 @@ interface GitWorktreeRebaseApi {
 
     fun abortRebase(worktreePath: String): Unit = throw UnsupportedOperationException(
         "abortRebase is not implemented",
+    )
+}
+
+interface GitWorktreeMergeApi {
+    fun mergeWorktreeWithParent(
+        worktreePath: String,
+        parentBranch: String,
+    ): Unit = throw UnsupportedOperationException(
+        "mergeWorktreeWithParent is not implemented",
     )
 }
 

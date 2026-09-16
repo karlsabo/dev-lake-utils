@@ -54,6 +54,7 @@ internal data class LocalWorktreeRowActions(
     val onArchive: () -> Unit,
     val onOpenCreateWorktreeDialog: () -> Unit,
     val onRebaseOntoParent: () -> Unit,
+    val onMergeOntoParent: () -> Unit,
 )
 
 private data class WorktreeRowContentActions(
@@ -138,7 +139,7 @@ private fun WorktreeRowContent(
             modifier = Modifier.weight(1f),
         )
         WorktreeRebaseNeededIndicator(state.worktree)
-        WorktreeProgressLabels(state.setupStatus, state.isArchiving, state.isRebasing)
+        WorktreeProgressLabels(state.setupStatus, state.isArchiving, state.isRebasing, state.isMerging)
         OpenWorktreeShortcut(state = state, onOpen = actions.onOpen)
         ArchiveWorktreeShortcut(state = state, onArchive = actions.onArchive)
         LocalWorktreeActionMenuButton(
@@ -227,6 +228,7 @@ private fun WorktreeProgressLabels(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
     isRebasing: Boolean,
+    isMerging: Boolean,
 ) {
     Row {
         setupStatus?.let {
@@ -239,6 +241,10 @@ private fun WorktreeProgressLabels(
         }
         if (isRebasing) {
             Text(text = "Rebasing...", style = MaterialTheme.typography.caption)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        if (isMerging) {
+            Text(text = "Merging...", style = MaterialTheme.typography.caption)
             Spacer(modifier = Modifier.width(8.dp))
         }
     }

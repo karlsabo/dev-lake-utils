@@ -6,6 +6,7 @@ internal fun emptyLocalWorktreeRowActions(): LocalWorktreeRowActions = LocalWork
     onArchive = {},
     onOpenCreateWorktreeDialog = {},
     onRebaseOntoParent = {},
+    onMergeOntoParent = {},
 )
 
 internal fun emptyPanelActions(): WorktreePanelActions = WorktreePanelActions(
@@ -26,6 +27,7 @@ internal fun emptyPanelActions(): WorktreePanelActions = WorktreePanelActions(
         onArchiveWorktree = { _, _ -> },
         onCreateWorktree = {},
         onRebaseOntoParent = { _, _, _ -> },
+        onMergeOntoParent = { _, _, _ -> },
     ),
     forceArchive = ForceArchiveWorktreeActions(
         onConfirm = { _, _ -> },

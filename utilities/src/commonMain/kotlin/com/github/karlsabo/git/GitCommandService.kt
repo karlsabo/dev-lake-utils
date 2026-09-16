@@ -17,6 +17,7 @@ private class DefaultGitCommandApi(
     GitAncestryCommandApi by GitAncestryCommandService(commandRunner),
     GitWorktreeCommandApi by GitWorktreeCommandService(commandRunner),
     GitRebaseCommandApi by GitRebaseCommandService(commandRunner),
+    GitMergeCommandApi by GitMergeCommandService(commandRunner),
     GitWorkingTreeCommandApi by GitWorkingTreeCommandService(commandRunner),
     GitHistoryCommandApi by GitHistoryCommandService(commandRunner),
     GitRawCommandExecutor by GitRawCommandService(commandRunner)
@@ -238,6 +239,14 @@ private class GitRebaseCommandService(
 
     override fun abortRebase(repoPath: String) {
         commandRunner.run(gitRepoCommand(repoPath, "rebase", "--abort"))
+    }
+}
+
+private class GitMergeCommandService(
+    private val commandRunner: GitCliCommandRunner,
+) : GitMergeCommandApi {
+    override fun merge(repoPath: String, sourceRef: String) {
+        commandRunner.run(gitRepoCommand(repoPath, "merge", "--autostash", sourceRef))
     }
 }
 
