@@ -977,15 +977,39 @@ private class GitWorktreeRebaseUpstreamResolver(
     private val gitCommandApi: GitCommandApi,
 ) {
     /**
-     * Chooses the ref to rebase onto from the fetched remote-tracking parent when the remote contains
-     * the local parent, otherwise the local parent itself. Fetch failures propagate so the worktree is left alone.
+     * Chooses the ref to rebase onto by comparing ancestry between the local parent and the fetched
+     * remote-tracking parent:
+     * - the remote parent when it contains the local parent;
+     * - the local parent when it contains the remote parent, preserving unpublished local commits;
+     * - otherwise the local parent, since two-way divergence is not yet rejected here.
+     * Fetch failures propagate so the worktree is left alone.
      */
     fun resolve(worktreePath: String, parentBranch: String): String {
         if (originUrl(worktreePath) == null) return parentBranch
         fetchOrigin(worktreePath)
+        return selectedParentRef(worktreePath, parentBranch)
+    }
+
+    private fun selectedParentRef(worktreePath: String, parentBranch: String): String {
         val remoteBranchExists = gitCommandApi.remoteBranchExists(worktreePath, parentBranch, ORIGIN)
-        val remoteContainsLocal = remoteBranchExists && localParentIsAncestorOfRemote(worktreePath, parentBranch)
-        return if (remoteContainsLocal) remoteTrackingRef(parentBranch) else parentBranch
+        return when {
+            !remoteBranchExists -> parentBranch
+
+            parentAncestry(worktreePath, parentBranch) == ParentAncestry.RemoteContainsLocal ->
+                remoteTrackingRef(parentBranch)
+
+            else -> parentBranch
+        }
+    }
+
+    private fun parentAncestry(worktreePath: String, parentBranch: String): ParentAncestry {
+        val localRef = localParentRef(parentBranch)
+        val remoteRef = remoteParentRef(parentBranch)
+        return when {
+            gitCommandApi.isAncestor(worktreePath, localRef, remoteRef) -> ParentAncestry.RemoteContainsLocal
+            gitCommandApi.isAncestor(worktreePath, remoteRef, localRef) -> ParentAncestry.LocalContainsRemote
+            else -> ParentAncestry.Diverged
+        }
     }
 
     private fun originUrl(worktreePath: String): String? = gitCommandApi.remoteUrl(worktreePath, ORIGIN)
@@ -994,17 +1018,17 @@ private class GitWorktreeRebaseUpstreamResolver(
         gitCommandApi.fetch(worktreePath, ORIGIN)
     }
 
-    private fun localParentIsAncestorOfRemote(worktreePath: String, parentBranch: String): Boolean {
-        val localRef = localParentRef(parentBranch)
-        val remoteRef = remoteParentRef(parentBranch)
-        return gitCommandApi.isAncestor(worktreePath, localRef, remoteRef)
-    }
-
     private fun localParentRef(parentBranch: String): String = "refs/heads/$parentBranch"
 
     private fun remoteParentRef(parentBranch: String): String = "refs/remotes/$ORIGIN/$parentBranch"
 
     private fun remoteTrackingRef(parentBranch: String): String = "$ORIGIN/$parentBranch"
+
+    private enum class ParentAncestry {
+        RemoteContainsLocal,
+        LocalContainsRemote,
+        Diverged,
+    }
 
     private companion object {
         const val ORIGIN = "origin"
