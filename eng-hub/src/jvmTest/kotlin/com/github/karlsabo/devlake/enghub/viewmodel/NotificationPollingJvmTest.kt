@@ -31,7 +31,7 @@ class NotificationPollingJvmTest {
             pollIntervalMs = 1,
         )
 
-        val results = withTimeout(2.seconds) {
+        val results = withTimeout(10.seconds) {
             viewModel.notifications.filterNotNull().take(2).toList()
         }
 

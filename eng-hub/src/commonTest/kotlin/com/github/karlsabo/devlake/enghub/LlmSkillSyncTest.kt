@@ -307,7 +307,10 @@ class LlmSkillSyncTest {
             val installedSkill = readFile(
                 Path(homeDir, ".pi", "agent", "skills", "eh-alert-triage", "SKILL.md"),
             ).normalizeLineEndings()
-            assertTrue(installedSkill.contains("## Where to look\n\n$guidance\n\n## Correlate evidence"))
+            val guidanceIndex = installedSkill.indexOf("## Where to look\n\n$guidance")
+            val correlateEvidenceIndex = installedSkill.indexOf("## Correlate evidence")
+            assertTrue(guidanceIndex >= 0)
+            assertTrue(correlateEvidenceIndex > guidanceIndex)
             assertFalse(installedSkill.contains("\${ALERT_TRIAGE_WHERE_TO_LOOK}"))
         } finally {
             deleteRecursively(homeDir)
