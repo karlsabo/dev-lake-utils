@@ -24,7 +24,44 @@ class GitWorktreeServiceRebaseTest {
         assertEquals(
             listOf(
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
+                FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
                 FakeGitCommandApi.Call("rebase", listOf(childWorktreePath, parentBranch)),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun rebaseWorktreeOntoParent_fetchesOriginAndRebasesOntoRemoteParentWhenRemoteContainsLocal() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        fake.remoteUrlAction = { _, remote ->
+            "git@github.com:karlsabo/dev-lake-utils.git".takeIf { remote == "origin" }
+        }
+        fake.remoteBranchExistsAction = { _, branch, remote -> branch == parentBranch && remote == "origin" }
+        fake.isAncestorAction = { _, ancestorRef, descendantRef ->
+            ancestorRef == "refs/heads/$parentBranch" &&
+                descendantRef == "refs/remotes/origin/$parentBranch"
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        service.rebaseWorktreeOntoParent(
+            worktreePath = childWorktreePath,
+            parentBranch = parentBranch,
+        )
+
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
+                FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call(
+                    "isAncestor",
+                    listOf(childWorktreePath, "refs/heads/$parentBranch", "refs/remotes/origin/$parentBranch"),
+                ),
+                FakeGitCommandApi.Call("rebase", listOf(childWorktreePath, "origin/$parentBranch")),
             ),
             fake.calls,
         )

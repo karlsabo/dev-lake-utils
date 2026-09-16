@@ -77,7 +77,8 @@ private fun buildGitWorktreeServiceParts(
     val defaultBranchRefResolver = GitDefaultBranchRefResolver(gitCommandApi)
     val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
     val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
-    val rebaser = GitWorktreeRebaser(gitCommandApi, branchValidator)
+    val rebaseUpstreamResolver = GitWorktreeRebaseUpstreamResolver(gitCommandApi)
+    val rebaser = GitWorktreeRebaser(gitCommandApi, branchValidator, rebaseUpstreamResolver)
 
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
@@ -972,9 +973,48 @@ private class GitWorktreeLister(
     }
 }
 
+private class GitWorktreeRebaseUpstreamResolver(
+    private val gitCommandApi: GitCommandApi,
+) {
+    /**
+     * Chooses the ref to rebase onto from the fetched remote-tracking parent when the remote contains
+     * the local parent, otherwise the local parent itself. Fetch failures propagate so the worktree is left alone.
+     */
+    fun resolve(worktreePath: String, parentBranch: String): String {
+        if (originUrl(worktreePath) == null) return parentBranch
+        fetchOrigin(worktreePath)
+        val remoteBranchExists = gitCommandApi.remoteBranchExists(worktreePath, parentBranch, ORIGIN)
+        val remoteContainsLocal = remoteBranchExists && localParentIsAncestorOfRemote(worktreePath, parentBranch)
+        return if (remoteContainsLocal) remoteTrackingRef(parentBranch) else parentBranch
+    }
+
+    private fun originUrl(worktreePath: String): String? = gitCommandApi.remoteUrl(worktreePath, ORIGIN)
+
+    private fun fetchOrigin(worktreePath: String) {
+        gitCommandApi.fetch(worktreePath, ORIGIN)
+    }
+
+    private fun localParentIsAncestorOfRemote(worktreePath: String, parentBranch: String): Boolean {
+        val localRef = localParentRef(parentBranch)
+        val remoteRef = remoteParentRef(parentBranch)
+        return gitCommandApi.isAncestor(worktreePath, localRef, remoteRef)
+    }
+
+    private fun localParentRef(parentBranch: String): String = "refs/heads/$parentBranch"
+
+    private fun remoteParentRef(parentBranch: String): String = "refs/remotes/$ORIGIN/$parentBranch"
+
+    private fun remoteTrackingRef(parentBranch: String): String = "$ORIGIN/$parentBranch"
+
+    private companion object {
+        const val ORIGIN = "origin"
+    }
+}
+
 private class GitWorktreeRebaser(
     private val gitCommandApi: GitCommandApi,
     private val branchValidator: GitWorktreeBranchValidator,
+    private val upstreamResolver: GitWorktreeRebaseUpstreamResolver,
 ) {
     fun rebaseWorktreeOntoParent(
         worktreePath: String,
@@ -982,18 +1022,19 @@ private class GitWorktreeRebaser(
     ) {
         require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
         branchValidator.validate(parentBranch)
+        val upstreamRef = upstreamResolver.resolve(worktreePath, parentBranch)
         try {
-            gitCommandApi.rebase(worktreePath, parentBranch)
+            gitCommandApi.rebase(worktreePath, upstreamRef)
         } catch (e: GitCommandException) {
             if (rebaseInProgress(worktreePath)) {
                 throw GitRebaseConflictException(
                     worktreePath = worktreePath,
-                    parentBranch = parentBranch,
+                    parentBranch = upstreamRef,
                     cause = e,
                 )
             }
             throw GitWorktreeException(
-                "Failed to rebase worktree $worktreePath onto $parentBranch: ${e.gitOutput}",
+                "Failed to rebase worktree $worktreePath onto $upstreamRef: ${e.gitOutput}",
                 e,
             )
         }
