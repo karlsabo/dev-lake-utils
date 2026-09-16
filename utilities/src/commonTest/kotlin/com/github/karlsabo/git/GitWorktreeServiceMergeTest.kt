@@ -44,6 +44,34 @@ class GitWorktreeServiceMergeTest {
     }
 
     @Test
+    fun mergeWorktreeWithParent_mergesLocalParentWhenFetchedRemoteHasNoMatchingBranch() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        fake.remoteUrlAction = { _, remote ->
+            "git@github.com:karlsabo/dev-lake-utils.git".takeIf { remote == "origin" }
+        }
+        fake.remoteBranchExistsAction = { _, _, _ -> false }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        service.mergeWorktreeWithParent(
+            worktreePath = childWorktreePath,
+            parentBranch = parentBranch,
+        )
+
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
+                FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call("merge", listOf(childWorktreePath, parentBranch)),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
     fun mergeWorktreeWithParent_rejectsDivergedParentWithoutMerging() {
         val fake = FakeGitCommandApi()
         val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
