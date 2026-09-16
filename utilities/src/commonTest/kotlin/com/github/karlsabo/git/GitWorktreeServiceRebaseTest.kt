@@ -108,6 +108,52 @@ class GitWorktreeServiceRebaseTest {
     }
 
     @Test
+    fun rebaseWorktreeOntoParent_rejectsDivergedParentWithoutRebasingChild() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        fake.remoteUrlAction = { _, remote ->
+            "git@github.com:karlsabo/dev-lake-utils.git".takeIf { remote == "origin" }
+        }
+        fake.remoteBranchExistsAction = { _, branch, remote -> branch == parentBranch && remote == "origin" }
+        fake.isAncestorAction = { _, _, _ -> false }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<DivergedParentBranchException> {
+            service.rebaseWorktreeOntoParent(
+                worktreePath = childWorktreePath,
+                parentBranch = parentBranch,
+            )
+        }
+
+        assertEquals(
+            "Local branch $parentBranch has diverged from origin/$parentBranch. " +
+                "Reconcile $parentBranch with origin/$parentBranch before rebasing.",
+            ex.message,
+        )
+        assertEquals(parentBranch, ex.parentBranch)
+        assertEquals("origin/$parentBranch", ex.remoteTrackingRef)
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
+                FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call(
+                    "isAncestor",
+                    listOf(childWorktreePath, "refs/heads/$parentBranch", "refs/remotes/origin/$parentBranch"),
+                ),
+                FakeGitCommandApi.Call(
+                    "isAncestor",
+                    listOf(childWorktreePath, "refs/remotes/origin/$parentBranch", "refs/heads/$parentBranch"),
+                ),
+            ),
+            fake.calls,
+        )
+        assertTrue(fake.calls.none { it.method == "rebase" })
+    }
+
+    @Test
     fun rebaseWorktreeOntoParent_rebasesOntoLocalParentWhenFetchedRemoteHasNoMatchingBranch() {
         val fake = FakeGitCommandApi()
         val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"

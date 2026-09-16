@@ -26,6 +26,11 @@ class GitRebaseConflictException(
     cause: Throwable,
 ) : GitWorktreeException(rebaseConflictMessage(worktreePath, parentBranch), cause)
 
+class DivergedParentBranchException(
+    val parentBranch: String,
+    val remoteTrackingRef: String,
+) : GitWorktreeException(divergedParentBranchFailureMessage(parentBranch, remoteTrackingRef))
+
 class GitWorktreeService private constructor(
     parts: GitWorktreeServiceParts,
 ) : GitWorktreeApi,
@@ -639,6 +644,12 @@ private fun rebaseConflictMessage(
     parentBranch: String,
 ): String = "Rebase conflict while rebasing worktree $worktreePath onto $parentBranch"
 
+private fun divergedParentBranchFailureMessage(
+    parentBranch: String,
+    remoteTrackingRef: String,
+): String = "Local branch $parentBranch has diverged from $remoteTrackingRef. " +
+    "Reconcile $parentBranch with $remoteTrackingRef before rebasing."
+
 private class GitBranchAncestryChecker(
     private val gitCommandApi: GitCommandApi,
     private val branchValidator: GitWorktreeBranchValidator,
@@ -983,7 +994,7 @@ private class GitWorktreeRebaseUpstreamResolver(
      * - the remote parent when it contains the local parent;
      * - the local parent when it contains the remote parent, preserving unpublished local commits;
      * - the local parent when no origin is configured or the fetched remote has no matching branch;
-     * - otherwise the local parent, since two-way divergence is not yet rejected here.
+     * - otherwise reject the integration when neither parent contains the other.
      * Fetch failures propagate so the worktree is left alone.
      */
     fun resolve(worktreePath: String, parentBranch: String): String {
@@ -994,14 +1005,16 @@ private class GitWorktreeRebaseUpstreamResolver(
     }
 
     private fun selectedParentRef(worktreePath: String, parentBranch: String): String {
-        val remoteBranchExists = gitCommandApi.remoteBranchExists(worktreePath, parentBranch, ORIGIN)
-        return when {
-            !remoteBranchExists -> parentBranch
+        if (!gitCommandApi.remoteBranchExists(worktreePath, parentBranch, ORIGIN)) return parentBranch
+        return when (parentAncestry(worktreePath, parentBranch)) {
+            ParentAncestry.RemoteContainsLocal -> remoteTrackingRef(parentBranch)
 
-            parentAncestry(worktreePath, parentBranch) == ParentAncestry.RemoteContainsLocal ->
-                remoteTrackingRef(parentBranch)
+            ParentAncestry.LocalContainsRemote -> parentBranch
 
-            else -> parentBranch
+            ParentAncestry.Diverged -> throw DivergedParentBranchException(
+                parentBranch = parentBranch,
+                remoteTrackingRef = remoteTrackingRef(parentBranch),
+            )
         }
     }
 
