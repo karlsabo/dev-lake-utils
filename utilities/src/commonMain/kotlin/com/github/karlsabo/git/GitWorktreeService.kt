@@ -77,8 +77,8 @@ private fun buildGitWorktreeServiceParts(
     val defaultBranchRefResolver = GitDefaultBranchRefResolver(gitCommandApi)
     val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
     val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
-    val rebaseUpstreamResolver = GitWorktreeRebaseUpstreamResolver(gitCommandApi)
-    val rebaser = GitWorktreeRebaser(gitCommandApi, branchValidator, rebaseUpstreamResolver)
+    val rebaseUpstreamResolver = GitWorktreeRebaseUpstreamResolver(gitCommandApi, branchValidator)
+    val rebaser = GitWorktreeRebaser(gitCommandApi, rebaseUpstreamResolver)
 
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
@@ -975,16 +975,19 @@ private class GitWorktreeLister(
 
 private class GitWorktreeRebaseUpstreamResolver(
     private val gitCommandApi: GitCommandApi,
+    private val branchValidator: GitWorktreeBranchValidator,
 ) {
     /**
-     * Chooses the ref to rebase onto by comparing ancestry between the local parent and the fetched
+     * Chooses the ref to integrate from by comparing ancestry between the local parent and the fetched
      * remote-tracking parent:
      * - the remote parent when it contains the local parent;
      * - the local parent when it contains the remote parent, preserving unpublished local commits;
+     * - the local parent when no origin is configured or the fetched remote has no matching branch;
      * - otherwise the local parent, since two-way divergence is not yet rejected here.
      * Fetch failures propagate so the worktree is left alone.
      */
     fun resolve(worktreePath: String, parentBranch: String): String {
+        branchValidator.validate(parentBranch)
         if (originUrl(worktreePath) == null) return parentBranch
         fetchOrigin(worktreePath)
         return selectedParentRef(worktreePath, parentBranch)
@@ -1037,7 +1040,6 @@ private class GitWorktreeRebaseUpstreamResolver(
 
 private class GitWorktreeRebaser(
     private val gitCommandApi: GitCommandApi,
-    private val branchValidator: GitWorktreeBranchValidator,
     private val upstreamResolver: GitWorktreeRebaseUpstreamResolver,
 ) {
     fun rebaseWorktreeOntoParent(
@@ -1045,7 +1047,6 @@ private class GitWorktreeRebaser(
         parentBranch: String,
     ) {
         require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
-        branchValidator.validate(parentBranch)
         val upstreamRef = upstreamResolver.resolve(worktreePath, parentBranch)
         try {
             gitCommandApi.rebase(worktreePath, upstreamRef)

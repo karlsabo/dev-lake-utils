@@ -108,6 +108,51 @@ class GitWorktreeServiceRebaseTest {
     }
 
     @Test
+    fun rebaseWorktreeOntoParent_rebasesOntoLocalParentWhenFetchedRemoteHasNoMatchingBranch() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        fake.remoteUrlAction = { _, remote ->
+            "git@github.com:karlsabo/dev-lake-utils.git".takeIf { remote == "origin" }
+        }
+        fake.remoteBranchExistsAction = { _, _, _ -> false }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        service.rebaseWorktreeOntoParent(
+            worktreePath = childWorktreePath,
+            parentBranch = parentBranch,
+        )
+
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
+                FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call("rebase", listOf(childWorktreePath, parentBranch)),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun rebaseWorktreeOntoParent_rejectsInvalidParentBranchBeforeResolvingRefs() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.rebaseWorktreeOntoParent(
+                worktreePath = childWorktreePath,
+                parentBranch = "feature/base pr",
+            )
+        }
+
+        assertEquals("Invalid worktree branch name: Branch name must not contain whitespace", ex.message)
+        assertTrue(fake.calls.isEmpty())
+    }
+
+    @Test
     fun rebaseWorktreeOntoParent_classifiesFailureWithRebaseInProgressAsConflict() {
         val fake = FakeGitCommandApi()
         val childWorktreePath = createArchiveWorktreeTempDir()
