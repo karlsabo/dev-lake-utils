@@ -1,6 +1,7 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.git.GitRebaseConflictException
+import com.github.karlsabo.git.OriginFetchFailureException
 import com.github.karlsabo.git.Worktree
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
@@ -9,6 +10,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class EngHubLocalWorktreeRebaseViewModelTest {
@@ -484,6 +486,55 @@ class EngHubLocalWorktreeRebaseViewModelTest {
             ),
             callbacks = callbacks,
         )
+    }
+
+    @Test
+    fun originFetchFailureReportsUnderlyingGitOutputWithoutPromptingForConflictRecovery() = runBlocking {
+        val childWorktreePath = "$DEV_LAKE_ROOT-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val worktrees = listOf(
+            Worktree(path = "$DEV_LAKE_ROOT-feature-base-pr", branch = parentBranch, commitHash = "abc123"),
+            Worktree(path = childWorktreePath, branch = "feature/stacked-pr", commitHash = "def456"),
+        )
+        val gitOutput = "fatal: could not read Username for 'https://github.com': terminal prompts disabled"
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to parentBranch),
+                ),
+                rebaseWorktreeFailure = OriginFetchFailureException(
+                    worktreePath = childWorktreePath,
+                    parentBranch = parentBranch,
+                    gitOutput = gitOutput,
+                    cause = RuntimeException("fetch failed"),
+                ),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+
+        viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+        assertTrue(actionError?.message.orEmpty().contains(gitOutput))
+        assertEquals(null, viewModel.rebaseConflictResolutionRequestStateFlow.value)
+        withTimeout(2_000.milliseconds) {
+            viewModel.rebasingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+        assertEquals(emptySet(), viewModel.rebasingLocalWorktreePathsStateFlow.value)
     }
 
     @Test

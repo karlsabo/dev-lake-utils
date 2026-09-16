@@ -31,6 +31,13 @@ class DivergedParentBranchException(
     val remoteTrackingRef: String,
 ) : GitWorktreeException(divergedParentBranchFailureMessage(parentBranch, remoteTrackingRef))
 
+class OriginFetchFailureException(
+    val worktreePath: String,
+    val parentBranch: String,
+    val gitOutput: String,
+    cause: Throwable,
+) : GitWorktreeException(originFetchFailureMessage(worktreePath, parentBranch, gitOutput), cause)
+
 class GitWorktreeService private constructor(
     parts: GitWorktreeServiceParts,
 ) : GitWorktreeApi,
@@ -650,6 +657,13 @@ private fun divergedParentBranchFailureMessage(
 ): String = "Local branch $parentBranch has diverged from $remoteTrackingRef. " +
     "Reconcile $parentBranch with $remoteTrackingRef before rebasing."
 
+private fun originFetchFailureMessage(
+    worktreePath: String,
+    parentBranch: String,
+    gitOutput: String,
+): String = "Failed to fetch origin before integrating $parentBranch into worktree $worktreePath. " +
+    "Resolve the fetch failure and try again: $gitOutput"
+
 private class GitBranchAncestryChecker(
     private val gitCommandApi: GitCommandApi,
     private val branchValidator: GitWorktreeBranchValidator,
@@ -995,12 +1009,13 @@ private class GitWorktreeRebaseUpstreamResolver(
      * - the local parent when it contains the remote parent, preserving unpublished local commits;
      * - the local parent when no origin is configured or the fetched remote has no matching branch;
      * - otherwise reject the integration when neither parent contains the other.
-     * Fetch failures propagate so the worktree is left alone.
+     * A configured origin that fails to fetch rejects the integration with the Git output preserved, so the
+     * worktree is left alone.
      */
     fun resolve(worktreePath: String, parentBranch: String): String {
         branchValidator.validate(parentBranch)
         if (originUrl(worktreePath) == null) return parentBranch
-        fetchOrigin(worktreePath)
+        fetchOrigin(worktreePath, parentBranch)
         return selectedParentRef(worktreePath, parentBranch)
     }
 
@@ -1030,8 +1045,17 @@ private class GitWorktreeRebaseUpstreamResolver(
 
     private fun originUrl(worktreePath: String): String? = gitCommandApi.remoteUrl(worktreePath, ORIGIN)
 
-    private fun fetchOrigin(worktreePath: String) {
-        gitCommandApi.fetch(worktreePath, ORIGIN)
+    private fun fetchOrigin(worktreePath: String, parentBranch: String) {
+        try {
+            gitCommandApi.fetch(worktreePath, ORIGIN)
+        } catch (e: GitCommandException) {
+            throw OriginFetchFailureException(
+                worktreePath = worktreePath,
+                parentBranch = parentBranch,
+                gitOutput = e.gitOutput,
+                cause = e,
+            )
+        }
     }
 
     private fun localParentRef(parentBranch: String): String = "refs/heads/$parentBranch"

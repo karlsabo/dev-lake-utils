@@ -182,6 +182,53 @@ class GitWorktreeServiceRebaseTest {
     }
 
     @Test
+    fun rebaseWorktreeOntoParent_rejectsIntegrationWhenConfiguredOriginFetchFailsWithoutRebasing() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val gitFailure = GitCommandException(
+            command = listOf("git", "-C", childWorktreePath, "fetch", "origin"),
+            exitCode = 128,
+            gitOutput = "fatal: could not read Password for 'https://github.com': terminal prompts disabled",
+        )
+        fake.remoteUrlAction = { _, remote ->
+            "git@github.com:karlsabo/dev-lake-utils.git".takeIf { remote == "origin" }
+        }
+        fake.fetchAction = { _, _, _ -> throw gitFailure }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<OriginFetchFailureException> {
+            service.rebaseWorktreeOntoParent(
+                worktreePath = childWorktreePath,
+                parentBranch = parentBranch,
+            )
+        }
+
+        assertEquals(childWorktreePath, ex.worktreePath)
+        assertEquals(parentBranch, ex.parentBranch)
+        assertEquals(gitFailure.gitOutput, ex.gitOutput)
+        assertSame(gitFailure, ex.cause)
+        assertEquals(
+            "Failed to fetch origin before integrating $parentBranch into worktree $childWorktreePath. " +
+                "Resolve the fetch failure and try again: ${gitFailure.gitOutput}",
+            ex.message,
+        )
+        assertTrue(
+            ex.message.orEmpty().contains("could not read Password"),
+            "Wrapped failure should preserve the underlying Git output",
+        )
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
+                FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
+            ),
+            fake.calls,
+        )
+        assertTrue(fake.calls.none { it.method == "rebase" })
+    }
+
+    @Test
     fun rebaseWorktreeOntoParent_rejectsInvalidParentBranchBeforeResolvingRefs() {
         val fake = FakeGitCommandApi()
         val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
