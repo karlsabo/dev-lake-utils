@@ -1,5 +1,7 @@
 package com.github.karlsabo.git
 
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -96,6 +98,85 @@ class GitWorktreeServiceMergeTest {
             ex.message,
         )
         assertTrue(fake.calls.none { it.method == "merge" })
+    }
+
+    @Test
+    fun mergeWorktreeWithParent_classifiesFailureWithMergeInProgressAsConflict() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = createArchiveWorktreeTempDir()
+        val parentBranch = "feature/base-pr"
+        val mergeHeadPath = Path(childWorktreePath, ".git", "MERGE_HEAD")
+        val failure = GitCommandException(
+            command = listOf("git", "-C", childWorktreePath, "merge", "--autostash", parentBranch),
+            exitCode = 1,
+            gitOutput = "CONFLICT (content): Merge conflict",
+        )
+        fake.mergeAction = { _, _ -> throw failure }
+        fake.revParseAction = { _, args ->
+            when (args.toList()) {
+                listOf("--git-path", "MERGE_HEAD") -> mergeHeadPath.toString()
+                else -> ""
+            }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        try {
+            SystemFileSystem.createDirectories(mergeHeadPath)
+
+            val ex = assertFailsWith<GitMergeConflictException> {
+                service.mergeWorktreeWithParent(
+                    worktreePath = childWorktreePath,
+                    parentBranch = parentBranch,
+                )
+            }
+
+            assertEquals(
+                "Merge conflict while merging $parentBranch into worktree $childWorktreePath",
+                ex.message,
+            )
+            assertEquals(childWorktreePath, ex.worktreePath)
+            assertEquals(parentBranch, ex.parentBranch)
+            assertSame(failure, ex.cause)
+        } finally {
+            removeTempDir(childWorktreePath)
+        }
+    }
+
+    @Test
+    fun abortMerge_runsAbortInChildWorktree() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        service.abortMerge(childWorktreePath)
+
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("abortMerge", listOf(childWorktreePath))),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun abortMerge_wrapsGitCommandFailure() {
+        val fake = FakeGitCommandApi()
+        val childWorktreePath = "/repos/dev-lake-utils-feature-stacked-pr"
+        val failure = GitCommandException(
+            command = listOf("git", "-C", childWorktreePath, "merge", "--abort"),
+            exitCode = 128,
+            gitOutput = "fatal: There is no merge to abort",
+        )
+        fake.abortMergeAction = { throw failure }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.abortMerge(childWorktreePath)
+        }
+
+        assertEquals(
+            "Failed to abort merge in worktree $childWorktreePath: fatal: There is no merge to abort",
+            ex.message,
+        )
+        assertSame(failure, ex.cause)
     }
 
     @Test

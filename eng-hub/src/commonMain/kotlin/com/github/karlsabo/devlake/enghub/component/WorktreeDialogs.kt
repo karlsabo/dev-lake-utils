@@ -41,7 +41,7 @@ internal data class WorktreeDialogState(
     val pendingCreateWorktree: PendingCreateWorktree?,
     val existingBranchDiscovery: ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(),
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch?,
-    val rebaseConflictResolutionRequest: PendingRebaseConflictResolution?,
+    val worktreeConflictResolutionRequest: PendingWorktreeConflictResolution?,
     val forceArchiveRequest: ForceArchiveWorktreeUiState?,
 )
 
@@ -53,8 +53,8 @@ internal data class WorktreeDialogActions(
     val onCheckoutExistingBranch: (repoRootPath: String, branch: String, existingWorktreePath: String?) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
-    val onAbortRebaseConflict: (PendingRebaseConflictResolution) -> Unit,
-    val onLeaveRebaseConflictAsIs: (PendingRebaseConflictResolution) -> Unit,
+    val onAbortWorktreeConflict: (PendingWorktreeConflictResolution) -> Unit,
+    val onLeaveRebaseConflictAsIs: (PendingWorktreeConflictResolution) -> Unit,
     val forceArchive: ForceArchiveWorktreeActions,
 )
 
@@ -118,10 +118,10 @@ internal fun WorktreeDialogHost(
         )
     }
 
-    state.rebaseConflictResolutionRequest?.let { request ->
-        RebaseConflictResolutionDialog(
+    state.worktreeConflictResolutionRequest?.let { request ->
+        WorktreeConflictResolutionDialog(
             request = request,
-            onAbort = { abortRebaseConflictDialog(request, actions.onAbortRebaseConflict) },
+            onAbort = { abortWorktreeConflictDialog(request, actions.onAbortWorktreeConflict) },
             onLeaveAsIs = { leaveRebaseConflictAsIsDialog(request, actions.onLeaveRebaseConflictAsIs) },
         )
     }
@@ -147,14 +147,15 @@ internal fun WorktreeDialogHost(
 }
 
 @Composable
-private fun RebaseConflictResolutionDialog(
-    request: PendingRebaseConflictResolution,
+private fun WorktreeConflictResolutionDialog(
+    request: PendingWorktreeConflictResolution,
     onAbort: () -> Unit,
     onLeaveAsIs: () -> Unit,
 ) {
+    val content = worktreeConflictDialogContent(request)
     DialogWindow(
         onCloseRequest = onLeaveAsIs,
-        title = "Rebase Conflict",
+        title = content.windowTitle,
         icon = painterResource(Res.drawable.icon),
         visible = true,
     ) {
@@ -166,19 +167,21 @@ private fun RebaseConflictResolutionDialog(
                         .fillMaxWidth()
                         .wrapContentHeight(),
                 ) {
-                    Text(text = "Rebase conflict", style = MaterialTheme.typography.h6)
+                    Text(text = content.heading, style = MaterialTheme.typography.h6)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Rebase onto ${request.parentBranch} stopped with conflicts in ${request.worktreePath}.")
+                    Text(content.summary)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Abort the rebase or leave the worktree as-is for manual conflict resolution.")
+                    Text(content.guidance)
                     Spacer(modifier = Modifier.height(16.dp))
                     Row {
                         Button(onClick = onAbort) {
                             Text("Abort")
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(onClick = onLeaveAsIs) {
-                            Text("Leave as-is")
+                        if (content.canLeaveAsIs) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = onLeaveAsIs) {
+                                Text("Leave as-is")
+                            }
                         }
                     }
                 }

@@ -86,6 +86,7 @@ interface GitRebaseCommandApi {
 
 interface GitMergeCommandApi {
     fun merge(repoPath: String, sourceRef: String)
+    fun abortMerge(repoPath: String)
 }
 
 interface GitWorkingTreeCommandApi {

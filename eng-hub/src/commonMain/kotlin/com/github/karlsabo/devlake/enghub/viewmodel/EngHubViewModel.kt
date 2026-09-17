@@ -157,9 +157,9 @@ class EngHubViewModel internal constructor(
     internal val useUnrelatedExistingBranchConfirmationRequestStateFlow:
         StateFlow<UseUnrelatedExistingBranchConfirmationRequest?> =
         state.useUnrelatedExistingBranchConfirmationRequest.asStateFlow()
-    internal val rebaseConflictResolutionRequestStateFlow:
-        StateFlow<RebaseConflictResolutionRequest?> =
-        MappedStateFlow(state.rebaseConflictResolutionRequests) { it.firstOrNull() }
+    internal val worktreeConflictResolutionRequestStateFlow:
+        StateFlow<WorktreeConflictResolutionRequest?> =
+        MappedStateFlow(state.worktreeConflictResolutionRequests) { it.firstOrNull() }
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.archivingLocalWorktreePaths.asStateFlow()
     val rebasingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
@@ -267,11 +267,14 @@ class EngHubViewModel internal constructor(
     val mergeLocalWorktreeWithParent: (String, String, String) -> Unit =
         mergeController::mergeLocalWorktreeWithParent
 
-    internal fun abortRebaseAfterConflict(request: RebaseConflictResolutionRequest) {
-        rebaseController.abortRebaseAfterConflict(request)
+    internal fun abortWorktreeConflict(request: WorktreeConflictResolutionRequest) {
+        when (request.operation) {
+            WorktreeIntegrationOperation.Rebase -> rebaseController.abortRebaseAfterConflict(request)
+            WorktreeIntegrationOperation.Merge -> mergeController.abortMergeAfterConflict(request)
+        }
     }
 
-    internal fun leaveRebaseConflictAsIs(request: RebaseConflictResolutionRequest) {
+    internal fun leaveRebaseConflictAsIs(request: WorktreeConflictResolutionRequest) {
         rebaseController.leaveRebaseConflictAsIs(request)
     }
 

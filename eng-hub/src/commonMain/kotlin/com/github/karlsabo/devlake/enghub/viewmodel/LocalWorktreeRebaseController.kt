@@ -55,7 +55,8 @@ internal class LocalWorktreeRebaseController(
         }
     }
 
-    fun abortRebaseAfterConflict(request: RebaseConflictResolutionRequest) {
+    fun abortRebaseAfterConflict(request: WorktreeConflictResolutionRequest) {
+        if (request.operation != WorktreeIntegrationOperation.Rebase) return
         val worktreeIdentity = request.worktreePath.normalizedRepositoryPath()
         if (!canAbortRebaseAfterConflict(request, request.repoRootPath, worktreeIdentity)) return
 
@@ -68,7 +69,7 @@ internal class LocalWorktreeRebaseController(
                 }
                     .rethrowCancellation()
                     .onSuccess {
-                        clearMatchingConflictRequest(request)
+                        clearWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request)
                         localRepositories.refreshLocalRepositoryWorktreesBestEffort(
                             repoRootPath = request.repoRootPath,
                             logContext = "after aborting rebase",
@@ -89,8 +90,9 @@ internal class LocalWorktreeRebaseController(
         }
     }
 
-    fun leaveRebaseConflictAsIs(request: RebaseConflictResolutionRequest) {
-        clearMatchingConflictRequest(request)
+    fun leaveRebaseConflictAsIs(request: WorktreeConflictResolutionRequest) {
+        if (request.operation != WorktreeIntegrationOperation.Rebase) return
+        clearWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request)
     }
 
     private fun handleRebaseFailure(
@@ -101,8 +103,10 @@ internal class LocalWorktreeRebaseController(
     ) {
         logger.error(failure) { "Failed to rebase worktree $worktreePath onto $parentBranch" }
         if (failure is GitRebaseConflictException) {
-            enqueueConflictRequest(
-                RebaseConflictResolutionRequest(
+            enqueueWorktreeConflictResolutionRequest(
+                state.worktreeConflictResolutionRequests,
+                WorktreeConflictResolutionRequest(
+                    operation = WorktreeIntegrationOperation.Rebase,
                     repoRootPath = repoRootPath,
                     worktreePath = worktreePath,
                     parentBranch = parentBranch,
@@ -117,30 +121,12 @@ internal class LocalWorktreeRebaseController(
         )
     }
 
-    private fun enqueueConflictRequest(request: RebaseConflictResolutionRequest) {
-        state.rebaseConflictResolutionRequests.update { requests ->
-            if (request in requests) requests else requests + request
-        }
-    }
-
     private fun canAbortRebaseAfterConflict(
-        request: RebaseConflictResolutionRequest,
+        request: WorktreeConflictResolutionRequest,
         repoRootPath: String,
         worktreePath: String,
     ): Boolean = repoRootPath.isNotEmpty() &&
         worktreePath.isNotEmpty() &&
-        hasConflictRequest(request) &&
+        hasWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request) &&
         abortingRebaseWorktreePaths.addPathIfAbsent(worktreePath)
-
-    private fun hasConflictRequest(
-        request: RebaseConflictResolutionRequest,
-    ): Boolean = request in state.rebaseConflictResolutionRequests.value
-
-    private fun clearMatchingConflictRequest(request: RebaseConflictResolutionRequest): Boolean {
-        while (true) {
-            val current = state.rebaseConflictResolutionRequests.value
-            if (request !in current) return false
-            if (state.rebaseConflictResolutionRequests.compareAndSet(current, current - request)) return true
-        }
-    }
 }

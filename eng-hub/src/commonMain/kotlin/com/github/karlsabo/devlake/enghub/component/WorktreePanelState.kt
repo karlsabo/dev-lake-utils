@@ -4,6 +4,7 @@ import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.devlake.enghub.viewmodel.WorktreeIntegrationOperation
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.github.GitHubRepositoryIdentity
@@ -21,7 +22,7 @@ internal data class WorktreePanelState(
     val repositoryCreateWorktreeRequest: PendingCreateWorktree? = null,
     val existingBranchDiscovery: ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(),
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch? = null,
-    val rebaseConflictResolutionRequest: PendingRebaseConflictResolution? = null,
+    val worktreeConflictResolutionRequest: PendingWorktreeConflictResolution? = null,
 )
 
 internal data class WorktreePanelActions(
@@ -34,8 +35,8 @@ internal data class WorktreePanelActions(
     val onCheckoutExistingBranch: (repoRootPath: String, branch: String, existingWorktreePath: String?) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
-    val onAbortRebaseConflict: (PendingRebaseConflictResolution) -> Unit,
-    val onLeaveRebaseConflictAsIs: (PendingRebaseConflictResolution) -> Unit,
+    val onAbortWorktreeConflict: (PendingWorktreeConflictResolution) -> Unit,
+    val onLeaveRebaseConflictAsIs: (PendingWorktreeConflictResolution) -> Unit,
     val worktrees: LocalWorktreeActions,
     val forceArchive: ForceArchiveWorktreeActions,
 )
@@ -121,7 +122,8 @@ internal data class PendingUseUnrelatedExistingBranch(
     val targetBranch: String,
 )
 
-internal data class PendingRebaseConflictResolution(
+internal data class PendingWorktreeConflictResolution(
+    val operation: WorktreeIntegrationOperation,
     val repoRootPath: String,
     val worktreePath: String,
     val parentBranch: String,
@@ -170,16 +172,44 @@ internal fun dismissUseUnrelatedExistingBranchDialog(onDismiss: () -> Unit) {
     onDismiss()
 }
 
-internal fun abortRebaseConflictDialog(
-    state: PendingRebaseConflictResolution,
-    onAbort: (PendingRebaseConflictResolution) -> Unit,
+internal fun abortWorktreeConflictDialog(
+    state: PendingWorktreeConflictResolution,
+    onAbort: (PendingWorktreeConflictResolution) -> Unit,
 ) {
     onAbort(state)
 }
 
 internal fun leaveRebaseConflictAsIsDialog(
-    state: PendingRebaseConflictResolution,
-    onLeaveAsIs: (PendingRebaseConflictResolution) -> Unit,
+    state: PendingWorktreeConflictResolution,
+    onLeaveAsIs: (PendingWorktreeConflictResolution) -> Unit,
 ) {
     onLeaveAsIs(state)
+}
+
+internal data class WorktreeConflictDialogContent(
+    val windowTitle: String,
+    val heading: String,
+    val summary: String,
+    val guidance: String,
+    val canLeaveAsIs: Boolean,
+)
+
+internal fun worktreeConflictDialogContent(
+    request: PendingWorktreeConflictResolution,
+): WorktreeConflictDialogContent = when (request.operation) {
+    WorktreeIntegrationOperation.Rebase -> WorktreeConflictDialogContent(
+        windowTitle = "Rebase Conflict",
+        heading = "Rebase conflict",
+        summary = "Rebase onto ${request.parentBranch} stopped with conflicts in ${request.worktreePath}.",
+        guidance = "Abort the rebase or leave the worktree as-is for manual conflict resolution.",
+        canLeaveAsIs = true,
+    )
+
+    WorktreeIntegrationOperation.Merge -> WorktreeConflictDialogContent(
+        windowTitle = "Merge Conflict",
+        heading = "Merge conflict",
+        summary = "Merge of ${request.parentBranch} into ${request.worktreePath} stopped with conflicts.",
+        guidance = "Abort the merge to restore the worktree.",
+        canLeaveAsIs = false,
+    )
 }

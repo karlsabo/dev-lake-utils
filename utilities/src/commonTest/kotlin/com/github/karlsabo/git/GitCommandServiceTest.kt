@@ -375,6 +375,36 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun abortMerge_abortsMergeInCurrentWorktree() {
+        val repoDir = createTempDir("repo")
+        val worktreeDir = createTempDir("wt")
+        removeTempDir(worktreeDir)
+        try {
+            initRepoWithCommit(repoDir)
+            executeGit("-C", repoDir, "branch", "feature/base-pr")
+            executeGit("-C", repoDir, "checkout", "-b", "feature/stacked-pr", "feature/base-pr")
+            writeFixtureFile(repoDir, "README.md", "child\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "child")
+            executeGit("-C", repoDir, "checkout", "feature/base-pr")
+            writeFixtureFile(repoDir, "README.md", "parent\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "parent")
+            service.worktreeAdd(repoDir, worktreeDir, "feature/stacked-pr")
+
+            assertFailsWith<GitCommandException> {
+                service.merge(worktreeDir, "feature/base-pr")
+            }
+            service.abortMerge(worktreeDir)
+
+            assertEquals("", service.status(worktreeDir))
+        } finally {
+            removeTempDir(repoDir)
+            removeTempDir(worktreeDir)
+        }
+    }
+
+    @Test
     fun abortRebase_abortsRebaseInCurrentWorktree() {
         val repoDir = createTempDir("repo")
         val worktreeDir = createTempDir("wt")

@@ -96,6 +96,10 @@ interface GitWorktreeMergeApi {
     ): Unit = throw UnsupportedOperationException(
         "mergeWorktreeWithParent is not implemented",
     )
+
+    fun abortMerge(worktreePath: String): Unit = throw UnsupportedOperationException(
+        "abortMerge is not implemented",
+    )
 }
 
 data class RefreshedExistingBranches(

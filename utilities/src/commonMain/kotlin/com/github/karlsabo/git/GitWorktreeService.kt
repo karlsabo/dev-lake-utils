@@ -24,7 +24,19 @@ class GitRebaseConflictException(
     val worktreePath: String,
     val parentBranch: String,
     cause: Throwable,
-) : GitWorktreeException(rebaseConflictMessage(worktreePath, parentBranch), cause)
+) : GitWorktreeException(
+    "Rebase conflict while rebasing worktree $worktreePath onto $parentBranch",
+    cause,
+)
+
+class GitMergeConflictException(
+    val worktreePath: String,
+    val parentBranch: String,
+    cause: Throwable,
+) : GitWorktreeException(
+    "Merge conflict while merging $parentBranch into worktree $worktreePath",
+    cause,
+)
 
 class DivergedParentBranchException(
     val parentBranch: String,
@@ -92,8 +104,9 @@ private fun buildGitWorktreeServiceParts(
     val parentInferer = GitWorktreeParentInferer(gitCommandApi, lister, defaultBranchRefResolver, logWarning)
     val archiver = GitWorktreeArchiver(gitCommandApi, deleteCheckoutDirectory)
     val integrationRefResolver = GitWorktreeIntegrationRefResolver(gitCommandApi, branchValidator)
-    val rebaser = GitWorktreeRebaser(gitCommandApi, integrationRefResolver)
-    val merger = GitWorktreeMerger(gitCommandApi, integrationRefResolver)
+    val operationStateDetector = GitOperationStateDetector(gitCommandApi)
+    val rebaser = GitWorktreeRebaser(gitCommandApi, integrationRefResolver, operationStateDetector)
+    val merger = GitWorktreeMerger(gitCommandApi, integrationRefResolver, operationStateDetector)
 
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
@@ -231,6 +244,10 @@ private class GitWorktreeMergeService(
         parentBranch: String,
     ) {
         merger.mergeWorktreeWithParent(worktreePath, parentBranch)
+    }
+
+    override fun abortMerge(worktreePath: String) {
+        merger.abortMerge(worktreePath)
     }
 }
 
@@ -661,11 +678,6 @@ private fun existingTargetBranchAncestryFailureMessage(
 ): String = "Existing branch $targetBranch is not descended from selected base $baseBranch. " +
     "Choose a different branch or start from the correct base."
 
-private fun rebaseConflictMessage(
-    worktreePath: String,
-    parentBranch: String,
-): String = "Rebase conflict while rebasing worktree $worktreePath onto $parentBranch"
-
 private fun divergedParentBranchFailureMessage(
     parentBranch: String,
     remoteTrackingRef: String,
@@ -1090,9 +1102,30 @@ private class GitWorktreeIntegrationRefResolver(
     }
 }
 
+private class GitOperationStateDetector(
+    private val gitCommandApi: GitCommandApi,
+) {
+    fun isInProgress(worktreePath: String, vararg stateEntries: String): Boolean = stateEntries.any { stateEntry ->
+        statePath(worktreePath, stateEntry)?.let { SystemFileSystem.exists(it) } == true
+    }
+
+    private fun statePath(worktreePath: String, stateEntry: String): Path? {
+        val gitPath = try {
+            gitCommandApi.revParse(worktreePath, "--git-path", stateEntry)
+        } catch (_: GitCommandException) {
+            null
+        }?.takeIf { it.isNotBlank() }
+
+        return gitPath?.let { if (it.isAbsolutePath()) Path(it) else Path(worktreePath, it) }
+    }
+
+    private fun String.isAbsolutePath(): Boolean = startsWith("/") || matches(Regex("^[A-Za-z]:[\\\\/].*"))
+}
+
 private class GitWorktreeRebaser(
     private val gitCommandApi: GitCommandApi,
     private val upstreamResolver: GitWorktreeIntegrationRefResolver,
+    private val operationStateDetector: GitOperationStateDetector,
 ) {
     fun rebaseWorktreeOntoParent(
         worktreePath: String,
@@ -1103,7 +1136,7 @@ private class GitWorktreeRebaser(
         try {
             gitCommandApi.rebase(worktreePath, upstreamRef)
         } catch (e: GitCommandException) {
-            if (rebaseInProgress(worktreePath)) {
+            if (operationStateDetector.isInProgress(worktreePath, REBASE_MERGE_STATE_ENTRY, REBASE_APPLY_STATE_ENTRY)) {
                 throw GitRebaseConflictException(
                     worktreePath = worktreePath,
                     parentBranch = upstreamRef,
@@ -1129,26 +1162,16 @@ private class GitWorktreeRebaser(
         }
     }
 
-    private fun rebaseInProgress(worktreePath: String): Boolean = listOf("rebase-merge", "rebase-apply")
-        .mapNotNull { rebaseStatePath(worktreePath, it) }
-        .any { SystemFileSystem.exists(it) }
-
-    private fun rebaseStatePath(worktreePath: String, stateDirectory: String): Path? {
-        val gitPath = try {
-            gitCommandApi.revParse(worktreePath, "--git-path", stateDirectory)
-        } catch (_: GitCommandException) {
-            null
-        }?.takeIf { it.isNotBlank() }
-
-        return gitPath?.let { if (it.isAbsolutePath()) Path(it) else Path(worktreePath, it) }
+    private companion object {
+        const val REBASE_MERGE_STATE_ENTRY = "rebase-merge"
+        const val REBASE_APPLY_STATE_ENTRY = "rebase-apply"
     }
-
-    private fun String.isAbsolutePath(): Boolean = startsWith("/") || matches(Regex("^[A-Za-z]:[\\\\/].*"))
 }
 
 private class GitWorktreeMerger(
     private val gitCommandApi: GitCommandApi,
     private val integrationRefResolver: GitWorktreeIntegrationRefResolver,
+    private val operationStateDetector: GitOperationStateDetector,
 ) {
     fun mergeWorktreeWithParent(
         worktreePath: String,
@@ -1159,11 +1182,34 @@ private class GitWorktreeMerger(
         try {
             gitCommandApi.merge(worktreePath, sourceRef)
         } catch (e: GitCommandException) {
+            if (operationStateDetector.isInProgress(worktreePath, MERGE_HEAD_STATE_ENTRY)) {
+                throw GitMergeConflictException(
+                    worktreePath = worktreePath,
+                    parentBranch = sourceRef,
+                    cause = e,
+                )
+            }
             throw GitWorktreeException(
                 "Failed to merge $sourceRef into worktree $worktreePath: ${e.gitOutput}",
                 e,
             )
         }
+    }
+
+    fun abortMerge(worktreePath: String) {
+        require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
+        try {
+            gitCommandApi.abortMerge(worktreePath)
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to abort merge in worktree $worktreePath: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+
+    private companion object {
+        const val MERGE_HEAD_STATE_ENTRY = "MERGE_HEAD"
     }
 }
 

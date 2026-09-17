@@ -248,6 +248,10 @@ private class GitMergeCommandService(
     override fun merge(repoPath: String, sourceRef: String) {
         commandRunner.run(gitRepoCommand(repoPath, "merge", "--autostash", sourceRef))
     }
+
+    override fun abortMerge(repoPath: String) {
+        commandRunner.run(gitRepoCommand(repoPath, "merge", "--abort"))
+    }
 }
 
 private class GitWorkingTreeCommandService(

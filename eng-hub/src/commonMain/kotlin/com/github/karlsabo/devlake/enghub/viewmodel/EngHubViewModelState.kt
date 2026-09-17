@@ -45,7 +45,13 @@ internal data class UseUnrelatedExistingBranchConfirmationRequest(
     val targetBranch: String,
 )
 
-internal data class RebaseConflictResolutionRequest(
+internal enum class WorktreeIntegrationOperation {
+    Rebase,
+    Merge,
+}
+
+internal data class WorktreeConflictResolutionRequest(
+    val operation: WorktreeIntegrationOperation,
     val repoRootPath: String,
     val worktreePath: String,
     val parentBranch: String,
@@ -123,8 +129,8 @@ internal class EngHubViewModelState(
     val globalExistingBranchDiscovery = MutableStateFlow(GlobalExistingBranchDiscoveryState())
     val useUnrelatedExistingBranchConfirmationRequest =
         MutableStateFlow<UseUnrelatedExistingBranchConfirmationRequest?>(null)
-    val rebaseConflictResolutionRequests =
-        MutableStateFlow<List<RebaseConflictResolutionRequest>>(emptyList())
+    val worktreeConflictResolutionRequests =
+        MutableStateFlow<List<WorktreeConflictResolutionRequest>>(emptyList())
     val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val rebasingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val mergingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())

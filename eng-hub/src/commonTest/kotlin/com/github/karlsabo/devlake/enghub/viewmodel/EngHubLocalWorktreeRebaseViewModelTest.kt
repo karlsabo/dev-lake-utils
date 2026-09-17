@@ -174,10 +174,11 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
 
         val request = withTimeout(2_000.milliseconds) {
-            viewModel.rebaseConflictResolutionRequestStateFlow.first { it != null }
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
         assertEquals(
-            RebaseConflictResolutionRequest(
+            WorktreeConflictResolutionRequest(
+                operation = WorktreeIntegrationOperation.Rebase,
                 repoRootPath = DEV_LAKE_ROOT,
                 worktreePath = childWorktreePath,
                 parentBranch = parentBranch,
@@ -186,14 +187,14 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         )
         assertEquals(null, viewModel.actionErrorStateFlow.value)
 
-        viewModel.abortRebaseAfterConflict(request!!)
+        viewModel.abortWorktreeConflict(request!!)
         withTimeout(2_000.milliseconds) { abortCalled.await() }
         withTimeout(2_000.milliseconds) {
             viewModel.rebasingLocalWorktreePathsStateFlow.first { it.isEmpty() }
         }
 
         assertEquals(listOf(AbortRebaseCall(childWorktreePath)), api.abortRebaseCalls)
-        assertEquals(null, viewModel.rebaseConflictResolutionRequestStateFlow.value)
+        assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
     }
 
     @Test
@@ -233,12 +234,12 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         }
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
         val request = withTimeout(2_000.milliseconds) {
-            viewModel.rebaseConflictResolutionRequestStateFlow.first { it != null }
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
-        viewModel.abortRebaseAfterConflict(request!!)
+        viewModel.abortWorktreeConflict(request!!)
         withTimeout(2_000.milliseconds) { firstAbortStarted.await() }
 
-        viewModel.abortRebaseAfterConflict(request)
+        viewModel.abortWorktreeConflict(request)
 
         assertEquals(null, withTimeoutOrNull(100.milliseconds) { overlappingAbortStarted.await() })
         releaseFirstAbort.complete(Unit)
@@ -246,7 +247,7 @@ class EngHubLocalWorktreeRebaseViewModelTest {
             viewModel.rebasingLocalWorktreePathsStateFlow.first { it.isEmpty() }
         }
         assertEquals(listOf(AbortRebaseCall(childWorktreePath)), api.abortRebaseCalls)
-        assertEquals(null, viewModel.rebaseConflictResolutionRequestStateFlow.value)
+        assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
         assertEquals(null, viewModel.actionErrorStateFlow.value)
     }
 
@@ -286,17 +287,17 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         }
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
         val request = withTimeout(2_000.milliseconds) {
-            viewModel.rebaseConflictResolutionRequestStateFlow.first { it != null }
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
 
-        viewModel.abortRebaseAfterConflict(request!!)
+        viewModel.abortWorktreeConflict(request!!)
 
         val actionError = withTimeout(2_000.milliseconds) {
             viewModel.actionErrorStateFlow.first { it != null }
         }
         assertEquals("abort failed", actionError?.message)
         assertEquals(listOf(AbortRebaseCall(childWorktreePath)), api.abortRebaseCalls)
-        assertEquals(request, viewModel.rebaseConflictResolutionRequestStateFlow.value)
+        assertEquals(request, viewModel.worktreeConflictResolutionRequestStateFlow.value)
     }
 
     @Test
@@ -339,7 +340,7 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         }
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, firstChildWorktreePath, parentBranch)
         val firstRequest = withTimeout(2_000.milliseconds) {
-            viewModel.rebaseConflictResolutionRequestStateFlow.first { it != null }
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, secondChildWorktreePath, parentBranch)
         withTimeout(2_000.milliseconds) {
@@ -348,16 +349,17 @@ class EngHubLocalWorktreeRebaseViewModelTest {
             }
         }
 
-        val secondRequest = RebaseConflictResolutionRequest(
+        val secondRequest = WorktreeConflictResolutionRequest(
+            operation = WorktreeIntegrationOperation.Rebase,
             repoRootPath = DEV_LAKE_ROOT,
             worktreePath = secondChildWorktreePath,
             parentBranch = parentBranch,
         )
-        assertEquals(firstRequest, viewModel.rebaseConflictResolutionRequestStateFlow.value)
+        assertEquals(firstRequest, viewModel.worktreeConflictResolutionRequestStateFlow.value)
 
         viewModel.leaveRebaseConflictAsIs(firstRequest!!)
 
-        assertEquals(secondRequest, viewModel.rebaseConflictResolutionRequestStateFlow.value)
+        assertEquals(secondRequest, viewModel.worktreeConflictResolutionRequestStateFlow.value)
     }
 
     @Test
@@ -397,12 +399,12 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
 
         val request = withTimeout(2_000.milliseconds) {
-            viewModel.rebaseConflictResolutionRequestStateFlow.first { it != null }
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
         viewModel.leaveRebaseConflictAsIs(request!!)
 
         assertEquals(emptyList(), api.abortRebaseCalls)
-        assertEquals(null, viewModel.rebaseConflictResolutionRequestStateFlow.value)
+        assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
         assertEquals(null, viewModel.actionErrorStateFlow.value)
     }
 
@@ -451,10 +453,10 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
 
         val request = withTimeout(2_000.milliseconds) {
-            viewModel.rebaseConflictResolutionRequestStateFlow.first { it != null }
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
         viewModel.leaveRebaseConflictAsIs(request!!)
-        viewModel.abortRebaseAfterConflict(request)
+        viewModel.abortWorktreeConflict(request)
 
         val staleAbortStarted = withTimeoutOrNull(100.milliseconds) { abortStarted.await() }
         releaseAbort.complete(Unit)
@@ -530,7 +532,7 @@ class EngHubLocalWorktreeRebaseViewModelTest {
             viewModel.actionErrorStateFlow.first { it != null }
         }
         assertTrue(actionError?.message.orEmpty().contains(gitOutput))
-        assertEquals(null, viewModel.rebaseConflictResolutionRequestStateFlow.value)
+        assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
         withTimeout(2_000.milliseconds) {
             viewModel.rebasingLocalWorktreePathsStateFlow.first { it.isEmpty() }
         }

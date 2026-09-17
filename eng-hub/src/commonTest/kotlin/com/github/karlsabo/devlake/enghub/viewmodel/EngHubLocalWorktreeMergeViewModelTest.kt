@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.git.GitMergeConflictException
 import com.github.karlsabo.git.Worktree
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
@@ -175,5 +176,173 @@ class EngHubLocalWorktreeMergeViewModelTest {
         )
         assertEquals(listOf(DEV_LAKE_ROOT, DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
         assertEquals(emptySet(), viewModel.mergingLocalWorktreePathsStateFlow.value)
+    }
+
+    @Test
+    fun mergeLocalWorktreeWithParentConflictPromptsAndAbortAbortsMerge() = runBlocking {
+        val childWorktreePath = "$DEV_LAKE_ROOT-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val worktrees = listOf(
+            Worktree(path = "$DEV_LAKE_ROOT-feature-base-pr", branch = parentBranch, commitHash = "abc123"),
+            Worktree(path = childWorktreePath, branch = "feature/stacked-pr", commitHash = "def456"),
+        )
+        val abortCalled = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to parentBranch),
+                ),
+                mergeWorktreeFailure = GitMergeConflictException(
+                    worktreePath = childWorktreePath,
+                    parentBranch = parentBranch,
+                    cause = RuntimeException("conflict"),
+                ),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onAbortMerge = { abortCalled.complete(Unit) },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+
+        viewModel.mergeLocalWorktreeWithParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
+
+        val request = withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
+        }
+        assertEquals(
+            WorktreeConflictResolutionRequest(
+                operation = WorktreeIntegrationOperation.Merge,
+                repoRootPath = DEV_LAKE_ROOT,
+                worktreePath = childWorktreePath,
+                parentBranch = parentBranch,
+            ),
+            request,
+        )
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+
+        viewModel.abortWorktreeConflict(request!!)
+        withTimeout(2_000.milliseconds) { abortCalled.await() }
+        withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it == null }
+        }
+
+        assertEquals(listOf(AbortMergeCall(childWorktreePath)), api.abortMergeCalls)
+        assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
+    }
+
+    @Test
+    fun failedAbortMergeAfterConflictKeepsPromptVisibleForRetry() = runBlocking {
+        val childWorktreePath = "$DEV_LAKE_ROOT-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val worktrees = listOf(
+            Worktree(path = "$DEV_LAKE_ROOT-feature-base-pr", branch = parentBranch, commitHash = "abc123"),
+            Worktree(path = childWorktreePath, branch = "feature/stacked-pr", commitHash = "def456"),
+        )
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to parentBranch),
+                ),
+                mergeWorktreeFailure = GitMergeConflictException(
+                    worktreePath = childWorktreePath,
+                    parentBranch = parentBranch,
+                    cause = RuntimeException("conflict"),
+                ),
+                abortMergeFailure = RuntimeException("abort failed"),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+        viewModel.mergeLocalWorktreeWithParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
+        val request = withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
+        }
+
+        viewModel.abortWorktreeConflict(request!!)
+
+        val actionError = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+        assertEquals("abort failed", actionError?.message)
+        assertEquals(listOf(AbortMergeCall(childWorktreePath)), api.abortMergeCalls)
+        assertEquals(request, viewModel.worktreeConflictResolutionRequestStateFlow.value)
+    }
+
+    @Test
+    fun staleMergeConflictAbortRequestDoesNotAbortAgain() = runBlocking {
+        val childWorktreePath = "$DEV_LAKE_ROOT-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val worktrees = listOf(
+            Worktree(path = "$DEV_LAKE_ROOT-feature-base-pr", branch = parentBranch, commitHash = "abc123"),
+            Worktree(path = childWorktreePath, branch = "feature/stacked-pr", commitHash = "def456"),
+        )
+        val abortCalled = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to parentBranch),
+                ),
+                mergeWorktreeFailure = GitMergeConflictException(
+                    worktreePath = childWorktreePath,
+                    parentBranch = parentBranch,
+                    cause = RuntimeException("conflict"),
+                ),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onAbortMerge = { abortCalled.complete(Unit) },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+        viewModel.mergeLocalWorktreeWithParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
+        val request = withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
+        }
+        viewModel.abortWorktreeConflict(request!!)
+        withTimeout(2_000.milliseconds) { abortCalled.await() }
+        withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it == null }
+        }
+
+        viewModel.abortWorktreeConflict(request)
+        withTimeout(2_000.milliseconds) {
+            viewModel.mergingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+
+        assertEquals(listOf(AbortMergeCall(childWorktreePath)), api.abortMergeCalls)
     }
 }

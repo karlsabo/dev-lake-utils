@@ -7,8 +7,8 @@ import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.GlobalExistingBranchDiscoveryUiState
 import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
-import com.github.karlsabo.devlake.enghub.component.PendingRebaseConflictResolution
 import com.github.karlsabo.devlake.enghub.component.PendingUseUnrelatedExistingBranch
+import com.github.karlsabo.devlake.enghub.component.PendingWorktreeConflictResolution
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.component.createRepositoryWorktreeDialogState
@@ -18,8 +18,8 @@ import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.ActionErrorUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
-import com.github.karlsabo.devlake.enghub.viewmodel.RebaseConflictResolutionRequest
 import com.github.karlsabo.devlake.enghub.viewmodel.UseUnrelatedExistingBranchConfirmationRequest
+import com.github.karlsabo.devlake.enghub.viewmodel.WorktreeConflictResolutionRequest
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
@@ -117,7 +117,8 @@ internal fun collectEngHubScreenState(
     val existingBranchDiscovery by viewModel.existingBranchDiscoveryStateFlow.collectAsState()
     val useUnrelatedExistingBranchRequest by
         viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.collectAsState()
-    val rebaseConflictResolutionRequest by viewModel.rebaseConflictResolutionRequestStateFlow.collectAsState()
+    val worktreeConflictResolutionRequest by
+        viewModel.worktreeConflictResolutionRequestStateFlow.collectAsState()
     val globalExistingBranchDiscovery by viewModel.globalExistingBranchDiscoveryStateFlow.collectAsState()
 
     return EngHubScreenState(
@@ -152,7 +153,7 @@ internal fun collectEngHubScreenState(
             },
             existingBranchDiscovery = existingBranchDiscovery.toUiState(),
             useUnrelatedExistingBranchConfirmationRequest = useUnrelatedExistingBranchRequest?.toPendingConfirmation(),
-            rebaseConflictResolutionRequest = rebaseConflictResolutionRequest?.toPendingResolution(),
+            worktreeConflictResolutionRequest = worktreeConflictResolutionRequest?.toPendingResolution(),
         ),
         settings = settings,
     )
@@ -225,8 +226,8 @@ private fun engHubWorktreePanelActions(viewModel: EngHubViewModel) = WorktreePan
         viewModel.confirmUseUnrelatedExistingBranch(request.toViewModelRequest())
     },
     onDismissUseUnrelatedExistingBranchConfirmation = viewModel::dismissUseUnrelatedExistingBranchConfirmation,
-    onAbortRebaseConflict = { request ->
-        viewModel.abortRebaseAfterConflict(request.toViewModelRequest())
+    onAbortWorktreeConflict = { request ->
+        viewModel.abortWorktreeConflict(request.toViewModelRequest())
     },
     onLeaveRebaseConflictAsIs = { request ->
         viewModel.leaveRebaseConflictAsIs(request.toViewModelRequest())
@@ -303,8 +304,9 @@ private fun PendingUseUnrelatedExistingBranch.toViewModelRequest(): UseUnrelated
     return viewModelRequest
 }
 
-private fun RebaseConflictResolutionRequest.toPendingResolution(): PendingRebaseConflictResolution {
-    val pendingRequest = PendingRebaseConflictResolution(
+private fun WorktreeConflictResolutionRequest.toPendingResolution(): PendingWorktreeConflictResolution {
+    val pendingRequest = PendingWorktreeConflictResolution(
+        operation = operation,
         repoRootPath = repoRootPath,
         worktreePath = worktreePath,
         parentBranch = parentBranch,
@@ -312,8 +314,9 @@ private fun RebaseConflictResolutionRequest.toPendingResolution(): PendingRebase
     return pendingRequest
 }
 
-private fun PendingRebaseConflictResolution.toViewModelRequest(): RebaseConflictResolutionRequest {
-    val viewModelRequest = RebaseConflictResolutionRequest(
+private fun PendingWorktreeConflictResolution.toViewModelRequest(): WorktreeConflictResolutionRequest {
+    val viewModelRequest = WorktreeConflictResolutionRequest(
+        operation = operation,
         repoRootPath = repoRootPath,
         worktreePath = worktreePath,
         parentBranch = parentBranch,

@@ -448,6 +448,10 @@ data class MergeWorktreeWithParentCall(
     val parentBranch: String,
 )
 
+data class AbortMergeCall(
+    val worktreePath: String,
+)
+
 data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
@@ -467,6 +471,7 @@ data class RecordingGitWorktreeApiResponses(
     val rebaseWorktreeFailure: RuntimeException? = null,
     val abortRebaseFailure: RuntimeException? = null,
     val mergeWorktreeFailure: RuntimeException? = null,
+    val abortMergeFailure: RuntimeException? = null,
 )
 
 data class RecordingGitWorktreeApiCallbacks(
@@ -485,6 +490,7 @@ data class RecordingGitWorktreeApiCallbacks(
     val onRebaseWorktreeOntoParent: (RebaseWorktreeOntoParentCall) -> Unit = {},
     val onAbortRebase: (AbortRebaseCall) -> Unit = {},
     val onMergeWorktreeWithParent: (MergeWorktreeWithParentCall) -> Unit = {},
+    val onAbortMerge: (AbortMergeCall) -> Unit = {},
 )
 
 class RecordingGitWorktreeApi(
@@ -530,6 +536,7 @@ class RecordingGitWorktreeApi(
     val rebaseWorktreeOntoParentCalls = mutableListOf<RebaseWorktreeOntoParentCall>()
     val abortRebaseCalls = mutableListOf<AbortRebaseCall>()
     val mergeWorktreeWithParentCalls = mutableListOf<MergeWorktreeWithParentCall>()
+    val abortMergeCalls = mutableListOf<AbortMergeCall>()
     val archiveWorktreeCalls = mutableListOf<Pair<String, String>>()
     val archiveWorktreeForceValues = mutableListOf<Boolean>()
     private val worktreesByRepoPath = responses.worktreesByRepoPath
@@ -680,6 +687,13 @@ class RecordingGitWorktreeApi(
         mergeWorktreeWithParentCalls += call
         responses.mergeWorktreeFailure?.let { throw it }
         callbacks.onMergeWorktreeWithParent(call)
+    }
+
+    override fun abortMerge(worktreePath: String) {
+        val call = AbortMergeCall(worktreePath)
+        abortMergeCalls += call
+        responses.abortMergeFailure?.let { throw it }
+        callbacks.onAbortMerge(call)
     }
 
     override fun archiveWorktree(
