@@ -91,7 +91,8 @@ internal class LocalWorktreeRebaseController(
     }
 
     fun leaveRebaseConflictAsIs(request: WorktreeConflictResolutionRequest) {
-        if (request.operation != WorktreeIntegrationOperation.Rebase) return
+        // Window close/Escape dismisses the prompt for every operation. Merge needs this escape hatch
+        // when its abort fails; explicit merge leave-as-is UI arrives in Story 9.
         clearWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request)
     }
 

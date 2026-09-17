@@ -234,12 +234,56 @@ class EngHubLocalWorktreeMergeViewModelTest {
 
         viewModel.abortWorktreeConflict(request!!)
         withTimeout(2_000.milliseconds) { abortCalled.await() }
-        withTimeout(2_000.milliseconds) {
-            viewModel.worktreeConflictResolutionRequestStateFlow.first { it == null }
-        }
+        awaitConflictPromptClearedAndMergeIdle(viewModel)
 
         assertEquals(listOf(AbortMergeCall(childWorktreePath)), api.abortMergeCalls)
+        assertEquals(listOf(DEV_LAKE_ROOT, DEV_LAKE_ROOT, DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
         assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
+    }
+
+    @Test
+    fun leavingMergeConflictAsIsDismissesPromptWithoutAborting() = runBlocking {
+        val childWorktreePath = "$DEV_LAKE_ROOT-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val worktrees = listOf(
+            Worktree(path = "$DEV_LAKE_ROOT-feature-base-pr", branch = parentBranch, commitHash = "abc123"),
+            Worktree(path = childWorktreePath, branch = "feature/stacked-pr", commitHash = "def456"),
+        )
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to parentBranch),
+                ),
+                mergeWorktreeFailure = GitMergeConflictException(
+                    worktreePath = childWorktreePath,
+                    parentBranch = parentBranch,
+                    cause = RuntimeException("conflict"),
+                ),
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+        viewModel.mergeLocalWorktreeWithParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
+        val request = withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
+        }
+
+        viewModel.leaveRebaseConflictAsIs(request!!)
+
+        assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
+        assertEquals(emptyList(), api.abortMergeCalls)
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
     }
 
     @Test
@@ -344,5 +388,14 @@ class EngHubLocalWorktreeMergeViewModelTest {
         }
 
         assertEquals(listOf(AbortMergeCall(childWorktreePath)), api.abortMergeCalls)
+    }
+
+    private suspend fun awaitConflictPromptClearedAndMergeIdle(viewModel: EngHubViewModel) {
+        withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it == null }
+        }
+        withTimeout(2_000.milliseconds) {
+            viewModel.mergingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
     }
 }

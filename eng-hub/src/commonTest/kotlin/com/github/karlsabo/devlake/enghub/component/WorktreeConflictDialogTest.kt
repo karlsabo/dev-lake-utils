@@ -39,6 +39,16 @@ class WorktreeConflictDialogTest {
     }
 
     @Test
+    fun dismissingMergeConflictDialogCallsBoundaryWithOriginalRequest() {
+        val requests = mutableListOf<PendingWorktreeConflictResolution>()
+        val request = conflictRequest(WorktreeIntegrationOperation.Merge)
+
+        leaveRebaseConflictAsIsDialog(request) { requests += it }
+
+        assertEquals(listOf(request), requests)
+    }
+
+    @Test
     fun rebaseConflictContentOffersAbortAndLeaveWithRebaseWording() {
         val content = worktreeConflictDialogContent(conflictRequest(WorktreeIntegrationOperation.Rebase))
 
