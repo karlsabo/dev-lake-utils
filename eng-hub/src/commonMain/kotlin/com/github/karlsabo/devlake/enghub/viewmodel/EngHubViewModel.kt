@@ -274,8 +274,9 @@ class EngHubViewModel internal constructor(
         }
     }
 
-    internal fun leaveRebaseConflictAsIs(request: WorktreeConflictResolutionRequest) {
-        rebaseController.leaveRebaseConflictAsIs(request)
+    /** Dismisses the exact matching conflict prompt without aborting or refreshing the worktree. */
+    internal fun leaveWorktreeConflictAsIs(request: WorktreeConflictResolutionRequest) {
+        clearWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request)
     }
 
     val confirmForceArchiveLocalWorktree: (String, String) -> Unit =

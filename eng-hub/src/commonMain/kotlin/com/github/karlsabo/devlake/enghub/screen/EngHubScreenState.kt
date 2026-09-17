@@ -229,8 +229,8 @@ private fun engHubWorktreePanelActions(viewModel: EngHubViewModel) = WorktreePan
     onAbortWorktreeConflict = { request ->
         viewModel.abortWorktreeConflict(request.toViewModelRequest())
     },
-    onLeaveRebaseConflictAsIs = { request ->
-        viewModel.leaveRebaseConflictAsIs(request.toViewModelRequest())
+    onLeaveWorktreeConflictAsIs = { request ->
+        viewModel.leaveWorktreeConflictAsIs(request.toViewModelRequest())
     },
     worktrees = localWorktreeActions(viewModel),
     forceArchive = ForceArchiveWorktreeActions(

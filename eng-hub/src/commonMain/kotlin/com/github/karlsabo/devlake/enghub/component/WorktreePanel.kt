@@ -75,7 +75,7 @@ internal fun WorktreePanel(
             onConfirmUseUnrelatedExistingBranch = actions.onConfirmUseUnrelatedExistingBranch,
             onDismissUseUnrelatedExistingBranchConfirmation = actions.onDismissUseUnrelatedExistingBranchConfirmation,
             onAbortWorktreeConflict = actions.onAbortWorktreeConflict,
-            onLeaveRebaseConflictAsIs = actions.onLeaveRebaseConflictAsIs,
+            onLeaveWorktreeConflictAsIs = actions.onLeaveWorktreeConflictAsIs,
             forceArchive = actions.forceArchive,
         ),
     )

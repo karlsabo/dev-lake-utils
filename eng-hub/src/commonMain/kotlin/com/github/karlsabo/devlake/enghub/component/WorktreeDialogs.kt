@@ -54,7 +54,7 @@ internal data class WorktreeDialogActions(
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val onAbortWorktreeConflict: (PendingWorktreeConflictResolution) -> Unit,
-    val onLeaveRebaseConflictAsIs: (PendingWorktreeConflictResolution) -> Unit,
+    val onLeaveWorktreeConflictAsIs: (PendingWorktreeConflictResolution) -> Unit,
     val forceArchive: ForceArchiveWorktreeActions,
 )
 
@@ -122,7 +122,7 @@ internal fun WorktreeDialogHost(
         WorktreeConflictResolutionDialog(
             request = request,
             onAbort = { abortWorktreeConflictDialog(request, actions.onAbortWorktreeConflict) },
-            onLeaveAsIs = { leaveRebaseConflictAsIsDialog(request, actions.onLeaveRebaseConflictAsIs) },
+            onLeaveAsIs = { leaveWorktreeConflictAsIsDialog(request, actions.onLeaveWorktreeConflictAsIs) },
         )
     }
 

@@ -3,7 +3,6 @@ package com.github.karlsabo.devlake.enghub.component
 import com.github.karlsabo.devlake.enghub.viewmodel.WorktreeIntegrationOperation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WorktreeConflictDialogTest {
@@ -33,17 +32,17 @@ class WorktreeConflictDialogTest {
         val requests = mutableListOf<PendingWorktreeConflictResolution>()
         val request = conflictRequest(WorktreeIntegrationOperation.Rebase)
 
-        leaveRebaseConflictAsIsDialog(request) { requests += it }
+        leaveWorktreeConflictAsIsDialog(request) { requests += it }
 
         assertEquals(listOf(request), requests)
     }
 
     @Test
-    fun dismissingMergeConflictDialogCallsBoundaryWithOriginalRequest() {
+    fun leavingOrDismissingMergeConflictDialogCallsBoundaryWithOriginalRequest() {
         val requests = mutableListOf<PendingWorktreeConflictResolution>()
         val request = conflictRequest(WorktreeIntegrationOperation.Merge)
 
-        leaveRebaseConflictAsIsDialog(request) { requests += it }
+        leaveWorktreeConflictAsIsDialog(request) { requests += it }
 
         assertEquals(listOf(request), requests)
     }
@@ -60,14 +59,15 @@ class WorktreeConflictDialogTest {
     }
 
     @Test
-    fun mergeConflictContentUsesMergeWordingWithoutLeaveAsIs() {
+    fun mergeConflictContentUsesMergeWordingWithLeaveAsIs() {
         val content = worktreeConflictDialogContent(conflictRequest(WorktreeIntegrationOperation.Merge))
 
         assertEquals("Merge Conflict", content.windowTitle)
         assertEquals("Merge conflict", content.heading)
         assertTrue(content.summary.contains("Merge of"))
         assertTrue(content.guidance.contains("Abort the merge"))
-        assertFalse(content.canLeaveAsIs)
+        assertTrue(content.guidance.contains("leave the worktree as-is"))
+        assertTrue(content.canLeaveAsIs)
     }
 
     private fun conflictRequest(

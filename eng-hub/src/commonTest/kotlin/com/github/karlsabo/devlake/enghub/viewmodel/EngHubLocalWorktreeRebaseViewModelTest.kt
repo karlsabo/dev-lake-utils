@@ -357,7 +357,7 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         )
         assertEquals(firstRequest, viewModel.worktreeConflictResolutionRequestStateFlow.value)
 
-        viewModel.leaveRebaseConflictAsIs(firstRequest!!)
+        viewModel.leaveWorktreeConflictAsIs(firstRequest!!)
 
         assertEquals(secondRequest, viewModel.worktreeConflictResolutionRequestStateFlow.value)
     }
@@ -401,7 +401,7 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         val request = withTimeout(2_000.milliseconds) {
             viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
-        viewModel.leaveRebaseConflictAsIs(request!!)
+        viewModel.leaveWorktreeConflictAsIs(request!!)
 
         assertEquals(emptyList(), api.abortRebaseCalls)
         assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
@@ -455,7 +455,7 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         val request = withTimeout(2_000.milliseconds) {
             viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
-        viewModel.leaveRebaseConflictAsIs(request!!)
+        viewModel.leaveWorktreeConflictAsIs(request!!)
         viewModel.abortWorktreeConflict(request)
 
         val staleAbortStarted = withTimeoutOrNull(100.milliseconds) { abortStarted.await() }

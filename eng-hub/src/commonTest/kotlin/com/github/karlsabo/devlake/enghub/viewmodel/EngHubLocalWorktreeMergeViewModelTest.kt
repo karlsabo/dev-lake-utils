@@ -278,12 +278,17 @@ class EngHubLocalWorktreeMergeViewModelTest {
         val request = withTimeout(2_000.milliseconds) {
             viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
+        withTimeout(2_000.milliseconds) {
+            viewModel.mergingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+        val refreshesBeforeLeave = api.listWorktreeRepoPaths.size
 
-        viewModel.leaveRebaseConflictAsIs(request!!)
+        viewModel.leaveWorktreeConflictAsIs(request!!)
 
         assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
         assertEquals(emptyList(), api.abortMergeCalls)
         assertEquals(null, viewModel.actionErrorStateFlow.value)
+        assertEquals(refreshesBeforeLeave, api.listWorktreeRepoPaths.size)
     }
 
     @Test

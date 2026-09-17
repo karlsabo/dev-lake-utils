@@ -36,7 +36,7 @@ internal data class WorktreePanelActions(
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val onAbortWorktreeConflict: (PendingWorktreeConflictResolution) -> Unit,
-    val onLeaveRebaseConflictAsIs: (PendingWorktreeConflictResolution) -> Unit,
+    val onLeaveWorktreeConflictAsIs: (PendingWorktreeConflictResolution) -> Unit,
     val worktrees: LocalWorktreeActions,
     val forceArchive: ForceArchiveWorktreeActions,
 )
@@ -179,7 +179,7 @@ internal fun abortWorktreeConflictDialog(
     onAbort(state)
 }
 
-internal fun leaveRebaseConflictAsIsDialog(
+internal fun leaveWorktreeConflictAsIsDialog(
     state: PendingWorktreeConflictResolution,
     onLeaveAsIs: (PendingWorktreeConflictResolution) -> Unit,
 ) {
@@ -209,7 +209,7 @@ internal fun worktreeConflictDialogContent(
         windowTitle = "Merge Conflict",
         heading = "Merge conflict",
         summary = "Merge of ${request.parentBranch} into ${request.worktreePath} stopped with conflicts.",
-        guidance = "Abort the merge to restore the worktree.",
-        canLeaveAsIs = false,
+        guidance = "Abort the merge or leave the worktree as-is for manual conflict resolution.",
+        canLeaveAsIs = true,
     )
 }
