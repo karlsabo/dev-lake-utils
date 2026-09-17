@@ -47,6 +47,40 @@ internal fun OpenWorktreeShortcut(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+internal fun RebaseWorktreeShortcut(
+    state: LocalWorktreeRowState,
+    onRebaseOntoParent: () -> Unit,
+) {
+    val parentBranch = state.worktree.parentBranch
+    if (parentBranch.isNullOrBlank()) return
+
+    val description = "Rebase worktree ${state.worktree.branch} onto $parentBranch"
+    TooltipArea(
+        tooltip = {
+            Surface(elevation = 4.dp) {
+                Text("Rebase onto parent", modifier = Modifier.padding(8.dp))
+            }
+        },
+    ) {
+        IconButton(
+            onClick = onRebaseOntoParent,
+            enabled = isWorktreeRebaseEnabled(
+                setupStatus = state.setupStatus,
+                isArchiving = state.isArchiving,
+                isRebasing = state.isRebasing,
+                isMerging = state.isMerging,
+            ),
+            modifier = Modifier
+                .size(32.dp)
+                .semantics { contentDescription = description },
+        ) {
+            Text(text = "🔀", style = MaterialTheme.typography.button)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 internal fun ArchiveWorktreeShortcut(
     state: LocalWorktreeRowState,
     onArchive: () -> Unit,
