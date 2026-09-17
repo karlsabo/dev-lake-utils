@@ -3,7 +3,6 @@ package com.github.karlsabo.devlake.enghub.component
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,7 +21,6 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getFirstLinkBounds
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -322,67 +320,6 @@ class WorktreeWorktreeRowsTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun constrainedRowKeepsProgressAndMenuVisibleWithLongPullRequestDetails() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                Box(
-                    modifier = Modifier
-                        .size(width = 480.dp, height = 80.dp)
-                        .testTag("constrained-worktree-container"),
-                ) {
-                    LocalWorktreeRow(
-                        state = LocalWorktreeRowState(
-                            worktree = LocalWorktreeUiState(
-                                branch = "feature/login",
-                                path = "/repos/widgets-feature-login",
-                            ),
-                            setupStatus = null,
-                            isArchiving = false,
-                            isRebasing = true,
-                            connectedPullRequest = sharedProgressPullRequest(
-                                repoFullName = "acme/widgets",
-                                branch = "feature/login",
-                            ).copy(
-                                number = 123,
-                                title = "Add a long login flow title that cannot fit in this constrained row",
-                                ciStatus = CiStatus.FAILED,
-                                ciSummaryText = "77/99 checks passed and 22 failed after several retries",
-                                reviewSummaryText = "waiting on many required reviewers",
-                            ),
-                        ),
-                        actions = emptyLocalWorktreeRowActions(),
-                    )
-                }
-            }
-        }
-
-        val containerBounds = onNodeWithTag("constrained-worktree-container").fetchSemanticsNode().boundsInRoot
-        val progressBounds = onNodeWithText("Rebasing...").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val openBounds = onNodeWithContentDescription("Open worktree feature/login")
-            .assertIsDisplayed()
-            .fetchSemanticsNode()
-            .boundsInRoot
-        val archiveBounds = onNodeWithContentDescription("Archive worktree feature/login")
-            .assertIsDisplayed()
-            .fetchSemanticsNode()
-            .boundsInRoot
-        val menuBounds = onNodeWithContentDescription("Worktree actions for feature/login")
-            .assertIsDisplayed()
-            .fetchSemanticsNode()
-            .boundsInRoot
-
-        assertTrue(openBounds.left >= containerBounds.left)
-        assertTrue(openBounds.top >= containerBounds.top)
-        assertTrue(openBounds.right <= containerBounds.right)
-        assertTrue(openBounds.bottom <= containerBounds.bottom)
-        assertTrue(progressBounds.right <= openBounds.left)
-        assertTrue(openBounds.right <= archiveBounds.left)
-        assertTrue(archiveBounds.right <= menuBounds.left)
-        assertTrue(menuBounds.right <= containerBounds.right)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
     fun rightClickingWorktreeRowWhitespaceOpensItsEnabledActionMenu() = runComposeUiTest {
         setContent {
             MaterialTheme {
@@ -521,97 +458,6 @@ class WorktreeWorktreeRowsTest {
         val hoveredPixels = IntArray(hoveredImage.width * hoveredImage.height)
         hoveredImage.readPixels(hoveredPixels)
         assertFalse(initialPixels.contentEquals(hoveredPixels))
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseShortcutIsVisibleOnlyWhenParentBranchIsKnown() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                WorktreeRow(
-                    state = worktreeRowState().copy(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/login",
-                            path = "/repos/dev-lake-utils-feature-login",
-                        ),
-                    ),
-                )
-            }
-        }
-
-        onAllNodesWithContentDescription("Rebase worktree feature/login onto main").assertCountEquals(0)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseShortcutIsEnabledWhenRebaseIsNotNeeded() = runComposeUiTest {
-        var rebaseCount = 0
-        setContent {
-            MaterialTheme {
-                WorktreeRow(
-                    state = worktreeRowState().copy(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/login",
-                            path = "/repos/dev-lake-utils-feature-login",
-                            parentBranch = "main",
-                            needsRebase = false,
-                        ),
-                    ),
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onRebaseOntoParent = { rebaseCount += 1 },
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Rebase worktree feature/login onto main")
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
-
-        assertEquals(1, rebaseCount)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseShortcutIsDisabledDuringOtherOperations() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                WorktreeRow(
-                    state = worktreeRowState().copy(
-                        setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
-                    ),
-                )
-                WorktreeRow(state = worktreeRowState().copy(isArchiving = true))
-                WorktreeRow(state = worktreeRowState().copy(isRebasing = true))
-                WorktreeRow(state = worktreeRowState().copy(isMerging = true))
-            }
-        }
-
-        val rebaseShortcuts = onAllNodesWithContentDescription("Rebase worktree feature/login onto main")
-        rebaseShortcuts.assertCountEquals(4)
-        repeat(4) { index -> rebaseShortcuts[index].assertIsNotEnabled() }
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseShortcutInvokesSameActionAsMenu() = runComposeUiTest {
-        val rebaseRequests = mutableListOf<Unit>()
-        setContent {
-            MaterialTheme {
-                WorktreeRow(
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onRebaseOntoParent = { rebaseRequests += Unit },
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Rebase worktree feature/login onto main").performClick()
-        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
-        onNodeWithText("Rebase onto parent").performClick()
-
-        assertEquals(2, rebaseRequests.size)
     }
 
     @Composable

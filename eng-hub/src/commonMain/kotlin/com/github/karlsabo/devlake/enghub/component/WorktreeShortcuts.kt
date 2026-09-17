@@ -14,6 +14,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
+private const val REBASE_SHORTCUT_GLYPH = "🔁"
+private const val MERGE_SHORTCUT_GLYPH = "🔀"
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun OpenWorktreeShortcut(
@@ -54,27 +57,67 @@ internal fun RebaseWorktreeShortcut(
     val parentBranch = state.worktree.parentBranch
     if (parentBranch.isNullOrBlank()) return
 
-    val description = "Rebase worktree ${state.worktree.branch} onto $parentBranch"
+    WorktreeIntegrationShortcut(
+        tooltip = "Rebase onto parent",
+        description = "Rebase worktree ${state.worktree.branch} onto $parentBranch",
+        glyph = REBASE_SHORTCUT_GLYPH,
+        enabled = isWorktreeRebaseEnabled(
+            setupStatus = state.setupStatus,
+            isArchiving = state.isArchiving,
+            isRebasing = state.isRebasing,
+            isMerging = state.isMerging,
+        ),
+        onClick = onRebaseOntoParent,
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun MergeWorktreeShortcut(
+    state: LocalWorktreeRowState,
+    onMergeOntoParent: () -> Unit,
+) {
+    val parentBranch = state.worktree.parentBranch
+    if (parentBranch.isNullOrBlank()) return
+
+    WorktreeIntegrationShortcut(
+        tooltip = "Merge parent into worktree",
+        description = "Merge parent $parentBranch into worktree ${state.worktree.branch}",
+        glyph = MERGE_SHORTCUT_GLYPH,
+        enabled = isWorktreeMergeEnabled(
+            setupStatus = state.setupStatus,
+            isArchiving = state.isArchiving,
+            isRebasing = state.isRebasing,
+            isMerging = state.isMerging,
+        ),
+        onClick = onMergeOntoParent,
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WorktreeIntegrationShortcut(
+    tooltip: String,
+    description: String,
+    glyph: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
     TooltipArea(
         tooltip = {
             Surface(elevation = 4.dp) {
-                Text("Rebase onto parent", modifier = Modifier.padding(8.dp))
+                Text(tooltip, modifier = Modifier.padding(8.dp))
             }
         },
     ) {
         IconButton(
-            onClick = onRebaseOntoParent,
-            enabled = isWorktreeRebaseEnabled(
-                setupStatus = state.setupStatus,
-                isArchiving = state.isArchiving,
-                isRebasing = state.isRebasing,
-                isMerging = state.isMerging,
-            ),
+            onClick = onClick,
+            enabled = enabled,
             modifier = Modifier
                 .size(32.dp)
                 .semantics { contentDescription = description },
         ) {
-            Text(text = "🔀", style = MaterialTheme.typography.button)
+            Text(text = glyph, style = MaterialTheme.typography.button)
         }
     }
 }

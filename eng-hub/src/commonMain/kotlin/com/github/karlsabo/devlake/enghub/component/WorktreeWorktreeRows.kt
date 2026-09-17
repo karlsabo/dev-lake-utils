@@ -61,6 +61,7 @@ private data class WorktreeRowContentActions(
     val onOpen: () -> Unit,
     val onArchive: () -> Unit,
     val onRebaseOntoParent: () -> Unit,
+    val onMergeOntoParent: () -> Unit,
     val onMenuButtonClick: () -> Unit,
     val onMenuButtonPositionUpdate: (Offset) -> Unit,
     val onOpenPullRequest: (String) -> Unit,
@@ -96,6 +97,7 @@ internal fun LocalWorktreeRow(
                 onOpen = actions.onOpen,
                 onArchive = actions.onArchive,
                 onRebaseOntoParent = actions.onRebaseOntoParent,
+                onMergeOntoParent = actions.onMergeOntoParent,
                 onMenuButtonClick = {
                     val anchorRelativePosition = anchorRelativeOffset(
                         anchorBoundsInWindow = menuAnchorBoundsInWindow,
@@ -143,6 +145,7 @@ private fun WorktreeRowContent(
         WorktreeRebaseNeededIndicator(state.worktree)
         WorktreeProgressLabels(state.setupStatus, state.isArchiving, state.isRebasing, state.isMerging)
         RebaseWorktreeShortcut(state = state, onRebaseOntoParent = actions.onRebaseOntoParent)
+        MergeWorktreeShortcut(state = state, onMergeOntoParent = actions.onMergeOntoParent)
         OpenWorktreeShortcut(state = state, onOpen = actions.onOpen)
         ArchiveWorktreeShortcut(state = state, onArchive = actions.onArchive)
         LocalWorktreeActionMenuButton(
