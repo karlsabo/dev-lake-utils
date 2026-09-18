@@ -132,6 +132,59 @@ class EngHubLocalWorktreeMergeViewModelTest {
     }
 
     @Test
+    fun rebaseRequestForWorktreeWithMergeInProgressIsIgnored() = runBlocking {
+        val childWorktreePath = "$DEV_LAKE_ROOT-feature-stacked-pr"
+        val parentBranch = "feature/base-pr"
+        val worktrees = listOf(
+            Worktree(path = "$DEV_LAKE_ROOT-feature-base-pr", branch = parentBranch, commitHash = "abc123"),
+            Worktree(path = childWorktreePath, branch = "feature/stacked-pr", commitHash = "def456"),
+        )
+        val mergeStarted = CompletableDeferred<Unit>()
+        val releaseMerge = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to parentBranch),
+                ),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onMergeWorktreeWithParent = {
+                    mergeStarted.complete(Unit)
+                    runBlocking { releaseMerge.await() }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.size == 2
+            }
+        }
+        viewModel.mergeLocalWorktreeWithParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
+        withTimeout(2_000.milliseconds) { mergeStarted.await() }
+
+        viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, parentBranch)
+
+        assertEquals(emptyList(), api.rebaseWorktreeOntoParentCalls)
+        assertEquals(emptySet(), viewModel.rebasingLocalWorktreePathsStateFlow.value)
+        releaseMerge.complete(Unit)
+        withTimeout(2_000.milliseconds) {
+            viewModel.mergingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+        assertEquals(
+            listOf(MergeWorktreeWithParentCall(childWorktreePath, parentBranch)),
+            api.mergeWorktreeWithParentCalls,
+        )
+    }
+
+    @Test
     fun mergeLocalWorktreeWithParentFailureSetsActionErrorAndRefreshesRepositoryBestEffort() = runBlocking {
         val childWorktreePath = "$DEV_LAKE_ROOT-feature-stacked-pr"
         val worktrees = listOf(

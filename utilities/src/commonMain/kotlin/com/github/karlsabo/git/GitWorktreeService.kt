@@ -1034,30 +1034,33 @@ private class GitWorktreeIntegrationRefResolver(
      * remote-tracking parent:
      * - the remote parent when it contains the local parent;
      * - the local parent when it contains the remote parent, preserving unpublished local commits;
-     * - the local parent when no origin is configured or the fetched remote has no matching branch;
+     * - the local parent when no origin is configured or the remote has no matching branch;
      * - otherwise reject the integration when neither parent contains the other.
      * A configured origin that fails to fetch rejects the integration with the Git output preserved, so the
      * worktree is left alone.
      */
     fun resolve(worktreePath: String, parentBranch: String): String {
         branchValidator.validate(parentBranch)
-        if (originUrl(worktreePath) == null) return parentBranch
-        fetchOrigin(worktreePath, parentBranch)
-        return selectedParentRef(worktreePath, parentBranch)
+        return if (
+            originUrl(worktreePath) == null ||
+            !gitCommandApi.remoteBranchExists(worktreePath, parentBranch, ORIGIN)
+        ) {
+            parentBranch
+        } else {
+            fetchOrigin(worktreePath, parentBranch)
+            selectedParentRef(worktreePath, parentBranch)
+        }
     }
 
-    private fun selectedParentRef(worktreePath: String, parentBranch: String): String {
-        if (!gitCommandApi.remoteBranchExists(worktreePath, parentBranch, ORIGIN)) return parentBranch
-        return when (parentAncestry(worktreePath, parentBranch)) {
-            ParentAncestry.RemoteContainsLocal -> remoteTrackingRef(parentBranch)
+    private fun selectedParentRef(path: String, branch: String): String = when (parentAncestry(path, branch)) {
+        ParentAncestry.RemoteContainsLocal -> remoteTrackingRef(branch)
 
-            ParentAncestry.LocalContainsRemote -> parentBranch
+        ParentAncestry.LocalContainsRemote -> branch
 
-            ParentAncestry.Diverged -> throw DivergedParentBranchException(
-                parentBranch = parentBranch,
-                remoteTrackingRef = remoteTrackingRef(parentBranch),
-            )
-        }
+        ParentAncestry.Diverged -> throw DivergedParentBranchException(
+            parentBranch = branch,
+            remoteTrackingRef = remoteTrackingRef(branch),
+        )
     }
 
     private fun parentAncestry(worktreePath: String, parentBranch: String): ParentAncestry {
@@ -1074,7 +1077,11 @@ private class GitWorktreeIntegrationRefResolver(
 
     private fun fetchOrigin(worktreePath: String, parentBranch: String) {
         try {
-            gitCommandApi.fetch(worktreePath, ORIGIN)
+            gitCommandApi.fetch(
+                worktreePath,
+                ORIGIN,
+                "+refs/heads/$parentBranch:${remoteParentRef(parentBranch)}",
+            )
         } catch (e: GitCommandException) {
             throw OriginFetchFailureException(
                 worktreePath = worktreePath,

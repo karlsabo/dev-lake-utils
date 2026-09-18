@@ -25,7 +25,8 @@ internal class LocalWorktreeRebaseController(
     ) {
         val worktreeIdentity = worktreePath.normalizedRepositoryPath()
         if (repoRootPath.isBlank() || worktreeIdentity.isEmpty()) return
-        if (!state.rebasingLocalWorktreePaths.addPathIfAbsent(worktreeIdentity)) return
+        if (!state.integratingLocalWorktreePaths.addPathIfAbsent(worktreeIdentity)) return
+        state.rebasingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
 
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -51,6 +52,7 @@ internal class LocalWorktreeRebaseController(
                     }
             } finally {
                 state.rebasingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
+                state.integratingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
             }
         }
     }

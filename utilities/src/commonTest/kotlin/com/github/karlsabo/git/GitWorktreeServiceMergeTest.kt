@@ -33,8 +33,15 @@ class GitWorktreeServiceMergeTest {
             listOf(
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
                 FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
-                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
                 FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call(
+                    "fetch",
+                    listOf(
+                        childWorktreePath,
+                        "origin",
+                        "+refs/heads/$parentBranch:refs/remotes/origin/$parentBranch",
+                    ),
+                ),
                 FakeGitCommandApi.Call(
                     "isAncestor",
                     listOf(childWorktreePath, "refs/heads/$parentBranch", "refs/remotes/origin/$parentBranch"),
@@ -65,7 +72,6 @@ class GitWorktreeServiceMergeTest {
             listOf(
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
                 FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
-                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
                 FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
                 FakeGitCommandApi.Call("merge", listOf(childWorktreePath, parentBranch)),
             ),

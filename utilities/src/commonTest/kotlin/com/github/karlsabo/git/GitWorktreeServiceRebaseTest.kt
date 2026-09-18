@@ -55,8 +55,15 @@ class GitWorktreeServiceRebaseTest {
             listOf(
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
                 FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
-                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
                 FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call(
+                    "fetch",
+                    listOf(
+                        childWorktreePath,
+                        "origin",
+                        "+refs/heads/$parentBranch:refs/remotes/origin/$parentBranch",
+                    ),
+                ),
                 FakeGitCommandApi.Call(
                     "isAncestor",
                     listOf(childWorktreePath, "refs/heads/$parentBranch", "refs/remotes/origin/$parentBranch"),
@@ -91,8 +98,15 @@ class GitWorktreeServiceRebaseTest {
             listOf(
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
                 FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
-                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
                 FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call(
+                    "fetch",
+                    listOf(
+                        childWorktreePath,
+                        "origin",
+                        "+refs/heads/$parentBranch:refs/remotes/origin/$parentBranch",
+                    ),
+                ),
                 FakeGitCommandApi.Call(
                     "isAncestor",
                     listOf(childWorktreePath, "refs/heads/$parentBranch", "refs/remotes/origin/$parentBranch"),
@@ -137,8 +151,15 @@ class GitWorktreeServiceRebaseTest {
             listOf(
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
                 FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
-                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
                 FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call(
+                    "fetch",
+                    listOf(
+                        childWorktreePath,
+                        "origin",
+                        "+refs/heads/$parentBranch:refs/remotes/origin/$parentBranch",
+                    ),
+                ),
                 FakeGitCommandApi.Call(
                     "isAncestor",
                     listOf(childWorktreePath, "refs/heads/$parentBranch", "refs/remotes/origin/$parentBranch"),
@@ -173,7 +194,6 @@ class GitWorktreeServiceRebaseTest {
             listOf(
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
                 FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
-                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
                 FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
                 FakeGitCommandApi.Call("rebase", listOf(childWorktreePath, parentBranch)),
             ),
@@ -194,6 +214,7 @@ class GitWorktreeServiceRebaseTest {
         fake.remoteUrlAction = { _, remote ->
             "git@github.com:karlsabo/dev-lake-utils.git".takeIf { remote == "origin" }
         }
+        fake.remoteBranchExistsAction = { _, branch, remote -> branch == parentBranch && remote == "origin" }
         fake.fetchAction = { _, _, _ -> throw gitFailure }
         val service: GitWorktreeApi = GitWorktreeService(fake)
 
@@ -221,7 +242,15 @@ class GitWorktreeServiceRebaseTest {
             listOf(
                 FakeGitCommandApi.Call("execute", listOf("check-ref-format", "--branch", parentBranch)),
                 FakeGitCommandApi.Call("remoteUrl", listOf(childWorktreePath, "origin")),
-                FakeGitCommandApi.Call("fetch", listOf(childWorktreePath, "origin")),
+                FakeGitCommandApi.Call("remoteBranchExists", listOf(childWorktreePath, parentBranch, "origin")),
+                FakeGitCommandApi.Call(
+                    "fetch",
+                    listOf(
+                        childWorktreePath,
+                        "origin",
+                        "+refs/heads/$parentBranch:refs/remotes/origin/$parentBranch",
+                    ),
+                ),
             ),
             fake.calls,
         )

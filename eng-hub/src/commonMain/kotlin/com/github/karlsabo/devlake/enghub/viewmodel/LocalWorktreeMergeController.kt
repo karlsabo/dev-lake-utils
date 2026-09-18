@@ -25,7 +25,8 @@ internal class LocalWorktreeMergeController(
     ) {
         val worktreeIdentity = worktreePath.normalizedRepositoryPath()
         if (repoRootPath.isBlank() || worktreeIdentity.isEmpty()) return
-        if (!state.mergingLocalWorktreePaths.addPathIfAbsent(worktreeIdentity)) return
+        if (!state.integratingLocalWorktreePaths.addPathIfAbsent(worktreeIdentity)) return
+        state.mergingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
 
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -51,6 +52,7 @@ internal class LocalWorktreeMergeController(
                     }
             } finally {
                 state.mergingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
+                state.integratingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
             }
         }
     }
