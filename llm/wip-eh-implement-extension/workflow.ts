@@ -1,3 +1,4 @@
+import type {HandoffLedger, WorkflowHandoff} from "./handoff.ts";
 import type {ReviewAttempt, ReviewClaim, ReviewEvidence} from "./review-evidence.ts";
 import type {InitialChange} from "./worktree.ts";
 
@@ -24,6 +25,7 @@ export interface StateResult {
 	artifactContent?: string;
 	fingerprint?: string;
 	findings?: string[];
+	handoff?: WorkflowHandoff;
 }
 
 export interface WorkflowResult {
@@ -38,6 +40,7 @@ export interface WorkflowOptions {
 	guidancePath: string;
 	initialChanges: readonly InitialChange[];
 	reviewEvidence: ReviewEvidence;
+	handoffLedger?: HandoffLedger;
 	prReviewSkillPath?: string;
 	maxInitialTestFixes?: number;
 	maxFinalTestFixes?: number;
@@ -85,16 +88,19 @@ interface Completion {
 	outcome: "completed" | "blocked";
 	workPerformed: boolean;
 	summary: string;
+	handoff?: WorkflowHandoff;
 }
 
 interface Review {
 	findings: string[];
 	summary: string;
+	handoff?: WorkflowHandoff;
 }
 
 interface Verification {
 	passed: boolean;
 	summary: string;
+	handoff?: WorkflowHandoff;
 }
 
 const DEFAULT_MAX_INITIAL_TEST_FIXES = 2;
@@ -266,21 +272,21 @@ class WorkflowExecution {
 		return this.parse("verify-tests", verifyTestsPrompt(this.context()), parseVerification);
 	}
 
-	private async parse<T extends { summary: string }>(
+	private async parse<T extends { summary: string; handoff?: WorkflowHandoff }>(
 		state: WorkflowState,
 		prompt: string,
 		parser: (response: string) => T,
 	): Promise<T> {
 		const response = await this.call(state, prompt);
 		try {
-			return this.recordParsed(state, parser(response));
+			return await this.recordParsed(state, parser(response));
 		} catch {
-			this.states.push({ state, summary: "Invalid state response" });
+			this.states.push({state, summary: "Invalid state response"});
 			const corrected = await this.call(state, correctionPrompt(state, prompt, response));
 			try {
-				return this.recordParsed(state, parser(corrected));
+				return await this.recordParsed(state, parser(corrected));
 			} catch (error) {
-				this.states.push({ state, summary: "Invalid state response" });
+				this.states.push({state, summary: "Invalid state response"});
 				const reason = error instanceof Error ? error.message : String(error);
 				throw new Error(
 					`${state} returned an invalid response after correction: ${reason}; response: ${truncate(corrected)}`,
@@ -289,14 +295,19 @@ class WorkflowExecution {
 		}
 	}
 
-	private recordParsed<T extends { summary: string }>(state: WorkflowState, parsed: T): T {
-		this.states.push({ state, summary: parsed.summary });
+	private async recordParsed<T extends {summary: string; handoff?: WorkflowHandoff}>(
+		state: WorkflowState,
+		parsed: T,
+	): Promise<T> {
+		this.states.push({state, summary: parsed.summary, handoff: parsed.handoff});
+		if (parsed.handoff) await this.options.handoffLedger?.record(state, parsed.handoff);
 		return parsed;
 	}
 
 	private async call(state: WorkflowState, prompt: string): Promise<string> {
 		this.options.onTransition?.(state);
-		return this.runAgent(state, prompt);
+		const retainedContext = await this.options.handoffLedger?.contextFor(state);
+		return this.runAgent(state, retainedContext ? `${prompt}\n\n${retainedContext}` : prompt);
 	}
 }
 
@@ -346,11 +357,32 @@ Do not delegate this state unless its responsibility explicitly requires a skept
 }
 
 function completionContract(): string {
-	return '{"outcome":"completed","workPerformed":true,"summary":"concise description of work performed or why none was needed"}\nSet workPerformed=false when no repository files were changed because this state needed no work. Use outcome "blocked" with workPerformed=false only when the state cannot proceed safely.';
+	return `${completionExample()}\nSet workPerformed=false when no repository files were changed because this state needed no work. Use outcome "blocked" with workPerformed=false only when the state cannot proceed safely.${handoffInstructions()}`;
 }
 
 function reviewContract(): string {
-	return '{"findings":["specific actionable finding"],"summary":"concise review result"}\nUse an empty findings array when the reviewed work is clean.';
+	return `${JSON.stringify({findings: ["specific actionable finding"], summary: "concise review result", handoff: handoffExample()})}\nUse an empty findings array when the reviewed work is clean.${handoffInstructions()}`;
+}
+
+function completionExample(): string {
+	return JSON.stringify({
+		outcome: "completed",
+		workPerformed: true,
+		summary: "concise description of work performed or why none was needed",
+		handoff: handoffExample(),
+	});
+}
+
+function handoffExample(): WorkflowHandoff {
+	return {
+		facts: [{claim: "concise mechanical fact", evidence: [{path: "relative/file.ts", line: 1}]}],
+		relevantPaths: ["relative/file.ts"],
+		commandsRun: ["exact command and concise result"],
+	};
+}
+
+function handoffInstructions(): string {
+	return " The optional handoff is for reusable mechanical evidence only. Omit it when there is nothing useful. Do not include recommendations, conclusions, or reasoning. Every fact requires repository-relative file evidence; keep all fields concise.";
 }
 
 function createContractPrompt(context: PromptContext): string {
@@ -374,7 +406,8 @@ function implementPrompt(context: PromptContext): string {
 }
 
 function verifyTestsPrompt(context: PromptContext): string {
-	return `${basePrompt(context, "Run the narrowest relevant tests, then every validation command required by the repository's AGENTS.md. Do not edit files in this state. Report passed=false if any required command fails, with enough failure detail for the next state.")}\n\nFinal response schema:\n{"passed":true,"summary":"commands run and result"}`;
+	const contract = `${JSON.stringify({passed: true, summary: "commands run and result", handoff: handoffExample()})}${handoffInstructions()}`;
+	return `${basePrompt(context, "Run the narrowest relevant tests, then every validation command required by the repository's AGENTS.md. Do not edit files in this state. Report passed=false if any required command fails, with enough failure detail for the next state.")}\n\nFinal response schema:\n${contract}`;
 }
 
 function fixFailingTestsPrompt(context: PromptContext, failure: string): string {
@@ -450,6 +483,7 @@ function parseCompletion(response: string): Completion {
 			outcome: value.outcome,
 			workPerformed: value.workPerformed,
 			summary: requireString(value.summary, "completion.summary"),
+			handoff: parseHandoff(value.handoff),
 		};
 	});
 }
@@ -460,6 +494,7 @@ function parseReview(response: string): Review {
 		return {
 			findings: requireStringArray(value.findings, "review.findings"),
 			summary: requireString(value.summary, "review.summary"),
+			handoff: parseHandoff(value.handoff),
 		};
 	});
 }
@@ -479,7 +514,11 @@ function parseVerification(response: string): Verification {
 	return parseJson(response, (parsed) => {
 		const value = requireRecord(parsed, "verification");
 		if (typeof value.passed !== "boolean") throw new Error("verification.passed must be a boolean");
-		return { passed: value.passed, summary: requireString(value.summary, "verification.summary") };
+		return {
+			passed: value.passed,
+			summary: requireString(value.summary, "verification.summary"),
+			handoff: parseHandoff(value.handoff),
+		};
 	});
 }
 
@@ -559,6 +598,49 @@ function extractJsonObject(text: string, start: number): string | undefined {
 		}
 	}
 	return undefined;
+}
+
+function parseHandoff(value: unknown): WorkflowHandoff | undefined {
+	if (value === undefined) return undefined;
+	const handoff = requireRecord(value, "handoff");
+	const facts = requireArray(handoff.facts, "handoff.facts").map((item, index) => {
+		const fact = requireRecord(item, `handoff.facts[${index}]`);
+		return {
+			claim: requireBoundedString(fact.claim, `handoff.facts[${index}].claim`, 240),
+			evidence: requireArray(fact.evidence, `handoff.facts[${index}].evidence`, 4).map((entry, evidenceIndex) => {
+				const citation = requireRecord(entry, `handoff.facts[${index}].evidence[${evidenceIndex}]`);
+				const line = citation.line;
+				if (line !== undefined && (!Number.isInteger(line) || (line as number) < 1)) {
+					throw new Error(`handoff.facts[${index}].evidence[${evidenceIndex}].line must be a positive integer`);
+				}
+				return {
+					path: requireBoundedString(citation.path, `handoff.facts[${index}].evidence[${evidenceIndex}].path`, 200),
+					...(line === undefined ? {} : {line: line as number}),
+				};
+			}),
+		};
+	});
+	return {
+		facts,
+		relevantPaths: requireArray(handoff.relevantPaths, "handoff.relevantPaths", 20)
+			.map((path, index) => requireBoundedString(path, `handoff.relevantPaths[${index}]`, 200)),
+		commandsRun: requireArray(handoff.commandsRun, "handoff.commandsRun", 8)
+			.map((command, index) => requireBoundedString(command, `handoff.commandsRun[${index}]`, 300)),
+	};
+}
+
+function requireArray(value: unknown, field: string, maximum = 12): unknown[] {
+	if (!Array.isArray(value) || value.length > maximum) {
+		throw new Error(`${field} must be an array with at most ${maximum} entries`);
+	}
+	return value;
+}
+
+function requireBoundedString(value: unknown, field: string, maximum: number): string {
+	const string = requireString(value, field);
+	if (string.length > maximum) throw new Error(`${field} must be at most ${maximum} characters`);
+	if (/[\r\n\0]/u.test(string)) throw new Error(`${field} must be a single line`);
+	return string;
 }
 
 function requireRecord(value: unknown, field: string): Record<string, unknown> {

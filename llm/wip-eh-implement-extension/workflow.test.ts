@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type {HandoffLedger, WorkflowHandoff} from "./handoff.ts";
 import type {ReviewAttempt, ReviewClaim, ReviewEvidence} from "./review-evidence.ts";
 import {runImplementationWorkflow, type StateAgent, WorkflowFailure, type WorkflowState} from "./workflow.ts";
 
@@ -87,6 +88,39 @@ function agent(overrides?: (state: WorkflowState, prompt: string) => string | un
 function options(evidence: ReviewEvidence, overrides: Record<string, unknown> = {}) {
 	return {guidancePath: GUIDANCE_PATH, initialChanges: [], reviewEvidence: evidence, ...overrides};
 }
+
+class FakeHandoffLedger implements HandoffLedger {
+	recorded: Array<{state: WorkflowState; handoff: WorkflowHandoff}> = [];
+
+	async record(state: WorkflowState, handoff: WorkflowHandoff): Promise<void> {
+		this.recorded.push({state, handoff});
+	}
+
+	async contextFor(state: WorkflowState): Promise<string | undefined> {
+		return this.recorded.length === 0 ? undefined : `cached evidence for ${state}`;
+	}
+}
+
+test("records structured handoffs and supplies retained evidence to later states", async () => {
+	const evidence = new FakeEvidence();
+	const ledger = new FakeHandoffLedger();
+	let blackBoxPrompt = "";
+	const handoff: WorkflowHandoff = {
+		facts: [{claim: "contract is declared by Foo", evidence: [{path: "src/foo.ts", line: 3}]}],
+		relevantPaths: ["src/foo.ts"],
+		commandsRun: [],
+	};
+	const response = JSON.stringify({outcome: "completed", workPerformed: true, summary: "contract added", handoff});
+	const result = await runImplementationWorkflow("implement behavior", agent((state, prompt) => {
+		if (state === "create-contract") return response;
+		if (state === "write-black-box-tests") blackBoxPrompt = prompt;
+		return undefined;
+	}), options(evidence, {handoffLedger: ledger}));
+
+	assert.deepEqual(ledger.recorded[0], {state: "create-contract", handoff});
+	assert.match(blackBoxPrompt, /cached evidence for write-black-box-tests/);
+	assert.deepEqual(result.states[0]?.handoff, handoff);
+});
 
 test("runs each required clean implementation state through a separate agent invocation", async () => {
 	const evidence = new FakeEvidence();

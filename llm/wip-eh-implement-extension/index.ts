@@ -3,6 +3,7 @@ import {homedir} from "node:os";
 import {join} from "node:path";
 import {fileURLToPath} from "node:url";
 import type {ExtensionAPI} from "@earendil-works/pi-coding-agent";
+import {createHandoffLedger} from "./handoff.ts";
 import {startWorkflowProgress} from "./progress.ts";
 import {createReviewEvidence} from "./review-evidence.ts";
 import {isWorkflowSubagent, runPiSubagent} from "./subagent.ts";
@@ -59,6 +60,7 @@ export default function (pi: ExtensionAPI) {
 										guidancePath: GUIDANCE_PATH,
 										initialChanges: baseline.changes,
 										reviewEvidence: createReviewEvidence(ctx.cwd),
+										handoffLedger: createHandoffLedger(ctx.cwd),
 										prReviewSkillPath: existsSync(PR_REVIEW_SKILL_PATH)
 											? PR_REVIEW_SKILL_PATH
 											: undefined,
