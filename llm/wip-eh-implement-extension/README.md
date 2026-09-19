@@ -1,81 +1,65 @@
 # WIP EH implement extension
 
-This extension runs an implementation workflow as a sequence of isolated, tool-capable Pi subagents. Decisions use structured subagent output rather than guessing from prose summaries.
+This extension runs an implementation workflow as isolated, tool-capable Pi subagents. Decisions use structured output and host-validated review evidence rather than prose claims.
 
 ```mermaid
 flowchart TD
-    Start([Start]) --> Scope{Request type?}
-    Scope -->|Normal: one acceptance-test slice| Contract[Create or confirm contract]
-    Scope -->|Normal: multiple slices| Blocked([Stop: split the request])
-    Scope -->|Planned/review comments| Contract
-
-    Contract -->|Blocked| Failed([Stop with reason])
-    Contract -->|Completed| BlackBox[Write black-box tests]
-
-    BlackBox -->|No test changes needed| Implement[Implement production behavior]
-    BlackBox -->|Tests created or changed| BlackBoxReview[Review black-box tests]
-    BlackBoxReview -->|No findings| Implement
-    BlackBoxReview -->|Findings| BlackBoxFix[Fix black-box test findings]
-    BlackBoxFix --> Implement
-
-    Implement --> Verify[Run focused and repository-required validation]
-    Verify -->|Passed| WhiteBox[Write white-box tests]
-    Verify -->|Failed and repair budget remains| FailureFix[Fix failing tests or implementation]
-    FailureFix --> Verify
-    Verify -->|Failed after repair budget| Failed
-
-    WhiteBox -->|No test changes needed| ChangeReview[Review workflow changes]
-    WhiteBox -->|Tests created or changed| WhiteBoxReview[Review white-box tests]
-    WhiteBoxReview -->|No findings| ChangeReview
-    WhiteBoxReview -->|Findings| WhiteBoxFix[Fix white-box test findings]
-    WhiteBoxFix --> ChangeReview
-
-    ChangeReview -->|Findings and repair budget remains| ReviewFix[Fix supported review findings]
-    ReviewFix --> ChangeReview
-    ChangeReview -->|Findings after repair budget| Failed
-    ChangeReview -->|Clean| FinalVerify[Run final validation]
-
-    FinalVerify -->|Passed| Done([Done])
-    FinalVerify -->|Failed and final repair budget remains| FinalFix[Fix failing tests or implementation]
-    FinalFix --> FinalVerify
-    FinalVerify -->|Failed after final repair budget| Failed
+    Start([Start]) --> Contract[Create or confirm contract]
+    Contract --> BlackBox[Write and review black-box tests]
+    BlackBox --> Implement[Implement production behavior]
+    Implement --> InitialVerify[Initial validation]
+    InitialVerify -->|Failed, repair budget remains| InitialFix[Repair]
+    InitialFix --> InitialVerify
+    InitialVerify -->|Passed| WhiteBox[Write and review white-box tests]
+    WhiteBox --> Draft[Draft complete uncommitted-change review]
+    Draft --> Skeptic[Independent skeptic review]
+    Skeptic -->|Findings, review budget remains| ReviewFix[Repair findings]
+    ReviewFix --> Draft
+    Skeptic -->|Clean| FinalVerify[Final validation of reviewed snapshot]
+    FinalVerify -->|Failed, final repair budget remains| FinalFix[Repair validation failure]
+    FinalFix --> Draft
+    FinalVerify -->|Passed and snapshot unchanged| Done([Done])
+    InitialVerify -->|Budget exhausted| Failed([Explicit failure])
+    Skeptic -->|Budget exhausted| Failed
+    FinalVerify -->|Budget exhausted or validation mutated files| Failed
 ```
 
-Each state starts a separate `pi` process in the current repository with the active model and thinking level. Worker states can read and edit files or run commands. Test-writing states report whether they changed repository files; when they report that no tests were needed, the associated test-review and test-fix states are skipped. Review states return structured findings, and fix states run only when findings exist. Validation and change-review repair loops are capped at two attempts. Final validation receives its own repair budget.
+Each state starts a separate `pi` process in the current repository with the active model and thinking level. The orchestrator invokes the draft and skeptic reviews as separate states. It does not trust the draft reviewer to self-delegate. The host defines the scope from the complete current uncommitted worktree, validates a unique current-attempt planned-comments artifact, and derives surviving inline findings from that artifact. A clean artifact requires an empty inline section and the exact overall comment `No actionable findings.`; every actionable finding must instead be a structured inline comment. Changed submodules are rejected because their nested worktrees cannot be covered by the parent repository fingerprint.
 
-The command waits for the current agent to become idle and rejects overlapping workflow invocations. While it runs, a persistent widget below the editor shows the active workflow state and elapsed time. It snapshots pre-existing dirty files before work starts so final review includes only the workflow's additional changes to those files.
+Final review includes every changed and untracked path, including paths dirty before the workflow started. The starting snapshot records provenance; it never excludes content from review. Review prompts also require impact analysis of relevant unchanged callers, consumers, tests, configuration, documentation, and documented commands.
 
-The workflow reads `../notes.md`, honors repository `AGENTS.md` instructions, and applies the `eh-pr-review` guidance during final review when that skill is installed globally. Normal implementation requests are rejected when they contain multiple acceptance-test slices. Planned-comments and review-comments artifacts are treated as review-remediation batches instead: each supported comment is evaluated and fixed independently.
+Success applies to one worktree fingerprint: both review passes leave it unchanged, the skeptic artifact is clean, required validation passes, and validation leaves the reviewed fingerprint unchanged. Every repair mutation—including a repair after final validation—returns through both final review passes. Unexpected mutation by a review or validation state fails explicitly.
+
+Three independent finite budgets cap initial-validation repairs, final-validation repairs, and review repairs. They do not reset when the convergence loop switches between review and validation. A zero budget still runs the check but permits no repair. Exhaustion is a failed run, not partial success. Review artifacts live in a private per-run temporary directory and are deleted during workflow teardown; validated artifact contents are copied into the state audit first so the evidence used for the decision remains available. Successful and failed runs are stored as one `wip-eh-implement-result` session entry after teardown; failures retain the completed state audit and consumed repair counts, and any review-evidence or outer teardown failures are included without replacing the primary workflow audit.
+
+The command waits for the current agent to become idle and rejects overlapping workflow invocations. While it runs, a widget shows the active state and elapsed time. The workflow reads `../notes.md`, honors applicable `AGENTS.md` instructions, and uses the globally installed `eh-pr-review` guidance when available. Normal requests remain limited to one acceptance-test slice; a planned-comments remediation batch may contain multiple supported findings.
 
 ## Install
 
-Register the extension globally:
+From the repository root:
 
 ```bash
-pi install dev-lake-utils:llm/wip-eh-implement-extension/index.ts
+pi install ./llm/wip-eh-implement-extension/index.ts
 ```
 
-Restart Pi or run `/reload` after changing the extension.
-
-For a one-off test:
+Restart Pi or run `/reload` after changing the extension. For a one-off run:
 
 ```bash
-pi -e dev-lake-utils:llm/wip-eh-implement-extension/index.ts
+pi -e ./llm/wip-eh-implement-extension/index.ts
 ```
 
 ## Run
 
-Invoke the workflow from the repository to modify:
+Invoke from the repository to modify:
 
 ```text
 /wip-eh-implement implement one narrowly scoped behavior
 ```
 
-The command runs through the complete workflow without placing a plan in the editor or requiring another Enter press. It modifies the current worktree, runs repository-required validation, and stores a `wip-eh-implement-result` entry in the current Pi session.
-
 ## Test
 
 ```bash
-cd dev-lake-utils:llm/wip-eh-implement-extension
+cd llm/wip-eh-implement-extension
 npm test
+npm run typecheck
 ```

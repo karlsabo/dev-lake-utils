@@ -4,9 +4,16 @@ import {join} from "node:path";
 import {fileURLToPath} from "node:url";
 import type {ExtensionAPI} from "@earendil-works/pi-coding-agent";
 import {startWorkflowProgress} from "./progress.ts";
+import {createReviewEvidence} from "./review-evidence.ts";
 import {isWorkflowSubagent, runPiSubagent} from "./subagent.ts";
-import {WorkflowRunGuard} from "./run-guard.ts";
-import {runImplementationWorkflow, type WorkflowState} from "./workflow.ts";
+import {type WorkflowRunAttempt, WorkflowRunGuard} from "./run-guard.ts";
+import {
+  combineWorkflowAndTeardownFailures,
+  runImplementationWorkflow,
+  WorkflowFailure,
+  type WorkflowResult,
+  type WorkflowState,
+} from "./workflow.ts";
 import {captureWorktreeBaseline} from "./worktree.ts";
 
 const GUIDANCE_PATH = fileURLToPath(new URL("../notes.md", import.meta.url));
@@ -30,15 +37,17 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			const model = `${ctx.model.provider}/${ctx.model.id}`;
+			let attempt: WorkflowRunAttempt<WorkflowResult>;
 			try {
-				const attempt = await runGuard.run(
+				attempt = await runGuard.run(
 					() => ctx.waitForIdle(),
 					async () => {
 						const progress = startWorkflowProgress(ctx.ui);
-						try {
-							const baseline = await captureWorktreeBaseline(ctx.cwd);
-							try {
-								const result = await runImplementationWorkflow(
+						let baseline: Awaited<ReturnType<typeof captureWorktreeBaseline>> | undefined;
+						return runWithTeardown(
+							async () => {
+								baseline = await captureWorktreeBaseline(ctx.cwd);
+								return runImplementationWorkflow(
 									task,
 									async (_state, prompt) =>
 										runPiSubagent(prompt, {
@@ -49,36 +58,81 @@ export default function (pi: ExtensionAPI) {
 									{
 										guidancePath: GUIDANCE_PATH,
 										initialChanges: baseline.changes,
+										reviewEvidence: createReviewEvidence(ctx.cwd),
 										prReviewSkillPath: existsSync(PR_REVIEW_SKILL_PATH)
 											? PR_REVIEW_SKILL_PATH
 											: undefined,
 										onTransition: (state) => progress.transition(statusText(state)),
 									},
 								);
-
-								pi.appendEntry("wip-eh-implement-result", {
-									task,
-									...result,
-									completedAt: new Date().toISOString(),
-								});
-								ctx.ui.notify(
-									`Implementation completed across ${result.states.length} subagent state(s)`,
-									"info",
-								);
-							} finally {
-								await baseline.cleanup();
-							}
-						} finally {
-							progress.stop();
-						}
+							},
+							[() => baseline?.cleanup() ?? Promise.resolve(), () => progress.stop()],
+						);
 					},
 				);
-				if (!attempt.started) ctx.ui.notify("Implementation workflow is already active", "warning");
 			} catch (error) {
-				ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+				const reason = error instanceof Error ? error.message : String(error);
+				pi.appendEntry("wip-eh-implement-result", {
+					task,
+					outcome: "failed",
+					reason,
+					...(error instanceof WorkflowFailure ? error.audit : emptyAudit()),
+					failedAt: new Date().toISOString(),
+				});
+				ctx.ui.notify(reason, "error");
+				return;
 			}
+
+			if (!attempt.started) {
+				ctx.ui.notify("Implementation workflow is already active", "warning");
+				return;
+			}
+			pi.appendEntry("wip-eh-implement-result", {
+				task,
+				...attempt.value,
+				completedAt: new Date().toISOString(),
+			});
+			ctx.ui.notify(
+				`Implementation completed across ${attempt.value.states.length} subagent state(s)`,
+				"info",
+			);
 		},
 	});
+}
+
+function emptyAudit() {
+	return {states: [], initialTestFixes: 0, finalTestFixes: 0, reviewFixes: 0};
+}
+
+export async function runWithTeardown(
+	run: () => Promise<WorkflowResult>,
+	teardowns: ReadonlyArray<() => Promise<void> | void>,
+): Promise<WorkflowResult> {
+	let result: WorkflowResult | undefined;
+	let failure: unknown;
+	const teardownFailures: unknown[] = [];
+	try {
+		result = await run();
+	} catch (error) {
+		failure = error;
+	}
+	for (const teardown of teardowns) {
+		try {
+			await teardown();
+		} catch (error) {
+			teardownFailures.push(error);
+		}
+	}
+	if (failure !== undefined || teardownFailures.length > 0) {
+		throw combineWorkflowAndTeardownFailures(failure, teardownFailures, {
+			states: result?.states ?? [],
+			initialTestFixes: result?.initialTestFixes ?? 0,
+			finalTestFixes: result?.finalTestFixes ?? 0,
+			reviewFixes: result?.reviewFixes ?? 0,
+		});
+	}
+	if (!result) throw new WorkflowFailure("Workflow produced no result", emptyAudit());
+	return result;
 }
 
 function statusText(state: WorkflowState): string {
@@ -93,7 +147,8 @@ function statusText(state: WorkflowState): string {
 		"write-white-box-tests": "Implement: writing white-box tests",
 		"review-white-box-tests": "Implement: reviewing white-box tests",
 		"fix-white-box-test-findings": "Implement: fixing white-box tests",
-		"review-changes": "Implement: reviewing all changes",
+		"review-changes": "Implement: drafting final review",
+		"skeptic-review-changes": "Implement: independently checking final review",
 		"fix-review-findings": "Implement: fixing review findings",
 	};
 	return labels[state];

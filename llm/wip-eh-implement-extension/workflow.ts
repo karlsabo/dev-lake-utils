@@ -1,3 +1,4 @@
+import type {ReviewAttempt, ReviewClaim, ReviewEvidence} from "./review-evidence.ts";
 import type {InitialChange} from "./worktree.ts";
 
 export type WorkflowState =
@@ -12,26 +13,70 @@ export type WorkflowState =
 	| "review-white-box-tests"
 	| "fix-white-box-test-findings"
 	| "review-changes"
+	| "skeptic-review-changes"
 	| "fix-review-findings";
 
 export interface StateResult {
 	state: WorkflowState;
 	summary: string;
+	attempt?: number;
+	artifactPath?: string;
+	artifactContent?: string;
+	fingerprint?: string;
+	findings?: string[];
 }
 
 export interface WorkflowResult {
+	outcome: "completed";
 	states: StateResult[];
-	testFixes: number;
+	initialTestFixes: number;
+	finalTestFixes: number;
 	reviewFixes: number;
 }
 
 export interface WorkflowOptions {
 	guidancePath: string;
 	initialChanges: readonly InitialChange[];
+	reviewEvidence: ReviewEvidence;
 	prReviewSkillPath?: string;
-	maxTestFixes?: number;
+	maxInitialTestFixes?: number;
+	maxFinalTestFixes?: number;
 	maxReviewFixes?: number;
 	onTransition?: (state: WorkflowState) => void;
+}
+
+export interface WorkflowAudit {
+	states: readonly StateResult[];
+	initialTestFixes: number;
+	finalTestFixes: number;
+	reviewFixes: number;
+}
+
+export class WorkflowFailure extends Error {
+	readonly audit: WorkflowAudit;
+
+	constructor(message: string, audit: WorkflowAudit) {
+		super(message);
+		this.name = "WorkflowFailure";
+		this.audit = audit;
+	}
+}
+
+export function combineWorkflowAndTeardownFailures(
+	failure: unknown,
+	teardownFailures: readonly unknown[],
+	audit: WorkflowAudit,
+): WorkflowFailure {
+	if (teardownFailures.length === 0 && failure instanceof WorkflowFailure) return failure;
+	const primaryAudit = failure instanceof WorkflowFailure ? failure.audit : audit;
+	const primaryMessage = failure === undefined ? undefined : errorMessage(failure);
+	const teardownMessage = teardownFailures.length === 0
+		? undefined
+		: `Teardown failure(s): ${teardownFailures.map(errorMessage).join("; ")}`;
+	return new WorkflowFailure(
+		[primaryMessage, teardownMessage].filter((message): message is string => message !== undefined).join("\n"),
+		primaryAudit,
+	);
 }
 
 export type StateAgent = (state: WorkflowState, prompt: string) => Promise<string>;
@@ -52,7 +97,8 @@ interface Verification {
 	summary: string;
 }
 
-const DEFAULT_MAX_TEST_FIXES = 2;
+const DEFAULT_MAX_INITIAL_TEST_FIXES = 2;
+const DEFAULT_MAX_FINAL_TEST_FIXES = 2;
 const DEFAULT_MAX_REVIEW_FIXES = 2;
 
 export async function runImplementationWorkflow(
@@ -61,11 +107,29 @@ export async function runImplementationWorkflow(
 	options: WorkflowOptions,
 ): Promise<WorkflowResult> {
 	if (!task.trim()) throw new Error("Task must not be empty");
-	assertNonNegativeInteger(options.maxTestFixes ?? DEFAULT_MAX_TEST_FIXES, "maxTestFixes");
+	assertNonNegativeInteger(options.maxInitialTestFixes ?? DEFAULT_MAX_INITIAL_TEST_FIXES, "maxInitialTestFixes");
+	assertNonNegativeInteger(options.maxFinalTestFixes ?? DEFAULT_MAX_FINAL_TEST_FIXES, "maxFinalTestFixes");
 	assertNonNegativeInteger(options.maxReviewFixes ?? DEFAULT_MAX_REVIEW_FIXES, "maxReviewFixes");
 
 	const workflow = new WorkflowExecution(task.trim(), runAgent, options);
-	return workflow.run();
+	let result: WorkflowResult | undefined;
+	let failure: unknown;
+	const teardownFailures: unknown[] = [];
+	try {
+		result = await workflow.run();
+	} catch (error) {
+		failure = error;
+	}
+	try {
+		await options.reviewEvidence.cleanup();
+	} catch (error) {
+		teardownFailures.push(error);
+	}
+	if (failure !== undefined || teardownFailures.length > 0) {
+		throw combineWorkflowAndTeardownFailures(failure, teardownFailures, workflow.audit());
+	}
+	if (!result) throw new WorkflowFailure("Workflow produced no result", workflow.audit());
+	return result;
 }
 
 class WorkflowExecution {
@@ -73,13 +137,24 @@ class WorkflowExecution {
 	private readonly task: string;
 	private readonly runAgent: StateAgent;
 	private readonly options: WorkflowOptions;
-	private testFixes = 0;
+	private initialTestFixes = 0;
+	private finalTestFixes = 0;
 	private reviewFixes = 0;
+	private reviewAttempts = 0;
 
 	constructor(task: string, runAgent: StateAgent, options: WorkflowOptions) {
 		this.task = task;
 		this.runAgent = runAgent;
 		this.options = options;
+	}
+
+	audit(): WorkflowAudit {
+		return {
+			states: this.states,
+			initialTestFixes: this.initialTestFixes,
+			finalTestFixes: this.finalTestFixes,
+			reviewFixes: this.reviewFixes,
+		};
 	}
 
 	async run(): Promise<WorkflowResult> {
@@ -88,64 +163,92 @@ class WorkflowExecution {
 		if (blackBoxTests.workPerformed) {
 			const review = await this.review("review-black-box-tests", reviewBlackBoxTestsPrompt(this.context()));
 			if (review.findings.length > 0) {
-				await this.complete(
-					"fix-black-box-test-findings",
-					fixTestFindingsPrompt(this.context(), "black-box", review.findings),
-				);
+				await this.complete("fix-black-box-test-findings", fixTestFindingsPrompt(this.context(), "black-box", review.findings));
 			}
 		}
 		await this.complete("implement", implementPrompt(this.context()));
-		await this.verifyUntilPassing();
+		await this.initialValidation();
 		const whiteBoxTests = await this.complete("write-white-box-tests", writeWhiteBoxTestsPrompt(this.context()));
 		if (whiteBoxTests.workPerformed) {
 			const review = await this.review("review-white-box-tests", reviewWhiteBoxTestsPrompt(this.context()));
 			if (review.findings.length > 0) {
-				await this.complete(
-					"fix-white-box-test-findings",
-					fixTestFindingsPrompt(this.context(), "white-box", review.findings),
-				);
+				await this.complete("fix-white-box-test-findings", fixTestFindingsPrompt(this.context(), "white-box", review.findings));
 			}
 		}
-		await this.reviewUntilClean();
-		await this.verifyUntilPassing();
-
-		return { states: this.states, testFixes: this.testFixes, reviewFixes: this.reviewFixes };
-	}
-
-	private context(): PromptContext {
+		await this.converge();
 		return {
-			task: this.task,
-			guidancePath: this.options.guidancePath,
-			initialChanges: this.options.initialChanges,
-			prReviewSkillPath: this.options.prReviewSkillPath,
+			outcome: "completed",
+			states: this.states,
+			initialTestFixes: this.initialTestFixes,
+			finalTestFixes: this.finalTestFixes,
+			reviewFixes: this.reviewFixes,
 		};
 	}
 
-	private async verifyUntilPassing(): Promise<void> {
-		const maxFixes = this.options.maxTestFixes ?? DEFAULT_MAX_TEST_FIXES;
-		let phaseFixes = 0;
+	private context(): PromptContext {
+		return {task: this.task, guidancePath: this.options.guidancePath, initialChanges: this.options.initialChanges, prReviewSkillPath: this.options.prReviewSkillPath};
+	}
+
+	private async initialValidation(): Promise<void> {
+		const maximum = this.options.maxInitialTestFixes ?? DEFAULT_MAX_INITIAL_TEST_FIXES;
 		let verification = await this.verify();
 		while (!verification.passed) {
-			if (phaseFixes >= maxFixes) {
-				throw new Error(`Tests still fail after ${maxFixes} fix attempt(s): ${verification.summary}`);
-			}
+			if (this.initialTestFixes >= maximum) throw exhausted("Initial validation", maximum, verification.summary);
 			await this.complete("fix-failing-tests", fixFailingTestsPrompt(this.context(), verification.summary));
-			phaseFixes += 1;
-			this.testFixes += 1;
+			this.initialTestFixes += 1;
 			verification = await this.verify();
 		}
 	}
 
-	private async reviewUntilClean(): Promise<void> {
-		const maxFixes = this.options.maxReviewFixes ?? DEFAULT_MAX_REVIEW_FIXES;
-		let review = await this.review("review-changes", reviewChangesPrompt(this.context()));
-		while (review.findings.length > 0) {
-			if (this.reviewFixes >= maxFixes) {
-				throw new Error(`Review still has findings after ${maxFixes} fix attempt(s): ${review.findings.join("; ")}`);
+	private async converge(): Promise<void> {
+		const maxReviewFixes = this.options.maxReviewFixes ?? DEFAULT_MAX_REVIEW_FIXES;
+		const maxFinalTestFixes = this.options.maxFinalTestFixes ?? DEFAULT_MAX_FINAL_TEST_FIXES;
+		while (true) {
+			const {attempt, findings} = await this.finalReview();
+			if (findings.length > 0) {
+				if (this.reviewFixes >= maxReviewFixes) throw exhausted("Review", maxReviewFixes, findings.join("; "));
+				await this.complete("fix-review-findings", fixReviewFindingsPrompt(this.context(), findings));
+				this.reviewFixes += 1;
+				continue;
 			}
-			await this.complete("fix-review-findings", fixReviewFindingsPrompt(this.context(), review.findings));
-			this.reviewFixes += 1;
-			review = await this.review("review-changes", reviewChangesPrompt(this.context()));
+
+			const verification = await this.verify();
+			const fingerprint = await this.options.reviewEvidence.fingerprint();
+			if (fingerprint !== attempt.fingerprint) throw new Error("Repository changed during final validation");
+			if (verification.passed) return;
+			if (this.finalTestFixes >= maxFinalTestFixes) throw exhausted("Final validation", maxFinalTestFixes, verification.summary);
+			await this.complete("fix-failing-tests", fixFailingTestsPrompt(this.context(), verification.summary));
+			this.finalTestFixes += 1;
+		}
+	}
+
+	private async finalReview(): Promise<{attempt: ReviewAttempt; findings: string[]}> {
+		this.reviewAttempts += 1;
+		const attempt = await this.options.reviewEvidence.begin(this.reviewAttempts);
+		const draft = await this.reviewClaim("review-changes", draftReviewPrompt(this.context(), attempt));
+		const draftArtifact = await this.options.reviewEvidence.validate(attempt, draft);
+		this.states.push(reviewState("review-changes", draft, attempt, draftArtifact));
+		const skeptic = await this.reviewClaim("skeptic-review-changes", skepticReviewPrompt(this.context(), attempt));
+		const skepticArtifact = await this.options.reviewEvidence.validate(attempt, skeptic);
+		const findings = this.options.reviewEvidence.findings(skepticArtifact);
+		this.states.push({...reviewState("skeptic-review-changes", skeptic, attempt, skepticArtifact), findings});
+		return {attempt, findings};
+	}
+
+	private async reviewClaim(state: WorkflowState, prompt: string): Promise<ReviewClaim> {
+		const response = await this.call(state, prompt);
+		try {
+			return parseReviewClaim(response);
+		} catch {
+			this.states.push({state, summary: "Invalid state response"});
+			const corrected = await this.call(state, correctionPrompt(state, prompt, response));
+			try {
+				return parseReviewClaim(corrected);
+			} catch (error) {
+				this.states.push({state, summary: "Invalid state response"});
+				const reason = error instanceof Error ? error.message : String(error);
+				throw new Error(`${state} returned an invalid response after correction: ${reason}; response: ${truncate(corrected)}`);
+			}
 		}
 	}
 
@@ -195,6 +298,26 @@ class WorkflowExecution {
 		this.options.onTransition?.(state);
 		return this.runAgent(state, prompt);
 	}
+}
+
+function reviewState(
+	state: WorkflowState,
+	claim: ReviewClaim,
+	attempt: ReviewAttempt,
+	artifactContent: string,
+): StateResult {
+	return {
+		state,
+		summary: claim.summary,
+		attempt: Number(attempt.attemptId.split("-").at(-1)),
+		artifactPath: attempt.artifactPath,
+		artifactContent,
+		fingerprint: attempt.fingerprint,
+	};
+}
+
+function exhausted(label: string, repairs: number, detail: string): Error {
+	return new Error(`${label} budget exhausted after ${repairs} repair(s): ${detail}`);
 }
 
 interface PromptContext {
@@ -266,12 +389,33 @@ function reviewWhiteBoxTestsPrompt(context: PromptContext): string {
 	return `${basePrompt(context, "Review the new white-box tests for meaningful branch and invariant coverage, implementation over-coupling, duplication, and false-positive assertions. Do not edit files.")}\n\nFinal response schema:\n${reviewContract()}`;
 }
 
-function reviewChangesPrompt(context: PromptContext): string {
+function draftReviewPrompt(context: PromptContext, attempt: ReviewAttempt): string {
 	const skillInstruction = context.prReviewSkillPath
-		? `Read ${context.prReviewSkillPath} and follow its uncommitted-change review process, including the planned-comments artifact and skeptic subagent pass. This is a non-interactive workflow state: do not post to GitHub or wait for user feedback; translate only the comments that survive the skeptic pass into the findings array.`
-		: "Apply the eh-pr-review lenses and calibration, including a skeptic pass over proposed findings.";
-	const initialChanges = formatInitialChanges(context.initialChanges);
-	return `${basePrompt(context, `${skillInstruction} Build the current scope from git status --short --untracked-files=all. Review every newly changed file in full-file context. For each path that was already dirty when this workflow started, review only this workflow's delta from the retained starting version described below; do not report findings about pre-existing changes. A snapshot path is the file's exact starting content. A missing snapshot means the path did not exist at workflow start. Compare snapshots without modifying either copy (git diff --no-index is suitable even though differences return exit code 1). If a pre-existing path has no delta from its starting version, exclude it. Do not edit repository files. You may create or update only the planned-comments artifact at the path required by the review skill, and the skeptic pass may revise that artifact. Return only well-supported, actionable findings; do not manufacture comments.\n\nRetained starting versions for pre-existing paths:\n${initialChanges}`)}\n\nFinal response schema:\n${reviewContract()}`;
+		? `Read ${context.prReviewSkillPath} and its references. Follow its review lenses and planned-comments format, but do not delegate the skeptic pass, post to GitHub, or wait for feedback.`
+		: "Apply the eh-pr-review lenses, calibration, and planned-comments format.";
+	const responsibility = `${skillInstruction}
+Review the complete current uncommitted scope listed below, reading every changed file in full. Initial dirtiness is provenance only: do not exclude those paths or any part of their current content. Trace references and imports to explicitly assess relevant unchanged callers, consumers, tests, configuration, and documentation, including documented commands that may have become stale.
+Write the review to exactly ${attempt.artifactPath}. It must contain the exact headings "## Overall PR Comment" and "## Inline Comments". Put every actionable finding in a complete structured planned-comment entry under Inline Comments; never leave a finding only in the overall comment or in prose outside those entries. If and only if there are no actionable findings, leave Inline Comments empty and set Overall PR Comment to exactly "No actionable findings." Do not edit repository files and do not run a skeptic yourself.
+
+Host-captured current scope:
+${formatScope(attempt.scope)}
+
+Starting-worktree provenance (never an exclusion):
+${formatInitialChanges(context.initialChanges)}`;
+	return `${basePrompt(context, responsibility)}\n\nFinal response schema:\n${reviewClaimContract(attempt)}`;
+}
+
+function skepticReviewPrompt(context: PromptContext, attempt: ReviewAttempt): string {
+	const skillInstruction = context.prReviewSkillPath ? `Read ${context.prReviewSkillPath} and its references.` : "Apply the eh-pr-review calibration.";
+	return `${basePrompt(context, `${skillInstruction} Independently inspect the complete current uncommitted scope and relevant unchanged callers, consumers, tests, configuration, and documentation. Then skeptically revise ${attempt.artifactPath}: remove unsupported comments, rewrite weak ones, and add supported findings missed by the draft. Preserve the exact required headings. Put every surviving actionable finding in a complete structured planned-comment entry under Inline Comments; never leave a finding only in the overall comment or in prose outside those entries. If and only if there are no actionable findings, leave Inline Comments empty and set Overall PR Comment to exactly "No actionable findings." Initial dirtiness is provenance, not an exclusion. Do not edit repository files or delegate another review.\n\nHost-captured current scope:\n${formatScope(attempt.scope)}`)}\n\nFinal response schema:\n${reviewClaimContract(attempt)}`;
+}
+
+function reviewClaimContract(attempt: ReviewAttempt): string {
+	return JSON.stringify({attemptId: attempt.attemptId, artifactPath: attempt.artifactPath, summary: "concise review result"});
+}
+
+function formatScope(scope: readonly string[]): string {
+	return scope.length === 0 ? "No changed paths." : scope.map((path) => `- ${JSON.stringify(path)}`).join("\n");
 }
 
 function formatInitialChanges(changes: readonly InitialChange[]): string {
@@ -316,6 +460,17 @@ function parseReview(response: string): Review {
 		return {
 			findings: requireStringArray(value.findings, "review.findings"),
 			summary: requireString(value.summary, "review.summary"),
+		};
+	});
+}
+
+function parseReviewClaim(response: string): ReviewClaim {
+	return parseJson(response, (parsed) => {
+		const value = requireRecord(parsed, "review evidence");
+		return {
+			attemptId: requireString(value.attemptId, "review evidence.attemptId"),
+			artifactPath: requireString(value.artifactPath, "review evidence.artifactPath"),
+			summary: requireString(value.summary, "review evidence.summary"),
 		};
 	});
 }
@@ -421,6 +576,10 @@ function requireStringArray(value: unknown, field: string): string[] {
 		throw new Error(`${field} must be an array of non-empty strings`);
 	}
 	return value.map((item) => item.trim());
+}
+
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }
 
 function assertNonNegativeInteger(value: number, field: string): void {
