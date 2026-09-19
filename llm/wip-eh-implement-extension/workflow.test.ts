@@ -4,8 +4,8 @@ import type {HandoffLedger, WorkflowHandoff} from "./handoff.ts";
 import type {ReviewAttempt, ReviewClaim, ReviewEvidence} from "./review-evidence.ts";
 import {runImplementationWorkflow, type StateAgent, WorkflowFailure, type WorkflowState} from "./workflow.ts";
 
-const COMPLETED = '{"outcome":"completed","workPerformed":true,"summary":"done"}';
-const NO_WORK = '{"outcome":"completed","workPerformed":false,"summary":"no work needed"}';
+const COMPLETED = '{"outcome":"completed","workPerformed":true,"continueWorkflow":true,"summary":"done"}';
+const NO_WORK = '{"outcome":"completed","workPerformed":false,"continueWorkflow":true,"summary":"no work needed"}';
 const PASSING = '{"passed":true,"summary":"tests passed"}';
 const CLEAN = '{"findings":[],"summary":"clean"}';
 const GUIDANCE_PATH = "/repo/llm/notes.md";
@@ -110,7 +110,13 @@ test("records structured handoffs and supplies retained evidence to later states
 		relevantPaths: ["src/foo.ts"],
 		commandsRun: [],
 	};
-	const response = JSON.stringify({outcome: "completed", workPerformed: true, summary: "contract added", handoff});
+	const response = JSON.stringify({
+		outcome: "completed",
+		workPerformed: true,
+		continueWorkflow: true,
+		summary: "contract added",
+		handoff,
+	});
 	const result = await runImplementationWorkflow("implement behavior", agent((state, prompt) => {
 		if (state === "create-contract") return response;
 		if (state === "write-black-box-tests") blackBoxPrompt = prompt;
@@ -148,6 +154,23 @@ test("runs each required clean implementation state through a separate agent inv
 	assert.equal(result.reviewFixes, 0);
 	assert.ok(calls.every(({prompt}) => prompt.includes(GUIDANCE_PATH)));
 	assert.ok(calls.every(({prompt}) => prompt.includes("implement one observable behavior")));
+});
+
+test("ends after direct inspection when a review-remediation artifact has no comments", async () => {
+	const evidence = new FakeEvidence();
+	const states: WorkflowState[] = [];
+	const result = await runImplementationWorkflow("fix comments in /tmp/empty-review.md", agent((state) => {
+		states.push(state);
+		if (state === "create-contract") {
+			return '{"outcome":"completed","workPerformed":false,"continueWorkflow":false,"summary":"review artifact has no actionable comments"}';
+		}
+		return undefined;
+	}), options(evidence));
+
+	assert.deepEqual(states, ["create-contract"]);
+	assert.equal(result.states.length, 1);
+	assert.equal(evidence.attempts, 0);
+	assert.equal(evidence.cleanupCalls, 1);
 });
 
 test("skips black-box test review when the test-writing state reports no work", async () => {
@@ -200,6 +223,8 @@ test("treats planned comments as a review-remediation batch", async () => {
 
 	assert.match(prompts.get("create-contract") ?? "", /review-remediation batch/);
 	assert.match(prompts.get("create-contract") ?? "", /Do not block it merely because it has multiple comments/);
+	assert.match(prompts.get("create-contract") ?? "", /read that artifact before exploring the repository/);
+	assert.match(prompts.get("create-contract") ?? "", /continueWorkflow=false/);
 	assert.match(prompts.get("write-black-box-tests") ?? "", /cover each supported comment independently/);
 });
 
@@ -397,7 +422,7 @@ async function runCreateContractResponse(response: string) {
 
 test("parses a JSON object embedded in prose without correction", async () => {
 	const {calls} = await runCreateContractResponse(
-		`Reviewed.\n{"outcome":"completed","workPerformed":false,"summary":"escaped \\"quote {with braces}\\""}\nDone {now}.`,
+		`Reviewed.\n{"outcome":"completed","workPerformed":false,"continueWorkflow":true,"summary":"escaped \\"quote {with braces}\\""}\nDone {now}.`,
 	);
 	assert.equal(calls, 1);
 });
@@ -437,15 +462,20 @@ test("correction retry preserves context and asks the agent to finish missing wo
 	assert.match(prompts[1] ?? "", /Original instructions/);
 });
 
-test("retries schema-invalid completion responses", async () => {
-	const evidence = new FakeEvidence();
-	let calls = 0;
-	await runImplementationWorkflow("implement command", agent((state) => {
-		if (state !== "create-contract") return undefined;
-		calls += 1;
-		return calls === 1 ? '{"outcome":"completed","summary":"missing workPerformed"}' : COMPLETED;
-	}), options(evidence));
-	assert.equal(calls, 2);
+test("retries schema-invalid contract completion responses", async () => {
+	for (const invalid of [
+		'{"outcome":"completed","summary":"missing workPerformed and continueWorkflow"}',
+		'{"outcome":"completed","workPerformed":false,"summary":"missing continueWorkflow"}',
+	]) {
+		const evidence = new FakeEvidence();
+		let calls = 0;
+		await runImplementationWorkflow("implement command", agent((state) => {
+			if (state !== "create-contract") return undefined;
+			calls += 1;
+			return calls === 1 ? invalid : COMPLETED;
+		}), options(evidence));
+		assert.equal(calls, 2);
+	}
 });
 
 test("retries malformed review claims and verification responses", async () => {
@@ -484,7 +514,7 @@ test("stops when a state reports the task is blocked", async () => {
 	await assert.rejects(
 		runImplementationWorkflow("implement two unrelated behaviors", agent((state) =>
 			state === "create-contract"
-				? '{"outcome":"blocked","workPerformed":false,"summary":"task has two acceptance tests"}'
+				? '{"outcome":"blocked","workPerformed":false,"continueWorkflow":false,"summary":"task has two acceptance tests"}'
 				: undefined,
 		), options(evidence)),
 		/create-contract blocked: task has two acceptance tests/,

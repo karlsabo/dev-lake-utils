@@ -91,6 +91,10 @@ interface Completion {
 	handoff?: WorkflowHandoff;
 }
 
+interface ContractCompletion extends Completion {
+	continueWorkflow: boolean;
+}
+
 interface Review {
 	findings: string[];
 	summary: string;
@@ -164,7 +168,14 @@ class WorkflowExecution {
 	}
 
 	async run(): Promise<WorkflowResult> {
-		await this.complete("create-contract", createContractPrompt(this.context()));
+		const contract = await this.parse(
+			"create-contract",
+			createContractPrompt(this.context()),
+			parseContractCompletion,
+		);
+		if (contract.outcome === "blocked") throw new Error(`create-contract blocked: ${contract.summary}`);
+		if (!contract.continueWorkflow) return this.result();
+
 		const blackBoxTests = await this.complete("write-black-box-tests", writeBlackBoxTestsPrompt(this.context()));
 		if (blackBoxTests.workPerformed) {
 			const review = await this.review("review-black-box-tests", reviewBlackBoxTestsPrompt(this.context()));
@@ -182,6 +193,10 @@ class WorkflowExecution {
 			}
 		}
 		await this.converge();
+		return this.result();
+	}
+
+	private result(): WorkflowResult {
 		return {
 			outcome: "completed",
 			states: this.states,
@@ -346,6 +361,8 @@ ${context.task}
 
 Before acting, read the repository's applicable AGENTS.md files and ${context.guidancePath}. Work directly in the current repository.
 
+Minimize no-op work. First determine whether this state's specific responsibility applies, using the task, retained evidence, and the narrowest direct inspection needed. If it does not apply, stop: do not edit files, repeat broad repository discovery, or run unrelated commands. Return the no-work form of the requested JSON. Do not run validation commands outside a validation state unless they are necessary to make the assigned edit safely.
+
 For a normal implementation request, stay within one acceptance-test slice. If a normal request contains multiple acceptance tests or unrelated behavior, do not edit files and report a blocked outcome.
 
 A request to address a planned-comments or review-comments artifact is a review-remediation batch, not a normal implementation request. It may contain multiple independent comments from the same review. Do not block it merely because it has multiple comments or acceptance-test slices. Evaluate each comment independently, implement every reasonable and supported fix, and skip unsupported comments with the reason recorded in your summary.
@@ -358,6 +375,17 @@ Do not delegate this state unless its responsibility explicitly requires a skept
 
 function completionContract(): string {
 	return `${completionExample()}\nSet workPerformed=false when no repository files were changed because this state needed no work. Use outcome "blocked" with workPerformed=false only when the state cannot proceed safely.${handoffInstructions()}`;
+}
+
+function contractCompletionContract(): string {
+	const example = JSON.stringify({
+		outcome: "completed",
+		workPerformed: true,
+		continueWorkflow: true,
+		summary: "concise description of contract work or why none was needed",
+		handoff: handoffExample(),
+	});
+	return `${example}\nSet continueWorkflow=false only when direct inspection proves the request contains no actionable work at all, such as an empty planned-comments artifact. This ends the workflow, so do not use it merely because contracts need no changes. Otherwise set continueWorkflow=true.\nSet workPerformed=false when no contract files were changed. Use outcome "blocked" with workPerformed=false only when the state cannot proceed safely.${handoffInstructions()}`;
 }
 
 function reviewContract(): string {
@@ -386,7 +414,7 @@ function handoffInstructions(): string {
 }
 
 function createContractPrompt(context: PromptContext): string {
-	return `${basePrompt(context, "Inspect the existing seams and flesh out the smallest classes, interfaces, or functions needed to express the new contract. Edit production files only as needed to establish those contracts; do not implement the behavior yet. If the existing contracts already express the required behavior, make no speculative contract changes and report completion so the test-writing state can proceed.")}\n\nFinal response schema:\n${completionContract()}`;
+	return `${basePrompt(context, "First inspect the direct task input. For a planned-comments or review-comments request, read that artifact before exploring the repository; if it has no actionable comments, do no further discovery and end the workflow. Otherwise inspect the existing seams and flesh out the smallest classes, interfaces, or functions needed to express the new contract. Edit production files only as needed to establish those contracts; do not implement the behavior yet. If the existing contracts already express the required behavior, make no speculative contract changes and continue to the test-writing state.")}\n\nFinal response schema:\n${contractCompletionContract()}`;
 }
 
 function writeBlackBoxTestsPrompt(context: PromptContext): string {
@@ -471,21 +499,34 @@ function formatFindings(findings: string[]): string {
 }
 
 function parseCompletion(response: string): Completion {
+	return parseJson(response, parseCompletionValue);
+}
+
+function parseContractCompletion(response: string): ContractCompletion {
 	return parseJson(response, (parsed) => {
-		const value = requireRecord(parsed, "completion");
-		if (value.outcome !== "completed" && value.outcome !== "blocked") {
-			throw new Error('completion.outcome must be "completed" or "blocked"');
+		const completion = parseCompletionValue(parsed);
+		const value = requireRecord(parsed, "contract completion");
+		if (typeof value.continueWorkflow !== "boolean") {
+			throw new Error("contract completion.continueWorkflow must be a boolean");
 		}
-		if (typeof value.workPerformed !== "boolean") {
-			throw new Error("completion.workPerformed must be a boolean");
-		}
-		return {
-			outcome: value.outcome,
-			workPerformed: value.workPerformed,
-			summary: requireString(value.summary, "completion.summary"),
-			handoff: parseHandoff(value.handoff),
-		};
+		return {...completion, continueWorkflow: value.continueWorkflow};
 	});
+}
+
+function parseCompletionValue(parsed: unknown): Completion {
+	const value = requireRecord(parsed, "completion");
+	if (value.outcome !== "completed" && value.outcome !== "blocked") {
+		throw new Error('completion.outcome must be "completed" or "blocked"');
+	}
+	if (typeof value.workPerformed !== "boolean") {
+		throw new Error("completion.workPerformed must be a boolean");
+	}
+	return {
+		outcome: value.outcome,
+		workPerformed: value.workPerformed,
+		summary: requireString(value.summary, "completion.summary"),
+		handoff: parseHandoff(value.handoff),
+	};
 }
 
 function parseReview(response: string): Review {

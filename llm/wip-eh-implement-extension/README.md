@@ -4,14 +4,19 @@ This extension runs an implementation workflow as isolated, tool-capable Pi suba
 
 ```mermaid
 flowchart TD
-    Start([Start]) --> Contract[Create or confirm contract]
-    Contract --> BlackBox[Write and review black-box tests]
-    BlackBox --> Implement[Implement production behavior]
+    Start([Start]) --> Contract[Inspect task and create or confirm contract]
+    Contract -->|No actionable task input| Done
+    Contract -->|Work remains| BlackBox[Write black-box tests]
+    BlackBox -->|Tests added| BlackBoxReview[Review black-box tests]
+    BlackBox -->|No tests needed| Implement
+    BlackBoxReview --> Implement[Implement production behavior]
     Implement --> InitialVerify[Initial validation]
     InitialVerify -->|Failed, repair budget remains| InitialFix[Repair]
     InitialFix --> InitialVerify
-    InitialVerify -->|Passed| WhiteBox[Write and review white-box tests]
-    WhiteBox --> Draft[Draft complete uncommitted-change review]
+    InitialVerify -->|Passed| WhiteBox[Write white-box tests if coverage needs them]
+    WhiteBox -->|Tests added| WhiteBoxReview[Review white-box tests]
+    WhiteBox -->|No tests needed| Draft
+    WhiteBoxReview --> Draft[Draft complete uncommitted-change review]
     Draft --> Skeptic[Independent skeptic review]
     Skeptic -->|Findings, review budget remains| ReviewFix[Repair findings]
     ReviewFix --> Draft
@@ -24,7 +29,9 @@ flowchart TD
     FinalVerify -->|Budget exhausted or validation mutated files| Failed
 ```
 
-Each state starts a separate `pi` process in the current repository with the active model and thinking level. Structured state responses may include a small evidence handoff containing cited mechanical facts, relevant paths, and commands already run. The host caps this retained context, rejects facts without readable repository-relative citations, and drops a fact when any cited file changes. Later prompts label retained evidence as untrusted research that must be verified. Review states receive paths and commands but not prior claims; the independent skeptic receives no handoff context. This reduces repeated repository discovery without reusing prior conversations or reasoning.
+Each state starts a separate `pi` process in the current repository with the active model and thinking level. States first determine whether their narrow responsibility applies and avoid edits, broad rediscovery, and unrelated commands when it does not. An empty planned-comments or review-comments artifact ends the workflow after the initial direct inspection. Test-review states run only when their corresponding test-writing state changed files, and finding-remediation states run only when findings exist. Validation and final review still run when actual implementation work remains.
+
+Structured state responses may include a small evidence handoff containing cited mechanical facts, relevant paths, and commands already run. The host caps this retained context, rejects facts without readable repository-relative citations, and drops a fact when any cited file changes. Later prompts label retained evidence as untrusted research that must be verified. Review states receive paths and commands but not prior claims; the independent skeptic receives no handoff context. This reduces repeated repository discovery without reusing prior conversations or reasoning.
 
 The orchestrator invokes the draft and skeptic reviews as separate states. It does not trust the draft reviewer to self-delegate. The host defines the scope from the complete current uncommitted worktree, validates a unique current-attempt planned-comments artifact, and derives surviving inline findings from that artifact. A clean artifact requires an empty inline section and the exact overall comment `No actionable findings.`; every actionable finding must instead be a structured inline comment. Changed submodules are rejected because their nested worktrees cannot be covered by the parent repository fingerprint.
 
