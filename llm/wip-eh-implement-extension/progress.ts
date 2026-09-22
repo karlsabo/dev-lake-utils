@@ -27,7 +27,7 @@ export function startWorkflowProgress(ui: WorkflowProgressUI, now: () => number 
 			[
 				`WIP EH implement · ${formatElapsed(now() - startedAt)} elapsed`,
 				label,
-				"A separate Pi subagent is working on this state.",
+				"Cancel: /wip-eh-implement-cancel",
 			],
 			{ placement: "belowEditor" },
 		);

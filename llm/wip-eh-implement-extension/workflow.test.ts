@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {cancellationError} from "./cancellation.ts";
 import type {HandoffLedger, WorkflowHandoff} from "./handoff.ts";
 import type {ReviewAttempt, ReviewClaim, ReviewEvidence} from "./review-evidence.ts";
-import {runImplementationWorkflow, type StateAgent, WorkflowFailure, type WorkflowState} from "./workflow.ts";
+import {
+  runImplementationWorkflow,
+  type StateAgent,
+  WorkflowCancelled,
+  WorkflowFailure,
+  type WorkflowState,
+} from "./workflow.ts";
 
 const COMPLETED = '{"outcome":"completed","workPerformed":true,"continueWorkflow":true,"summary":"done"}';
 const NO_WORK = '{"outcome":"completed","workPerformed":false,"continueWorkflow":true,"summary":"no work needed"}';
@@ -507,6 +514,75 @@ test("fails with the state name when the corrected response is still malformed",
 		/create-contract returned an invalid response after correction/,
 	);
 	assert.equal(calls, 2);
+});
+
+test("cancellation stops the active state, retains its audit, and starts no later state", async () => {
+	const evidence = new FakeEvidence();
+	const controller = new AbortController();
+	const states: WorkflowState[] = [];
+	let activeStateStarted!: () => void;
+	const active = new Promise<void>((resolve) => {
+		activeStateStarted = resolve;
+	});
+	const workflow = runImplementationWorkflow("implement behavior", async (state) => {
+		states.push(state);
+		if (state === "create-contract") return COMPLETED;
+		activeStateStarted();
+		return new Promise<string>((_resolve, reject) => {
+			controller.signal.addEventListener("abort", () => reject(cancellationError(controller.signal)), {once: true});
+		});
+	}, options(evidence, {signal: controller.signal}));
+
+	await active;
+	controller.abort();
+	await assert.rejects(workflow, (error: unknown) => {
+		assert.ok(error instanceof WorkflowCancelled);
+		assert.equal(error.message, "Cancelled by user");
+		assert.deepEqual(error.audit.states, [{state: "create-contract", summary: "done", handoff: undefined}]);
+		assert.deepEqual(
+			{initialTestFixes: error.audit.initialTestFixes, finalTestFixes: error.audit.finalTestFixes, reviewFixes: error.audit.reviewFixes},
+			{initialTestFixes: 0, finalTestFixes: 0, reviewFixes: 0},
+		);
+		return true;
+	});
+	assert.deepEqual(states, ["create-contract", "write-black-box-tests"]);
+	assert.equal(evidence.cleanupCalls, 1);
+});
+
+test("cancellation remains distinct when teardown also fails", async () => {
+	const evidence = new FakeEvidence();
+	evidence.cleanupError = new Error("cleanup failed");
+	const controller = new AbortController();
+	controller.abort();
+
+	await assert.rejects(
+		runImplementationWorkflow("implement behavior", agent(), options(evidence, {signal: controller.signal})),
+		(error: unknown) =>
+			error instanceof WorkflowCancelled
+			&& error.reason === "Cancelled by user"
+			&& /Teardown failure\(s\): cleanup failed/.test(error.message),
+	);
+});
+
+test("cancellation requested by failing teardown remains distinct", async () => {
+	const evidence = new FakeEvidence();
+	const controller = new AbortController();
+	evidence.cleanup = async () => {
+		evidence.cleanupCalls += 1;
+		controller.abort();
+		throw new Error("cleanup failed");
+	};
+
+	await assert.rejects(
+		runImplementationWorkflow("implement behavior", agent(), options(evidence, {signal: controller.signal})),
+		(error: unknown) => {
+			assert.ok(error instanceof WorkflowCancelled);
+			assert.equal(error.reason, "Cancelled by user");
+			assert.match(error.message, /Teardown failure\(s\): cleanup failed/);
+			assert.ok(error.audit.states.length > 0);
+			return true;
+		},
+	);
 });
 
 test("stops when a state reports the task is blocked", async () => {

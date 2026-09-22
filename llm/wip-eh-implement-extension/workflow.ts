@@ -1,3 +1,4 @@
+import {CancellationError, cancellationError, throwIfCancelled} from "./cancellation.ts";
 import type {HandoffLedger, WorkflowHandoff} from "./handoff.ts";
 import type {ReviewAttempt, ReviewClaim, ReviewEvidence} from "./review-evidence.ts";
 import type {InitialChange} from "./worktree.ts";
@@ -46,6 +47,7 @@ export interface WorkflowOptions {
 	maxFinalTestFixes?: number;
 	maxReviewFixes?: number;
 	onTransition?: (state: WorkflowState) => void;
+	signal?: AbortSignal;
 }
 
 export interface WorkflowAudit {
@@ -65,21 +67,41 @@ export class WorkflowFailure extends Error {
 	}
 }
 
+export class WorkflowCancelled extends CancellationError {
+	readonly audit: WorkflowAudit;
+	readonly reason: string;
+
+	constructor(message: string, audit: WorkflowAudit, reason = message) {
+		super(message);
+		this.name = "WorkflowCancelled";
+		this.audit = audit;
+		this.reason = reason;
+	}
+}
+
 export function combineWorkflowAndTeardownFailures(
 	failure: unknown,
 	teardownFailures: readonly unknown[],
 	audit: WorkflowAudit,
-): WorkflowFailure {
-	if (teardownFailures.length === 0 && failure instanceof WorkflowFailure) return failure;
-	const primaryAudit = failure instanceof WorkflowFailure ? failure.audit : audit;
+): WorkflowFailure | WorkflowCancelled {
+	if (teardownFailures.length === 0 && (failure instanceof WorkflowFailure || failure instanceof WorkflowCancelled)) {
+		return failure;
+	}
+	const primaryAudit = failure instanceof WorkflowFailure || failure instanceof WorkflowCancelled ? failure.audit : audit;
 	const primaryMessage = failure === undefined ? undefined : errorMessage(failure);
 	const teardownMessage = teardownFailures.length === 0
 		? undefined
 		: `Teardown failure(s): ${teardownFailures.map(errorMessage).join("; ")}`;
-	return new WorkflowFailure(
-		[primaryMessage, teardownMessage].filter((message): message is string => message !== undefined).join("\n"),
-		primaryAudit,
-	);
+	const message = [primaryMessage, teardownMessage]
+		.filter((part): part is string => part !== undefined)
+		.join("\n");
+	return failure instanceof CancellationError
+		? new WorkflowCancelled(
+			message,
+			primaryAudit,
+			failure instanceof WorkflowCancelled ? failure.reason : failure.message,
+		)
+		: new WorkflowFailure(message, primaryAudit);
 }
 
 export type StateAgent = (state: WorkflowState, prompt: string) => Promise<string>;
@@ -128,13 +150,16 @@ export async function runImplementationWorkflow(
 	try {
 		result = await workflow.run();
 	} catch (error) {
-		failure = error;
+		failure = error instanceof CancellationError && !(error instanceof WorkflowCancelled)
+			? new WorkflowCancelled(error.message, workflow.audit())
+			: error;
 	}
 	try {
 		await options.reviewEvidence.cleanup();
 	} catch (error) {
 		teardownFailures.push(error);
 	}
+	if (failure === undefined && options.signal?.aborted) failure = cancellationError(options.signal);
 	if (failure !== undefined || teardownFailures.length > 0) {
 		throw combineWorkflowAndTeardownFailures(failure, teardownFailures, workflow.audit());
 	}
@@ -320,8 +345,10 @@ class WorkflowExecution {
 	}
 
 	private async call(state: WorkflowState, prompt: string): Promise<string> {
-		this.options.onTransition?.(state);
+		throwIfCancelled(this.options.signal);
 		const retainedContext = await this.options.handoffLedger?.contextFor(state);
+		throwIfCancelled(this.options.signal);
+		this.options.onTransition?.(state);
 		return this.runAgent(state, retainedContext ? `${prompt}\n\n${retainedContext}` : prompt);
 	}
 }

@@ -3,6 +3,7 @@ import {homedir} from "node:os";
 import {join} from "node:path";
 import {fileURLToPath} from "node:url";
 import type {ExtensionAPI} from "@earendil-works/pi-coding-agent";
+import {CancellationError, cancellationError} from "./cancellation.ts";
 import {createHandoffLedger} from "./handoff.ts";
 import {startWorkflowProgress} from "./progress.ts";
 import {createReviewEvidence} from "./review-evidence.ts";
@@ -11,6 +12,7 @@ import {type WorkflowRunAttempt, WorkflowRunGuard} from "./run-guard.ts";
 import {
   combineWorkflowAndTeardownFailures,
   runImplementationWorkflow,
+  WorkflowCancelled,
   WorkflowFailure,
   type WorkflowResult,
   type WorkflowState,
@@ -24,6 +26,19 @@ export default function (pi: ExtensionAPI) {
 	if (isWorkflowSubagent()) return;
 
 	const runGuard = new WorkflowRunGuard();
+	pi.registerCommand("wip-eh-implement-cancel", {
+		description: "Cancel the active WIP EH implementation workflow",
+		handler: async (_args, ctx) => {
+			const request = runGuard.cancel();
+			if (request === "not-active") {
+				ctx.ui.notify("No implementation workflow is active", "warning");
+			} else if (request === "already-requested") {
+				ctx.ui.notify("Implementation workflow cancellation is already in progress", "warning");
+			} else {
+				ctx.ui.notify("Cancelling implementation workflow", "info");
+			}
+		},
+	});
 	pi.registerCommand("wip-eh-implement", {
 		description: "Run the tool-capable WIP EH implementation workflow",
 		handler: async (args, ctx) => {
@@ -42,7 +57,7 @@ export default function (pi: ExtensionAPI) {
 			try {
 				attempt = await runGuard.run(
 					() => ctx.waitForIdle(),
-					async () => {
+					async (signal) => {
 						const progress = startWorkflowProgress(ctx.ui);
 						let baseline: Awaited<ReturnType<typeof captureWorktreeBaseline>> | undefined;
 						return runWithTeardown(
@@ -55,6 +70,7 @@ export default function (pi: ExtensionAPI) {
 											cwd: ctx.cwd,
 											model,
 											thinkingLevel: ctx.thinkingLevel,
+											signal,
 										}),
 									{
 										guidancePath: GUIDANCE_PATH,
@@ -65,23 +81,37 @@ export default function (pi: ExtensionAPI) {
 											? PR_REVIEW_SKILL_PATH
 											: undefined,
 										onTransition: (state) => progress.transition(statusText(state)),
+										signal,
 									},
 								);
 							},
 							[() => baseline?.cleanup() ?? Promise.resolve(), () => progress.stop()],
+							signal,
 						);
 					},
 				);
 			} catch (error) {
-				const reason = error instanceof Error ? error.message : String(error);
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				if (error instanceof CancellationError) {
+					const reason = cancellationReason(error);
+					pi.appendEntry("wip-eh-implement-result", {
+						task,
+						outcome: "cancelled",
+						reason,
+						...(error instanceof WorkflowCancelled ? error.audit : emptyAudit()),
+						cancelledAt: new Date().toISOString(),
+					});
+					ctx.ui.notify(`Implementation workflow cancelled: ${errorMessage}`, "warning");
+					return;
+				}
 				pi.appendEntry("wip-eh-implement-result", {
 					task,
 					outcome: "failed",
-					reason,
+					reason: errorMessage,
 					...(error instanceof WorkflowFailure ? error.audit : emptyAudit()),
 					failedAt: new Date().toISOString(),
 				});
-				ctx.ui.notify(reason, "error");
+				ctx.ui.notify(errorMessage, "error");
 				return;
 			}
 
@@ -106,9 +136,14 @@ function emptyAudit() {
 	return {states: [], initialTestFixes: 0, finalTestFixes: 0, reviewFixes: 0};
 }
 
+export function cancellationReason(error: CancellationError): string {
+	return error instanceof WorkflowCancelled ? error.reason : error.message;
+}
+
 export async function runWithTeardown(
 	run: () => Promise<WorkflowResult>,
 	teardowns: ReadonlyArray<() => Promise<void> | void>,
+	signal?: AbortSignal,
 ): Promise<WorkflowResult> {
 	let result: WorkflowResult | undefined;
 	let failure: unknown;
@@ -125,6 +160,7 @@ export async function runWithTeardown(
 			teardownFailures.push(error);
 		}
 	}
+	if (failure === undefined && signal?.aborted) failure = cancellationError(signal);
 	if (failure !== undefined || teardownFailures.length > 0) {
 		throw combineWorkflowAndTeardownFailures(failure, teardownFailures, {
 			states: result?.states ?? [],

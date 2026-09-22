@@ -1,12 +1,15 @@
 import {spawn} from "node:child_process";
 import {existsSync} from "node:fs";
 import {basename} from "node:path";
+import {CancellationError, cancellationError, throwIfCancelled} from "./cancellation.ts";
 
 export interface SubagentOptions {
 	cwd: string;
 	model: string;
 	thinkingLevel?: string;
 	timeoutMs?: number;
+	signal?: AbortSignal;
+	killGraceMs?: number;
 }
 
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
@@ -34,11 +37,16 @@ export function piSubagentArgs(prompt: string, options: SubagentOptions): string
 	];
 }
 
-export async function runPiSubagent(prompt: string, options: SubagentOptions): Promise<string> {
+export async function runPiSubagent(
+	prompt: string,
+	options: SubagentOptions,
+	spawnProcess: typeof spawn = spawn,
+): Promise<string> {
+	throwIfCancelled(options.signal);
 	const invocation = piInvocation(piSubagentArgs(prompt, options));
 
 	return new Promise<string>((resolve, reject) => {
-		const child = spawn(invocation.command, invocation.args, {
+		const child = spawnProcess(invocation.command, invocation.args, {
 			cwd: options.cwd,
 			env: { ...process.env, [WORKFLOW_SUBAGENT_ENV]: "1" },
 			shell: false,
@@ -48,13 +56,10 @@ export async function runPiSubagent(prompt: string, options: SubagentOptions): P
 		let stderr = "";
 		let finalText = "";
 		let modelError = "";
-		let timedOut = false;
-
-		const timeout = setTimeout(() => {
-			timedOut = true;
-			child.kill("SIGTERM");
-			setTimeout(() => child.kill("SIGKILL"), 5_000).unref();
-		}, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+		let settled = false;
+		let termination: Error | undefined;
+		let timeout: NodeJS.Timeout | undefined;
+		let killTimer: NodeJS.Timeout | undefined;
 
 		const processLine = (line: string) => {
 			if (!line.trim()) return;
@@ -72,33 +77,70 @@ export async function runPiSubagent(prompt: string, options: SubagentOptions): P
 				// JSON mode may include non-event diagnostics; stderr and exit status remain authoritative.
 			}
 		};
-
-		child.stdout.on("data", (chunk) => {
+		const onStdout = (chunk: Buffer | string) => {
 			stdoutBuffer += chunk.toString();
 			const lines = stdoutBuffer.split("\n");
 			stdoutBuffer = lines.pop() ?? "";
 			lines.forEach(processLine);
-		});
-		child.stderr.on("data", (chunk) => {
+		};
+		const onStderr = (chunk: Buffer | string) => {
 			stderr += chunk.toString();
-		});
-		child.on("error", (error) => {
-			clearTimeout(timeout);
-			reject(error);
-		});
-		child.on("close", (code) => {
-			clearTimeout(timeout);
-			processLine(stdoutBuffer);
-			if (timedOut) {
-				reject(new Error("Subagent timed out"));
-			} else if (code !== 0 || modelError) {
-				reject(new Error(modelError || stderr.trim() || `Subagent exited with code ${code}`));
-			} else if (!finalText) {
-				reject(new Error("Subagent returned no final response"));
-			} else {
-				resolve(finalText);
+		};
+		const cleanup = () => {
+			if (timeout) clearTimeout(timeout);
+			if (killTimer) clearTimeout(killTimer);
+			options.signal?.removeEventListener("abort", onAbort);
+			child.stdout.removeListener("data", onStdout);
+			child.stderr.removeListener("data", onStderr);
+			child.removeListener("error", onError);
+			child.removeListener("close", onClose);
+		};
+		const settle = (error?: Error, value?: string) => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			if (error) reject(error);
+			else resolve(value ?? "");
+		};
+		const terminate = (reason: Error) => {
+			if (settled) return;
+			if (termination) {
+				if (reason instanceof CancellationError) termination = reason;
+				return;
 			}
-		});
+			termination = reason;
+			child.kill("SIGTERM");
+			killTimer = setTimeout(() => {
+				if (!settled) child.kill("SIGKILL");
+			}, options.killGraceMs ?? 5_000);
+			killTimer.unref();
+		};
+		function onAbort() {
+			terminate(options.signal ? cancellationError(options.signal) : new CancellationError());
+		}
+		function onError(error: Error) {
+			settle(termination ?? error);
+		}
+		function onClose(code: number | null) {
+			processLine(stdoutBuffer);
+			if (termination) settle(termination);
+			else if (code !== 0 || modelError) {
+				settle(new Error(modelError || stderr.trim() || `Subagent exited with code ${code}`));
+			} else if (!finalText) settle(new Error("Subagent returned no final response"));
+			else settle(undefined, finalText);
+		}
+
+		child.stdout.on("data", onStdout);
+		child.stderr.on("data", onStderr);
+		child.on("error", onError);
+		child.on("close", onClose);
+		options.signal?.addEventListener("abort", onAbort, {once: true});
+		timeout = setTimeout(
+			() => terminate(new Error("Subagent timed out")),
+			options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+		);
+		timeout.unref();
+		if (options.signal?.aborted) onAbort();
 	});
 }
 

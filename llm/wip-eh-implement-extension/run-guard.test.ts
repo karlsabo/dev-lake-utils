@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {CancellationError} from "./cancellation.ts";
 import {WorkflowRunGuard} from "./run-guard.ts";
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
@@ -54,6 +55,46 @@ test("rejects another invocation while a workflow is active", async () => {
 	assert.equal(workflowStarts, 1);
 	workflowDone.resolve();
 	await first;
+});
+
+test("cancels the active run once and clears the handle after settlement", async () => {
+	const workflowDone = deferred();
+	const guard = new WorkflowRunGuard();
+	let signal: AbortSignal | undefined;
+	const run = guard.run(
+		async () => {},
+		async (activeSignal) => {
+			signal = activeSignal;
+			await workflowDone.promise;
+		},
+	);
+	await Promise.resolve();
+
+	assert.equal(guard.cancel(), "requested");
+	assert.equal(guard.cancel(), "already-requested");
+	assert.equal(signal?.aborted, true);
+	assert.ok(signal?.reason instanceof CancellationError);
+	workflowDone.resolve();
+	await run;
+	assert.equal(guard.cancel(), "not-active");
+});
+
+test("cancellation while waiting for idle prevents the workflow from starting", async () => {
+	const idle = deferred();
+	const guard = new WorkflowRunGuard();
+	let started = false;
+	const run = guard.run(
+		() => idle.promise,
+		async () => {
+			started = true;
+		},
+	);
+
+	assert.equal(guard.cancel(), "requested");
+	idle.resolve();
+	await assert.rejects(run, CancellationError);
+	assert.equal(started, false);
+	assert.equal(guard.cancel(), "not-active");
 });
 
 test("allows another invocation after a workflow fails", async () => {

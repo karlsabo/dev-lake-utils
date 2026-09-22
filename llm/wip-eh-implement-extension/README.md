@@ -39,9 +39,9 @@ Final review includes every changed and untracked path, including paths dirty be
 
 Success applies to one worktree fingerprint: both review passes leave it unchanged, the skeptic artifact is clean, required validation passes, and validation leaves the reviewed fingerprint unchanged. Every repair mutation—including a repair after final validation—returns through both final review passes. Unexpected mutation by a review or validation state fails explicitly.
 
-Three independent finite budgets cap initial-validation repairs, final-validation repairs, and review repairs. They do not reset when the convergence loop switches between review and validation. A zero budget still runs the check but permits no repair. Exhaustion is a failed run, not partial success. Review artifacts live in a private per-run temporary directory and are deleted during workflow teardown; validated artifact contents are copied into the state audit first so the evidence used for the decision remains available. Successful and failed runs are stored as one `wip-eh-implement-result` session entry after teardown; failures retain the completed state audit and consumed repair counts, and any review-evidence or outer teardown failures are included without replacing the primary workflow audit.
+Three independent finite budgets cap initial-validation repairs, final-validation repairs, and review repairs. They do not reset when the convergence loop switches between review and validation. A zero budget still runs the check but permits no repair. Exhaustion is a failed run, not partial success. Review artifacts live in a private per-run temporary directory and are deleted during workflow teardown; validated artifact contents are copied into the state audit first so the evidence used for the decision remains available. Successful, failed, and cancelled runs are stored as one `wip-eh-implement-result` session entry after teardown. Failures and cancellations retain the completed state audit and consumed repair counts, and any review-evidence or outer teardown failures are included without replacing the primary workflow audit.
 
-The command waits for the current agent to become idle and rejects overlapping workflow invocations. While it runs, a widget shows the active state and elapsed time. The workflow reads `../notes.md`, honors applicable `AGENTS.md` instructions, and uses the globally installed `eh-pr-review` guidance when available. Normal requests remain limited to one acceptance-test slice; a planned-comments remediation batch may contain multiple supported findings.
+The command waits for the current agent to become idle and rejects overlapping workflow invocations. While it runs, a widget shows the active state, elapsed time, and cancellation command. Cancellation stops the active workflow but preserves edits already made in the worktree. The workflow reads `../notes.md`, honors applicable `AGENTS.md` instructions, and uses the globally installed `eh-pr-review` guidance when available. Normal requests remain limited to one acceptance-test slice; a planned-comments remediation batch may contain multiple supported findings.
 
 ## Install
 
@@ -63,6 +63,12 @@ Invoke from the repository to modify:
 
 ```text
 /wip-eh-implement implement one narrowly scoped behavior
+```
+
+Cancel the active workflow without rolling back its worktree edits:
+
+```text
+/wip-eh-implement-cancel
 ```
 
 ## Test
