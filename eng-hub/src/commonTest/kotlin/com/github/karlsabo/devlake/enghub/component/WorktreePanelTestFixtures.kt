@@ -5,6 +5,7 @@ internal fun emptyLocalWorktreeRowActions(): LocalWorktreeRowActions = LocalWork
     onOpenPullRequest = {},
     onArchive = {},
     onOpenCreateWorktreeDialog = {},
+    onUpdateFromOrigin = {},
     onRebaseOntoParent = {},
     onMergeOntoParent = {},
 )
@@ -26,6 +27,7 @@ internal fun emptyPanelActions(): WorktreePanelActions = WorktreePanelActions(
         onOpenPullRequest = {},
         onArchiveWorktree = { _, _ -> },
         onCreateWorktree = {},
+        onUpdateFromOrigin = { _, _, _ -> },
         onRebaseOntoParent = { _, _, _ -> },
         onMergeOntoParent = { _, _, _ -> },
     ),

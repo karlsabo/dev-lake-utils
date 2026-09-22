@@ -26,6 +26,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var listLocalBranchesAction: (String) -> List<String> = { emptyList() }
     var currentBranchUpstreamRemoteAction: (String) -> String? = { null }
     var remoteDefaultBranchRefAction: (String, String) -> String? = { _, _ -> null }
+    var queryRemoteDefaultBranchAction: (String, String) -> String? = { _, _ -> null }
     var isAncestorAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var hasCommitsNotContainedInAction: (String, String, String) -> Boolean = { _, _, _ -> false }
     var worktreeAddAction: (String, String, String) -> Unit = { _, _, _ -> }
@@ -33,6 +34,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var rebaseAction: (String, String) -> Unit = { _, _ -> }
     var abortRebaseAction: (String) -> Unit = {}
     var mergeAction: (String, String) -> Unit = { _, _ -> }
+    var mergeFastForwardOnlyAction: (String, String) -> Unit = { _, _ -> }
     var abortMergeAction: (String) -> Unit = {}
     var worktreeListResult: String = ""
     var worktreeListAction: (String) -> String = { worktreeListResult }
@@ -109,6 +111,11 @@ internal class FakeGitCommandApi : GitCommandApi {
         return remoteDefaultBranchRefAction(repoPath, remote)
     }
 
+    override fun queryRemoteDefaultBranch(repoPath: String, remote: String): String? {
+        calls.add(Call("queryRemoteDefaultBranch", listOf(repoPath, remote)))
+        return queryRemoteDefaultBranchAction(repoPath, remote)
+    }
+
     override fun isAncestor(
         repoPath: String,
         ancestorRef: String,
@@ -176,6 +183,11 @@ internal class FakeGitCommandApi : GitCommandApi {
     override fun merge(repoPath: String, sourceRef: String) {
         calls.add(Call("merge", listOf(repoPath, sourceRef)))
         mergeAction(repoPath, sourceRef)
+    }
+
+    override fun mergeFastForwardOnly(repoPath: String, sourceRef: String) {
+        calls.add(Call("mergeFastForwardOnly", listOf(repoPath, sourceRef)))
+        mergeFastForwardOnlyAction(repoPath, sourceRef)
     }
 
     override fun abortMerge(repoPath: String) {

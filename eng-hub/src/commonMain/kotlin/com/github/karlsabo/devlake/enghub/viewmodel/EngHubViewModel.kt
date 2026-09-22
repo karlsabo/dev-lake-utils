@@ -124,6 +124,13 @@ class EngHubViewModel internal constructor(
         localRepositories = localRepositoriesController,
         errorReporter = errorReporter,
     )
+    private val updateController = LocalWorktreeUpdateController(
+        viewModel = this,
+        state = state,
+        worktreeServices = worktreeServices,
+        localRepositories = localRepositoriesController,
+        errorReporter = errorReporter,
+    )
     private val ignoredNotificationPersistence = IgnoredNotificationPersistence(
         state = state,
         notificationIgnoreStore = notificationIgnoreStore,
@@ -162,6 +169,8 @@ class EngHubViewModel internal constructor(
         MappedStateFlow(state.worktreeConflictResolutionRequests) { it.firstOrNull() }
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.archivingLocalWorktreePaths.asStateFlow()
+    val updatingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
+        state.updatingLocalWorktreePaths.asStateFlow()
     val rebasingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.rebasingLocalWorktreePaths.asStateFlow()
     val mergingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
@@ -266,6 +275,8 @@ class EngHubViewModel internal constructor(
         rebaseController::rebaseLocalWorktreeOntoParent
     val mergeLocalWorktreeWithParent: (String, String, String) -> Unit =
         mergeController::mergeLocalWorktreeWithParent
+    val updateLocalWorktreeFromOrigin: (String, String, String) -> Unit =
+        updateController::updateLocalWorktreeFromOrigin
 
     internal fun abortWorktreeConflict(request: WorktreeConflictResolutionRequest) {
         when (request.operation) {

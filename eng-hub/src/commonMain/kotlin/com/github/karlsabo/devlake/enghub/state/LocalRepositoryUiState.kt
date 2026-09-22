@@ -26,6 +26,7 @@ data class LocalWorktreeUiState(
     val parentBranch: String? = null,
     val baseCommitHash: String? = null,
     val needsRebase: Boolean = false,
+    val canUpdateFromOrigin: Boolean = false,
 )
 
 data class ForceArchiveWorktreeUiState(

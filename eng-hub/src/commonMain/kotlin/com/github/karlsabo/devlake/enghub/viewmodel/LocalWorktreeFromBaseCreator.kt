@@ -31,13 +31,34 @@ internal class LocalWorktreeFromBaseCreator(
             state.useUnrelatedExistingBranchConfirmationRequest.value = null
         }
 
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
-            val refresh = LocalWorktreeCreateRefresh()
-            runCatching { createLocalWorktree(request, refresh) }
-                .rethrowCancellation()
-                .onFailure { failure -> handleCreateFailure(request, refresh, failure) }
-            refresh.refreshAfterSuccessIfNeeded()
+        val guardedPaths = runCatching {
+            listOf(request.baseWorktreePath, buildWorktreePath(request.repoRootPath, request.targetBranch).value)
+        }.getOrNull()
+        val mutationLease = guardedPaths?.let { paths ->
+            state.localWorktreeMutationGuard.tryAcquire(paths) ?: return
         }
+
+        val createJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
+            var ancestryFailure: ExistingTargetBranchAncestryException? = null
+            try {
+                val refresh = LocalWorktreeCreateRefresh()
+                runCatching { createLocalWorktree(request, refresh) }
+                    .rethrowCancellation()
+                    .onFailure { failure ->
+                        if (!request.allowUnrelatedExistingBranch && failure is ExistingTargetBranchAncestryException) {
+                            refresh.refreshedAfterFailure = true
+                            ancestryFailure = failure
+                        } else {
+                            handleCreateFailure(request, refresh, failure)
+                        }
+                    }
+                refresh.refreshAfterSuccessIfNeeded()
+            } finally {
+                mutationLease?.release()
+            }
+            ancestryFailure?.let { requestUnrelatedExistingBranchConfirmation(request) }
+        }
+        createJob.invokeOnCompletion { mutationLease?.release() }
     }
 
     private suspend fun createLocalWorktree(
@@ -58,16 +79,6 @@ internal class LocalWorktreeFromBaseCreator(
         refresh: LocalWorktreeCreateRefresh,
         failure: Throwable,
     ) {
-        if (!request.allowUnrelatedExistingBranch && failure is ExistingTargetBranchAncestryException) {
-            refresh.refreshedAfterFailure = true
-            state.useUnrelatedExistingBranchConfirmationRequest.value = request.toConfirmation()
-            logger.info {
-                "Confirmation required to create local worktree for unrelated existing branch " +
-                    "${request.targetBranch} from ${request.baseBranch}"
-            }
-            return
-        }
-
         val message = failure.message ?: "Failed to create worktree"
         val shouldReport = refresh.setupRequest?.let { requestWithPath ->
             refresh.setupHandle?.let { handle ->
@@ -115,6 +126,14 @@ internal class LocalWorktreeFromBaseCreator(
             setupShell = activeConfig.setupShell,
             setupCommands = setupCommands,
         )
+    }
+
+    private fun requestUnrelatedExistingBranchConfirmation(request: CreateLocalWorktreeFromBaseRequest) {
+        state.useUnrelatedExistingBranchConfirmationRequest.value = request.toConfirmation()
+        logger.info {
+            "Confirmation required to create local worktree for unrelated existing branch " +
+                "${request.targetBranch} from ${request.baseBranch}"
+        }
     }
 
     private fun CreateLocalWorktreeFromBaseRequest.toConfirmation() = UseUnrelatedExistingBranchConfirmationRequest(

@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
+private const val UPDATE_SHORTCUT_GLYPH = "⬇️"
 private const val REBASE_SHORTCUT_GLYPH = "🔁"
 private const val MERGE_SHORTCUT_GLYPH = "🔀"
 
@@ -36,6 +37,7 @@ internal fun OpenWorktreeShortcut(
             enabled = isWorktreeOpenEnabled(
                 setupStatus = state.setupStatus,
                 isArchiving = state.isArchiving,
+                isUpdating = state.isUpdating,
                 isRebasing = state.isRebasing,
                 isMerging = state.isMerging,
             ),
@@ -50,12 +52,35 @@ internal fun OpenWorktreeShortcut(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+internal fun UpdateWorktreeShortcut(
+    state: LocalWorktreeRowState,
+    onUpdateFromOrigin: () -> Unit,
+) {
+    if (!state.worktree.canUpdateFromOrigin) return
+
+    WorktreeIntegrationShortcut(
+        tooltip = "Update from origin",
+        description = "Update worktree ${state.worktree.branch} from origin",
+        glyph = UPDATE_SHORTCUT_GLYPH,
+        enabled = isWorktreeOpenEnabled(
+            setupStatus = state.setupStatus,
+            isArchiving = state.isArchiving,
+            isUpdating = state.isUpdating,
+            isRebasing = state.isRebasing,
+            isMerging = state.isMerging,
+        ),
+        onClick = onUpdateFromOrigin,
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 internal fun RebaseWorktreeShortcut(
     state: LocalWorktreeRowState,
     onRebaseOntoParent: () -> Unit,
 ) {
     val parentBranch = state.worktree.parentBranch
-    if (parentBranch.isNullOrBlank()) return
+    if (parentBranch.isNullOrBlank() || state.worktree.canUpdateFromOrigin) return
 
     WorktreeIntegrationShortcut(
         tooltip = "Rebase onto parent",
@@ -64,6 +89,7 @@ internal fun RebaseWorktreeShortcut(
         enabled = isWorktreeRebaseEnabled(
             setupStatus = state.setupStatus,
             isArchiving = state.isArchiving,
+            isUpdating = state.isUpdating,
             isRebasing = state.isRebasing,
             isMerging = state.isMerging,
         ),
@@ -78,7 +104,7 @@ internal fun MergeWorktreeShortcut(
     onMergeOntoParent: () -> Unit,
 ) {
     val parentBranch = state.worktree.parentBranch
-    if (parentBranch.isNullOrBlank()) return
+    if (parentBranch.isNullOrBlank() || state.worktree.canUpdateFromOrigin) return
 
     WorktreeIntegrationShortcut(
         tooltip = "Merge parent into worktree",
@@ -87,6 +113,7 @@ internal fun MergeWorktreeShortcut(
         enabled = isWorktreeMergeEnabled(
             setupStatus = state.setupStatus,
             isArchiving = state.isArchiving,
+            isUpdating = state.isUpdating,
             isRebasing = state.isRebasing,
             isMerging = state.isMerging,
         ),
@@ -143,6 +170,7 @@ internal fun ArchiveWorktreeShortcut(
             enabled = isWorktreeArchiveEnabled(
                 setupStatus = state.setupStatus,
                 isArchiving = state.isArchiving,
+                isUpdating = state.isUpdating,
                 isRebasing = state.isRebasing,
                 isMerging = state.isMerging,
             ),

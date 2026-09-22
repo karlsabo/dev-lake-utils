@@ -106,6 +106,21 @@ class WorktreeRowsTest {
     }
 
     @Test
+    fun updateProgressDisablesEveryConflictingWorktreeAction() {
+        val worktree = LocalWorktreeUiState(
+            branch = "main",
+            path = "/repos/dev-lake-utils",
+            canUpdateFromOrigin = true,
+        )
+
+        assertFalse(isWorktreeOpenEnabled(null, isArchiving = false, isUpdating = true))
+        assertFalse(isWorktreeCreateEnabled(worktree, null, isArchiving = false, isUpdating = true))
+        assertFalse(isWorktreeArchiveEnabled(null, isArchiving = false, isUpdating = true))
+        assertFalse(isWorktreeRebaseEnabled(null, isArchiving = false, isUpdating = true))
+        assertFalse(isWorktreeMergeEnabled(null, isArchiving = false, isUpdating = true))
+    }
+
+    @Test
     fun visibleWorktreeRowsFallBackToFlatListWhenParentIsMissing() {
         val stacked = LocalWorktreeUiState(
             branch = "feature/stacked-pr",

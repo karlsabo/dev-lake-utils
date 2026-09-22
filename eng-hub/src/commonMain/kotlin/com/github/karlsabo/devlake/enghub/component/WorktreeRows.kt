@@ -25,6 +25,7 @@ internal data class WorktreeRowsState(
     val repository: LocalRepositoryUiState,
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
+    val updatingWorktreePaths: Set<String> = emptySet(),
     val rebasingWorktreePaths: Set<String> = emptySet(),
     val mergingWorktreePaths: Set<String> = emptySet(),
     val authoredOpenPullRequests: List<PullRequestUiState> = emptyList(),
@@ -34,6 +35,7 @@ internal data class LocalWorktreeRowState(
     val worktree: LocalWorktreeUiState,
     val setupStatus: WorktreeSetupStatus?,
     val isArchiving: Boolean,
+    val isUpdating: Boolean = false,
     val isRebasing: Boolean = false,
     val isMerging: Boolean = false,
     val nestingDepth: Int = 0,
@@ -72,37 +74,49 @@ internal fun visibleWorktreeMenuActions(
 internal fun isWorktreeOpenEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
+    isUpdating: Boolean = false,
     isRebasing: Boolean = false,
     isMerging: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging
+): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isRebasing || isMerging)
 
 internal fun isWorktreeCreateEnabled(
     worktree: LocalWorktreeUiState,
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
-    isRebasing: Boolean = false,
-    isMerging: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging && worktree.hasCreatableBase()
+    isUpdating: Boolean = false,
+    isIntegrating: Boolean = false,
+): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isIntegrating) &&
+    worktree.hasCreatableBase()
 
 internal fun isWorktreeArchiveEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
+    isUpdating: Boolean = false,
     isRebasing: Boolean = false,
     isMerging: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging
+): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isRebasing || isMerging)
 
 internal fun isWorktreeRebaseEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
+    isUpdating: Boolean = false,
     isRebasing: Boolean = false,
     isMerging: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging
+): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isRebasing || isMerging)
 
 internal fun isWorktreeMergeEnabled(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
+    isUpdating: Boolean = false,
     isRebasing: Boolean = false,
     isMerging: Boolean = false,
-): Boolean = setupStatus == null && !isArchiving && !isRebasing && !isMerging
+): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isRebasing || isMerging)
+
+private fun areWorktreeActionsEnabled(
+    setupStatus: WorktreeSetupStatus?,
+    isArchiving: Boolean,
+    isUpdating: Boolean,
+    isIntegrating: Boolean,
+): Boolean = setupStatus == null && !isArchiving && !isUpdating && !isIntegrating
 
 private fun LocalWorktreeUiState.hasCreatableBase(): Boolean = branch != DETACHED || !baseCommitHash.isNullOrBlank()

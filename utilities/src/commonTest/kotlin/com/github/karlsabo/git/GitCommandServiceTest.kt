@@ -267,7 +267,28 @@ class GitCommandServiceTest {
             initRepoWithCommit(originDir)
             service.clone(originDir, cloneDir)
 
-            assertEquals("origin/HEAD", service.remoteDefaultBranchRef(cloneDir, "origin"))
+            val defaultBranch = executeGit("-C", cloneDir, "branch", "--show-current").trim()
+            assertEquals("origin/$defaultBranch", service.remoteDefaultBranchRef(cloneDir, "origin"))
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
+        }
+    }
+
+    @Test
+    fun queryRemoteDefaultBranchReadsCurrentRemoteHeadInsteadOfStaleTrackingHead() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            service.clone(originDir, cloneDir)
+            val originalBranch = executeGit("-C", originDir, "branch", "--show-current").trim()
+            executeGit("-C", originDir, "branch", "trunk")
+            executeGit("-C", originDir, "symbolic-ref", "HEAD", "refs/heads/trunk")
+
+            assertEquals("origin/$originalBranch", service.remoteDefaultBranchRef(cloneDir, "origin"))
+            assertEquals("trunk", service.queryRemoteDefaultBranch(cloneDir, "origin"))
         } finally {
             removeTempDir(originDir)
             removeTempDir(cloneDir)
@@ -342,6 +363,63 @@ class GitCommandServiceTest {
         } finally {
             removeTempDir(repoDir)
             removeTempDir(worktreeDir)
+        }
+    }
+
+    @Test
+    fun mergeFastForwardOnly_fastForwardsCurrentWorktreeWithAutostash() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            service.clone(originDir, cloneDir)
+            writeFixtureFile(originDir, "remote.txt", "remote\n")
+            executeGit("-C", originDir, "add", ".")
+            executeGit("-C", originDir, "commit", "-m", "remote update")
+            writeFixtureFile(cloneDir, "README.md", "dirty\n")
+
+            service.fetch(cloneDir)
+            val branch = executeGit("-C", cloneDir, "branch", "--show-current").trim()
+            service.mergeFastForwardOnly(cloneDir, "origin/$branch")
+
+            assertTrue(SystemFileSystem.exists(Path(cloneDir, "remote.txt")))
+            assertTrue(service.status(cloneDir).contains("README.md"))
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
+        }
+    }
+
+    @Test
+    fun mergeFastForwardOnlyReportsConflictingAutostashRestoration() {
+        val originDir = createTempDir("origin")
+        val cloneDir = createTempDir("clone")
+        removeTempDir(cloneDir)
+        try {
+            initRepoWithCommit(originDir)
+            service.clone(originDir, cloneDir)
+            writeFixtureFile(cloneDir, "README.md", "local dirty change\n")
+            writeFixtureFile(originDir, "README.md", "remote committed change\n")
+            executeGit("-C", originDir, "add", "README.md")
+            executeGit("-C", originDir, "commit", "-m", "remote conflict")
+            service.fetch(cloneDir)
+            val branch = executeGit("-C", cloneDir, "branch", "--show-current").trim()
+
+            val failure = assertFailsWith<GitCommandException> {
+                service.mergeFastForwardOnly(cloneDir, "origin/$branch")
+            }
+
+            assertTrue(failure.gitOutput.contains("Autostash restoration left conflicts"))
+            assertEquals(
+                executeGit("-C", cloneDir, "rev-parse", "origin/$branch").trim(),
+                executeGit("-C", cloneDir, "rev-parse", "HEAD").trim(),
+            )
+            assertTrue(executeGit("-C", cloneDir, "diff", "--name-only", "--diff-filter=U").isNotBlank())
+            assertTrue(executeGit("-C", cloneDir, "stash", "list").contains("autostash"))
+        } finally {
+            removeTempDir(originDir)
+            removeTempDir(cloneDir)
         }
     }
 

@@ -16,6 +16,7 @@ internal data class WorktreePanelState(
     val forceArchiveRequest: ForceArchiveWorktreeUiState?,
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
+    val updatingWorktreePaths: Set<String> = emptySet(),
     val rebasingWorktreePaths: Set<String> = emptySet(),
     val mergingWorktreePaths: Set<String> = emptySet(),
     val authoredOpenPullRequests: List<PullRequestUiState> = emptyList(),
@@ -46,6 +47,7 @@ internal data class LocalWorktreeActions(
     val onOpenPullRequest: (url: String) -> Unit,
     val onArchiveWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     val onCreateWorktree: CreateWorktreeCallback,
+    val onUpdateFromOrigin: (repoRootPath: String, worktreePath: String, branch: String) -> Unit,
     val onRebaseOntoParent: (repoRootPath: String, worktreePath: String, parentBranch: String) -> Unit,
     val onMergeOntoParent: (repoRootPath: String, worktreePath: String, parentBranch: String) -> Unit,
 )

@@ -51,12 +51,11 @@ internal class LocalWorktreeArchiveController(
                 errorReporter.enqueueActionError("Cannot archive root worktree: $worktreePath")
             }
 
-            state.archivingLocalWorktreePaths.addPathIfAbsent(normalizedWorktreePath) -> launchArchive(
-                repoRootPath,
-                worktreePath,
-                normalizedWorktreePath,
-                force,
-            )
+            else -> {
+                val mutationLease = state.localWorktreeMutationGuard.tryAcquire(worktreePath) ?: return
+                state.archivingLocalWorktreePaths.update { paths -> paths + normalizedWorktreePath }
+                launchArchive(repoRootPath, worktreePath, normalizedWorktreePath, force, mutationLease)
+            }
         }
     }
 
@@ -65,32 +64,36 @@ internal class LocalWorktreeArchiveController(
         worktreePath: String,
         normalizedWorktreePath: String,
         force: Boolean,
+        mutationLease: LocalWorktreeMutationGuard.Lease,
     ) {
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
-            val result = runCatching {
-                logger.info { "Archiving worktree $worktreePath for $repoRootPath force=$force" }
-                worktreeServices.gitWorktreeApi.archiveWorktree(repoRootPath, worktreePath, force = force)
-            }
-            result.onSuccess {
-                try {
-                    localRepositories.refreshLocalRepositoryWorktreesBestEffort(
-                        repoRootPath = repoRootPath,
-                        logContext = "after archive",
-                    )
-                    awaitWorktreeRemoval(
-                        repoRootPath = repoRootPath,
-                        worktreePath = normalizedWorktreePath,
-                    )
-                } finally {
-                    state.archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
+        val archiveJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
+            val failure = try {
+                runCatching {
+                    logger.info { "Archiving worktree $worktreePath for $repoRootPath force=$force" }
+                    worktreeServices.gitWorktreeApi.archiveWorktree(repoRootPath, worktreePath, force = force)
                 }
-            }.onFailure { failure ->
+                    .rethrowCancellation()
+                    .exceptionOrNull()
+                    .also { archiveFailure ->
+                        if (archiveFailure == null) {
+                            localRepositories.refreshLocalRepositoryWorktreesBestEffort(
+                                repoRootPath = repoRootPath,
+                                logContext = "after archive",
+                            )
+                            awaitWorktreeRemoval(repoRootPath, normalizedWorktreePath)
+                        }
+                    }
+            } finally {
                 state.archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
-                logger.error(failure) { "Failed to archive worktree $worktreePath" }
-                if (!force && failure.isDirtyWorktreeArchiveFailure()) {
+                mutationLease.release()
+            }
+
+            failure?.let { archiveFailure ->
+                logger.error(archiveFailure) { "Failed to archive worktree $worktreePath" }
+                if (!force && archiveFailure.isDirtyWorktreeArchiveFailure()) {
                     state.forceArchiveWorktreeRequest.value = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
                 } else {
-                    errorReporter.enqueueActionError(failure.message ?: "Failed to archive worktree")
+                    errorReporter.enqueueActionError(archiveFailure.message ?: "Failed to archive worktree")
                 }
                 localRepositories.refreshLocalRepositoryWorktreesBestEffort(
                     repoRootPath = repoRootPath,
@@ -98,6 +101,7 @@ internal class LocalWorktreeArchiveController(
                 )
             }
         }
+        archiveJob.invokeOnCompletion { mutationLease.release() }
     }
 
     private suspend fun awaitWorktreeRemoval(

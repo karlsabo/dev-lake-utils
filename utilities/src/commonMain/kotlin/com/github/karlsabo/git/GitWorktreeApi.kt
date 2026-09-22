@@ -6,7 +6,8 @@ interface GitWorktreeApi :
     GitWorktreeDiscoveryApi,
     GitWorktreeArchiveApi,
     GitWorktreeRebaseApi,
-    GitWorktreeMergeApi
+    GitWorktreeMergeApi,
+    GitWorktreeBaseUpdateApi
 
 interface GitRepositoryApi {
     fun ensureRepository(repoPath: String, cloneUrl: String)
@@ -57,6 +58,10 @@ interface GitWorktreeDiscoveryApi {
         "refreshAndListExistingBranches is not implemented",
     )
     fun inferDefaultBranchRef(repoPath: String): String?
+    fun inferOriginDefaultBranch(repoPath: String): String? = inferDefaultBranchRef(repoPath)
+        ?.takeIf { it.startsWith("origin/") }
+        ?.removePrefix("origin/")
+        ?.takeIf { it.isNotBlank() && it != "HEAD" }
     fun inferWorktreeParentBranches(repoPath: String): Map<String, String>
     fun branchNeedsRebase(
         repoPath: String,
@@ -87,6 +92,13 @@ interface GitWorktreeRebaseApi {
     fun abortRebase(worktreePath: String): Unit = throw UnsupportedOperationException(
         "abortRebase is not implemented",
     )
+}
+
+interface GitWorktreeBaseUpdateApi {
+    fun updateWorktreeFromOrigin(
+        worktreePath: String,
+        branch: String,
+    ): Unit = throw UnsupportedOperationException("updateWorktreeFromOrigin is not implemented")
 }
 
 interface GitWorktreeMergeApi {

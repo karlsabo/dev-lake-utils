@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.git.GitMergeConflictException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -16,8 +15,6 @@ internal class LocalWorktreeMergeController(
     private val localRepositories: LocalRepositoryController,
     private val errorReporter: ActionErrorReporter,
 ) {
-    private val abortingMergeWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
-
     fun mergeLocalWorktreeWithParent(
         repoRootPath: String,
         worktreePath: String,
@@ -25,10 +22,12 @@ internal class LocalWorktreeMergeController(
     ) {
         val worktreeIdentity = worktreePath.normalizedRepositoryPath()
         if (repoRootPath.isBlank() || worktreeIdentity.isEmpty()) return
-        if (!state.integratingLocalWorktreePaths.addPathIfAbsent(worktreeIdentity)) return
+        val mutationLease = state.localWorktreeMutationGuard.tryAcquire(worktreePath) ?: return
+        state.integratingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
         state.mergingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
 
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
+        val mergeJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
+            var conflictFailure: GitMergeConflictException? = null
             try {
                 runCatching {
                     require(parentBranch.isNotBlank()) { "Parent branch is required" }
@@ -43,26 +42,34 @@ internal class LocalWorktreeMergeController(
                         )
                     }
                     .onFailure { failure ->
-                        handleMergeFailure(
-                            failure = failure,
-                            repoRootPath = repoRootPath,
-                            worktreePath = worktreePath,
-                            parentBranch = parentBranch,
-                        )
+                        if (failure is GitMergeConflictException) {
+                            conflictFailure = failure
+                        } else {
+                            handleMergeFailure(failure, repoRootPath, worktreePath, parentBranch)
+                        }
                     }
             } finally {
                 state.mergingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
                 state.integratingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
+                mutationLease.release()
+            }
+            conflictFailure?.let { failure ->
+                handleMergeFailure(failure, repoRootPath, worktreePath, parentBranch)
             }
         }
+        mergeJob.invokeOnCompletion { mutationLease.release() }
     }
 
     fun abortMergeAfterConflict(request: WorktreeConflictResolutionRequest) {
-        if (request.operation != WorktreeIntegrationOperation.Merge) return
         val worktreeIdentity = request.worktreePath.normalizedRepositoryPath()
-        if (!canAbortMergeAfterConflict(request, request.repoRootPath, worktreeIdentity)) return
+        if (request.operation != WorktreeIntegrationOperation.Merge ||
+            !canAbortMergeAfterConflict(request, request.repoRootPath, worktreeIdentity)
+        ) {
+            return
+        }
+        val mutationLease = state.localWorktreeMutationGuard.tryAcquire(request.worktreePath) ?: return
 
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
+        val abortJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
             state.mergingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
             try {
                 runCatching {
@@ -87,9 +94,10 @@ internal class LocalWorktreeMergeController(
                     }
             } finally {
                 state.mergingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
-                abortingMergeWorktreePaths.update { paths -> paths - worktreeIdentity }
+                mutationLease.release()
             }
         }
+        abortJob.invokeOnCompletion { mutationLease.release() }
     }
 
     private fun handleMergeFailure(
@@ -124,6 +132,5 @@ internal class LocalWorktreeMergeController(
         worktreePath: String,
     ): Boolean = repoRootPath.isNotEmpty() &&
         worktreePath.isNotEmpty() &&
-        hasWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request) &&
-        abortingMergeWorktreePaths.addPathIfAbsent(worktreePath)
+        hasWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request)
 }

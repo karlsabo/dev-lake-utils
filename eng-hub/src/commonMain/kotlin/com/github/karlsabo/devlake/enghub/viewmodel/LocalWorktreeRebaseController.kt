@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.git.GitRebaseConflictException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -16,8 +15,6 @@ internal class LocalWorktreeRebaseController(
     private val localRepositories: LocalRepositoryController,
     private val errorReporter: ActionErrorReporter,
 ) {
-    private val abortingRebaseWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
-
     fun rebaseLocalWorktreeOntoParent(
         repoRootPath: String,
         worktreePath: String,
@@ -25,10 +22,12 @@ internal class LocalWorktreeRebaseController(
     ) {
         val worktreeIdentity = worktreePath.normalizedRepositoryPath()
         if (repoRootPath.isBlank() || worktreeIdentity.isEmpty()) return
-        if (!state.integratingLocalWorktreePaths.addPathIfAbsent(worktreeIdentity)) return
+        val mutationLease = state.localWorktreeMutationGuard.tryAcquire(worktreePath) ?: return
+        state.integratingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
         state.rebasingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
 
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
+        val rebaseJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
+            var conflictFailure: GitRebaseConflictException? = null
             try {
                 runCatching {
                     require(parentBranch.isNotBlank()) { "Parent branch is required" }
@@ -43,26 +42,34 @@ internal class LocalWorktreeRebaseController(
                         )
                     }
                     .onFailure { failure ->
-                        handleRebaseFailure(
-                            failure = failure,
-                            repoRootPath = repoRootPath,
-                            worktreePath = worktreePath,
-                            parentBranch = parentBranch,
-                        )
+                        if (failure is GitRebaseConflictException) {
+                            conflictFailure = failure
+                        } else {
+                            handleRebaseFailure(failure, repoRootPath, worktreePath, parentBranch)
+                        }
                     }
             } finally {
                 state.rebasingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
                 state.integratingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
+                mutationLease.release()
+            }
+            conflictFailure?.let { failure ->
+                handleRebaseFailure(failure, repoRootPath, worktreePath, parentBranch)
             }
         }
+        rebaseJob.invokeOnCompletion { mutationLease.release() }
     }
 
     fun abortRebaseAfterConflict(request: WorktreeConflictResolutionRequest) {
-        if (request.operation != WorktreeIntegrationOperation.Rebase) return
         val worktreeIdentity = request.worktreePath.normalizedRepositoryPath()
-        if (!canAbortRebaseAfterConflict(request, request.repoRootPath, worktreeIdentity)) return
+        if (request.operation != WorktreeIntegrationOperation.Rebase ||
+            !canAbortRebaseAfterConflict(request, request.repoRootPath, worktreeIdentity)
+        ) {
+            return
+        }
+        val mutationLease = state.localWorktreeMutationGuard.tryAcquire(request.worktreePath) ?: return
 
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
+        val abortJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
             state.rebasingLocalWorktreePaths.update { paths -> paths + worktreeIdentity }
             try {
                 runCatching {
@@ -87,9 +94,10 @@ internal class LocalWorktreeRebaseController(
                     }
             } finally {
                 state.rebasingLocalWorktreePaths.update { paths -> paths - worktreeIdentity }
-                abortingRebaseWorktreePaths.update { paths -> paths - worktreeIdentity }
+                mutationLease.release()
             }
         }
+        abortJob.invokeOnCompletion { mutationLease.release() }
     }
 
     private fun handleRebaseFailure(
@@ -124,6 +132,5 @@ internal class LocalWorktreeRebaseController(
         worktreePath: String,
     ): Boolean = repoRootPath.isNotEmpty() &&
         worktreePath.isNotEmpty() &&
-        hasWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request) &&
-        abortingRebaseWorktreePaths.addPathIfAbsent(worktreePath)
+        hasWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request)
 }

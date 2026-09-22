@@ -140,6 +140,7 @@ private fun WorktreeRepositoryList(
                             repository = repository,
                             setupStatuses = state.setupStatuses,
                             archivingWorktreePaths = state.archivingWorktreePaths,
+                            updatingWorktreePaths = state.updatingWorktreePaths,
                             rebasingWorktreePaths = state.rebasingWorktreePaths,
                             mergingWorktreePaths = state.mergingWorktreePaths,
                             authoredOpenPullRequests = state.authoredOpenPullRequests,

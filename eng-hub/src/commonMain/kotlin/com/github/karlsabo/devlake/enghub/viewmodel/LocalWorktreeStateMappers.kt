@@ -29,6 +29,7 @@ internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
             currentWorktree.copy(
                 parentBranch = parentBranch,
                 needsRebase = parentBranch != null && enrichedWorktree.needsRebase,
+                canUpdateFromOrigin = enrichedWorktree.canUpdateFromOrigin,
             )
         }
     }
@@ -40,11 +41,16 @@ internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
 ): List<LocalWorktreeUiState> {
     val parentBranchesByChildBranch = inferWorktreeParentBranches(repoRootPath)
     val needsRebaseByChildBranch = rebaseNeedsByChildBranch(repoRootPath, parentBranchesByChildBranch)
+    val originDefaultBranch = inferOriginDefaultBranch(repoRootPath)
     val visibleBranches = worktrees.mapTo(mutableSetOf()) { it.branch }
     return worktrees.map { worktree ->
+        val canUpdateFromOrigin = worktree.branch == originDefaultBranch
+        val parentBranch = parentBranchesByChildBranch[worktree.branch]
+            ?.takeIf { !canUpdateFromOrigin && it in visibleBranches }
         worktree.copy(
-            parentBranch = parentBranchesByChildBranch[worktree.branch]?.takeIf { it in visibleBranches },
-            needsRebase = needsRebaseByChildBranch[worktree.branch] == true,
+            parentBranch = parentBranch,
+            needsRebase = parentBranch != null && needsRebaseByChildBranch[worktree.branch] == true,
+            canUpdateFromOrigin = canUpdateFromOrigin,
         )
     }
 }

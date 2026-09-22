@@ -53,6 +53,7 @@ internal data class LocalWorktreeRowActions(
     val onOpenPullRequest: (String) -> Unit,
     val onArchive: () -> Unit,
     val onOpenCreateWorktreeDialog: () -> Unit,
+    val onUpdateFromOrigin: () -> Unit,
     val onRebaseOntoParent: () -> Unit,
     val onMergeOntoParent: () -> Unit,
 )
@@ -60,6 +61,7 @@ internal data class LocalWorktreeRowActions(
 private data class WorktreeRowContentActions(
     val onOpen: () -> Unit,
     val onArchive: () -> Unit,
+    val onUpdateFromOrigin: () -> Unit,
     val onRebaseOntoParent: () -> Unit,
     val onMergeOntoParent: () -> Unit,
     val onMenuButtonClick: () -> Unit,
@@ -96,6 +98,7 @@ internal fun LocalWorktreeRow(
             actions = WorktreeRowContentActions(
                 onOpen = actions.onOpen,
                 onArchive = actions.onArchive,
+                onUpdateFromOrigin = actions.onUpdateFromOrigin,
                 onRebaseOntoParent = actions.onRebaseOntoParent,
                 onMergeOntoParent = actions.onMergeOntoParent,
                 onMenuButtonClick = {
@@ -143,7 +146,14 @@ private fun WorktreeRowContent(
             modifier = Modifier.weight(1f),
         )
         WorktreeRebaseNeededIndicator(state.worktree)
-        WorktreeProgressLabels(state.setupStatus, state.isArchiving, state.isRebasing, state.isMerging)
+        WorktreeProgressLabels(
+            state.setupStatus,
+            state.isArchiving,
+            state.isUpdating,
+            state.isRebasing,
+            state.isMerging,
+        )
+        UpdateWorktreeShortcut(state = state, onUpdateFromOrigin = actions.onUpdateFromOrigin)
         RebaseWorktreeShortcut(state = state, onRebaseOntoParent = actions.onRebaseOntoParent)
         MergeWorktreeShortcut(state = state, onMergeOntoParent = actions.onMergeOntoParent)
         OpenWorktreeShortcut(state = state, onOpen = actions.onOpen)
@@ -233,6 +243,7 @@ private fun WorktreeRebaseNeededIndicator(worktree: LocalWorktreeUiState) {
 private fun WorktreeProgressLabels(
     setupStatus: WorktreeSetupStatus?,
     isArchiving: Boolean,
+    isUpdating: Boolean,
     isRebasing: Boolean,
     isMerging: Boolean,
 ) {
@@ -243,6 +254,10 @@ private fun WorktreeProgressLabels(
         }
         if (isArchiving) {
             Text(text = "Archiving...", style = MaterialTheme.typography.caption)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        if (isUpdating) {
+            Text(text = "Updating...", style = MaterialTheme.typography.caption)
             Spacer(modifier = Modifier.width(8.dp))
         }
         if (isRebasing) {

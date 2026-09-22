@@ -99,41 +99,53 @@ internal class ExistingWorktreeController(
             ?.takeIf(String::isNotBlank)
             ?.let(::WorktreePath)
             ?: buildWorktreePath(repoRootPath, branch)
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
-            var setupHandle: WorktreeSetupHandle? = null
-            runCatching {
-                val request = existingBranchSetupRequest(repoRootPath, branch, worktreePath)
-                setupHandle = worktreeServices.worktreeSetupCoordinator.setup(request)
-                setupHandle.await()
-                localRepositories.refreshLocalRepositoryWorktreesBestEffort(
-                    repoRootPath = repoRootPath,
-                    logContext = "after checking out existing branch $branch",
-                )
-                logger.info { "Setup: existing branch worktree setup done for ${worktreePath.value}" }
-            }.rethrowCancellation().onFailure { failure ->
-                localRepositories.refreshLocalRepositoryWorktreesBestEffort(
-                    repoRootPath = repoRootPath,
-                    logContext = "after existing branch setup failed for $branch",
-                )
-                reportSetupFailure(worktreePath, setupHandle, failure)
+        val mutationLease = state.localWorktreeMutationGuard.tryAcquire(worktreePath.value) ?: return
+        val checkoutJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
+            try {
+                var setupHandle: WorktreeSetupHandle? = null
+                runCatching {
+                    val request = existingBranchSetupRequest(repoRootPath, branch, worktreePath)
+                    setupHandle = worktreeServices.worktreeSetupCoordinator.setup(request)
+                    setupHandle.await()
+                    localRepositories.refreshLocalRepositoryWorktreesBestEffort(
+                        repoRootPath = repoRootPath,
+                        logContext = "after checking out existing branch $branch",
+                    )
+                    logger.info { "Setup: existing branch worktree setup done for ${worktreePath.value}" }
+                }.rethrowCancellation().onFailure { failure ->
+                    localRepositories.refreshLocalRepositoryWorktreesBestEffort(
+                        repoRootPath = repoRootPath,
+                        logContext = "after existing branch setup failed for $branch",
+                    )
+                    reportSetupFailure(worktreePath, setupHandle, failure)
+                }
+            } finally {
+                mutationLease.release()
             }
         }
+        checkoutJob.invokeOnCompletion { mutationLease.release() }
     }
     fun openLocalWorktree(repoRootPath: String, worktreePath: String) {
         if (repoRootPath.isBlank() || worktreePath.isBlank()) return
 
         val worktreeKey = WorktreePath(worktreePath)
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
-            var setupHandle: WorktreeSetupHandle? = null
-            runCatching {
-                logger.info { "Setup: requesting existing worktree setup for $worktreePath" }
-                setupHandle = requestExistingWorktreeSetup(repoRootPath, worktreePath)
-                setupHandle.await()
-                logger.info { "Setup: existing worktree setup done for $worktreePath" }
-            }.rethrowCancellation().onFailure { failure ->
-                reportSetupFailure(worktreeKey, setupHandle, failure)
+        val mutationLease = state.localWorktreeMutationGuard.tryAcquire(worktreePath) ?: return
+        val openJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
+            try {
+                var setupHandle: WorktreeSetupHandle? = null
+                runCatching {
+                    logger.info { "Setup: requesting existing worktree setup for $worktreePath" }
+                    setupHandle = requestExistingWorktreeSetup(repoRootPath, worktreePath)
+                    setupHandle.await()
+                    logger.info { "Setup: existing worktree setup done for $worktreePath" }
+                }.rethrowCancellation().onFailure { failure ->
+                    reportSetupFailure(worktreeKey, setupHandle, failure)
+                }
+            } finally {
+                mutationLease.release()
             }
         }
+        openJob.invokeOnCompletion { mutationLease.release() }
     }
 
     private fun existingBranchSetupRequest(

@@ -330,7 +330,7 @@ class EngHubLocalWorktreeArchiveViewModelTest {
     }
 
     @Test
-    fun successfulArchiveRemainsGuardedWhileSupersedingRefreshRuns() = runBlocking {
+    fun staleRebaseCallbackCannotMutatePathWhileArchiveRefreshRuns() = runBlocking {
         val rootWorktree = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
         val featureWorktree = Worktree(
             path = DEV_LAKE_SELECTED_WORKTREE,
@@ -338,25 +338,18 @@ class EngHubLocalWorktreeArchiveViewModelTest {
             commitHash = "def456",
         )
         var currentWorktrees = listOf(rootWorktree, featureWorktree)
-        val archiveRefreshStarted = CompletableDeferred<Unit>()
-        val releaseArchiveRefresh = CompletableDeferred<Unit>()
-        val supersedingRefreshStarted = CompletableDeferred<Unit>()
-        val releaseSupersedingRefresh = CompletableDeferred<Unit>()
-        val listCalls = blockedRefreshCalls(
-            archiveRefreshStarted,
-            releaseArchiveRefresh,
-            supersedingRefreshStarted,
-            releaseSupersedingRefresh,
-        )
+        val refreshStarted = CompletableDeferred<Unit>()
+        val releaseRefresh = CompletableDeferred<Unit>()
         val api = RecordingGitWorktreeApi(
-            responses = RecordingGitWorktreeApiResponses(
-                worktreesForRepoPath = { currentWorktrees },
-            ),
+            responses = RecordingGitWorktreeApiResponses(worktreesForRepoPath = { currentWorktrees }),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onListWorktrees = { listCalls.tryReceive().getOrNull()?.invoke() },
-                onArchiveWorktree = { _, _, _ ->
-                    currentWorktrees = listOf(rootWorktree)
+                onListWorktrees = {
+                    if (currentWorktrees.size == 1) {
+                        refreshStarted.complete(Unit)
+                        runBlocking { releaseRefresh.await() }
+                    }
                 },
+                onArchiveWorktree = { _, _, _ -> currentWorktrees = listOf(rootWorktree) },
             ),
         )
         val viewModel = createLocalRepositoryViewModel(
@@ -365,31 +358,19 @@ class EngHubLocalWorktreeArchiveViewModelTest {
             localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
         )
 
-        try {
-            expandRepository(viewModel)
-            viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
-            withTimeout(2_000.milliseconds) { archiveRefreshStarted.await() }
-            viewModel.rebaseLocalWorktreeOntoParent(
-                DEV_LAKE_ROOT,
-                DEV_LAKE_SELECTED_WORKTREE,
-                "main",
-            )
-            withTimeout(2_000.milliseconds) { supersedingRefreshStarted.await() }
+        expandRepository(viewModel)
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+        withTimeout(2_000.milliseconds) { refreshStarted.await() }
+        viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "main")
 
-            releaseArchiveRefresh.complete(Unit)
-            retryArchiveWhileBlocked(viewModel)
+        assertEquals(emptyList(), api.rebaseWorktreeOntoParentCalls)
+        assertArchiveIsGuarded(viewModel, api)
 
-            assertArchiveIsGuarded(viewModel, api)
-
-            releaseSupersedingRefresh.complete(Unit)
-            withTimeout(2_000.milliseconds) {
-                viewModel.archivingLocalWorktreePathsStateFlow.first { it.isEmpty() }
-            }
-            assertEquals(emptySet(), viewModel.archivingLocalWorktreePathsStateFlow.value)
-        } finally {
-            releaseArchiveRefresh.complete(Unit)
-            releaseSupersedingRefresh.complete(Unit)
+        releaseRefresh.complete(Unit)
+        withTimeout(2_000.milliseconds) {
+            viewModel.archivingLocalWorktreePathsStateFlow.first { it.isEmpty() }
         }
+        Unit
     }
 }
 
@@ -456,6 +437,46 @@ class EngHubLocalWorktreeArchiveFailureViewModelTest {
             viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.path },
         )
         assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
+    }
+
+    @Test
+    fun staleForceArchiveDialogCannotArchiveWhileUpdateRuns() = runBlocking {
+        val updateStarted = CompletableDeferred<Unit>()
+        val releaseUpdate = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onArchiveWorktree = { _, _, _ -> error("fatal: contains modified files") },
+                onUpdateWorktreeFromOrigin = {
+                    updateStarted.complete(Unit)
+                    runBlocking { releaseUpdate.await() }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+        val forceRequest = withTimeout(2_000.milliseconds) {
+            viewModel.forceArchiveWorktreeRequestStateFlow.first { it != null }!!
+        }
+        viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "main")
+        withTimeout(2_000.milliseconds) { updateStarted.await() }
+
+        viewModel.confirmForceArchiveLocalWorktree(forceRequest.repoRootPath, forceRequest.worktreePath)
+
+        assertEquals(
+            listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE),
+            api.archiveWorktreeCalls,
+        )
+        assertEquals(listOf(false), api.archiveWorktreeForceValues)
+        releaseUpdate.complete(Unit)
+        withTimeout(2_000.milliseconds) {
+            viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+        Unit
     }
 
     @Test

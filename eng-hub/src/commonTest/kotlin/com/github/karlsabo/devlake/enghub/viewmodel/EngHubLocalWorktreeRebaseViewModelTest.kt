@@ -342,10 +342,11 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         val firstRequest = withTimeout(2_000.milliseconds) {
             viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
+        val refreshCountBeforeSecondConflict = api.listWorktreeRepoPaths.size
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, secondChildWorktreePath, parentBranch)
         withTimeout(2_000.milliseconds) {
-            viewModel.rebasingLocalWorktreePathsStateFlow.first {
-                api.rebaseWorktreeOntoParentCalls.size == 2 && it.isEmpty()
+            while (api.listWorktreeRepoPaths.size == refreshCountBeforeSecondConflict) {
+                kotlinx.coroutines.yield()
             }
         }
 

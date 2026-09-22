@@ -12,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -320,6 +319,61 @@ class WorktreeWorktreeRowsTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun repositoryRowMapsNormalizedUpdatingPathToWorktreeProgress() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "dev-lake-utils",
+                            path = "/repos/dev-lake-utils",
+                            isExpanded = true,
+                            worktrees = listOf(
+                                LocalWorktreeUiState(
+                                    branch = "main",
+                                    path = "/repos/other/../dev-lake-utils/",
+                                    canUpdateFromOrigin = true,
+                                ),
+                            ),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                        updatingWorktreePaths = setOf("/repos/dev-lake-utils"),
+                    ),
+                    panelActions = emptyPanelActions(),
+                    onArchiveRequest = {},
+                    onCreateRequest = {},
+                )
+            }
+        }
+
+        onNodeWithText("Updating...").assertIsDisplayed()
+        onNodeWithContentDescription("Update worktree main from origin").assertIsNotEnabled()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun updatingWorktreeRowShowsProgressAndDisablesCompactActionsAndMenuButton() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                WorktreeRow(
+                    state = worktreeRowState().copy(
+                        worktree = worktreeRowState().worktree.copy(canUpdateFromOrigin = true),
+                        isUpdating = true,
+                    ),
+                )
+            }
+        }
+
+        onNodeWithText("Updating...").assertIsDisplayed()
+        onNodeWithContentDescription("Update worktree feature/login from origin").assertIsNotEnabled()
+        onNodeWithContentDescription("Open worktree feature/login").assertIsNotEnabled()
+        onNodeWithContentDescription("Archive worktree feature/login").assertIsNotEnabled()
+        onNodeWithContentDescription("Worktree actions for feature/login").assertIsNotEnabled()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun rightClickingWorktreeRowWhitespaceOpensItsEnabledActionMenu() = runComposeUiTest {
         setContent {
             MaterialTheme {
@@ -370,6 +424,36 @@ class WorktreeWorktreeRowsTest {
         }
 
         onNodeWithTag("worktree-row-feature/login").performMouseInput { rightClick() }
+
+        listOf("Open", "Create worktree", "Rebase onto parent", "Merge parent into worktree", "Archive")
+            .forEach { label ->
+                onNodeWithText(label).assertIsDisplayed().assertIsNotEnabled()
+            }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun rightClickingUpdatingWorktreeRowShowsConflictingMenuActionsDisabled() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                LocalWorktreeRow(
+                    state = LocalWorktreeRowState(
+                        worktree = LocalWorktreeUiState(
+                            branch = "main",
+                            path = "/repos/dev-lake-utils",
+                            parentBranch = "develop",
+                            canUpdateFromOrigin = true,
+                        ),
+                        setupStatus = null,
+                        isArchiving = false,
+                        isUpdating = true,
+                    ),
+                    actions = emptyLocalWorktreeRowActions(),
+                )
+            }
+        }
+
+        onNodeWithTag("worktree-row-main").performMouseInput { rightClick() }
 
         listOf("Open", "Create worktree", "Rebase onto parent", "Merge parent into worktree", "Archive")
             .forEach { label ->

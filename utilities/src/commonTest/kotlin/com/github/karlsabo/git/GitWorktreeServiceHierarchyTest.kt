@@ -82,6 +82,49 @@ class GitWorktreeServiceHierarchyTest {
     }
 
     @Test
+    fun inferOriginDefaultBranchQueriesServerInsteadOfUsingStaleTrackingHead() {
+        val fake = FakeGitCommandApi().apply {
+            remoteDefaultBranchRefAction = { _, _ -> "origin/main" }
+            queryRemoteDefaultBranchAction = { _, _ -> "trunk" }
+        }
+        val repoPath = "/repos/dev-lake-utils"
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val defaultBranch = service.inferOriginDefaultBranch(repoPath)
+
+        assertEquals("trunk", defaultBranch)
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("queryRemoteDefaultBranch", listOf(repoPath, "origin"))),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun inferOriginDefaultBranchFallsBackToCachedTrackingHeadWhenServerQueryFails() {
+        val fake = FakeGitCommandApi().apply {
+            remoteDefaultBranchRefAction = { _, _ -> "origin/main" }
+            queryRemoteDefaultBranchAction = { _, _ ->
+                throw GitCommandException(
+                    command = listOf("git", "ls-remote", "--symref", "origin", "HEAD"),
+                    exitCode = 128,
+                    gitOutput = "fatal: unable to access origin",
+                )
+            }
+        }
+        val repoPath = "/repos/dev-lake-utils"
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        assertEquals("main", service.inferOriginDefaultBranch(repoPath))
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("queryRemoteDefaultBranch", listOf(repoPath, "origin")),
+                FakeGitCommandApi.Call("remoteDefaultBranchRef", listOf(repoPath, "origin")),
+            ),
+            fake.calls,
+        )
+    }
+
+    @Test
     fun inferWorktreeParentBranches_usesLocalRefsWithoutContactingRemote() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"

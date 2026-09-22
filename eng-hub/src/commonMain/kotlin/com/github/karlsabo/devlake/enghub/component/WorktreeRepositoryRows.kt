@@ -239,6 +239,7 @@ private fun WorktreeRowEntry(
                 worktree = worktree,
                 setupStatus = state.setupStatuses[WorktreePath(worktree.path)],
                 isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
+                isUpdating = normalizedWorktreePath in state.updatingWorktreePaths,
                 isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
                 isMerging = normalizedWorktreePath in state.mergingWorktreePaths,
                 nestingDepth = row.nestingDepth,
@@ -266,6 +267,9 @@ private fun worktreeRowActions(
     onOpenPullRequest = panelActions.worktrees.onOpenPullRequest,
     onArchive = { onArchiveRequest(PendingArchive(repositoryPath, worktree.path)) },
     onOpenCreateWorktreeDialog = { onCreateRequest(createWorktreeDialogState(repositoryPath, worktree)) },
+    onUpdateFromOrigin = {
+        panelActions.worktrees.onUpdateFromOrigin(repositoryPath, worktree.path, worktree.branch)
+    },
     onRebaseOntoParent = {
         worktree.parentBranch?.let { parentBranch ->
             panelActions.worktrees.onRebaseOntoParent(repositoryPath, worktree.path, parentBranch)

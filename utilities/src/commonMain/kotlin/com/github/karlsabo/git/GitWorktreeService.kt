@@ -50,6 +50,16 @@ class OriginFetchFailureException(
     cause: Throwable,
 ) : GitWorktreeException(originFetchFailureMessage(worktreePath, parentBranch, gitOutput), cause)
 
+interface WorktreeUnchangedFailure
+
+class BaseBranchOriginFetchFailureException(
+    val worktreePath: String,
+    val branch: String,
+    val gitOutput: String,
+    cause: Throwable,
+) : GitWorktreeException(baseBranchOriginFetchFailureMessage(worktreePath, branch, gitOutput), cause),
+    WorktreeUnchangedFailure
+
 class GitWorktreeService private constructor(
     parts: GitWorktreeServiceParts,
 ) : GitWorktreeApi,
@@ -58,7 +68,8 @@ class GitWorktreeService private constructor(
     GitWorktreeDiscoveryApi by parts.discoveryApi,
     GitWorktreeArchiveApi by parts.archiveApi,
     GitWorktreeRebaseApi by parts.rebaseApi,
-    GitWorktreeMergeApi by parts.mergeApi {
+    GitWorktreeMergeApi by parts.mergeApi,
+    GitWorktreeBaseUpdateApi by parts.baseUpdateApi {
     constructor(
         gitCommandApi: GitCommandApi = GitCommandService(),
         deleteCheckoutDirectory: (String) -> Unit = ::deleteCheckoutDirectory,
@@ -83,6 +94,7 @@ private data class GitWorktreeServiceParts(
     val archiveApi: GitWorktreeArchiveApi,
     val rebaseApi: GitWorktreeRebaseApi,
     val mergeApi: GitWorktreeMergeApi,
+    val baseUpdateApi: GitWorktreeBaseUpdateApi,
 )
 
 private fun buildGitWorktreeServiceParts(
@@ -107,6 +119,7 @@ private fun buildGitWorktreeServiceParts(
     val operationStateDetector = GitOperationStateDetector(gitCommandApi)
     val rebaser = GitWorktreeRebaser(gitCommandApi, integrationRefResolver, operationStateDetector)
     val merger = GitWorktreeMerger(gitCommandApi, integrationRefResolver, operationStateDetector)
+    val baseUpdater = GitWorktreeBaseUpdater(gitCommandApi, branchValidator)
 
     return GitWorktreeServiceParts(
         repositoryApi = GitRepositoryService(repoResolver),
@@ -122,6 +135,7 @@ private fun buildGitWorktreeServiceParts(
         archiveApi = GitWorktreeArchiveService(archiver),
         rebaseApi = GitWorktreeRebaseService(rebaser),
         mergeApi = GitWorktreeMergeService(merger),
+        baseUpdateApi = GitWorktreeBaseUpdateService(baseUpdater),
     )
 }
 
@@ -209,6 +223,8 @@ private class GitWorktreeDiscoveryService(
 
     override fun inferDefaultBranchRef(repoPath: String): String? = defaultRefs.inferDefaultBranchRef(repoPath)
 
+    override fun inferOriginDefaultBranch(repoPath: String): String? = defaultRefs.inferOriginDefaultBranch(repoPath)
+
     override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> {
         val parentBranches = parents.inferParentBranches(repoPath)
         return parentBranches
@@ -233,6 +249,14 @@ private class GitWorktreeRebaseService(
 
     override fun abortRebase(worktreePath: String) {
         rebaser.abortRebase(worktreePath)
+    }
+}
+
+private class GitWorktreeBaseUpdateService(
+    private val updater: GitWorktreeBaseUpdater,
+) : GitWorktreeBaseUpdateApi {
+    override fun updateWorktreeFromOrigin(worktreePath: String, branch: String) {
+        updater.update(worktreePath, branch)
     }
 }
 
@@ -691,6 +715,13 @@ private fun originFetchFailureMessage(
 ): String = "Failed to fetch origin before integrating $parentBranch into worktree $worktreePath. " +
     "Resolve the fetch failure and try again: $gitOutput"
 
+private fun baseBranchOriginFetchFailureMessage(
+    worktreePath: String,
+    branch: String,
+    gitOutput: String,
+): String = "Failed to fetch origin before updating branch $branch in worktree $worktreePath. " +
+    "Resolve the fetch failure and try again: $gitOutput"
+
 private class GitBranchAncestryChecker(
     private val gitCommandApi: GitCommandApi,
     private val branchValidator: GitWorktreeBranchValidator,
@@ -806,6 +837,15 @@ private class GitDefaultBranchRefResolver(
             remoteDefaultBranchRef(repoPath, remote)?.let { return it }
         }
         return null
+    }
+
+    fun inferOriginDefaultBranch(repoPath: String): String? = try {
+        gitCommandApi.queryRemoteDefaultBranch(repoPath, DEFAULT_REMOTE)
+    } catch (_: GitCommandException) {
+        remoteDefaultBranchRef(repoPath, DEFAULT_REMOTE)
+            ?.takeIf { it.startsWith("$DEFAULT_REMOTE/") }
+            ?.removePrefix("$DEFAULT_REMOTE/")
+            ?.takeIf { it.isNotBlank() && it != "HEAD" }
     }
 
     private fun candidateDefaultBranchRemotes(repoPath: String): List<String> = listOfNotNull(
@@ -1172,6 +1212,85 @@ private class GitWorktreeRebaser(
     private companion object {
         const val REBASE_MERGE_STATE_ENTRY = "rebase-merge"
         const val REBASE_APPLY_STATE_ENTRY = "rebase-apply"
+    }
+}
+
+private class GitWorktreeBaseUpdater(
+    private val gitCommandApi: GitCommandApi,
+    private val branchValidator: GitWorktreeBranchValidator,
+) {
+    fun update(worktreePath: String, branch: String) {
+        require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
+        branchValidator.validate(branch)
+        fetchOrigin(worktreePath, branch)
+        val defaultBranch = gitCommandApi.queryRemoteDefaultBranch(worktreePath, ORIGIN)
+        validateDefaultBranch(worktreePath, branch, defaultBranch)
+        val checkedOutBranch = gitCommandApi.revParse(worktreePath, "--abbrev-ref", "HEAD")
+        validateCheckedOutBranch(worktreePath, branch, checkedOutBranch)
+        validateRemoteContainsLocal(worktreePath, branch)
+        try {
+            gitCommandApi.mergeFastForwardOnly(worktreePath, remoteTrackingRef(branch))
+        } catch (e: GitCommandException) {
+            throw GitWorktreeException(
+                "Failed to fast-forward $branch from $ORIGIN/$branch in worktree $worktreePath: ${e.gitOutput}",
+                e,
+            )
+        }
+    }
+
+    private fun fetchOrigin(worktreePath: String, branch: String) {
+        try {
+            gitCommandApi.fetch(worktreePath, ORIGIN)
+        } catch (e: GitCommandException) {
+            throw BaseBranchOriginFetchFailureException(
+                worktreePath = worktreePath,
+                branch = branch,
+                gitOutput = e.gitOutput,
+                cause = e,
+            )
+        }
+    }
+
+    private fun validateDefaultBranch(
+        worktreePath: String,
+        branch: String,
+        defaultBranch: String?,
+    ) {
+        if (defaultBranch != branch) {
+            throw GitWorktreeException(
+                "Cannot update $branch in worktree $worktreePath because origin's default branch is " +
+                    "${defaultBranch ?: "unavailable"}.",
+            )
+        }
+    }
+
+    private fun validateCheckedOutBranch(
+        worktreePath: String,
+        branch: String,
+        checkedOutBranch: String,
+    ) {
+        if (checkedOutBranch != branch) {
+            throw GitWorktreeException(
+                "Cannot update $branch in worktree $worktreePath because it currently has " +
+                    "${checkedOutBranch.ifBlank { "no branch" }} checked out.",
+            )
+        }
+    }
+
+    private fun validateRemoteContainsLocal(worktreePath: String, branch: String) {
+        val remoteRef = remoteTrackingRef(branch)
+        if (!gitCommandApi.isAncestor(worktreePath, "refs/heads/$branch", "refs/remotes/$remoteRef")) {
+            throw GitWorktreeException(
+                "Cannot update local branch $branch from $remoteRef because $branch contains commits absent from " +
+                    "$remoteRef. Reconcile $branch with $remoteRef manually before updating.",
+            )
+        }
+    }
+
+    private fun remoteTrackingRef(branch: String): String = "$ORIGIN/$branch"
+
+    private companion object {
+        const val ORIGIN = "origin"
     }
 }
 

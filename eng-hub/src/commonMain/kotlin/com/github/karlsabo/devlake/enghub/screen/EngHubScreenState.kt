@@ -109,6 +109,7 @@ internal fun collectEngHubScreenState(
     val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
     val archivingPaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
+    val updatingPaths by viewModel.updatingLocalWorktreePathsStateFlow.collectAsState()
     val rebasingPaths by viewModel.rebasingLocalWorktreePathsStateFlow.collectAsState()
     val mergingPaths by viewModel.mergingLocalWorktreePathsStateFlow.collectAsState()
     val forceArchiveRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
@@ -141,6 +142,7 @@ internal fun collectEngHubScreenState(
             forceArchiveRequest = forceArchiveRequest,
             setupStatuses = setupStatuses,
             archivingWorktreePaths = archivingPaths,
+            updatingWorktreePaths = updatingPaths,
             rebasingWorktreePaths = rebasingPaths,
             mergingWorktreePaths = mergingPaths,
             authoredOpenPullRequests = activityResults.pullRequests?.getOrNull().orEmpty(),
@@ -252,6 +254,7 @@ private fun localWorktreeActions(viewModel: EngHubViewModel) = LocalWorktreeActi
             baseCommitIsh = request.baseCommitIsh,
         )
     },
+    onUpdateFromOrigin = viewModel.updateLocalWorktreeFromOrigin,
     onRebaseOntoParent = viewModel.rebaseLocalWorktreeOntoParent,
     onMergeOntoParent = viewModel.mergeLocalWorktreeWithParent,
 )

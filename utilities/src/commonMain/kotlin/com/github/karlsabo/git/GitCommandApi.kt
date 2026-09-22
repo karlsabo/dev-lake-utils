@@ -36,6 +36,12 @@ interface GitRemoteCommandApi {
         repoPath: String,
         remote: String = "origin",
     ): String?
+
+    fun queryRemoteDefaultBranch(
+        repoPath: String,
+        remote: String = "origin",
+    ): String? = remoteDefaultBranchRef(repoPath, remote)
+        ?.removePrefix("$remote/")
 }
 
 interface GitBranchCommandApi {
@@ -86,6 +92,7 @@ interface GitRebaseCommandApi {
 
 interface GitMergeCommandApi {
     fun merge(repoPath: String, sourceRef: String)
+    fun mergeFastForwardOnly(repoPath: String, sourceRef: String)
     fun abortMerge(repoPath: String)
 }
 

@@ -4,6 +4,7 @@ import com.github.karlsabo.git.ExistingTargetBranchAncestryException
 import com.github.karlsabo.git.GitWorktreeException
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.buildWorktreePath
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -401,6 +402,48 @@ class EngHubLocalWorktreeCreateFailureViewModelTest {
         assertEquals(0, setupRunner.calls())
         assertEquals(emptyMap(), viewModel.setupStatusesStateFlow.value)
         assertEquals(null, setupRunner.requestFor(targetWorktreePath))
+    }
+
+    @Test
+    fun staleUnrelatedBranchDialogCannotCreateWhileBaseUpdateRuns() = runBlocking {
+        val baseWorktreePath = "$DEV_LAKE_ROOT-feature-base-pr"
+        val targetBranch = "feature/stacked-pr"
+        val updateStarted = CompletableDeferred<Unit>()
+        val releaseUpdate = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onCreateBranchWorktree = createExistingBranchWorktreeOrRequestConfirmation(),
+                onUpdateWorktreeFromOrigin = {
+                    updateStarted.complete(Unit)
+                    runBlocking { releaseUpdate.await() }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+        )
+        viewModel.createLocalWorktreeFromBase(
+            repoRootPath = DEV_LAKE_ROOT,
+            baseWorktreePath = baseWorktreePath,
+            baseBranch = "feature/base-pr",
+            targetBranch = targetBranch,
+        )
+        val confirmation = withTimeout(2_000.milliseconds) {
+            viewModel.useUnrelatedExistingBranchConfirmationRequestStateFlow.first { it != null }!!
+        }
+        viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, baseWorktreePath, "feature/base-pr")
+        withTimeout(2_000.milliseconds) { updateStarted.await() }
+
+        viewModel.confirmUseUnrelatedExistingBranch(confirmation)
+
+        assertEquals(1, api.createBranchWorktreeCalls.size)
+        assertEquals(false, api.createBranchWorktreeCalls.single().allowUnrelatedExistingBranch)
+        releaseUpdate.complete(Unit)
+        withTimeout(2_000.milliseconds) {
+            viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+        Unit
     }
 }
 

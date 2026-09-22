@@ -141,13 +141,28 @@ private class GitRemoteCommandService(
         remote: String,
     ): String? {
         require(remote.isNotBlank()) { "remote must not be blank" }
-        val command = gitRepoCommand(repoPath, "rev-parse", "--verify", "--quiet", "refs/remotes/$remote/HEAD")
+        val command = gitRepoCommand(repoPath, "symbolic-ref", "--quiet", "--short", "refs/remotes/$remote/HEAD")
         val result = commandRunner.runForResult(command)
         return when (result.exitCode) {
-            0 -> "$remote/HEAD"
+            0 -> result.stdout.trim().takeIf(String::isNotBlank)
             1 -> null
             else -> throwGitCommandException(command, result)
         }
+    }
+
+    override fun queryRemoteDefaultBranch(repoPath: String, remote: String): String? {
+        require(remote.isNotBlank()) { "remote must not be blank" }
+        val command = gitRepoCommand(repoPath, "ls-remote", "--symref", remote, "HEAD")
+        val result = commandRunner.runForResult(command)
+        if (result.exitCode != 0) throwGitCommandException(command, result)
+        return result.stdout.lineSequence()
+            .map { it.split('\t') }
+            .firstOrNull { fields ->
+                fields.size == 2 && fields[1] == "HEAD" && fields[0].startsWith("ref: refs/heads/")
+            }
+            ?.first()
+            ?.removePrefix("ref: refs/heads/")
+            ?.takeIf { it.isNotBlank() }
     }
 }
 
@@ -247,6 +262,21 @@ private class GitMergeCommandService(
 ) : GitMergeCommandApi {
     override fun merge(repoPath: String, sourceRef: String) {
         commandRunner.run(gitRepoCommand(repoPath, "merge", "--autostash", sourceRef))
+    }
+
+    override fun mergeFastForwardOnly(repoPath: String, sourceRef: String) {
+        val mergeCommand = gitRepoCommand(repoPath, "merge", "--ff-only", "--autostash", sourceRef)
+        commandRunner.run(mergeCommand)
+        val unmergedFiles = commandRunner.run(
+            gitRepoCommand(repoPath, "diff", "--name-only", "--diff-filter=U"),
+        )
+        if (unmergedFiles.isNotBlank()) {
+            throw GitCommandException(
+                command = mergeCommand,
+                exitCode = 1,
+                gitOutput = "Autostash restoration left conflicts in: ${unmergedFiles.lineSequence().joinToString()}",
+            )
+        }
     }
 
     override fun abortMerge(repoPath: String) {

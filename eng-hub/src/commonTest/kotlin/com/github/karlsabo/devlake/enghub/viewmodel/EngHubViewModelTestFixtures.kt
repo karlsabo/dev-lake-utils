@@ -434,6 +434,11 @@ data class BranchNeedsRebaseCall(
     val childBranch: String,
 )
 
+data class UpdateWorktreeFromOriginCall(
+    val worktreePath: String,
+    val branch: String,
+)
+
 data class RebaseWorktreeOntoParentCall(
     val worktreePath: String,
     val parentBranch: String,
@@ -456,6 +461,7 @@ data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
     val defaultBranchRefsByRepoPath: Map<String, String?> = emptyMap(),
+    val originDefaultBranchesByRepoPath: Map<String, String?> = emptyMap(),
     val existingBranchesByRepoPath: Map<String, List<String>> = emptyMap(),
     val existingBranchesForRepoPath: ((String) -> List<String>)? = null,
     val existingBranchDiscoveryFailure: RuntimeException? = null,
@@ -468,6 +474,7 @@ data class RecordingGitWorktreeApiResponses(
     val listWorktreesFailure: RuntimeException? = null,
     val branchNeedsRebaseFailure: RuntimeException? = null,
     val archiveWorktreeFailure: RuntimeException? = null,
+    val updateWorktreeFailure: RuntimeException? = null,
     val rebaseWorktreeFailure: RuntimeException? = null,
     val abortRebaseFailure: RuntimeException? = null,
     val mergeWorktreeFailure: RuntimeException? = null,
@@ -487,6 +494,7 @@ data class RecordingGitWorktreeApiCallbacks(
     val onCreateBranchWorktreeFromCommitIsh: (CreateBranchWorktreeFromCommitIshCall) -> String = {
         error("Unexpected call")
     },
+    val onUpdateWorktreeFromOrigin: (UpdateWorktreeFromOriginCall) -> Unit = {},
     val onRebaseWorktreeOntoParent: (RebaseWorktreeOntoParentCall) -> Unit = {},
     val onAbortRebase: (AbortRebaseCall) -> Unit = {},
     val onMergeWorktreeWithParent: (MergeWorktreeWithParentCall) -> Unit = {},
@@ -533,6 +541,7 @@ class RecordingGitWorktreeApi(
     val createBranchWorktreeFromCommitIshCalls = mutableListOf<CreateBranchWorktreeFromCommitIshCall>()
     val inferDefaultBranchRefCalls = mutableListOf<String>()
     val branchNeedsRebaseCalls = mutableListOf<BranchNeedsRebaseCall>()
+    val updateWorktreeFromOriginCalls = mutableListOf<UpdateWorktreeFromOriginCall>()
     val rebaseWorktreeOntoParentCalls = mutableListOf<RebaseWorktreeOntoParentCall>()
     val abortRebaseCalls = mutableListOf<AbortRebaseCall>()
     val mergeWorktreeWithParentCalls = mutableListOf<MergeWorktreeWithParentCall>()
@@ -644,6 +653,8 @@ class RecordingGitWorktreeApi(
         return responses.defaultBranchRefsByRepoPath[repoPath]
     }
 
+    override fun inferOriginDefaultBranch(repoPath: String): String? = responses.originDefaultBranchesByRepoPath[repoPath]
+
     override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> {
         callbacks.onInferWorktreeParentBranches(repoPath)
         return responses.parentBranchesByRepoPath[repoPath].orEmpty()
@@ -661,6 +672,13 @@ class RecordingGitWorktreeApi(
     }
 
     override fun removeWorktree(worktreePath: String, force: Boolean) = Unit
+
+    override fun updateWorktreeFromOrigin(worktreePath: String, branch: String) {
+        val call = UpdateWorktreeFromOriginCall(worktreePath, branch)
+        updateWorktreeFromOriginCalls += call
+        responses.updateWorktreeFailure?.let { throw it }
+        callbacks.onUpdateWorktreeFromOrigin(call)
+    }
 
     override fun rebaseWorktreeOntoParent(
         worktreePath: String,

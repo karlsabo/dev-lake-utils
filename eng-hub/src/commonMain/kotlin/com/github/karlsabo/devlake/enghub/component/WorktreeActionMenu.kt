@@ -27,7 +27,7 @@ internal fun LocalWorktreeActionMenuButton(
 ) {
     IconButton(
         onClick = onClick,
-        enabled = !state.isArchiving && !state.isRebasing && !state.isMerging,
+        enabled = !state.isArchiving && !state.isUpdating && !state.isRebasing && !state.isMerging,
         modifier = Modifier
             .size(32.dp)
             .onGloballyPositioned { coordinates -> onPositionUpdate(coordinates.boundsInWindow().bottomLeft) }
@@ -93,7 +93,13 @@ private fun OpenWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onOpen()
         },
-        enabled = isWorktreeOpenEnabled(state.setupStatus, state.isArchiving, state.isRebasing, state.isMerging),
+        enabled = isWorktreeOpenEnabled(
+            setupStatus = state.setupStatus,
+            isArchiving = state.isArchiving,
+            isUpdating = state.isUpdating,
+            isRebasing = state.isRebasing,
+            isMerging = state.isMerging,
+        ),
     ) {
         Text(setupActionLabel(defaultLabel = "Open", setupStatus = state.setupStatus))
     }
@@ -131,8 +137,8 @@ private fun CreateWorktreeMenuItem(
             worktree = state.worktree,
             setupStatus = state.setupStatus,
             isArchiving = state.isArchiving,
-            isRebasing = state.isRebasing,
-            isMerging = state.isMerging,
+            isUpdating = state.isUpdating,
+            isIntegrating = state.isRebasing || state.isMerging,
         ),
     ) {
         Text("Create worktree")
@@ -153,6 +159,7 @@ private fun RebaseOntoParentMenuItem(
         enabled = isWorktreeRebaseEnabled(
             setupStatus = state.setupStatus,
             isArchiving = state.isArchiving,
+            isUpdating = state.isUpdating,
             isRebasing = state.isRebasing,
             isMerging = state.isMerging,
         ),
@@ -175,6 +182,7 @@ private fun MergeOntoParentMenuItem(
         enabled = isWorktreeMergeEnabled(
             setupStatus = state.setupStatus,
             isArchiving = state.isArchiving,
+            isUpdating = state.isUpdating,
             isRebasing = state.isRebasing,
             isMerging = state.isMerging,
         ),
@@ -197,6 +205,7 @@ private fun ArchiveWorktreeMenuItem(
         enabled = isWorktreeArchiveEnabled(
             setupStatus = state.setupStatus,
             isArchiving = state.isArchiving,
+            isUpdating = state.isUpdating,
             isRebasing = state.isRebasing,
             isMerging = state.isMerging,
         ),
