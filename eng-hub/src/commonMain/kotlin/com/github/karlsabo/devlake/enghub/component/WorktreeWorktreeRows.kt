@@ -53,7 +53,7 @@ internal data class LocalWorktreeRowActions(
     val onOpenPullRequest: (String) -> Unit,
     val onArchive: () -> Unit,
     val onOpenCreateWorktreeDialog: () -> Unit,
-    val onUpdateFromOrigin: () -> Unit,
+    val onUpdate: () -> Unit,
     val onRebaseOntoParent: () -> Unit,
     val onMergeOntoParent: () -> Unit,
 )
@@ -61,9 +61,7 @@ internal data class LocalWorktreeRowActions(
 private data class WorktreeRowContentActions(
     val onOpen: () -> Unit,
     val onArchive: () -> Unit,
-    val onUpdateFromOrigin: () -> Unit,
-    val onRebaseOntoParent: () -> Unit,
-    val onMergeOntoParent: () -> Unit,
+    val onUpdate: () -> Unit,
     val onMenuButtonClick: () -> Unit,
     val onMenuButtonPositionUpdate: (Offset) -> Unit,
     val onOpenPullRequest: (String) -> Unit,
@@ -98,9 +96,7 @@ internal fun LocalWorktreeRow(
             actions = WorktreeRowContentActions(
                 onOpen = actions.onOpen,
                 onArchive = actions.onArchive,
-                onUpdateFromOrigin = actions.onUpdateFromOrigin,
-                onRebaseOntoParent = actions.onRebaseOntoParent,
-                onMergeOntoParent = actions.onMergeOntoParent,
+                onUpdate = actions.onUpdate,
                 onMenuButtonClick = {
                     val anchorRelativePosition = anchorRelativeOffset(
                         anchorBoundsInWindow = menuAnchorBoundsInWindow,
@@ -153,9 +149,7 @@ private fun WorktreeRowContent(
             state.isRebasing,
             state.isMerging,
         )
-        UpdateWorktreeShortcut(state = state, onUpdateFromOrigin = actions.onUpdateFromOrigin)
-        RebaseWorktreeShortcut(state = state, onRebaseOntoParent = actions.onRebaseOntoParent)
-        MergeWorktreeShortcut(state = state, onMergeOntoParent = actions.onMergeOntoParent)
+        UpdateWorktreeShortcut(state = state, onUpdate = actions.onUpdate)
         OpenWorktreeShortcut(state = state, onOpen = actions.onOpen)
         ArchiveWorktreeShortcut(state = state, onArchive = actions.onArchive)
         LocalWorktreeActionMenuButton(

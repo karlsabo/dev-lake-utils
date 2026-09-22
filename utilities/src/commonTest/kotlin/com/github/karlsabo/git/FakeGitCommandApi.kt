@@ -40,6 +40,7 @@ internal class FakeGitCommandApi : GitCommandApi {
     var worktreeListAction: (String) -> String = { worktreeListResult }
     var worktreeRemoveAction: (String, String) -> Unit = { _, _ -> }
     var statusAction: (String) -> String = { "" }
+    var logAction: (String, Array<out String>) -> String = { _, _ -> "" }
     var revParseAction: (String, Array<out String>) -> String = { _, _ -> "" }
     var executeAction: (String?, Array<out String>) -> String = { _, _ -> "" }
 
@@ -206,7 +207,7 @@ internal class FakeGitCommandApi : GitCommandApi {
 
     override fun log(repoPath: String, vararg args: String): String {
         calls.add(Call("log", listOf(repoPath) + args.toList()))
-        return ""
+        return logAction(repoPath, args)
     }
 
     override fun diff(repoPath: String, vararg args: String): String {

@@ -277,6 +277,8 @@ class EngHubViewModel internal constructor(
         mergeController::mergeLocalWorktreeWithParent
     val updateLocalWorktreeFromOrigin: (String, String, String) -> Unit =
         updateController::updateLocalWorktreeFromOrigin
+    val updateLocalWorktreeFromParent: (String, String, String) -> Unit =
+        updateController::updateLocalWorktreeFromParent
 
     internal fun abortWorktreeConflict(request: WorktreeConflictResolutionRequest) {
         when (request.operation) {

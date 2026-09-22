@@ -255,6 +255,7 @@ private fun localWorktreeActions(viewModel: EngHubViewModel) = LocalWorktreeActi
         )
     },
     onUpdateFromOrigin = viewModel.updateLocalWorktreeFromOrigin,
+    onUpdateFromParent = viewModel.updateLocalWorktreeFromParent,
     onRebaseOntoParent = viewModel.rebaseLocalWorktreeOntoParent,
     onMergeOntoParent = viewModel.mergeLocalWorktreeWithParent,
 )

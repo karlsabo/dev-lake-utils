@@ -48,6 +48,7 @@ internal data class LocalWorktreeActions(
     val onArchiveWorktree: (repoRootPath: String, worktreePath: String) -> Unit,
     val onCreateWorktree: CreateWorktreeCallback,
     val onUpdateFromOrigin: (repoRootPath: String, worktreePath: String, branch: String) -> Unit,
+    val onUpdateFromParent: (repoRootPath: String, worktreePath: String, parentBranch: String) -> Unit,
     val onRebaseOntoParent: (repoRootPath: String, worktreePath: String, parentBranch: String) -> Unit,
     val onMergeOntoParent: (repoRootPath: String, worktreePath: String, parentBranch: String) -> Unit,
 )

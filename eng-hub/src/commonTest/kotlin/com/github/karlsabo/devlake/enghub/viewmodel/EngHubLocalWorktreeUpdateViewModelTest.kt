@@ -2,10 +2,14 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.git.BaseBranchOriginFetchFailureException
+import com.github.karlsabo.git.GitMergeConflictException
+import com.github.karlsabo.git.GitRebaseConflictException
 import com.github.karlsabo.git.GitWorktreeException
 import com.github.karlsabo.git.Worktree
+import com.github.karlsabo.git.WorktreeIntegrationStrategy
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -324,6 +328,21 @@ class EngHubLocalWorktreeUpdateViewModelTest {
     }
 
     @Test
+    fun cancelledScopeReleasesProgressWhenUpdateNeverStarts() = runBlocking {
+        val worktreePath = "$DEV_LAKE_ROOT-feature-base"
+        val api = RecordingGitWorktreeApi()
+        val viewModel = updateViewModel(api)
+        viewModel.viewModelScope.cancel()
+
+        viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, worktreePath, "main")
+
+        withTimeout(2_000.milliseconds) {
+            viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+        assertEquals(emptyList(), api.updateWorktreeFromOriginCalls)
+    }
+
+    @Test
     fun cancellingUpdateReleasesProgressAndExclusion() = runBlocking {
         val updateStarted = CompletableDeferred<Unit>()
         val releaseUpdate = CompletableDeferred<Unit>()
@@ -358,6 +377,200 @@ class EngHubLocalWorktreeUpdateViewModelTest {
         }
         assertEquals(listOf(MergeWorktreeWithParentCall(worktreePath, "develop")), api.mergeWorktreeWithParentCalls)
     }
+
+    @Test
+    fun childUpdateUsesInferredParentRefreshesAndExcludesConcurrentIntegrations() = runBlocking {
+        val updateStarted = CompletableDeferred<Unit>()
+        val releaseUpdate = CompletableDeferred<Unit>()
+        val worktreePath = "$DEV_LAKE_ROOT-feature-login"
+        val before = Worktree(path = worktreePath, branch = "feature/login", commitHash = "before", isDirty = true)
+        val after = before.copy(commitHash = "after", isDirty = false)
+        val parent = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "base")
+        var currentWorktrees = listOf(parent, before)
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesForRepoPath = { currentWorktrees },
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/login" to "main"),
+                ),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onUpdateWorktreeFromParent = {
+                    updateStarted.complete(Unit)
+                    runBlocking { releaseUpdate.await() }
+                    currentWorktrees = listOf(parent, after)
+                    WorktreeIntegrationStrategy.Rebase
+                },
+            ),
+        )
+        val viewModel = updateViewModel(api)
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        val inferredParent = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first {
+                it.single().worktrees.firstOrNull { worktree -> worktree.branch == "feature/login" }
+                    ?.parentBranch == "main"
+            }.single().worktrees.first { it.branch == "feature/login" }.parentBranch
+        }
+        val refreshCountBeforeUpdate = api.listWorktreeRepoPaths.size
+
+        viewModel.updateLocalWorktreeFromParent(DEV_LAKE_ROOT, worktreePath, requireNotNull(inferredParent))
+        withTimeout(2_000.milliseconds) { updateStarted.await() }
+        viewModel.updateLocalWorktreeFromParent(DEV_LAKE_ROOT, worktreePath, inferredParent)
+        viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, worktreePath, inferredParent)
+        viewModel.mergeLocalWorktreeWithParent(DEV_LAKE_ROOT, worktreePath, inferredParent)
+
+        assertEquals(setOf(worktreePath), viewModel.updatingLocalWorktreePathsStateFlow.value)
+        assertEquals(listOf(UpdateWorktreeFromParentCall(worktreePath, "main")), api.updateWorktreeFromParentCalls)
+        assertEquals(emptyList(), api.rebaseWorktreeOntoParentCalls)
+        assertEquals(emptyList(), api.mergeWorktreeWithParentCalls)
+        releaseUpdate.complete(Unit)
+
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first {
+                it.single().worktrees.firstOrNull { worktree -> worktree.branch == "feature/login" }
+                    ?.isDirty == false
+            }
+            viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+        assertEquals(refreshCountBeforeUpdate + 1, api.listWorktreeRepoPaths.size)
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun automaticRebaseConflictPromptsAndAbortOnlyAbortsRebase() = runBlocking {
+        val worktreePath = "$DEV_LAKE_ROOT-feature-login"
+        val parentBranch = "main"
+        val api = childUpdateConflictApi(
+            worktreePath,
+            GitRebaseConflictException(worktreePath, "origin/main", RuntimeException("conflict")),
+        )
+        val viewModel = updateViewModel(api)
+
+        viewModel.updateLocalWorktreeFromParent(DEV_LAKE_ROOT, worktreePath, parentBranch)
+
+        val request = withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
+        }
+        assertEquals(
+            WorktreeConflictResolutionRequest(
+                operation = WorktreeIntegrationOperation.Rebase,
+                repoRootPath = DEV_LAKE_ROOT,
+                worktreePath = worktreePath,
+                parentBranch = parentBranch,
+            ),
+            request,
+        )
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+
+        viewModel.abortWorktreeConflict(requireNotNull(request))
+        withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it == null }
+        }
+
+        assertEquals(
+            listOf(UpdateWorktreeFromParentCall(worktreePath, parentBranch)),
+            api.updateWorktreeFromParentCalls,
+        )
+        assertEquals(listOf(AbortRebaseCall(worktreePath)), api.abortRebaseCalls)
+        assertEquals(emptyList(), api.abortMergeCalls)
+        assertEquals(emptyList(), api.rebaseWorktreeOntoParentCalls)
+        assertEquals(emptyList(), api.mergeWorktreeWithParentCalls)
+    }
+
+    @Test
+    fun automaticMergeConflictPromptsAndLeaveAsIsDoesNotRunAnotherOperation() = runBlocking {
+        val worktreePath = "$DEV_LAKE_ROOT-feature-payments"
+        val parentBranch = "main"
+        val api = childUpdateConflictApi(
+            worktreePath,
+            GitMergeConflictException(worktreePath, "origin/main", RuntimeException("conflict")),
+        )
+        val viewModel = updateViewModel(api)
+
+        viewModel.updateLocalWorktreeFromParent(DEV_LAKE_ROOT, worktreePath, parentBranch)
+
+        val request = withTimeout(2_000.milliseconds) {
+            viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
+        }
+        assertEquals(
+            WorktreeConflictResolutionRequest(
+                operation = WorktreeIntegrationOperation.Merge,
+                repoRootPath = DEV_LAKE_ROOT,
+                worktreePath = worktreePath,
+                parentBranch = parentBranch,
+            ),
+            request,
+        )
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+
+        viewModel.leaveWorktreeConflictAsIs(requireNotNull(request))
+
+        assertEquals(null, viewModel.worktreeConflictResolutionRequestStateFlow.value)
+        assertEquals(
+            listOf(UpdateWorktreeFromParentCall(worktreePath, parentBranch)),
+            api.updateWorktreeFromParentCalls,
+        )
+        assertEquals(emptyList(), api.abortRebaseCalls)
+        assertEquals(emptyList(), api.abortMergeCalls)
+        assertEquals(emptyList(), api.rebaseWorktreeOntoParentCalls)
+        assertEquals(emptyList(), api.mergeWorktreeWithParentCalls)
+    }
+
+    @Test
+    fun childUpdateFailureRefreshesAndReportsError() = runBlocking {
+        val worktreePath = "$DEV_LAKE_ROOT-feature-payments"
+        val failure = IllegalStateException("automatic child update failed")
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(DEV_LAKE_ROOT, "main", "base"),
+                        Worktree(worktreePath, "feature/payments", "before"),
+                    ),
+                ),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/payments" to "main"),
+                ),
+                childUpdateWorktreeFailure = failure,
+            ),
+        )
+        val viewModel = updateViewModel(api)
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        val inferredParent = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first {
+                it.single().worktrees.firstOrNull { worktree -> worktree.branch == "feature/payments" }
+                    ?.parentBranch == "main"
+            }.single().worktrees.first { it.branch == "feature/payments" }.parentBranch
+        }
+        val refreshCountBeforeUpdate = api.listWorktreeRepoPaths.size
+
+        viewModel.updateLocalWorktreeFromParent(DEV_LAKE_ROOT, worktreePath, requireNotNull(inferredParent))
+
+        val error = withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it != null }
+        }
+        withTimeout(2_000.milliseconds) {
+            viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
+        }
+        assertEquals(failure.message, error?.message)
+        assertEquals(listOf(UpdateWorktreeFromParentCall(worktreePath, "main")), api.updateWorktreeFromParentCalls)
+        assertEquals(refreshCountBeforeUpdate + 1, api.listWorktreeRepoPaths.size)
+    }
+
+    private fun childUpdateConflictApi(
+        worktreePath: String,
+        failure: RuntimeException,
+    ): RecordingGitWorktreeApi = RecordingGitWorktreeApi(
+        responses = RecordingGitWorktreeApiResponses(
+            worktreesByRepoPath = mapOf(
+                DEV_LAKE_ROOT to listOf(
+                    Worktree(DEV_LAKE_ROOT, "main", "base"),
+                    Worktree(worktreePath, "feature/child", "child"),
+                ),
+            ),
+            childUpdateWorktreeFailure = failure,
+        ),
+    )
 
     private fun updateViewModel(api: RecordingGitWorktreeApi): EngHubViewModel = createLocalRepositoryViewModel(
         gitWorktreeApi = api,

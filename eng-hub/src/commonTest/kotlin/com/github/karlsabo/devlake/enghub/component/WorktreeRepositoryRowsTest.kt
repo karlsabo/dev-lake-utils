@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.v2.runComposeUiTest
@@ -60,6 +61,108 @@ class WorktreeRepositoryRowsTest {
         }
 
         onNodeWithText("PR #123 · Add login").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun childUpdateShortcutRoutesRepositoryWorktreeAndParentToAutomaticUpdate() = runComposeUiTest {
+        val updateRequests = mutableListOf<Triple<String, String, String>>()
+        val unexpectedRequests = mutableListOf<String>()
+        val emptyActions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "dev-lake-utils",
+                            path = "/repos/dev-lake-utils",
+                            isExpanded = true,
+                            worktrees = listOf(
+                                LocalWorktreeUiState(
+                                    branch = "feature/login",
+                                    path = "/repos/dev-lake-utils-feature-login",
+                                    parentBranch = "main",
+                                ),
+                            ),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                    ),
+                    panelActions = emptyActions.copy(
+                        worktrees = emptyActions.worktrees.copy(
+                            onUpdateFromOrigin = { _, _, _ -> unexpectedRequests += "origin update" },
+                            onUpdateFromParent = { repositoryPath, worktreePath, parentBranch ->
+                                updateRequests += Triple(repositoryPath, worktreePath, parentBranch)
+                            },
+                            onRebaseOntoParent = { _, _, _ -> unexpectedRequests += "rebase" },
+                            onMergeOntoParent = { _, _, _ -> unexpectedRequests += "merge" },
+                        ),
+                    ),
+                    onArchiveRequest = {},
+                    onCreateRequest = {},
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Update feature/login from base main").performClick()
+
+        assertEquals(
+            listOf(Triple("/repos/dev-lake-utils", "/repos/dev-lake-utils-feature-login", "main")),
+            updateRequests,
+        )
+        assertEquals(emptyList(), unexpectedRequests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun originDefaultUpdateShortcutRoutesOnlyToOriginUpdate() = runComposeUiTest {
+        val originUpdateRequests = mutableListOf<Triple<String, String, String>>()
+        val unexpectedRequests = mutableListOf<String>()
+        val emptyActions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "dev-lake-utils",
+                            path = "/repos/dev-lake-utils",
+                            isExpanded = true,
+                            worktrees = listOf(
+                                LocalWorktreeUiState(
+                                    branch = "main",
+                                    path = "/repos/dev-lake-utils",
+                                    parentBranch = "develop",
+                                    canUpdateFromOrigin = true,
+                                ),
+                            ),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                    ),
+                    panelActions = emptyActions.copy(
+                        worktrees = emptyActions.worktrees.copy(
+                            onUpdateFromOrigin = { repositoryPath, worktreePath, branch ->
+                                originUpdateRequests += Triple(repositoryPath, worktreePath, branch)
+                            },
+                            onUpdateFromParent = { _, _, _ -> unexpectedRequests += "automatic parent update" },
+                            onRebaseOntoParent = { _, _, _ -> unexpectedRequests += "rebase" },
+                            onMergeOntoParent = { _, _, _ -> unexpectedRequests += "merge" },
+                        ),
+                    ),
+                    onArchiveRequest = {},
+                    onCreateRequest = {},
+                )
+            }
+        }
+
+        onNodeWithText("⬇️").assertIsDisplayed()
+        onNodeWithContentDescription("Update worktree main from origin").performClick()
+
+        assertEquals(
+            listOf(Triple("/repos/dev-lake-utils", "/repos/dev-lake-utils", "main")),
+            originUpdateRequests,
+        )
+        assertEquals(emptyList(), unexpectedRequests)
     }
 
     @OptIn(ExperimentalTestApi::class)

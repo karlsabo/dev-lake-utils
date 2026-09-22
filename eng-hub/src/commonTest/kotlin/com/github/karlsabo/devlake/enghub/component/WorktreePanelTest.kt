@@ -7,7 +7,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
@@ -203,35 +202,6 @@ class WorktreePanelTest {
             visibleWorktreeMenuActions(worktree, pullRequest),
         )
         assertFalse(WorktreeMenuAction.OpenPullRequest in visibleWorktreeMenuActions(worktree))
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun choosingRebaseOntoParentCallsRowBoundary() = runComposeUiTest {
-        val rebaseRequests = mutableListOf<Unit>()
-        setContent {
-            MaterialTheme {
-                LocalWorktreeRow(
-                    state = LocalWorktreeRowState(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/stacked-pr",
-                            path = "/repos/dev-lake-utils-feature-stacked-pr",
-                            parentBranch = "feature/base-pr",
-                        ),
-                        setupStatus = null,
-                        isArchiving = false,
-                    ),
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onRebaseOntoParent = { rebaseRequests += Unit },
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Worktree actions for feature/stacked-pr").performClick()
-        onNodeWithText("Rebase onto parent").performClick()
-
-        assertEquals(1, rebaseRequests.size)
     }
 
     @Test

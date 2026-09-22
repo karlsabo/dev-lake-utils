@@ -69,6 +69,7 @@ class GitWorktreeService private constructor(
     GitWorktreeArchiveApi by parts.archiveApi,
     GitWorktreeRebaseApi by parts.rebaseApi,
     GitWorktreeMergeApi by parts.mergeApi,
+    GitWorktreeChildUpdateApi by parts.childUpdateApi,
     GitWorktreeBaseUpdateApi by parts.baseUpdateApi {
     constructor(
         gitCommandApi: GitCommandApi = GitCommandService(),
@@ -94,6 +95,7 @@ private data class GitWorktreeServiceParts(
     val archiveApi: GitWorktreeArchiveApi,
     val rebaseApi: GitWorktreeRebaseApi,
     val mergeApi: GitWorktreeMergeApi,
+    val childUpdateApi: GitWorktreeChildUpdateApi,
     val baseUpdateApi: GitWorktreeBaseUpdateApi,
 )
 
@@ -119,6 +121,7 @@ private fun buildGitWorktreeServiceParts(
     val operationStateDetector = GitOperationStateDetector(gitCommandApi)
     val rebaser = GitWorktreeRebaser(gitCommandApi, integrationRefResolver, operationStateDetector)
     val merger = GitWorktreeMerger(gitCommandApi, integrationRefResolver, operationStateDetector)
+    val childUpdater = GitWorktreeChildUpdater(gitCommandApi, integrationRefResolver, rebaser, merger)
     val baseUpdater = GitWorktreeBaseUpdater(gitCommandApi, branchValidator)
 
     return GitWorktreeServiceParts(
@@ -135,6 +138,7 @@ private fun buildGitWorktreeServiceParts(
         archiveApi = GitWorktreeArchiveService(archiver),
         rebaseApi = GitWorktreeRebaseService(rebaser),
         mergeApi = GitWorktreeMergeService(merger),
+        childUpdateApi = GitWorktreeChildUpdateService(childUpdater),
         baseUpdateApi = GitWorktreeBaseUpdateService(baseUpdater),
     )
 }
@@ -250,6 +254,15 @@ private class GitWorktreeRebaseService(
     override fun abortRebase(worktreePath: String) {
         rebaser.abortRebase(worktreePath)
     }
+}
+
+private class GitWorktreeChildUpdateService(
+    private val updater: GitWorktreeChildUpdater,
+) : GitWorktreeChildUpdateApi {
+    override fun updateWorktreeFromParent(
+        worktreePath: String,
+        parentBranch: String,
+    ): WorktreeIntegrationStrategy = updater.update(worktreePath, parentBranch)
 }
 
 private class GitWorktreeBaseUpdateService(
@@ -1180,6 +1193,11 @@ private class GitWorktreeRebaser(
     ) {
         require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
         val upstreamRef = upstreamResolver.resolve(worktreePath, parentBranch)
+        rebaseWorktreeOntoResolvedParent(worktreePath, upstreamRef)
+    }
+
+    fun rebaseWorktreeOntoResolvedParent(worktreePath: String, upstreamRef: String) {
+        require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
         try {
             gitCommandApi.rebase(worktreePath, upstreamRef)
         } catch (e: GitCommandException) {
@@ -1212,6 +1230,40 @@ private class GitWorktreeRebaser(
     private companion object {
         const val REBASE_MERGE_STATE_ENTRY = "rebase-merge"
         const val REBASE_APPLY_STATE_ENTRY = "rebase-apply"
+    }
+}
+
+private class GitWorktreeChildUpdater(
+    private val gitCommandApi: GitCommandApi,
+    private val integrationRefResolver: GitWorktreeIntegrationRefResolver,
+    private val rebaser: GitWorktreeRebaser,
+    private val merger: GitWorktreeMerger,
+) {
+    fun update(worktreePath: String, parentBranch: String): WorktreeIntegrationStrategy {
+        require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
+        val resolvedParentRef = integrationRefResolver.resolve(worktreePath, parentBranch)
+        val strategy = if (childOnlyHistoryContainsMerge(worktreePath, resolvedParentRef)) {
+            WorktreeIntegrationStrategy.Merge
+        } else {
+            WorktreeIntegrationStrategy.Rebase
+        }
+        when (strategy) {
+            WorktreeIntegrationStrategy.Rebase ->
+                rebaser.rebaseWorktreeOntoResolvedParent(worktreePath, resolvedParentRef)
+
+            WorktreeIntegrationStrategy.Merge ->
+                merger.mergeWorktreeWithResolvedParent(worktreePath, resolvedParentRef)
+        }
+        return strategy
+    }
+
+    private fun childOnlyHistoryContainsMerge(worktreePath: String, resolvedParentRef: String): Boolean = try {
+        gitCommandApi.log(worktreePath, "--merges", "--format=%H", "$resolvedParentRef..HEAD").isNotBlank()
+    } catch (e: GitCommandException) {
+        throw GitWorktreeException(
+            "Failed to inspect child-only history in worktree $worktreePath from $resolvedParentRef: ${e.gitOutput}",
+            e,
+        )
     }
 }
 
@@ -1305,6 +1357,11 @@ private class GitWorktreeMerger(
     ) {
         require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
         val sourceRef = integrationRefResolver.resolve(worktreePath, parentBranch)
+        mergeWorktreeWithResolvedParent(worktreePath, sourceRef)
+    }
+
+    fun mergeWorktreeWithResolvedParent(worktreePath: String, sourceRef: String) {
+        require(worktreePath.isNotBlank()) { "worktreePath must not be blank" }
         try {
             gitCommandApi.merge(worktreePath, sourceRef)
         } catch (e: GitCommandException) {

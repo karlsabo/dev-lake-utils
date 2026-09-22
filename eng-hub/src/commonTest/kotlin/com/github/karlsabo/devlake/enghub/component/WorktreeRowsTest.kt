@@ -94,6 +94,19 @@ class WorktreeRowsTest {
     }
 
     @Test
+    fun manualIntegrationActionsAreHiddenWithoutAnInferredParent() {
+        val worktree = LocalWorktreeUiState(
+            branch = "feature/stacked-pr",
+            path = "/repos/dev-lake-utils-feature-stacked-pr",
+        )
+
+        val actions = visibleWorktreeMenuActions(worktree)
+
+        assertFalse(WorktreeMenuAction.RebaseOntoParent in actions)
+        assertFalse(WorktreeMenuAction.MergeOntoParent in actions)
+    }
+
+    @Test
     fun mergeActionIsExcludedWhileAnotherIntegrationIsInProgress() {
         assertFalse(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false, isRebasing = true))
         assertFalse(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false, isMerging = true))

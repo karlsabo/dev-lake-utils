@@ -267,8 +267,14 @@ private fun worktreeRowActions(
     onOpenPullRequest = panelActions.worktrees.onOpenPullRequest,
     onArchive = { onArchiveRequest(PendingArchive(repositoryPath, worktree.path)) },
     onOpenCreateWorktreeDialog = { onCreateRequest(createWorktreeDialogState(repositoryPath, worktree)) },
-    onUpdateFromOrigin = {
-        panelActions.worktrees.onUpdateFromOrigin(repositoryPath, worktree.path, worktree.branch)
+    onUpdate = {
+        if (worktree.canUpdateFromOrigin) {
+            panelActions.worktrees.onUpdateFromOrigin(repositoryPath, worktree.path, worktree.branch)
+        } else {
+            worktree.parentBranch?.let { parentBranch ->
+                panelActions.worktrees.onUpdateFromParent(repositoryPath, worktree.path, parentBranch)
+            }
+        }
     },
     onRebaseOntoParent = {
         worktree.parentBranch?.let { parentBranch ->

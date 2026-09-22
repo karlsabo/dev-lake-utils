@@ -14,12 +14,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.sharedProgressPullRequest
 import com.github.karlsabo.git.WorktreeSetupStatus
@@ -32,8 +36,153 @@ class WorktreeIntegrationShortcutsTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun compactUpdateShortcutIsVisibleOnlyForOriginDefaultBranchAndInvokesUpdate() = runComposeUiTest {
+    fun childRowShowsOneBaseSpecificUpdateShortcutAndInvokesAutomaticUpdate() = runComposeUiTest {
         var updateCount = 0
+        setContent {
+            MaterialTheme {
+                IntegrationShortcutRow(
+                    actions = emptyLocalWorktreeRowActions().copy(onUpdate = { updateCount += 1 }),
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Update feature/login from base main")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+
+        assertEquals(1, updateCount)
+        onAllNodesWithText("⬇️").assertCountEquals(1)
+        onAllNodesWithText("🔁").assertCountEquals(0)
+        onAllNodesWithText("🔀").assertCountEquals(0)
+        onAllNodesWithContentDescription("Rebase worktree feature/login onto main").assertCountEquals(0)
+        onAllNodesWithContentDescription("Merge parent main into worktree feature/login").assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun threeDotMenuRetainsManualRebaseAndInvokesOnlyRebase() = runComposeUiTest {
+        val requests = mutableListOf<IntegrationRequest>()
+        setContent {
+            MaterialTheme {
+                IntegrationRepositoryRow(integrationPanelActions(requests))
+            }
+        }
+
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
+        onNodeWithText("Rebase onto parent").assertIsDisplayed().assertIsEnabled().performClick()
+
+        assertEquals(
+            listOf(integrationRequest(IntegrationOperation.REBASE)),
+            requests,
+        )
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun threeDotMenuRetainsManualMergeAndInvokesOnlyMerge() = runComposeUiTest {
+        val requests = mutableListOf<IntegrationRequest>()
+        setContent {
+            MaterialTheme {
+                IntegrationRepositoryRow(integrationPanelActions(requests))
+            }
+        }
+
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
+        onNodeWithText("Merge parent into worktree").assertIsDisplayed().assertIsEnabled().performClick()
+
+        assertEquals(
+            listOf(integrationRequest(IntegrationOperation.MERGE)),
+            requests,
+        )
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun rightClickMenuRetainsManualActionsAndInvokesOnlyTheSelectedOperation() = runComposeUiTest {
+        val requests = mutableListOf<IntegrationRequest>()
+        setContent {
+            MaterialTheme {
+                IntegrationRepositoryRow(integrationPanelActions(requests))
+            }
+        }
+        val row = onNodeWithTag("worktree-row-feature/login")
+
+        row.performMouseInput { rightClick() }
+        onNodeWithText("Rebase onto parent").assertIsDisplayed().assertIsEnabled().performClick()
+        assertEquals(listOf(integrationRequest(IntegrationOperation.REBASE)), requests)
+
+        row.performMouseInput { rightClick() }
+        onNodeWithText("Merge parent into worktree").assertIsDisplayed().assertIsEnabled().performClick()
+        assertEquals(
+            listOf(
+                integrationRequest(IntegrationOperation.REBASE),
+                integrationRequest(IntegrationOperation.MERGE),
+            ),
+            requests,
+        )
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun childUpdateShortcutTooltipNamesItsBase() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                IntegrationShortcutRow()
+            }
+        }
+
+        onNodeWithContentDescription("Update feature/login from base main")
+            .performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(1_000)
+
+        onNodeWithText("Update from base main").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun childUpdateShortcutIsHiddenWithoutAnInferredBase() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                IntegrationShortcutRow(
+                    state = integrationShortcutRowState().copy(
+                        worktree = LocalWorktreeUiState(
+                            branch = "feature/login",
+                            path = "/repos/dev-lake-utils-feature-login",
+                        ),
+                    ),
+                )
+            }
+        }
+
+        onAllNodesWithText("⬇️").assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun childUpdateShortcutIsDisabledDuringEveryExclusiveOperation() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                IntegrationShortcutRow(
+                    state = integrationShortcutRowState().copy(
+                        setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
+                    ),
+                )
+                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isArchiving = true))
+                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isUpdating = true))
+                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isRebasing = true))
+                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isMerging = true))
+            }
+        }
+
+        val updateShortcuts = onAllNodesWithContentDescription("Update feature/login from base main")
+        updateShortcuts.assertCountEquals(5)
+        repeat(5) { index -> updateShortcuts[index].assertIsNotEnabled() }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun originDefaultBranchRetainsItsOriginSpecificUpdateShortcut() = runComposeUiTest {
         setContent {
             MaterialTheme {
                 IntegrationShortcutRow(
@@ -42,12 +191,8 @@ class WorktreeIntegrationShortcutsTest {
                             branch = "main",
                             path = "/repos/dev-lake-utils",
                             parentBranch = "develop",
-                            needsRebase = true,
                             canUpdateFromOrigin = true,
                         ),
-                    ),
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onUpdateFromOrigin = { updateCount += 1 },
                     ),
                 )
             }
@@ -56,246 +201,12 @@ class WorktreeIntegrationShortcutsTest {
         onNodeWithContentDescription("Update worktree main from origin")
             .assertIsDisplayed()
             .assertIsEnabled()
-            .performClick()
-
-        assertEquals(1, updateCount)
-        onAllNodesWithContentDescription("Rebase worktree main onto develop").assertCountEquals(0)
-        onAllNodesWithContentDescription("Merge parent develop into worktree main").assertCountEquals(0)
+        onAllNodesWithContentDescription("Update main from base develop").assertCountEquals(0)
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun compactUpdateShortcutIsDisabledWhileUpdateIsRunning() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    state = integrationShortcutRowState().copy(
-                        worktree = LocalWorktreeUiState(
-                            branch = "main",
-                            path = "/repos/dev-lake-utils",
-                            canUpdateFromOrigin = true,
-                        ),
-                        isUpdating = true,
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Update worktree main from origin").assertIsNotEnabled()
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactUpdateShortcutIsHiddenForOtherBranches() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow()
-            }
-        }
-
-        onAllNodesWithContentDescription("Update worktree feature/login from origin").assertCountEquals(0)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseShortcutIsVisibleOnlyWhenParentBranchIsKnown() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    state = integrationShortcutRowState().copy(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/login",
-                            path = "/repos/dev-lake-utils-feature-login",
-                        ),
-                    ),
-                )
-            }
-        }
-
-        onAllNodesWithContentDescription("Rebase worktree feature/login onto main").assertCountEquals(0)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseShortcutIsEnabledWhenRebaseIsNotNeeded() = runComposeUiTest {
-        var rebaseCount = 0
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    state = integrationShortcutRowState().copy(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/login",
-                            path = "/repos/dev-lake-utils-feature-login",
-                            parentBranch = "main",
-                            needsRebase = false,
-                        ),
-                    ),
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onRebaseOntoParent = { rebaseCount += 1 },
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Rebase worktree feature/login onto main")
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
-
-        assertEquals(1, rebaseCount)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseShortcutIsDisabledDuringOtherOperations() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    state = integrationShortcutRowState().copy(
-                        setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
-                    ),
-                )
-                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isArchiving = true))
-                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isUpdating = true))
-                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isRebasing = true))
-                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isMerging = true))
-            }
-        }
-
-        val rebaseShortcuts = onAllNodesWithContentDescription("Rebase worktree feature/login onto main")
-        rebaseShortcuts.assertCountEquals(5)
-        repeat(5) { index -> rebaseShortcuts[index].assertIsNotEnabled() }
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseShortcutInvokesSameActionAsMenu() = runComposeUiTest {
-        val rebaseRequests = mutableListOf<Unit>()
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onRebaseOntoParent = { rebaseRequests += Unit },
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Rebase worktree feature/login onto main").performClick()
-        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
-        onNodeWithText("Rebase onto parent").performClick()
-
-        assertEquals(2, rebaseRequests.size)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactMergeShortcutIsVisibleOnlyWhenParentBranchIsKnown() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    state = integrationShortcutRowState().copy(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/login",
-                            path = "/repos/dev-lake-utils-feature-login",
-                        ),
-                    ),
-                )
-            }
-        }
-
-        onAllNodesWithContentDescription("Merge parent main into worktree feature/login").assertCountEquals(0)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactMergeShortcutIsEnabledWhenRebaseIsNotNeeded() = runComposeUiTest {
-        var mergeCount = 0
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    state = integrationShortcutRowState().copy(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/login",
-                            path = "/repos/dev-lake-utils-feature-login",
-                            parentBranch = "main",
-                            needsRebase = false,
-                        ),
-                    ),
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onMergeOntoParent = { mergeCount += 1 },
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Merge parent main into worktree feature/login")
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
-
-        assertEquals(1, mergeCount)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactMergeShortcutIsDisabledDuringOtherOperations() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    state = integrationShortcutRowState().copy(
-                        setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
-                    ),
-                )
-                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isArchiving = true))
-                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isUpdating = true))
-                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isRebasing = true))
-                IntegrationShortcutRow(state = integrationShortcutRowState().copy(isMerging = true))
-            }
-        }
-
-        val mergeShortcuts = onAllNodesWithContentDescription("Merge parent main into worktree feature/login")
-        mergeShortcuts.assertCountEquals(5)
-        repeat(5) { index -> mergeShortcuts[index].assertIsNotEnabled() }
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactMergeShortcutInvokesSameActionAsMenu() = runComposeUiTest {
-        val mergeRequests = mutableListOf<Unit>()
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow(
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onMergeOntoParent = { mergeRequests += Unit },
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Merge parent main into worktree feature/login").performClick()
-        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
-        onNodeWithText("Merge parent into worktree").performClick()
-
-        assertEquals(2, mergeRequests.size)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun compactRebaseAndMergeShortcutsUseDistinguishableIcons() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                IntegrationShortcutRow()
-            }
-        }
-
-        onNodeWithText("🔁").assertIsDisplayed()
-        onNodeWithText("🔀").assertIsDisplayed()
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun constrainedRowRendersBothIntegrationControlsWithLongPullRequestDetails() = runComposeUiTest {
+    fun constrainedRowRendersSingleIntegrationControlWithLongPullRequestDetails() = runComposeUiTest {
         setContent {
             MaterialTheme {
                 Box(
@@ -332,15 +243,13 @@ class WorktreeIntegrationShortcutsTest {
 
         val container = onNodeWithTag("constrained-worktree-container").fetchSemanticsNode().boundsInRoot
         val progress = onNodeWithText("Rebasing...").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val rebase = assertControlFitsWithin(container, "Rebase worktree feature/login onto main")
-        val merge = assertControlFitsWithin(container, "Merge parent main into worktree feature/login")
+        val update = assertControlFitsWithin(container, "Update feature/login from base main")
         val open = assertControlFitsWithin(container, "Open worktree feature/login")
         val archive = assertControlFitsWithin(container, "Archive worktree feature/login")
         val menu = assertControlFitsWithin(container, "Worktree actions for feature/login")
 
-        assertTrue(progress.right <= rebase.left)
-        assertTrue(rebase.right <= merge.left)
-        assertTrue(merge.right <= open.left)
+        assertTrue(progress.right <= update.left)
+        assertTrue(update.right <= open.left)
         assertTrue(open.right <= archive.left)
         assertTrue(archive.right <= menu.left)
     }
@@ -366,13 +275,89 @@ class WorktreeIntegrationShortcutsTest {
         LocalWorktreeRow(state = state, actions = actions)
     }
 
+    @Composable
+    private fun IntegrationRepositoryRow(panelActions: WorktreePanelActions) {
+        LocalRepositoryRow(
+            state = WorktreeRowsState(
+                repository = LocalRepositoryUiState(
+                    name = "dev-lake-utils",
+                    path = REPOSITORY_PATH,
+                    isExpanded = true,
+                    worktrees = listOf(integrationShortcutRowState().worktree),
+                ),
+                setupStatuses = emptyMap(),
+                archivingWorktreePaths = emptySet(),
+            ),
+            panelActions = panelActions,
+            onArchiveRequest = {},
+            onCreateRequest = {},
+        )
+    }
+
+    private fun integrationPanelActions(requests: MutableList<IntegrationRequest>): WorktreePanelActions {
+        val actions = emptyPanelActions()
+        return actions.copy(
+            worktrees = actions.worktrees.copy(
+                onUpdateFromParent = { repositoryPath, worktreePath, parentBranch ->
+                    requests += IntegrationRequest(
+                        IntegrationOperation.UPDATE,
+                        repositoryPath,
+                        worktreePath,
+                        parentBranch,
+                    )
+                },
+                onRebaseOntoParent = { repositoryPath, worktreePath, parentBranch ->
+                    requests += IntegrationRequest(
+                        IntegrationOperation.REBASE,
+                        repositoryPath,
+                        worktreePath,
+                        parentBranch,
+                    )
+                },
+                onMergeOntoParent = { repositoryPath, worktreePath, parentBranch ->
+                    requests += IntegrationRequest(
+                        IntegrationOperation.MERGE,
+                        repositoryPath,
+                        worktreePath,
+                        parentBranch,
+                    )
+                },
+            ),
+        )
+    }
+
+    private fun integrationRequest(operation: IntegrationOperation) = IntegrationRequest(
+        operation = operation,
+        repositoryPath = REPOSITORY_PATH,
+        worktreePath = WORKTREE_PATH,
+        parentBranch = "main",
+    )
+
     private fun integrationShortcutRowState(): LocalWorktreeRowState = LocalWorktreeRowState(
         worktree = LocalWorktreeUiState(
             branch = "feature/login",
-            path = "/repos/dev-lake-utils-feature-login",
+            path = WORKTREE_PATH,
             parentBranch = "main",
         ),
         setupStatus = null,
         isArchiving = false,
     )
+
+    private data class IntegrationRequest(
+        val operation: IntegrationOperation,
+        val repositoryPath: String,
+        val worktreePath: String,
+        val parentBranch: String,
+    )
+
+    private enum class IntegrationOperation {
+        UPDATE,
+        REBASE,
+        MERGE,
+    }
+
+    private companion object {
+        const val REPOSITORY_PATH = "/repos/dev-lake-utils"
+        const val WORKTREE_PATH = "/repos/dev-lake-utils-feature-login"
+    }
 }

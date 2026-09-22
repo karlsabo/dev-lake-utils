@@ -3,14 +3,11 @@ package com.github.karlsabo.devlake.enghub.component
 import androidx.compose.material.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -29,35 +26,6 @@ class WorktreeMergeTest {
         }
 
         onNodeWithText("Merging...").assertIsDisplayed()
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun choosingMergeOntoParentCallsRowBoundary() = runComposeUiTest {
-        val mergeRequests = mutableListOf<Unit>()
-        setContent {
-            MaterialTheme {
-                LocalWorktreeRow(
-                    state = LocalWorktreeRowState(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/stacked-pr",
-                            path = "/repos/dev-lake-utils-feature-stacked-pr",
-                            parentBranch = "feature/base-pr",
-                        ),
-                        setupStatus = null,
-                        isArchiving = false,
-                    ),
-                    actions = emptyLocalWorktreeRowActions().copy(
-                        onMergeOntoParent = { mergeRequests += Unit },
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Worktree actions for feature/stacked-pr").performClick()
-        onNodeWithText("Merge parent into worktree").performClick()
-
-        assertEquals(1, mergeRequests.size)
     }
 
     @Test

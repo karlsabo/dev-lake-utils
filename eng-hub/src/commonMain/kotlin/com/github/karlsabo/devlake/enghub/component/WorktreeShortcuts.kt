@@ -15,8 +15,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 private const val UPDATE_SHORTCUT_GLYPH = "⬇️"
-private const val REBASE_SHORTCUT_GLYPH = "🔁"
-private const val MERGE_SHORTCUT_GLYPH = "🔀"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -54,13 +52,21 @@ internal fun OpenWorktreeShortcut(
 @Composable
 internal fun UpdateWorktreeShortcut(
     state: LocalWorktreeRowState,
-    onUpdateFromOrigin: () -> Unit,
+    onUpdate: () -> Unit,
 ) {
-    if (!state.worktree.canUpdateFromOrigin) return
+    val parentBranch = state.worktree.parentBranch
+    val updatesFromOrigin = state.worktree.canUpdateFromOrigin
+    if (!updatesFromOrigin && parentBranch.isNullOrBlank()) return
 
+    val tooltip = if (updatesFromOrigin) "Update from origin" else "Update from base $parentBranch"
+    val description = if (updatesFromOrigin) {
+        "Update worktree ${state.worktree.branch} from origin"
+    } else {
+        "Update ${state.worktree.branch} from base $parentBranch"
+    }
     WorktreeIntegrationShortcut(
-        tooltip = "Update from origin",
-        description = "Update worktree ${state.worktree.branch} from origin",
+        tooltip = tooltip,
+        description = description,
         glyph = UPDATE_SHORTCUT_GLYPH,
         enabled = isWorktreeOpenEnabled(
             setupStatus = state.setupStatus,
@@ -69,55 +75,7 @@ internal fun UpdateWorktreeShortcut(
             isRebasing = state.isRebasing,
             isMerging = state.isMerging,
         ),
-        onClick = onUpdateFromOrigin,
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-internal fun RebaseWorktreeShortcut(
-    state: LocalWorktreeRowState,
-    onRebaseOntoParent: () -> Unit,
-) {
-    val parentBranch = state.worktree.parentBranch
-    if (parentBranch.isNullOrBlank() || state.worktree.canUpdateFromOrigin) return
-
-    WorktreeIntegrationShortcut(
-        tooltip = "Rebase onto parent",
-        description = "Rebase worktree ${state.worktree.branch} onto $parentBranch",
-        glyph = REBASE_SHORTCUT_GLYPH,
-        enabled = isWorktreeRebaseEnabled(
-            setupStatus = state.setupStatus,
-            isArchiving = state.isArchiving,
-            isUpdating = state.isUpdating,
-            isRebasing = state.isRebasing,
-            isMerging = state.isMerging,
-        ),
-        onClick = onRebaseOntoParent,
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-internal fun MergeWorktreeShortcut(
-    state: LocalWorktreeRowState,
-    onMergeOntoParent: () -> Unit,
-) {
-    val parentBranch = state.worktree.parentBranch
-    if (parentBranch.isNullOrBlank() || state.worktree.canUpdateFromOrigin) return
-
-    WorktreeIntegrationShortcut(
-        tooltip = "Merge parent into worktree",
-        description = "Merge parent $parentBranch into worktree ${state.worktree.branch}",
-        glyph = MERGE_SHORTCUT_GLYPH,
-        enabled = isWorktreeMergeEnabled(
-            setupStatus = state.setupStatus,
-            isArchiving = state.isArchiving,
-            isUpdating = state.isUpdating,
-            isRebasing = state.isRebasing,
-            isMerging = state.isMerging,
-        ),
-        onClick = onMergeOntoParent,
+        onClick = onUpdate,
     )
 }
 

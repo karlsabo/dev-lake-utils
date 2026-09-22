@@ -7,6 +7,7 @@ interface GitWorktreeApi :
     GitWorktreeArchiveApi,
     GitWorktreeRebaseApi,
     GitWorktreeMergeApi,
+    GitWorktreeChildUpdateApi,
     GitWorktreeBaseUpdateApi
 
 interface GitRepositoryApi {
@@ -94,6 +95,15 @@ interface GitWorktreeRebaseApi {
     )
 }
 
+interface GitWorktreeChildUpdateApi {
+    fun updateWorktreeFromParent(
+        worktreePath: String,
+        parentBranch: String,
+    ): WorktreeIntegrationStrategy = throw UnsupportedOperationException(
+        "updateWorktreeFromParent is not implemented",
+    )
+}
+
 interface GitWorktreeBaseUpdateApi {
     fun updateWorktreeFromOrigin(
         worktreePath: String,
@@ -112,6 +122,11 @@ interface GitWorktreeMergeApi {
     fun abortMerge(worktreePath: String): Unit = throw UnsupportedOperationException(
         "abortMerge is not implemented",
     )
+}
+
+enum class WorktreeIntegrationStrategy {
+    Rebase,
+    Merge,
 }
 
 data class RefreshedExistingBranches(
