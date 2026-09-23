@@ -103,7 +103,9 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 
 **Notes:** Persist repository root, normalized worktree path, display branch, lifecycle state, and state timestamps. Acquire the existing `LocalWorktreeMutationGuard` before accepting a queue request so programmatic mutations cannot race the hidden row. Store writes must complete before the UI claims the item is safely queued; report persistence failure and leave the row active. Use a dedicated database rather than extending `NotificationDatabase`. Relevant current boundaries are `LocalWorktreeArchiveController.kt`, `EngHubScreen.kt`, and `EngHubComponent.kt`.
 
-### 2. Undo a queued worktree archive
+### 2. Undo a queued worktree archive - Done
+
+**Status:** Done
 
 **Acceptance criteria:** Given `feature/login` is in `Queued` state before its deadline, when the user clicks Undo, then its persisted archive record is removed, its mutation lease is released, it returns to the active worktree list, and no Git archive call occurs.
 

@@ -22,4 +22,7 @@ interface WorktreeArchiveStore {
     fun listJobs(): List<WorktreeArchiveJob>
 
     fun saveJob(job: WorktreeArchiveJob)
+
+    /** Deletes the job only while it is still cancelable. */
+    fun deleteQueuedJob(worktreePath: String): Boolean
 }

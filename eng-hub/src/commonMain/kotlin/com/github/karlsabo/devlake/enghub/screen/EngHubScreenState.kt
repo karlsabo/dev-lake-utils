@@ -54,6 +54,7 @@ internal data class NotificationsPaneState(
 internal data class EngHubScreenActions(
     val onPaneSelected: (EngHubPane) -> Unit,
     val onClearActionError: () -> Unit,
+    val onUndoQueuedWorktreeArchive: (String) -> Unit,
     val checkoutWorktreePath: CheckoutWorktreePath,
     val onDiscoverGlobalExistingBranches: () -> Unit,
     val onDiscoverGlobalExistingPullRequests: (query: String) -> Unit,
@@ -194,6 +195,7 @@ internal fun engHubScreenActions(
 ): EngHubScreenActions = EngHubScreenActions(
     onPaneSelected = onPaneSelected,
     onClearActionError = viewModel.clearActionError,
+    onUndoQueuedWorktreeArchive = viewModel.undoQueuedWorktreeArchive,
     checkoutWorktreePath = viewModel.checkoutWorktreePath,
     onDiscoverGlobalExistingBranches = viewModel.discoverGlobalExistingBranches,
     onDiscoverGlobalExistingPullRequests = viewModel.discoverGlobalExistingPullRequests,

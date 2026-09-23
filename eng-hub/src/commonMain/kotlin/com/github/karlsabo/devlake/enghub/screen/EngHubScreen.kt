@@ -92,7 +92,7 @@ internal fun availablePaneOrSettings(
 }
 
 @Composable
-private fun EngHubScreenContent(
+internal fun EngHubScreenContent(
     state: EngHubScreenState,
     actions: EngHubScreenActions,
 ) {
@@ -131,6 +131,7 @@ private fun EngHubScreenContent(
             paneAvailability = state.paneAvailability,
             archiveBinEntries = state.archiveBinEntries,
             onPaneSelect = actions.onPaneSelected,
+            onUndoQueuedWorktreeArchive = actions.onUndoQueuedWorktreeArchive,
         )
         Box(
             modifier = Modifier
@@ -217,6 +218,7 @@ internal fun EngHubSidebar(
     paneAvailability: Map<EngHubPane, EngHubPaneAvailability> =
         EngHubPane.entries.associateWith { EngHubPaneAvailability(isEnabled = true) },
     archiveBinEntries: List<WorktreeArchiveBinEntry> = emptyList(),
+    onUndoQueuedWorktreeArchive: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxHeight().width(56.dp).padding(vertical = 8.dp),
@@ -236,7 +238,10 @@ internal fun EngHubSidebar(
             }
         }
         Spacer(modifier = Modifier.weight(1f))
-        WorktreeArchiveBin(entries = archiveBinEntries)
+        WorktreeArchiveBin(
+            entries = archiveBinEntries,
+            onUndo = onUndoQueuedWorktreeArchive,
+        )
         Spacer(modifier = Modifier.size(6.dp))
         EngHubSidebarButton(
             pane = EngHubPane.Settings,

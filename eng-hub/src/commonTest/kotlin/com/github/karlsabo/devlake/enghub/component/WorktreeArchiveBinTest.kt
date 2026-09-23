@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class WorktreeArchiveBinTest {
     @OptIn(ExperimentalTestApi::class)
@@ -34,6 +35,7 @@ class WorktreeArchiveBinTest {
                             repository = "widgets",
                             branch = "feature/login",
                             remainingSeconds = 60,
+                            worktreePath = "/repos/widgets-feature-login",
                         ),
                     ),
                 )
@@ -44,5 +46,31 @@ class WorktreeArchiveBinTest {
         onNodeWithText("widgets").assertIsDisplayed()
         onNodeWithText("feature/login").assertIsDisplayed()
         onNodeWithText("60 seconds remaining").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun queuedBinEntryOffersUndoForItsWorktree() = runComposeUiTest {
+        val undoRequests = mutableListOf<String>()
+        setContent {
+            MaterialTheme {
+                WorktreeArchiveBin(
+                    entries = listOf(
+                        WorktreeArchiveBinEntry(
+                            repository = "widgets",
+                            branch = "feature/login",
+                            remainingSeconds = 42,
+                            worktreePath = "/repos/widgets-feature-login",
+                        ),
+                    ),
+                    onUndo = undoRequests::add,
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Undo").assertIsDisplayed().performClick()
+
+        assertEquals(listOf("/repos/widgets-feature-login"), undoRequests)
     }
 }

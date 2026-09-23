@@ -26,9 +26,17 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeActions
+import com.github.karlsabo.devlake.enghub.component.GlobalExistingBranchDiscoveryUiState
+import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
+import com.github.karlsabo.devlake.enghub.component.NotificationActions
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBin
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
+import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
+import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.state.createEngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.representativeEngHubConfig
+import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
@@ -223,6 +231,32 @@ class EngHubScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun archiveBinEntryRetainsQueuedWorktreePathForUndo() = runComposeUiTest {
+        val archive = WorktreeArchiveJob(
+            repositoryRootPath = "/repos/widgets",
+            worktreePath = "/repos/widgets-feature-login",
+            branch = "feature/login",
+            state = WorktreeArchiveLifecycleState.QUEUED,
+            queuedAtEpochMs = 10_000,
+            stateUpdatedAtEpochMs = 10_000,
+            deadlineAtEpochMs = 70_000,
+        )
+        val undoRequests = mutableListOf<String>()
+        setContent {
+            WorktreeArchiveBin(
+                entries = collectArchiveBinEntries(listOf(archive)) { 10_000L },
+                onUndo = undoRequests::add,
+            )
+        }
+
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Undo").performClick()
+
+        assertEquals(listOf("/repos/widgets-feature-login"), undoRequests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun archiveCountdownUsesCurrentTimeWhenFirstArchiveIsQueued() = runComposeUiTest {
         mainClock.autoAdvance = false
         var nowEpochMs = 10_000L
@@ -261,7 +295,12 @@ class EngHubScreenTest {
                         selectedPane = EngHubPane.Worktrees,
                         onPaneSelect = {},
                         archiveBinEntries = listOf(
-                            WorktreeArchiveBinEntry("widgets", "feature/login", 60),
+                            WorktreeArchiveBinEntry(
+                                repository = "widgets",
+                                branch = "feature/login",
+                                remainingSeconds = 60,
+                                worktreePath = "/repos/widgets-feature-login",
+                            ),
                         ),
                     )
                 }
@@ -271,6 +310,25 @@ class EngHubScreenTest {
         val recycleBin = onNodeWithContentDescription("Recycle bin (1)").fetchSemanticsNode().boundsInRoot
         val settings = onNodeWithContentDescription("Settings").fetchSemanticsNode().boundsInRoot
         assertTrue(recycleBin.bottom <= settings.top)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun screenRoutesArchiveUndoToItsAction() = runComposeUiTest {
+        val undoRequests = mutableListOf<String>()
+        setContent {
+            MaterialTheme {
+                EngHubScreenContent(
+                    state = screenStateWithQueuedArchive(),
+                    actions = screenActions(onUndoQueuedWorktreeArchive = undoRequests::add),
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Undo").performClick()
+
+        assertEquals(listOf("/repos/widgets-feature-login"), undoRequests)
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -301,3 +359,74 @@ class EngHubScreenTest {
         onNodeWithText("Selected: Settings").assertIsDisplayed()
     }
 }
+
+private fun screenStateWithQueuedArchive() = EngHubScreenState(
+    selectedPane = EngHubPane.PullRequests,
+    paneAvailability = EngHubPane.entries.associateWith { EngHubPaneAvailability(isEnabled = true) },
+    actionError = null,
+    archiveBinEntries = listOf(
+        WorktreeArchiveBinEntry(
+            repository = "widgets",
+            branch = "feature/login",
+            remainingSeconds = 42,
+            worktreePath = "/repos/widgets-feature-login",
+        ),
+    ),
+    globalExistingBranchDiscovery = GlobalExistingBranchDiscoveryUiState(),
+    pullRequests = PullRequestsPaneState(result = null, organizationIdsEmpty = false, setupStatuses = emptyMap()),
+    notifications = NotificationsPaneState(result = null, actingOnThreadIds = emptySet(), setupStatuses = emptyMap()),
+    worktrees = WorktreePanelState(
+        localRepositories = emptyList(),
+        forceArchiveRequest = null,
+        setupStatuses = emptyMap(),
+        archivingWorktreePaths = emptySet(),
+    ),
+    settings = createEngHubSettingsUiState(
+        engHubConfig = representativeEngHubConfig(),
+        gitHubConfig = GitHubConfig(tokenPath = "/secrets/github.json"),
+        gitHubSecret = GitHubSecret(githubToken = "token"),
+    ),
+)
+
+private fun screenActions(onUndoQueuedWorktreeArchive: (String) -> Unit) = EngHubScreenActions(
+    onPaneSelected = {},
+    onClearActionError = {},
+    onUndoQueuedWorktreeArchive = onUndoQueuedWorktreeArchive,
+    checkoutWorktreePath = { _, _ -> WorktreePath("/tmp/worktree") },
+    onDiscoverGlobalExistingBranches = {},
+    onDiscoverGlobalExistingPullRequests = {},
+    onCheckoutExistingBranch = { _, _, _ -> },
+    pullRequests = PullRequestPaneActions(onOpenInBrowser = {}, onCheckoutAndOpen = { _, _ -> }),
+    notifications = NotificationActions(
+        onOpenInBrowser = {},
+        onCheckoutAndOpen = { _, _ -> },
+        onApprove = {},
+        onMarkDone = {},
+        onUnsubscribe = {},
+    ),
+    worktrees = WorktreePanelActions(
+        onAddRepository = {},
+        onToggleRepository = {},
+        onCreateWorktreeFromRepository = {},
+        onRepositoryCreateWorktreeRequestHandled = {},
+        onDiscoverExistingBranches = {},
+        onDiscoverExistingPullRequest = { _, _ -> },
+        onCheckoutExistingBranch = { _, _, _ -> },
+        onConfirmUseUnrelatedExistingBranch = {},
+        onDismissUseUnrelatedExistingBranchConfirmation = {},
+        onAbortWorktreeConflict = {},
+        onLeaveWorktreeConflictAsIs = {},
+        worktrees = LocalWorktreeActions(
+            onOpenWorktree = { _, _ -> },
+            onOpenPullRequest = {},
+            onArchiveWorktree = { _, _ -> },
+            onCreateWorktree = {},
+            onUpdateFromOrigin = { _, _, _ -> },
+            onUpdateFromParent = { _, _, _ -> },
+            onRebaseOntoParent = { _, _, _ -> },
+            onMergeOntoParent = { _, _, _ -> },
+        ),
+        forceArchive = ForceArchiveWorktreeActions(onConfirm = { _, _ -> }, onDismiss = {}),
+    ),
+    settings = EngHubSettingsActions(),
+)

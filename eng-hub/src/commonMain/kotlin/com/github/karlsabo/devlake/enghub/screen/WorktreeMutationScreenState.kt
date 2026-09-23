@@ -67,5 +67,6 @@ private fun WorktreeArchiveJob.toArchiveBinEntry(nowEpochMs: Long): WorktreeArch
         repository = repositoryName,
         branch = branch,
         remainingSeconds = ((deadlineAtEpochMs - nowEpochMs).coerceAtLeast(0) + 999) / 1_000,
+        worktreePath = worktreePath,
     )
 }

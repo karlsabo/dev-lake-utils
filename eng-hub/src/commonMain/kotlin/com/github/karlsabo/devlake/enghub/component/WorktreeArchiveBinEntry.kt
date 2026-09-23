@@ -9,8 +9,10 @@ import androidx.compose.material.DropdownMenu
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -23,12 +25,14 @@ internal data class WorktreeArchiveBinEntry(
     val repository: String,
     val branch: String,
     val remainingSeconds: Long,
+    val worktreePath: String,
 )
 
 @Composable
 internal fun WorktreeArchiveBin(
     entries: List<WorktreeArchiveBinEntry>,
     modifier: Modifier = Modifier,
+    onUndo: (String) -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
@@ -51,7 +55,9 @@ internal fun WorktreeArchiveBin(
                     Text("No worktrees queued for archive")
                 } else {
                     entries.forEach { entry ->
-                        WorktreeArchiveBinEntryRow(entry)
+                        key(entry.worktreePath) {
+                            WorktreeArchiveBinEntryRow(entry, onUndo)
+                        }
                     }
                 }
             }
@@ -60,10 +66,16 @@ internal fun WorktreeArchiveBin(
 }
 
 @Composable
-private fun WorktreeArchiveBinEntryRow(entry: WorktreeArchiveBinEntry) {
+private fun WorktreeArchiveBinEntryRow(
+    entry: WorktreeArchiveBinEntry,
+    onUndo: (String) -> Unit,
+) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text(entry.branch, style = MaterialTheme.typography.body1)
         Text(entry.repository, style = MaterialTheme.typography.caption)
         Text("${entry.remainingSeconds} seconds remaining", style = MaterialTheme.typography.caption)
+        TextButton(onClick = { onUndo(entry.worktreePath) }) {
+            Text("Undo")
+        }
     }
 }

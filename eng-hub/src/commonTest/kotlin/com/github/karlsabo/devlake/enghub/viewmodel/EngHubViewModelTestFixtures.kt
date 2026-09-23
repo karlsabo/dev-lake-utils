@@ -33,6 +33,7 @@ import com.github.karlsabo.system.DesktopLauncher
 import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.osFamily
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
+import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import com.github.karlsabo.worktreearchive.WorktreeArchiveStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -849,12 +850,25 @@ class RecordingWorktreeArchiveStore(
     private val saveFailure: RuntimeException? = null,
 ) : WorktreeArchiveStore {
     val jobs = MutableStateFlow<List<WorktreeArchiveJob>>(emptyList())
+    val deleteQueuedJobCalls = MutableStateFlow<List<String>>(emptyList())
 
     override fun listJobs(): List<WorktreeArchiveJob> = jobs.value
 
     override fun saveJob(job: WorktreeArchiveJob) {
         saveFailure?.let { throw it }
         jobs.update { existing -> existing.filterNot { it.worktreePath == job.worktreePath } + job }
+    }
+
+    override fun deleteQueuedJob(worktreePath: String): Boolean {
+        deleteQueuedJobCalls.update { it + worktreePath }
+        while (true) {
+            val existing = jobs.value
+            val updated = existing.filterNot { job ->
+                job.worktreePath == worktreePath && job.state == WorktreeArchiveLifecycleState.QUEUED
+            }
+            if (updated.size == existing.size) return false
+            if (jobs.compareAndSet(existing, updated)) return true
+        }
     }
 }
 

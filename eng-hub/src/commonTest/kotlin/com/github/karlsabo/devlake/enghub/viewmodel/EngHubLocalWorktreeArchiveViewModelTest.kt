@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.component.visibleWorktreeRows
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlinx.coroutines.flow.first
@@ -120,6 +121,70 @@ class EngHubLocalWorktreeArchiveViewModelTest {
 
         viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
 
+        assertEquals(emptyList(), api.updateWorktreeFromOriginCalls)
+        assertEquals(emptyList(), api.archiveWorktreeCalls)
+    }
+
+    @Test
+    fun undoQueuedArchiveRestoresOnlySelectedWorktreeWithoutRunningGitRemoval() = runBlocking {
+        val secondPath = "/repos/dev-lake-utils-feature-search"
+        val store = RecordingWorktreeArchiveStore()
+        val api = archiveTestApi(secondPath)
+        val viewModel = archiveViewModel(api, store) { Instant.fromEpochMilliseconds(50_000) }
+        expandRepository(viewModel, expectedWorktreeCount = 3)
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, secondPath)
+        withTimeout(2_000.milliseconds) {
+            viewModel.queuedWorktreeArchivesStateFlow.first { it.size == 2 }
+        }
+
+        viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+
+        val remainingJobs = withTimeout(2_000.milliseconds) {
+            viewModel.queuedWorktreeArchivesStateFlow.first { jobs ->
+                jobs.size == 1 && jobs.single().worktreePath == secondPath
+            }
+        }
+        assertEquals(listOf(secondPath), remainingJobs.map { it.worktreePath })
+        assertEquals(listOf(secondPath), store.listJobs().map { it.worktreePath })
+        assertEquals(
+            listOf(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE),
+            visibleWorktreeRows(
+                worktrees = viewModel.localRepositoriesStateFlow.value.single().worktrees,
+                hiddenPaths = remainingJobs.mapTo(mutableSetOf()) { it.worktreePath },
+            ).map { it.worktree.path },
+        )
+        assertEquals(emptyList(), api.archiveWorktreeCalls)
+
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+        withTimeout(2_000.milliseconds) {
+            viewModel.queuedWorktreeArchivesStateFlow.first { jobs ->
+                jobs.size == 2 && jobs.any { it.worktreePath == DEV_LAKE_SELECTED_WORKTREE }
+            }
+        }
+        assertEquals(emptyList(), api.archiveWorktreeCalls)
+    }
+
+    @Test
+    fun undoDoesNothingWhenPersistedArchiveIsNoLongerQueued() = runBlocking {
+        val store = RecordingWorktreeArchiveStore()
+        val api = archiveTestApi()
+        val viewModel = archiveViewModel(api, store) { Instant.fromEpochMilliseconds(60_000) }
+        expandRepository(viewModel)
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+        val queuedJob = withTimeout(2_000.milliseconds) {
+            viewModel.queuedWorktreeArchivesStateFlow.first { it.isNotEmpty() }.single()
+        }
+        store.jobs.value = listOf(queuedJob.copy(state = WorktreeArchiveLifecycleState.REMOVING))
+
+        viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+        withTimeout(2_000.milliseconds) {
+            store.deleteQueuedJobCalls.first { it == listOf(DEV_LAKE_SELECTED_WORKTREE) }
+        }
+        viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+
+        assertEquals(listOf(queuedJob), viewModel.queuedWorktreeArchivesStateFlow.value)
+        assertEquals(WorktreeArchiveLifecycleState.REMOVING, store.listJobs().single().state)
         assertEquals(emptyList(), api.updateWorktreeFromOriginCalls)
         assertEquals(emptyList(), api.archiveWorktreeCalls)
     }

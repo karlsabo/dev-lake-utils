@@ -34,3 +34,10 @@ INSERT OR REPLACE INTO worktree_archive_jobs(
   error_message
 )
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteQueuedJob:
+DELETE FROM worktree_archive_jobs
+WHERE worktree_path = ? AND lifecycle_state = 'QUEUED';
+
+changedRowCount:
+SELECT changes();

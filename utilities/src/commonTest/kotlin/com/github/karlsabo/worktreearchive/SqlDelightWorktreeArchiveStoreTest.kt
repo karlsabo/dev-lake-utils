@@ -6,6 +6,8 @@ import kotlinx.io.files.SystemTemporaryDirectory
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class SqlDelightWorktreeArchiveStoreTest {
     @Test
@@ -24,6 +26,44 @@ class SqlDelightWorktreeArchiveStoreTest {
                 listOf(loginJob, searchJob),
                 SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs(),
             )
+        } finally {
+            deleteRecursively(testDirectory)
+        }
+    }
+
+    @Test
+    fun deletingQueuedJobRemovesItsPersistedRecord() {
+        val testDirectory = createTestDirectory()
+        val databasePath = Path(testDirectory, "archive.db").toString()
+        val queued = queuedJob("/repos/widgets-feature-login", "feature/login", 1_000)
+
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(queued)
+
+            assertTrue(store.deleteQueuedJob(queued.worktreePath))
+            assertEquals(emptyList(), store.listJobs())
+            assertFalse(store.deleteQueuedJob(queued.worktreePath))
+        } finally {
+            deleteRecursively(testDirectory)
+        }
+    }
+
+    @Test
+    fun deletingQueuedJobDoesNotRemoveJobAfterRemovalStarts() {
+        val testDirectory = createTestDirectory()
+        val databasePath = Path(testDirectory, "archive.db").toString()
+        val removing = queuedJob("/repos/widgets-feature-login", "feature/login", 1_000).copy(
+            state = WorktreeArchiveLifecycleState.REMOVING,
+            stateUpdatedAtEpochMs = 2_000,
+        )
+
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(removing)
+
+            assertFalse(store.deleteQueuedJob(removing.worktreePath))
+            assertEquals(listOf(removing), store.listJobs())
         } finally {
             deleteRecursively(testDirectory)
         }

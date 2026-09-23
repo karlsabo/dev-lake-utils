@@ -49,4 +49,9 @@ class SqlDelightWorktreeArchiveStore(
             error_message = job.errorMessage,
         )
     }
+
+    override fun deleteQueuedJob(worktreePath: String): Boolean = queries.transactionWithResult {
+        queries.deleteQueuedJob(worktreePath)
+        queries.changedRowCount().executeAsOne() > 0
+    }
 }
