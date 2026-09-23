@@ -11,6 +11,8 @@ import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupHandle
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.notifications.NotificationIgnoreStore
+import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
+import com.github.karlsabo.worktreearchive.WorktreeArchiveStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,14 +27,27 @@ internal data class ConfiguredRepositoryStartup(
     val pollImmediately: Boolean,
 )
 
+internal data class WorktreeArchiveDependencies(
+    val store: WorktreeArchiveStore,
+    val delay: kotlin.time.Duration = DEFAULT_WORKTREE_ARCHIVE_DELAY,
+    val now: () -> kotlin.time.Instant = kotlin.time.Clock.System::now,
+)
+
+internal data class EngHubPersistenceDependencies(
+    val notificationIgnoreStore: NotificationIgnoreStore,
+    val worktreeArchive: WorktreeArchiveDependencies,
+)
+
 class EngHubViewModel internal constructor(
     gitHubServices: EngHubGitHubServices,
     worktreeServices: EngHubWorktreeServices,
     desktopServices: EngHubDesktopServices,
     config: EngHubConfig,
-    notificationIgnoreStore: NotificationIgnoreStore,
+    persistenceDependencies: EngHubPersistenceDependencies,
     private val configuredRepositoryStartup: ConfiguredRepositoryStartup,
 ) : ViewModel() {
+    private val archiveNow = persistenceDependencies.worktreeArchive.now
+
     @Inject
     constructor(
         gitHubServices: EngHubGitHubServices,
@@ -40,12 +55,16 @@ class EngHubViewModel internal constructor(
         desktopServices: EngHubDesktopServices,
         config: EngHubConfig,
         notificationIgnoreStore: NotificationIgnoreStore,
+        worktreeArchiveStore: WorktreeArchiveStore,
     ) : this(
         gitHubServices = gitHubServices,
         worktreeServices = worktreeServices,
         desktopServices = desktopServices,
         config = config,
-        notificationIgnoreStore = notificationIgnoreStore,
+        persistenceDependencies = EngHubPersistenceDependencies(
+            notificationIgnoreStore = notificationIgnoreStore,
+            worktreeArchive = WorktreeArchiveDependencies(worktreeArchiveStore),
+        ),
         configuredRepositoryStartup = ConfiguredRepositoryStartup(
             startPolling = true,
             initiallyExpanded = true,
@@ -56,7 +75,7 @@ class EngHubViewModel internal constructor(
         config = config,
         configWriter = worktreeServices.configWriter,
         worktreeSetupCoordinator = worktreeServices.worktreeSetupCoordinator,
-        notificationIgnoreStore = notificationIgnoreStore,
+        notificationIgnoreStore = persistenceDependencies.notificationIgnoreStore,
         startConfiguredRepositoriesExpanded = configuredRepositoryStartup.initiallyExpanded,
     )
     private val errorReporter = ActionErrorReporter(state)
@@ -106,9 +125,10 @@ class EngHubViewModel internal constructor(
     private val archiveController = LocalWorktreeArchiveController(
         viewModel = this,
         state = state,
-        worktreeServices = worktreeServices,
-        localRepositories = localRepositoriesController,
+        archiveStore = persistenceDependencies.worktreeArchive.store,
         errorReporter = errorReporter,
+        archiveDelay = persistenceDependencies.worktreeArchive.delay,
+        now = archiveNow,
     )
     private val rebaseController = LocalWorktreeRebaseController(
         viewModel = this,
@@ -133,7 +153,7 @@ class EngHubViewModel internal constructor(
     )
     private val ignoredNotificationPersistence = IgnoredNotificationPersistence(
         state = state,
-        notificationIgnoreStore = notificationIgnoreStore,
+        notificationIgnoreStore = persistenceDependencies.notificationIgnoreStore,
     )
     private val notificationActionController = NotificationActionController(
         state = state,
@@ -169,6 +189,9 @@ class EngHubViewModel internal constructor(
         MappedStateFlow(state.worktreeConflictResolutionRequests) { it.firstOrNull() }
     val archivingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.archivingLocalWorktreePaths.asStateFlow()
+    val queuedWorktreeArchivesStateFlow: StateFlow<List<WorktreeArchiveJob>> =
+        state.queuedWorktreeArchives.asStateFlow()
+    internal val currentArchiveTimeEpochMs: () -> Long = { archiveNow().toEpochMilliseconds() }
     val updatingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.updatingLocalWorktreePaths.asStateFlow()
     val rebasingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =

@@ -34,26 +34,6 @@ private data class ConfirmationWorktreeDialogActions(
 )
 
 @Composable
-internal fun ArchiveWorktreeDialog(
-    worktreePath: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ConfirmationWorktreeDialog(
-        state = ConfirmationWorktreeDialogState(
-            title = "Archive Worktree",
-            message = "Remove this worktree and delete any leftover checkout directory?",
-            worktreePath = worktreePath,
-            confirmText = "Archive",
-        ),
-        actions = ConfirmationWorktreeDialogActions(
-            onConfirm = onConfirm,
-            onDismiss = onDismiss,
-        ),
-    )
-}
-
-@Composable
 internal fun ForceArchiveWorktreeDialog(
     worktreePath: String,
     onConfirm: () -> Unit,

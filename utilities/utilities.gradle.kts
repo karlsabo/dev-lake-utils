@@ -113,9 +113,14 @@ sqldelight {
     databases {
         create("NotificationDatabase") {
             packageName.set("com.github.karlsabo.notifications")
+            srcDirs.setFrom("src/commonMain/sqldelight")
             schemaOutputDirectory.set(
                 file("src/commonMain/sqldelight/com/github/karlsabo/notifications"),
             )
+        }
+        create("WorktreeArchiveDatabase") {
+            packageName.set("com.github.karlsabo.worktreearchive")
+            srcDirs.setFrom("src/commonMain/worktreeArchiveSqldelight")
         }
     }
 }

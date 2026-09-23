@@ -39,6 +39,8 @@ import com.github.karlsabo.devlake.enghub.component.EngHubActionPopup
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
 import com.github.karlsabo.devlake.enghub.component.GlobalExistingBranchWorktreeDialog
 import com.github.karlsabo.devlake.enghub.component.PendingGlobalCreateWorktree
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBin
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
@@ -127,6 +129,7 @@ private fun EngHubScreenContent(
         EngHubSidebar(
             selectedPane = state.selectedPane,
             paneAvailability = state.paneAvailability,
+            archiveBinEntries = state.archiveBinEntries,
             onPaneSelect = actions.onPaneSelected,
         )
         Box(
@@ -213,6 +216,7 @@ internal fun EngHubSidebar(
     onPaneSelect: (EngHubPane) -> Unit,
     paneAvailability: Map<EngHubPane, EngHubPaneAvailability> =
         EngHubPane.entries.associateWith { EngHubPaneAvailability(isEnabled = true) },
+    archiveBinEntries: List<WorktreeArchiveBinEntry> = emptyList(),
 ) {
     Column(
         modifier = Modifier.fillMaxHeight().width(56.dp).padding(vertical = 8.dp),
@@ -232,6 +236,8 @@ internal fun EngHubSidebar(
             }
         }
         Spacer(modifier = Modifier.weight(1f))
+        WorktreeArchiveBin(entries = archiveBinEntries)
+        Spacer(modifier = Modifier.size(6.dp))
         EngHubSidebarButton(
             pane = EngHubPane.Settings,
             selected = selectedPane == EngHubPane.Settings,

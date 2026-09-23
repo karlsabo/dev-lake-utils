@@ -29,6 +29,49 @@ class LocalWorktreeStateMappersTest {
     }
 
     @Test
+    fun enrichmentUsesOriginDefaultAsIntegrationTargetWhenVisibleParentIsNotInferred() {
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                originDefaultBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to "main"),
+            ),
+        )
+        val worktrees = listOf(
+            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+            Worktree(path = "$DEV_LAKE_ROOT-feature", branch = "feature/login", commitHash = "def456"),
+        )
+
+        val enriched = api.toLocalWorktreeUiStates(DEV_LAKE_ROOT, worktrees)
+        val feature = enriched.single { it.branch == "feature/login" }
+
+        assertEquals(null, feature.parentBranch)
+        assertEquals("main", feature.integrationTargetBranch)
+        assertEquals(null, enriched.single { it.branch == "main" }.integrationTargetBranch)
+    }
+
+    @Test
+    fun enrichmentPrefersVisibleInferredParentOverOriginDefaultIntegrationTarget() {
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                originDefaultBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to "main"),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/stacked" to "feature/base"),
+                ),
+            ),
+        )
+        val worktrees = listOf(
+            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+            Worktree(path = "$DEV_LAKE_ROOT-base", branch = "feature/base", commitHash = "def456"),
+            Worktree(path = "$DEV_LAKE_ROOT-stacked", branch = "feature/stacked", commitHash = "ghi789"),
+        )
+
+        val stacked = api.toLocalWorktreeUiStates(DEV_LAKE_ROOT, worktrees)
+            .single { it.branch == "feature/stacked" }
+
+        assertEquals("feature/base", stacked.parentBranch)
+        assertEquals("feature/base", stacked.integrationTargetBranch)
+    }
+
+    @Test
     fun enrichmentRemovesInferredParentActionsFromOriginDefaultWorktree() {
         val api = RecordingGitWorktreeApi(
             responses = RecordingGitWorktreeApiResponses(
@@ -48,6 +91,7 @@ class LocalWorktreeStateMappersTest {
 
         assertEquals(true, originDefault.canUpdateFromOrigin)
         assertEquals(null, originDefault.parentBranch)
+        assertEquals(null, originDefault.integrationTargetBranch)
         assertEquals(false, originDefault.needsRebase)
     }
 
@@ -60,6 +104,21 @@ class LocalWorktreeStateMappersTest {
         )
 
         assertEquals(true, discovered.withEnrichmentFrom(enriched).single().canUpdateFromOrigin)
+    }
+
+    @Test
+    fun discoveryPreservesIntegrationTargetFromEnrichment() {
+        val path = "/repo-feature"
+        val discovered = listOf(LocalWorktreeUiState(branch = "feature/login", path = path))
+        val enriched = listOf(
+            LocalWorktreeUiState(
+                branch = "feature/login",
+                path = path,
+                integrationTargetBranch = "main",
+            ),
+        )
+
+        assertEquals("main", discovered.withEnrichmentFrom(enriched).single().integrationTargetBranch)
     }
 
     @Test

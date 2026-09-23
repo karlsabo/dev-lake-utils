@@ -54,15 +54,19 @@ internal fun UpdateWorktreeShortcut(
     state: LocalWorktreeRowState,
     onUpdate: () -> Unit,
 ) {
-    val parentBranch = state.worktree.parentBranch
+    val integrationTargetBranch = state.worktree.integrationTargetBranch
     val updatesFromOrigin = state.worktree.canUpdateFromOrigin
-    if (!updatesFromOrigin && parentBranch.isNullOrBlank()) return
+    if (!updatesFromOrigin && integrationTargetBranch.isNullOrBlank()) return
 
-    val tooltip = if (updatesFromOrigin) "Update from origin" else "Update from base $parentBranch"
+    val tooltip = if (updatesFromOrigin) {
+        "Update from origin"
+    } else {
+        "Update from base $integrationTargetBranch"
+    }
     val description = if (updatesFromOrigin) {
         "Update worktree ${state.worktree.branch} from origin"
     } else {
-        "Update ${state.worktree.branch} from base $parentBranch"
+        "Update ${state.worktree.branch} from base $integrationTargetBranch"
     }
     WorktreeIntegrationShortcut(
         tooltip = tooltip,

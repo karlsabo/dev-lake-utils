@@ -1,12 +1,18 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 
-internal fun visibleWorktreeRows(worktrees: List<LocalWorktreeUiState>): List<VisibleWorktreeRow> {
-    val visibleRows = if (worktrees.hasValidParentBranchNesting()) {
-        worktrees.asNestedRows()
+internal fun visibleWorktreeRows(
+    worktrees: List<LocalWorktreeUiState>,
+    hiddenPaths: Set<String> = emptySet(),
+): List<VisibleWorktreeRow> {
+    val normalizedHiddenPaths = hiddenPaths.mapTo(mutableSetOf(), String::normalizedRepositoryPath)
+    val activeWorktrees = worktrees.filterNot { it.path.normalizedRepositoryPath() in normalizedHiddenPaths }
+    val visibleRows = if (activeWorktrees.hasValidParentBranchNesting()) {
+        activeWorktrees.asNestedRows()
     } else {
-        worktrees.map { worktree -> VisibleWorktreeRow(worktree = worktree, nestingDepth = 0) }
+        activeWorktrees.map { worktree -> VisibleWorktreeRow(worktree = worktree, nestingDepth = 0) }
     }
     return visibleRows
 }

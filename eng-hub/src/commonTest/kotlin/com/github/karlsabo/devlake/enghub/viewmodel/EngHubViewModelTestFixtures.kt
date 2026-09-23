@@ -32,6 +32,8 @@ import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
 import com.github.karlsabo.system.DesktopLauncher
 import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.osFamily
+import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
+import com.github.karlsabo.worktreearchive.WorktreeArchiveStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -271,6 +273,8 @@ fun localRepositoryConfigs(vararg paths: String) = paths.map { LocalRepositoryCo
 data class LocalRepositoryViewModelServices(
     val gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()),
     val worktreeSetupCoordinator: WorktreeSetupCoordinator? = null,
+    val worktreeArchiveStore: WorktreeArchiveStore = RecordingWorktreeArchiveStore(),
+    val archiveNow: () -> Instant = Clock.System::now,
 )
 
 fun createLocalRepositoryViewModel(
@@ -299,7 +303,13 @@ fun createLocalRepositoryViewModel(
         localRepositories = localRepositoryConfigs,
         setupShell = testConfig.setupShell,
     ),
-    notificationIgnoreStore = NoOpNotificationIgnoreStore(),
+    persistenceDependencies = EngHubPersistenceDependencies(
+        notificationIgnoreStore = NoOpNotificationIgnoreStore(),
+        worktreeArchive = WorktreeArchiveDependencies(
+            store = services.worktreeArchiveStore,
+            now = services.archiveNow,
+        ),
+    ),
     configuredRepositoryStartup = ConfiguredRepositoryStartup(
         startPolling = testConfig.startConfiguredRepositoryPolling,
         initiallyExpanded = testConfig.startConfiguredRepositoriesExpanded,
@@ -833,6 +843,19 @@ class LocalRepositoryNoOpDesktopLauncher : DesktopLauncher {
     override fun openUrl(url: String) = Unit
 
     override fun openInIdea(projectPath: String) = Unit
+}
+
+class RecordingWorktreeArchiveStore(
+    private val saveFailure: RuntimeException? = null,
+) : WorktreeArchiveStore {
+    val jobs = MutableStateFlow<List<WorktreeArchiveJob>>(emptyList())
+
+    override fun listJobs(): List<WorktreeArchiveJob> = jobs.value
+
+    override fun saveJob(job: WorktreeArchiveJob) {
+        saveFailure?.let { throw it }
+        jobs.update { existing -> existing.filterNot { it.worktreePath == job.worktreePath } + job }
+    }
 }
 
 class NoOpNotificationIgnoreStore : NotificationIgnoreStore {

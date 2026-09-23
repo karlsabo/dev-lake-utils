@@ -56,6 +56,7 @@ fun createViewModel(
             pollIntervalMs = pollIntervalMs,
         ),
         notificationIgnoreStore = store,
+        worktreeArchiveStore = RecordingWorktreeArchiveStore(),
     )
 }
 

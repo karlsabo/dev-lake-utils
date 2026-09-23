@@ -16,6 +16,7 @@ internal data class WorktreePanelState(
     val forceArchiveRequest: ForceArchiveWorktreeUiState?,
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
+    val queuedArchiveWorktreePaths: Set<String> = emptySet(),
     val updatingWorktreePaths: Set<String> = emptySet(),
     val rebasingWorktreePaths: Set<String> = emptySet(),
     val mergingWorktreePaths: Set<String> = emptySet(),
@@ -130,11 +131,6 @@ internal data class PendingWorktreeConflictResolution(
     val repoRootPath: String,
     val worktreePath: String,
     val parentBranch: String,
-)
-
-internal data class PendingArchive(
-    val repoRootPath: String,
-    val worktreePath: String,
 )
 
 internal fun createWorktreeDialogState(

@@ -37,7 +37,6 @@ class WorktreePanelTest {
                         archivingWorktreePaths = emptySet(),
                     ),
                     panelActions = emptyPanelActions(),
-                    onArchiveRequest = {},
                     onCreateRequest = {},
                 )
             }

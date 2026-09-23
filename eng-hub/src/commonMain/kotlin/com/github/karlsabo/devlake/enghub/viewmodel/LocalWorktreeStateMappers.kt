@@ -6,6 +6,8 @@ import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.Worktree
 
+private const val DETACHED_BRANCH = "(detached)"
+
 internal fun GitWorktreeApi.toLocalWorktreeUiStates(
     repoRootPath: String,
     worktrees: List<Worktree>,
@@ -30,6 +32,7 @@ internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
                 parentBranch = parentBranch,
                 needsRebase = parentBranch != null && enrichedWorktree.needsRebase,
                 canUpdateFromOrigin = enrichedWorktree.canUpdateFromOrigin,
+                integrationTargetBranch = enrichedWorktree.integrationTargetBranch,
             )
         }
     }
@@ -47,10 +50,14 @@ internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
         val canUpdateFromOrigin = worktree.branch == originDefaultBranch
         val parentBranch = parentBranchesByChildBranch[worktree.branch]
             ?.takeIf { !canUpdateFromOrigin && it in visibleBranches }
+        val integrationTargetBranch = parentBranch ?: originDefaultBranch?.takeIf {
+            it.isNotBlank() && worktree.branch != DETACHED_BRANCH && !canUpdateFromOrigin
+        }
         worktree.copy(
             parentBranch = parentBranch,
             needsRebase = parentBranch != null && needsRebaseByChildBranch[worktree.branch] == true,
             canUpdateFromOrigin = canUpdateFromOrigin,
+            integrationTargetBranch = integrationTargetBranch,
         )
     }
 }

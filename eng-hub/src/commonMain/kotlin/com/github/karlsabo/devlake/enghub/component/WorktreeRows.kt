@@ -25,6 +25,7 @@ internal data class WorktreeRowsState(
     val repository: LocalRepositoryUiState,
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
+    val queuedArchiveWorktreePaths: Set<String> = emptySet(),
     val updatingWorktreePaths: Set<String> = emptySet(),
     val rebasingWorktreePaths: Set<String> = emptySet(),
     val mergingWorktreePaths: Set<String> = emptySet(),
@@ -64,7 +65,7 @@ internal fun visibleWorktreeMenuActions(
     add(WorktreeMenuAction.Open)
     if (connectedPullRequest != null) add(WorktreeMenuAction.OpenPullRequest)
     add(WorktreeMenuAction.CreateWorktree)
-    if (!worktree.parentBranch.isNullOrBlank()) {
+    if (!worktree.integrationTargetBranch.isNullOrBlank() && worktree.integrationTargetBranch != worktree.branch) {
         add(WorktreeMenuAction.RebaseOntoParent)
         add(WorktreeMenuAction.MergeOntoParent)
     }

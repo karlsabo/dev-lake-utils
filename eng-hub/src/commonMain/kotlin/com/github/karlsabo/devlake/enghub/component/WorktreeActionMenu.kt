@@ -164,7 +164,7 @@ private fun RebaseOntoParentMenuItem(
             isMerging = state.isMerging,
         ),
     ) {
-        Text("Rebase onto parent")
+        Text("Rebase onto ${requireNotNull(state.worktree.integrationTargetBranch)}")
     }
 }
 
@@ -187,7 +187,7 @@ private fun MergeOntoParentMenuItem(
             isMerging = state.isMerging,
         ),
     ) {
-        Text("Merge parent into worktree")
+        Text("Merge ${requireNotNull(state.worktree.integrationTargetBranch)} into worktree")
     }
 }
 

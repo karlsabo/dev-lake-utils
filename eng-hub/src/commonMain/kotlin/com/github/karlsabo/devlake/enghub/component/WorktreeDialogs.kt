@@ -37,7 +37,6 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
 internal data class WorktreeDialogState(
-    val pendingArchive: PendingArchive?,
     val pendingCreateWorktree: PendingCreateWorktree?,
     val existingBranchDiscovery: ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(),
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch?,
@@ -46,9 +45,7 @@ internal data class WorktreeDialogState(
 )
 
 internal data class WorktreeDialogActions(
-    val onPendingArchiveChange: (PendingArchive?) -> Unit,
     val onPendingCreateWorktreeChange: (PendingCreateWorktree?) -> Unit,
-    val onArchiveWorktree: (PendingArchive) -> Unit,
     val onCreateWorktree: (PendingCreateWorktree) -> Unit,
     val onCheckoutExistingBranch: (repoRootPath: String, branch: String, existingWorktreePath: String?) -> Unit,
     val onConfirmUseUnrelatedExistingBranch: (PendingUseUnrelatedExistingBranch) -> Unit,
@@ -87,17 +84,6 @@ internal fun WorktreeDialogHost(
     state: WorktreeDialogState,
     actions: WorktreeDialogActions,
 ) {
-    state.pendingArchive?.let { archive ->
-        ArchiveWorktreeDialog(
-            worktreePath = archive.worktreePath,
-            onConfirm = {
-                actions.onPendingArchiveChange(null)
-                actions.onArchiveWorktree(archive)
-            },
-            onDismiss = { actions.onPendingArchiveChange(null) },
-        )
-    }
-
     state.forceArchiveRequest?.let { archive ->
         ForceArchiveWorktreeDialog(
             worktreePath = archive.worktreePath,

@@ -1,0 +1,36 @@
+CREATE TABLE worktree_archive_jobs (
+  worktree_path TEXT NOT NULL PRIMARY KEY,
+  repository_root_path TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  lifecycle_state TEXT NOT NULL,
+  queued_at_epoch_ms INTEGER NOT NULL,
+  state_updated_at_epoch_ms INTEGER NOT NULL,
+  deadline_at_epoch_ms INTEGER NOT NULL,
+  error_message TEXT
+);
+
+selectAll:
+SELECT
+  worktree_path,
+  repository_root_path,
+  branch,
+  lifecycle_state,
+  queued_at_epoch_ms,
+  state_updated_at_epoch_ms,
+  deadline_at_epoch_ms,
+  error_message
+FROM worktree_archive_jobs
+ORDER BY queued_at_epoch_ms, worktree_path;
+
+upsertJob:
+INSERT OR REPLACE INTO worktree_archive_jobs(
+  worktree_path,
+  repository_root_path,
+  branch,
+  lifecycle_state,
+  queued_at_epoch_ms,
+  state_updated_at_epoch_ms,
+  deadline_at_epoch_ms,
+  error_message
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);

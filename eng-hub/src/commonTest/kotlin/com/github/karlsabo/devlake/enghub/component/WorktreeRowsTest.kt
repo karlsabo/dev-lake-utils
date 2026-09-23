@@ -50,6 +50,19 @@ class WorktreeRowsTest {
     }
 
     @Test
+    fun queuedArchivePathIsOmittedFromVisibleRows() {
+        val root = LocalWorktreeUiState(branch = "main", path = "/repos/widgets", isRoot = true)
+        val queued = LocalWorktreeUiState(branch = "feature/login", path = "/repos/widgets-feature-login")
+
+        val rows = visibleWorktreeRows(
+            worktrees = listOf(root, queued),
+            hiddenPaths = setOf("/repos/widgets-feature-login/"),
+        )
+
+        assertEquals(listOf("main"), rows.map { it.worktree.branch })
+    }
+
+    @Test
     fun worktreeRowIndentMakesGrandchildDepthVisible() {
         assertTrue(worktreeRowIndentDp(2) > worktreeRowIndentDp(1))
     }
@@ -94,16 +107,32 @@ class WorktreeRowsTest {
     }
 
     @Test
-    fun manualIntegrationActionsAreHiddenWithoutAnInferredParent() {
+    fun manualIntegrationActionsUseIntegrationTargetWithoutAnInferredParent() {
         val worktree = LocalWorktreeUiState(
-            branch = "feature/stacked-pr",
-            path = "/repos/dev-lake-utils-feature-stacked-pr",
+            branch = "feature/audit",
+            path = "/repos/legacy-api-feature-audit",
+            integrationTargetBranch = "master",
         )
 
         val actions = visibleWorktreeMenuActions(worktree)
 
-        assertFalse(WorktreeMenuAction.RebaseOntoParent in actions)
-        assertFalse(WorktreeMenuAction.MergeOntoParent in actions)
+        assertTrue(WorktreeMenuAction.RebaseOntoParent in actions)
+        assertTrue(WorktreeMenuAction.MergeOntoParent in actions)
+    }
+
+    @Test
+    fun manualIntegrationActionsAreHiddenWithoutANonSelfIntegrationTarget() {
+        val withoutTarget = LocalWorktreeUiState(
+            branch = "feature/audit",
+            path = "/repos/legacy-api-feature-audit",
+        )
+        val selfTarget = withoutTarget.copy(branch = "master", integrationTargetBranch = "master")
+
+        listOf(withoutTarget, selfTarget).forEach { worktree ->
+            val actions = visibleWorktreeMenuActions(worktree)
+            assertFalse(WorktreeMenuAction.RebaseOntoParent in actions)
+            assertFalse(WorktreeMenuAction.MergeOntoParent in actions)
+        }
     }
 
     @Test

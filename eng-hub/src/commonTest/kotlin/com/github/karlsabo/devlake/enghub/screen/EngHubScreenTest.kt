@@ -26,10 +26,13 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
 import com.github.karlsabo.devlake.enghub.state.createEngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.representativeEngHubConfig
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
+import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
+import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -189,6 +192,85 @@ class EngHubScreenTest {
         onAllNodesWithText("Search actions…").assertCountEquals(0)
         onNodeWithContentDescription("Open actions").assertIsFocused()
         onNodeWithText("Pull Requests").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun archiveCountdownObservesInjectedClockAsTimeAdvances() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var nowEpochMs = 10_000L
+        val archive = WorktreeArchiveJob(
+            repositoryRootPath = "/repos/widgets",
+            worktreePath = "/repos/widgets-feature-login",
+            branch = "feature/login",
+            state = WorktreeArchiveLifecycleState.QUEUED,
+            queuedAtEpochMs = 10_000,
+            stateUpdatedAtEpochMs = 10_000,
+            deadlineAtEpochMs = 70_000,
+        )
+        setContent {
+            val entries = collectArchiveBinEntries(listOf(archive)) { nowEpochMs }
+            Text("${entries.single().remainingSeconds} seconds remaining")
+        }
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("60 seconds remaining").assertIsDisplayed()
+
+        nowEpochMs = 11_000
+        mainClock.advanceTimeBy(1_000)
+
+        onNodeWithText("59 seconds remaining").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun archiveCountdownUsesCurrentTimeWhenFirstArchiveIsQueued() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var nowEpochMs = 10_000L
+        val queuedArchives = mutableStateOf(emptyList<WorktreeArchiveJob>())
+        val archive = WorktreeArchiveJob(
+            repositoryRootPath = "/repos/widgets",
+            worktreePath = "/repos/widgets-feature-login",
+            branch = "feature/login",
+            state = WorktreeArchiveLifecycleState.QUEUED,
+            queuedAtEpochMs = 20_000,
+            stateUpdatedAtEpochMs = 20_000,
+            deadlineAtEpochMs = 80_000,
+        )
+        setContent {
+            val entries = collectArchiveBinEntries(queuedArchives.value) { nowEpochMs }
+            Text(entries.singleOrNull()?.let { "${it.remainingSeconds} seconds remaining" } ?: "No archives")
+        }
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("No archives").assertIsDisplayed()
+
+        nowEpochMs = 20_000
+        queuedArchives.value = listOf(archive)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+
+        onNodeWithText("60 seconds remaining").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun recycleBinIsPlacedAboveSettings() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                Box(modifier = Modifier.size(width = 240.dp, height = 300.dp)) {
+                    EngHubSidebar(
+                        selectedPane = EngHubPane.Worktrees,
+                        onPaneSelect = {},
+                        archiveBinEntries = listOf(
+                            WorktreeArchiveBinEntry("widgets", "feature/login", 60),
+                        ),
+                    )
+                }
+            }
+        }
+
+        val recycleBin = onNodeWithContentDescription("Recycle bin (1)").fetchSemanticsNode().boundsInRoot
+        val settings = onNodeWithContentDescription("Settings").fetchSemanticsNode().boundsInRoot
+        assertTrue(recycleBin.bottom <= settings.top)
     }
 
     @OptIn(ExperimentalTestApi::class)

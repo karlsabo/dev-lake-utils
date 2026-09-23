@@ -4,44 +4,28 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
+import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
+import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
+import com.github.karlsabo.worktreearchive.WorktreeArchiveStore
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
-private val DEFAULT_WORKTREE_REMOVAL_WAIT_TIMEOUT = 30.seconds
+internal val DEFAULT_WORKTREE_ARCHIVE_DELAY: Duration = 60.seconds
 
 internal class LocalWorktreeArchiveController(
     private val viewModel: ViewModel,
     private val state: EngHubViewModelState,
-    private val worktreeServices: EngHubWorktreeServices,
-    private val localRepositories: LocalRepositoryController,
+    private val archiveStore: WorktreeArchiveStore,
     private val errorReporter: ActionErrorReporter,
-    private val worktreeRemovalWaitTimeout: Duration = DEFAULT_WORKTREE_REMOVAL_WAIT_TIMEOUT,
+    private val archiveDelay: Duration = DEFAULT_WORKTREE_ARCHIVE_DELAY,
+    private val now: () -> Instant = Clock.System::now,
 ) {
     fun archiveLocalWorktree(repoRootPath: String, worktreePath: String) {
-        archiveLocalWorktree(repoRootPath, worktreePath, force = false)
-    }
-
-    fun confirmForceArchiveLocalWorktree(repoRootPath: String, worktreePath: String) {
-        val request = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
-        if (state.forceArchiveWorktreeRequest.compareAndSet(expect = request, update = null)) {
-            archiveLocalWorktree(repoRootPath, worktreePath, force = true)
-        }
-    }
-
-    fun dismissForceArchiveWorktreeRequest() {
-        state.forceArchiveWorktreeRequest.value = null
-    }
-
-    private fun archiveLocalWorktree(
-        repoRootPath: String,
-        worktreePath: String,
-        force: Boolean,
-    ) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepositoryPath()
         val normalizedWorktreePath = worktreePath.normalizedRepositoryPath()
         when {
@@ -51,77 +35,72 @@ internal class LocalWorktreeArchiveController(
                 errorReporter.enqueueActionError("Cannot archive root worktree: $worktreePath")
             }
 
-            else -> {
-                val mutationLease = state.localWorktreeMutationGuard.tryAcquire(worktreePath) ?: return
-                state.archivingLocalWorktreePaths.update { paths -> paths + normalizedWorktreePath }
-                launchArchive(repoRootPath, worktreePath, normalizedWorktreePath, force, mutationLease)
-            }
+            else -> queueKnownWorktree(normalizedRepoRootPath, normalizedWorktreePath)
         }
     }
 
-    private fun launchArchive(
-        repoRootPath: String,
-        worktreePath: String,
-        normalizedWorktreePath: String,
-        force: Boolean,
+    fun confirmForceArchiveLocalWorktree(repoRootPath: String, worktreePath: String) {
+        val request = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
+        if (state.forceArchiveWorktreeRequest.compareAndSet(expect = request, update = null)) {
+            archiveLocalWorktree(repoRootPath, worktreePath)
+        }
+    }
+
+    fun dismissForceArchiveWorktreeRequest() {
+        state.forceArchiveWorktreeRequest.value = null
+    }
+
+    private fun queueKnownWorktree(repositoryRootPath: String, worktreePath: String) {
+        val repository = state.localRepositories.value.firstOrNull {
+            it.path.normalizedRepositoryPath() == repositoryRootPath
+        }
+        val worktree = repository?.worktrees?.firstOrNull {
+            it.path.normalizedRepositoryPath() == worktreePath
+        }
+        if (worktree == null || worktree.isRoot) {
+            errorReporter.enqueueActionError("Cannot queue unknown worktree for archive: $worktreePath")
+            return
+        }
+
+        val mutationLease = state.localWorktreeMutationGuard.tryAcquire(worktreePath) ?: return
+        val queuedAt = now().toEpochMilliseconds()
+        val archiveJob = WorktreeArchiveJob(
+            repositoryRootPath = repository.path,
+            worktreePath = worktreePath,
+            branch = worktree.branch,
+            state = WorktreeArchiveLifecycleState.QUEUED,
+            queuedAtEpochMs = queuedAt,
+            stateUpdatedAtEpochMs = queuedAt,
+            deadlineAtEpochMs = queuedAt + archiveDelay.inWholeMilliseconds,
+        )
+        persistThenExpose(archiveJob, mutationLease)
+    }
+
+    private fun persistThenExpose(
+        archiveJob: WorktreeArchiveJob,
         mutationLease: LocalWorktreeMutationGuard.Lease,
     ) {
-        val archiveJob = viewModel.viewModelScope.launch(Dispatchers.IO) {
-            val failure = try {
+        viewModel.viewModelScope.launch(Dispatchers.IO) {
+            var safelyQueued = false
+            try {
                 runCatching {
-                    logger.info { "Archiving worktree $worktreePath for $repoRootPath force=$force" }
-                    worktreeServices.gitWorktreeApi.archiveWorktree(repoRootPath, worktreePath, force = force)
+                    archiveStore.saveJob(archiveJob)
+                    state.queuedWorktreeArchives.update { jobs ->
+                        jobs.filterNot { it.worktreePath == archiveJob.worktreePath } + archiveJob
+                    }
+                    safelyQueued = true
+                    logger.info { "Queued worktree ${archiveJob.worktreePath} for archive" }
                 }
                     .rethrowCancellation()
-                    .exceptionOrNull()
-                    .also { archiveFailure ->
-                        if (archiveFailure == null) {
-                            localRepositories.refreshLocalRepositoryWorktreesBestEffort(
-                                repoRootPath = repoRootPath,
-                                logContext = "after archive",
-                            )
-                            awaitWorktreeRemoval(repoRootPath, normalizedWorktreePath)
-                        }
+                    .onFailure { failure ->
+                        logger.error(failure) { "Failed to persist queued worktree ${archiveJob.worktreePath}" }
+                        errorReporter.enqueueActionError(
+                            failure.message?.let { "Failed to queue worktree archive: $it" }
+                                ?: "Failed to queue worktree archive",
+                        )
                     }
             } finally {
-                state.archivingLocalWorktreePaths.update { paths -> paths - normalizedWorktreePath }
-                mutationLease.release()
-            }
-
-            failure?.let { archiveFailure ->
-                logger.error(archiveFailure) { "Failed to archive worktree $worktreePath" }
-                if (!force && archiveFailure.isDirtyWorktreeArchiveFailure()) {
-                    state.forceArchiveWorktreeRequest.value = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
-                } else {
-                    errorReporter.enqueueActionError(archiveFailure.message ?: "Failed to archive worktree")
-                }
-                localRepositories.refreshLocalRepositoryWorktreesBestEffort(
-                    repoRootPath = repoRootPath,
-                    logContext = "after archive failure",
-                )
-            }
-        }
-        archiveJob.invokeOnCompletion { mutationLease.release() }
-    }
-
-    private suspend fun awaitWorktreeRemoval(
-        repoRootPath: String,
-        worktreePath: String,
-    ) {
-        val normalizedRepoRootPath = repoRootPath.normalizedRepositoryPath()
-        val removalObserved = withTimeoutOrNull(worktreeRemovalWaitTimeout) {
-            state.localRepositories.first { repositories ->
-                val repository = repositories.firstOrNull {
-                    it.path.normalizedRepositoryPath() == normalizedRepoRootPath
-                }
-                repository == null ||
-                    repository.worktrees.none { it.path.normalizedRepositoryPath() == worktreePath }
-            }
-            true
-        } == true
-        if (!removalObserved) {
-            logger.warn {
-                "Stopped guarding archived worktree $worktreePath after state reconciliation timed out"
+                if (!safelyQueued) mutationLease.release()
             }
         }
     }

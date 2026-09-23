@@ -9,6 +9,7 @@ import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
 import com.github.karlsabo.devlake.enghub.component.PendingUseUnrelatedExistingBranch
 import com.github.karlsabo.devlake.enghub.component.PendingWorktreeConflictResolution
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.component.createRepositoryWorktreeDialogState
@@ -30,6 +31,7 @@ internal data class EngHubScreenState(
     val selectedPane: EngHubPane,
     val paneAvailability: Map<EngHubPane, EngHubPaneAvailability>,
     val actionError: ActionErrorUiState?,
+    val archiveBinEntries: List<WorktreeArchiveBinEntry>,
     val globalExistingBranchDiscovery: GlobalExistingBranchDiscoveryUiState,
     val pullRequests: PullRequestsPaneState,
     val notifications: NotificationsPaneState,
@@ -108,10 +110,7 @@ internal fun collectEngHubScreenState(
     val setupStatuses by viewModel.setupStatusesStateFlow.collectAsState()
     val actingOnThreadIds by viewModel.actingOnThreadIdsStateFlow.collectAsState()
     val localRepositories by viewModel.localRepositoriesStateFlow.collectAsState()
-    val archivingPaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
-    val updatingPaths by viewModel.updatingLocalWorktreePathsStateFlow.collectAsState()
-    val rebasingPaths by viewModel.rebasingLocalWorktreePathsStateFlow.collectAsState()
-    val mergingPaths by viewModel.mergingLocalWorktreePathsStateFlow.collectAsState()
+    val worktreeMutations = collectWorktreeMutationScreenState(viewModel)
     val forceArchiveRequest by viewModel.forceArchiveWorktreeRequestStateFlow.collectAsState()
     val repositoryCreateWorktreeRequest by
         viewModel.lastCreateLocalWorktreeFromRepositoryRequestStateFlow.collectAsState()
@@ -126,6 +125,7 @@ internal fun collectEngHubScreenState(
         selectedPane = selectedPane,
         paneAvailability = paneAvailability,
         actionError = actionError,
+        archiveBinEntries = worktreeMutations.archiveBinEntries,
         globalExistingBranchDiscovery = globalExistingBranchDiscovery.toUiState(),
         pullRequests = PullRequestsPaneState(
             result = activityResults.pullRequests,
@@ -141,10 +141,11 @@ internal fun collectEngHubScreenState(
             localRepositories = localRepositories,
             forceArchiveRequest = forceArchiveRequest,
             setupStatuses = setupStatuses,
-            archivingWorktreePaths = archivingPaths,
-            updatingWorktreePaths = updatingPaths,
-            rebasingWorktreePaths = rebasingPaths,
-            mergingWorktreePaths = mergingPaths,
+            archivingWorktreePaths = worktreeMutations.archivingPaths,
+            queuedArchiveWorktreePaths = worktreeMutations.queuedArchivePaths,
+            updatingWorktreePaths = worktreeMutations.updatingPaths,
+            rebasingWorktreePaths = worktreeMutations.rebasingPaths,
+            mergingWorktreePaths = worktreeMutations.mergingPaths,
             authoredOpenPullRequests = activityResults.pullRequests?.getOrNull().orEmpty(),
             repositoryCreateWorktreeRequest = repositoryCreateWorktreeRequest?.let { request ->
                 createRepositoryWorktreeDialogState(

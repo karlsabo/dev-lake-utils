@@ -6,6 +6,7 @@ import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubDesktopServices
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubGitHubServices
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubWorktreeServices
+import com.github.karlsabo.devlake.enghub.viewmodel.RecordingWorktreeArchiveStore
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.WorktreeSetupCoordinator
@@ -22,7 +23,6 @@ import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubConfigStore
 import com.github.karlsabo.github.config.GitHubSecret
-import com.github.karlsabo.github.config.GitHubSecretFileWriter
 import com.github.karlsabo.github.config.LoadedGitHubConfig
 import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreStore
@@ -119,7 +119,7 @@ class EngHubDependenciesTest {
         writeGitHubTestFile(gitHubPath, lenientJson.encodeToString(originalGitHubConfig))
         var secretWrites = 0
         val configStore = GitHubConfigStore(
-            secretFileWriter = GitHubSecretFileWriter { _, _ -> secretWrites++ },
+            secretFileWriter = { _, _ -> secretWrites++ },
         )
         val loadedGitHubConfig = LoadedGitHubConfig(originalGitHubConfig, GitHubSecret("existing-token"))
 
@@ -180,6 +180,7 @@ class EngHubDependenciesTest {
             desktopServices = EngHubDesktopServices(fakeDesktopLauncher),
             config = config,
             notificationIgnoreStore = fakeNotificationIgnoreStore,
+            worktreeArchiveStore = RecordingWorktreeArchiveStore(),
         )
 
         val viewModel = loadEngHubDependencies(
@@ -236,6 +237,7 @@ class EngHubDependenciesTest {
             desktopServices = EngHubDesktopServices(RecordingDesktopLauncher()),
             config = config,
             notificationIgnoreStore = fakeNotificationIgnoreStore,
+            worktreeArchiveStore = RecordingWorktreeArchiveStore(),
         )
 
         val loadedDependencies = loadEngHubDependencies(
@@ -388,6 +390,7 @@ private fun testEngHubComponent(config: EngHubConfig, gitHubApiConfig: GitHubApi
         desktopServices = EngHubDesktopServices(RecordingDesktopLauncher()),
         config = config,
         notificationIgnoreStore = RecordingNotificationIgnoreStore(),
+        worktreeArchiveStore = RecordingWorktreeArchiveStore(),
     )
     return object : EngHubComponent(config, gitHubApiConfig) {
         override val viewModel = viewModel

@@ -70,7 +70,7 @@ class WorktreeIntegrationShortcutsTest {
         }
 
         onNodeWithContentDescription("Worktree actions for feature/login").performClick()
-        onNodeWithText("Rebase onto parent").assertIsDisplayed().assertIsEnabled().performClick()
+        onNodeWithText("Rebase onto main").assertIsDisplayed().assertIsEnabled().performClick()
 
         assertEquals(
             listOf(integrationRequest(IntegrationOperation.REBASE)),
@@ -89,7 +89,7 @@ class WorktreeIntegrationShortcutsTest {
         }
 
         onNodeWithContentDescription("Worktree actions for feature/login").performClick()
-        onNodeWithText("Merge parent into worktree").assertIsDisplayed().assertIsEnabled().performClick()
+        onNodeWithText("Merge main into worktree").assertIsDisplayed().assertIsEnabled().performClick()
 
         assertEquals(
             listOf(integrationRequest(IntegrationOperation.MERGE)),
@@ -109,11 +109,11 @@ class WorktreeIntegrationShortcutsTest {
         val row = onNodeWithTag("worktree-row-feature/login")
 
         row.performMouseInput { rightClick() }
-        onNodeWithText("Rebase onto parent").assertIsDisplayed().assertIsEnabled().performClick()
+        onNodeWithText("Rebase onto main").assertIsDisplayed().assertIsEnabled().performClick()
         assertEquals(listOf(integrationRequest(IntegrationOperation.REBASE)), requests)
 
         row.performMouseInput { rightClick() }
-        onNodeWithText("Merge parent into worktree").assertIsDisplayed().assertIsEnabled().performClick()
+        onNodeWithText("Merge main into worktree").assertIsDisplayed().assertIsEnabled().performClick()
         assertEquals(
             listOf(
                 integrationRequest(IntegrationOperation.REBASE),
@@ -141,21 +141,43 @@ class WorktreeIntegrationShortcutsTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun childUpdateShortcutIsHiddenWithoutAnInferredBase() = runComposeUiTest {
+    fun threeDotMenuMergesDefaultIntegrationTargetAndInvokesOnlyMerge() = runComposeUiTest {
+        val requests = mutableListOf<IntegrationRequest>()
         setContent {
             MaterialTheme {
-                IntegrationShortcutRow(
-                    state = integrationShortcutRowState().copy(
-                        worktree = LocalWorktreeUiState(
-                            branch = "feature/login",
-                            path = "/repos/dev-lake-utils-feature-login",
-                        ),
-                    ),
+                IntegrationRepositoryRow(
+                    panelActions = integrationPanelActions(requests),
+                    worktree = defaultTargetWorktree(),
                 )
             }
         }
 
-        onAllNodesWithText("⬇️").assertCountEquals(0)
+        onNodeWithContentDescription("Update feature/login from base main")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
+        onNodeWithText("Merge main into worktree").assertIsDisplayed().assertIsEnabled().performClick()
+
+        assertEquals(listOf(integrationRequest(IntegrationOperation.MERGE)), requests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun rightClickMenuMergesDefaultIntegrationTargetAndInvokesOnlyMerge() = runComposeUiTest {
+        val requests = mutableListOf<IntegrationRequest>()
+        setContent {
+            MaterialTheme {
+                IntegrationRepositoryRow(
+                    panelActions = integrationPanelActions(requests),
+                    worktree = defaultTargetWorktree(),
+                )
+            }
+        }
+
+        onNodeWithTag("worktree-row-feature/login").performMouseInput { rightClick() }
+        onNodeWithText("Merge main into worktree").assertIsDisplayed().assertIsEnabled().performClick()
+
+        assertEquals(listOf(integrationRequest(IntegrationOperation.MERGE)), requests)
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -190,7 +212,6 @@ class WorktreeIntegrationShortcutsTest {
                         worktree = LocalWorktreeUiState(
                             branch = "main",
                             path = "/repos/dev-lake-utils",
-                            parentBranch = "develop",
                             canUpdateFromOrigin = true,
                         ),
                     ),
@@ -201,7 +222,9 @@ class WorktreeIntegrationShortcutsTest {
         onNodeWithContentDescription("Update worktree main from origin")
             .assertIsDisplayed()
             .assertIsEnabled()
-        onAllNodesWithContentDescription("Update main from base develop").assertCountEquals(0)
+        onAllNodesWithContentDescription("Update main from base main").assertCountEquals(0)
+        onNodeWithContentDescription("Worktree actions for main").performClick()
+        onAllNodesWithText("Rebase onto main").assertCountEquals(0)
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -276,20 +299,22 @@ class WorktreeIntegrationShortcutsTest {
     }
 
     @Composable
-    private fun IntegrationRepositoryRow(panelActions: WorktreePanelActions) {
+    private fun IntegrationRepositoryRow(
+        panelActions: WorktreePanelActions,
+        worktree: LocalWorktreeUiState = integrationShortcutRowState().worktree,
+    ) {
         LocalRepositoryRow(
             state = WorktreeRowsState(
                 repository = LocalRepositoryUiState(
                     name = "dev-lake-utils",
                     path = REPOSITORY_PATH,
                     isExpanded = true,
-                    worktrees = listOf(integrationShortcutRowState().worktree),
+                    worktrees = listOf(worktree),
                 ),
                 setupStatuses = emptyMap(),
                 archivingWorktreePaths = emptySet(),
             ),
             panelActions = panelActions,
-            onArchiveRequest = {},
             onCreateRequest = {},
         )
     }
@@ -341,6 +366,12 @@ class WorktreeIntegrationShortcutsTest {
         ),
         setupStatus = null,
         isArchiving = false,
+    )
+
+    private fun defaultTargetWorktree() = LocalWorktreeUiState(
+        branch = "feature/login",
+        path = WORKTREE_PATH,
+        integrationTargetBranch = "main",
     )
 
     private data class IntegrationRequest(

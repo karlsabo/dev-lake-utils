@@ -12,6 +12,8 @@ import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.notifications.SqlDelightNotificationIgnoreStore
 import com.github.karlsabo.system.DesktopLauncher
 import com.github.karlsabo.system.DesktopLauncherService
+import com.github.karlsabo.worktreearchive.SqlDelightWorktreeArchiveStore
+import com.github.karlsabo.worktreearchive.WorktreeArchiveStore
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
 import software.amazon.lastmile.kotlin.inject.anvil.MergeComponent
@@ -69,6 +71,9 @@ interface EngHubBindings {
 
     @Provides
     fun provideNotificationIgnoreStore(): NotificationIgnoreStore = SqlDelightNotificationIgnoreStore()
+
+    @Provides
+    fun provideWorktreeArchiveStore(): WorktreeArchiveStore = SqlDelightWorktreeArchiveStore()
 }
 
 @MergeComponent(EngHubScope::class)

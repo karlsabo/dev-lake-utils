@@ -45,7 +45,6 @@ import com.github.karlsabo.git.WorktreeSetupStatus
 internal fun LocalRepositoryRow(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
-    onArchiveRequest: (PendingArchive) -> Unit,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
 ) {
     Card(
@@ -62,7 +61,6 @@ internal fun LocalRepositoryRow(
             LocalWorktreeRows(
                 state = state,
                 panelActions = panelActions,
-                onArchiveRequest = onArchiveRequest,
                 onCreateRequest = onCreateRequest,
             )
         }
@@ -191,7 +189,6 @@ private fun LocalRepositoryMenuItem(
 private fun LocalWorktreeRows(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
-    onArchiveRequest: (PendingArchive) -> Unit,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
 ) {
     if (!state.repository.isExpanded) return
@@ -210,12 +207,14 @@ private fun LocalWorktreeRows(
         }
         if (state.repository.worktrees.isNotEmpty()) {
             Spacer(modifier = Modifier.size(8.dp))
-            visibleWorktreeRows(state.repository.worktrees).forEach { row ->
+            visibleWorktreeRows(
+                worktrees = state.repository.worktrees,
+                hiddenPaths = state.queuedArchiveWorktreePaths,
+            ).forEach { row ->
                 WorktreeRowEntry(
                     row = row,
                     state = state,
                     panelActions = panelActions,
-                    onArchiveRequest = onArchiveRequest,
                     onCreateRequest = onCreateRequest,
                 )
             }
@@ -228,7 +227,6 @@ private fun WorktreeRowEntry(
     row: VisibleWorktreeRow,
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
-    onArchiveRequest: (PendingArchive) -> Unit,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
 ) {
     val worktree = row.worktree
@@ -249,7 +247,6 @@ private fun WorktreeRowEntry(
                 worktree = worktree,
                 repositoryPath = state.repository.path,
                 panelActions = panelActions,
-                onArchiveRequest = onArchiveRequest,
                 onCreateRequest = onCreateRequest,
             ),
         )
@@ -260,30 +257,29 @@ private fun worktreeRowActions(
     worktree: LocalWorktreeUiState,
     repositoryPath: String,
     panelActions: WorktreePanelActions,
-    onArchiveRequest: (PendingArchive) -> Unit,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
 ): LocalWorktreeRowActions = LocalWorktreeRowActions(
     onOpen = { panelActions.worktrees.onOpenWorktree(repositoryPath, worktree.path) },
     onOpenPullRequest = panelActions.worktrees.onOpenPullRequest,
-    onArchive = { onArchiveRequest(PendingArchive(repositoryPath, worktree.path)) },
+    onArchive = { panelActions.worktrees.onArchiveWorktree(repositoryPath, worktree.path) },
     onOpenCreateWorktreeDialog = { onCreateRequest(createWorktreeDialogState(repositoryPath, worktree)) },
     onUpdate = {
         if (worktree.canUpdateFromOrigin) {
             panelActions.worktrees.onUpdateFromOrigin(repositoryPath, worktree.path, worktree.branch)
         } else {
-            worktree.parentBranch?.let { parentBranch ->
-                panelActions.worktrees.onUpdateFromParent(repositoryPath, worktree.path, parentBranch)
+            worktree.integrationTargetBranch?.let { integrationTargetBranch ->
+                panelActions.worktrees.onUpdateFromParent(repositoryPath, worktree.path, integrationTargetBranch)
             }
         }
     },
     onRebaseOntoParent = {
-        worktree.parentBranch?.let { parentBranch ->
-            panelActions.worktrees.onRebaseOntoParent(repositoryPath, worktree.path, parentBranch)
+        worktree.integrationTargetBranch?.let { integrationTargetBranch ->
+            panelActions.worktrees.onRebaseOntoParent(repositoryPath, worktree.path, integrationTargetBranch)
         }
     },
     onMergeOntoParent = {
-        worktree.parentBranch?.let { parentBranch ->
-            panelActions.worktrees.onMergeOntoParent(repositoryPath, worktree.path, parentBranch)
+        worktree.integrationTargetBranch?.let { integrationTargetBranch ->
+            panelActions.worktrees.onMergeOntoParent(repositoryPath, worktree.path, integrationTargetBranch)
         }
     },
 )

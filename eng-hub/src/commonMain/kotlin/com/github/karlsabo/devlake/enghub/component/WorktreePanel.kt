@@ -27,7 +27,6 @@ internal fun WorktreePanel(
     actions: WorktreePanelActions,
     modifier: Modifier = Modifier,
 ) {
-    var pendingArchive by remember { mutableStateOf<PendingArchive?>(null) }
     var pendingCreateWorktree by remember { mutableStateOf<PendingCreateWorktree?>(null) }
 
     LaunchedEffect(pendingCreateWorktree?.repoRootPath) {
@@ -55,7 +54,6 @@ internal fun WorktreePanel(
 
     WorktreeDialogHost(
         state = WorktreeDialogState(
-            pendingArchive = pendingArchive,
             pendingCreateWorktree = pendingCreateWorktree,
             existingBranchDiscovery = state.existingBranchDiscovery,
             useUnrelatedExistingBranchConfirmationRequest = state.useUnrelatedExistingBranchConfirmationRequest,
@@ -63,11 +61,7 @@ internal fun WorktreePanel(
             forceArchiveRequest = state.forceArchiveRequest,
         ),
         actions = WorktreeDialogActions(
-            onPendingArchiveChange = { pendingArchive = it },
             onPendingCreateWorktreeChange = { pendingCreateWorktree = it },
-            onArchiveWorktree = { archive ->
-                actions.worktrees.onArchiveWorktree(archive.repoRootPath, archive.worktreePath)
-            },
             onCreateWorktree = { request ->
                 submitCreateWorktreeDialog(request, actions.worktrees.onCreateWorktree)
             },
@@ -83,7 +77,6 @@ internal fun WorktreePanel(
     WorktreePanelContent(
         state = state,
         actions = actions,
-        onArchiveRequest = { pendingArchive = it },
         onCreateRequest = { pendingCreateWorktree = it },
         modifier = modifier,
     )
@@ -93,7 +86,6 @@ internal fun WorktreePanel(
 private fun WorktreePanelContent(
     state: WorktreePanelState,
     actions: WorktreePanelActions,
-    onArchiveRequest: (PendingArchive) -> Unit,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -102,7 +94,6 @@ private fun WorktreePanelContent(
         WorktreeRepositoryList(
             state = state,
             actions = actions,
-            onArchiveRequest = onArchiveRequest,
             onCreateRequest = onCreateRequest,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         )
@@ -125,7 +116,6 @@ private fun WorktreePanelToolbar(onAddRepository: () -> Unit) {
 private fun WorktreeRepositoryList(
     state: WorktreePanelState,
     actions: WorktreePanelActions,
-    onArchiveRequest: (PendingArchive) -> Unit,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -140,13 +130,13 @@ private fun WorktreeRepositoryList(
                             repository = repository,
                             setupStatuses = state.setupStatuses,
                             archivingWorktreePaths = state.archivingWorktreePaths,
+                            queuedArchiveWorktreePaths = state.queuedArchiveWorktreePaths,
                             updatingWorktreePaths = state.updatingWorktreePaths,
                             rebasingWorktreePaths = state.rebasingWorktreePaths,
                             mergingWorktreePaths = state.mergingWorktreePaths,
                             authoredOpenPullRequests = state.authoredOpenPullRequests,
                         ),
                         panelActions = actions,
-                        onArchiveRequest = onArchiveRequest,
                         onCreateRequest = onCreateRequest,
                     )
                 }

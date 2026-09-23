@@ -5,10 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -29,7 +25,6 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.sharedProgressPullRequest
@@ -135,7 +130,6 @@ class WorktreeWorktreeRowsTest {
                         ),
                     ),
                     panelActions = panelActions,
-                    onArchiveRequest = {},
                     onCreateRequest = {},
                 )
             }
@@ -219,11 +213,10 @@ class WorktreeWorktreeRowsTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun compactArchiveShortcutContinuesDirtyWorktreeConfirmationFlow() = runComposeUiTest {
+    fun compactArchiveShortcutQueuesWithoutConfirmation() = runComposeUiTest {
         val archiveRequests = mutableListOf<Pair<String, String>>()
+        val emptyActions = emptyPanelActions()
         setContent {
-            var forceArchiveRequest by remember { mutableStateOf<ForceArchiveWorktreeUiState?>(null) }
-            val emptyActions = emptyPanelActions()
             MaterialTheme {
                 WorktreePanel(
                     state = WorktreePanelState(
@@ -234,14 +227,13 @@ class WorktreeWorktreeRowsTest {
                                 isExpanded = true,
                                 worktrees = listOf(
                                     LocalWorktreeUiState(
-                                        branch = "feature/dirty",
-                                        path = "/repos/dev-lake-utils-feature-dirty",
-                                        isDirty = true,
+                                        branch = "feature/login",
+                                        path = "/repos/dev-lake-utils-feature-login",
                                     ),
                                 ),
                             ),
                         ),
-                        forceArchiveRequest = forceArchiveRequest,
+                        forceArchiveRequest = null,
                         setupStatuses = emptyMap(),
                         archivingWorktreePaths = emptySet(),
                     ),
@@ -249,7 +241,6 @@ class WorktreeWorktreeRowsTest {
                         worktrees = emptyActions.worktrees.copy(
                             onArchiveWorktree = { repoRootPath, worktreePath ->
                                 archiveRequests += repoRootPath to worktreePath
-                                forceArchiveRequest = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
                             },
                         ),
                     ),
@@ -257,15 +248,60 @@ class WorktreeWorktreeRowsTest {
             }
         }
 
-        onNodeWithContentDescription("Archive worktree feature/dirty").performClick()
-        onNodeWithText("Archive Worktree").assertIsDisplayed()
+        onNodeWithContentDescription("Archive worktree feature/login").performClick()
+
+        assertEquals(
+            listOf("/repos/dev-lake-utils" to "/repos/dev-lake-utils-feature-login"),
+            archiveRequests,
+        )
+        onAllNodesWithText("Archive Worktree").assertCountEquals(0)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun actionMenuArchiveQueuesWithoutConfirmation() = runComposeUiTest {
+        val archiveRequests = mutableListOf<Pair<String, String>>()
+        val emptyActions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                WorktreePanel(
+                    state = WorktreePanelState(
+                        localRepositories = listOf(
+                            LocalRepositoryUiState(
+                                name = "dev-lake-utils",
+                                path = "/repos/dev-lake-utils",
+                                isExpanded = true,
+                                worktrees = listOf(
+                                    LocalWorktreeUiState(
+                                        branch = "feature/login",
+                                        path = "/repos/dev-lake-utils-feature-login",
+                                    ),
+                                ),
+                            ),
+                        ),
+                        forceArchiveRequest = null,
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                    ),
+                    actions = emptyActions.copy(
+                        worktrees = emptyActions.worktrees.copy(
+                            onArchiveWorktree = { repoRootPath, worktreePath ->
+                                archiveRequests += repoRootPath to worktreePath
+                            },
+                        ),
+                    ),
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
         onNodeWithText("Archive").performClick()
 
         assertEquals(
-            listOf("/repos/dev-lake-utils" to "/repos/dev-lake-utils-feature-dirty"),
+            listOf("/repos/dev-lake-utils" to "/repos/dev-lake-utils-feature-login"),
             archiveRequests,
         )
-        onNodeWithText("Force Archive Worktree").assertIsDisplayed()
+        onAllNodesWithText("Archive Worktree").assertCountEquals(0)
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -341,7 +377,6 @@ class WorktreeWorktreeRowsTest {
                         updatingWorktreePaths = setOf("/repos/dev-lake-utils"),
                     ),
                     panelActions = emptyPanelActions(),
-                    onArchiveRequest = {},
                     onCreateRequest = {},
                 )
             }
@@ -396,7 +431,7 @@ class WorktreeWorktreeRowsTest {
             rightClick(position = Offset(1f, center.y))
         }
 
-        listOf("Open", "Create worktree", "Rebase onto parent", "Merge parent into worktree", "Archive")
+        listOf("Open", "Create worktree", "Rebase onto main", "Merge main into worktree", "Archive")
             .forEach { label ->
                 onNodeWithText(label).assertIsDisplayed().assertIsEnabled()
             }
@@ -425,7 +460,7 @@ class WorktreeWorktreeRowsTest {
 
         onNodeWithTag("worktree-row-feature/login").performMouseInput { rightClick() }
 
-        listOf("Open", "Create worktree", "Rebase onto parent", "Merge parent into worktree", "Archive")
+        listOf("Open", "Create worktree", "Rebase onto main", "Merge main into worktree", "Archive")
             .forEach { label ->
                 onNodeWithText(label).assertIsDisplayed().assertIsNotEnabled()
             }
@@ -455,7 +490,7 @@ class WorktreeWorktreeRowsTest {
 
         onNodeWithTag("worktree-row-main").performMouseInput { rightClick() }
 
-        listOf("Open", "Create worktree", "Rebase onto parent", "Merge parent into worktree", "Archive")
+        listOf("Open", "Create worktree", "Rebase onto develop", "Merge develop into worktree", "Archive")
             .forEach { label ->
                 onNodeWithText(label).assertIsDisplayed().assertIsNotEnabled()
             }

@@ -54,7 +54,6 @@ class WorktreeRepositoryRowsTest {
                         ),
                     ),
                     panelActions = emptyPanelActions(),
-                    onArchiveRequest = {},
                     onCreateRequest = {},
                 )
             }
@@ -98,7 +97,6 @@ class WorktreeRepositoryRowsTest {
                             onMergeOntoParent = { _, _, _ -> unexpectedRequests += "merge" },
                         ),
                     ),
-                    onArchiveRequest = {},
                     onCreateRequest = {},
                 )
             }
@@ -111,6 +109,204 @@ class WorktreeRepositoryRowsTest {
             updateRequests,
         )
         assertEquals(emptyList(), unexpectedRequests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun parentlessBranchUpdateRoutesDefaultIntegrationTargetToAutomaticUpdate() = runComposeUiTest {
+        val updateRequests = mutableListOf<Triple<String, String, String>>()
+        val unexpectedRequests = mutableListOf<String>()
+        val emptyActions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "widgets",
+                            path = "/repos/widgets",
+                            isExpanded = true,
+                            worktrees = listOf(
+                                LocalWorktreeUiState(
+                                    branch = "feature/login",
+                                    path = "/repos/widgets-feature-login",
+                                    integrationTargetBranch = "main",
+                                ),
+                            ),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                    ),
+                    panelActions = emptyActions.copy(
+                        worktrees = emptyActions.worktrees.copy(
+                            onUpdateFromOrigin = { _, _, _ -> unexpectedRequests += "origin update" },
+                            onUpdateFromParent = { repositoryPath, worktreePath, integrationTargetBranch ->
+                                updateRequests += Triple(repositoryPath, worktreePath, integrationTargetBranch)
+                            },
+                            onRebaseOntoParent = { _, _, _ -> unexpectedRequests += "rebase" },
+                            onMergeOntoParent = { _, _, _ -> unexpectedRequests += "merge" },
+                        ),
+                    ),
+                    onCreateRequest = {},
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Update feature/login from base main").performClick()
+
+        assertEquals(
+            listOf(Triple("/repos/widgets", "/repos/widgets-feature-login", "main")),
+            updateRequests,
+        )
+        assertEquals(emptyList(), unexpectedRequests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun parentlessBranchRebaseRoutesDefaultIntegrationTargetOnlyToRebase() = runComposeUiTest {
+        val rebaseRequests = mutableListOf<Triple<String, String, String>>()
+        val unexpectedRequests = mutableListOf<String>()
+        val emptyActions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "legacy-api",
+                            path = "/repos/legacy-api",
+                            isExpanded = true,
+                            worktrees = listOf(
+                                LocalWorktreeUiState(
+                                    branch = "feature/audit",
+                                    path = "/repos/legacy-api-feature-audit",
+                                    integrationTargetBranch = "master",
+                                ),
+                            ),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                    ),
+                    panelActions = emptyActions.copy(
+                        worktrees = emptyActions.worktrees.copy(
+                            onUpdateFromOrigin = { _, _, _ -> unexpectedRequests += "origin update" },
+                            onUpdateFromParent = { _, _, _ -> unexpectedRequests += "automatic update" },
+                            onRebaseOntoParent = { repositoryPath, worktreePath, integrationTargetBranch ->
+                                rebaseRequests += Triple(repositoryPath, worktreePath, integrationTargetBranch)
+                            },
+                            onMergeOntoParent = { _, _, _ -> unexpectedRequests += "merge" },
+                        ),
+                    ),
+                    onCreateRequest = {},
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Worktree actions for feature/audit").performClick()
+        onNodeWithText("Rebase onto master").performClick()
+
+        assertEquals(
+            listOf(Triple("/repos/legacy-api", "/repos/legacy-api-feature-audit", "master")),
+            rebaseRequests,
+        )
+        assertEquals(emptyList(), unexpectedRequests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun parentlessBranchMergeRoutesDefaultIntegrationTargetOnlyToMerge() = runComposeUiTest {
+        val mergeRequests = mutableListOf<Triple<String, String, String>>()
+        val unexpectedRequests = mutableListOf<String>()
+        val emptyActions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "widgets",
+                            path = "/repos/widgets",
+                            isExpanded = true,
+                            worktrees = listOf(
+                                LocalWorktreeUiState(
+                                    branch = "feature/login",
+                                    path = "/repos/widgets-feature-login",
+                                    integrationTargetBranch = "main",
+                                ),
+                            ),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                    ),
+                    panelActions = emptyActions.copy(
+                        worktrees = emptyActions.worktrees.copy(
+                            onUpdateFromOrigin = { _, _, _ -> unexpectedRequests += "origin update" },
+                            onUpdateFromParent = { _, _, _ -> unexpectedRequests += "automatic update" },
+                            onRebaseOntoParent = { _, _, _ -> unexpectedRequests += "rebase" },
+                            onMergeOntoParent = { repositoryPath, worktreePath, integrationTargetBranch ->
+                                mergeRequests += Triple(repositoryPath, worktreePath, integrationTargetBranch)
+                            },
+                        ),
+                    ),
+                    onCreateRequest = {},
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
+        onNodeWithText("Merge main into worktree").performClick()
+
+        assertEquals(
+            listOf(Triple("/repos/widgets", "/repos/widgets-feature-login", "main")),
+            mergeRequests,
+        )
+        assertEquals(emptyList(), unexpectedRequests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun inferredStackedParentRemainsTheMergeTarget() = runComposeUiTest {
+        val mergeRequests = mutableListOf<Triple<String, String, String>>()
+        val emptyActions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "widgets",
+                            path = "/repos/widgets",
+                            isExpanded = true,
+                            worktrees = listOf(
+                                LocalWorktreeUiState(
+                                    branch = "feature/base",
+                                    path = "/repos/widgets-feature-base",
+                                ),
+                                LocalWorktreeUiState(
+                                    branch = "feature/stacked",
+                                    path = "/repos/widgets-feature-stacked",
+                                    parentBranch = "feature/base",
+                                ),
+                            ),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                    ),
+                    panelActions = emptyActions.copy(
+                        worktrees = emptyActions.worktrees.copy(
+                            onMergeOntoParent = { repositoryPath, worktreePath, integrationTargetBranch ->
+                                mergeRequests += Triple(repositoryPath, worktreePath, integrationTargetBranch)
+                            },
+                        ),
+                    ),
+                    onCreateRequest = {},
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Worktree actions for feature/stacked").performClick()
+        onNodeWithText("Merge feature/base into worktree").performClick()
+
+        assertEquals(
+            listOf(Triple("/repos/widgets", "/repos/widgets-feature-stacked", "feature/base")),
+            mergeRequests,
+        )
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -149,7 +345,6 @@ class WorktreeRepositoryRowsTest {
                             onMergeOntoParent = { _, _, _ -> unexpectedRequests += "merge" },
                         ),
                     ),
-                    onArchiveRequest = {},
                     onCreateRequest = {},
                 )
             }
@@ -180,7 +375,6 @@ class WorktreeRepositoryRowsTest {
                         archivingWorktreePaths = emptySet(),
                     ),
                     panelActions = emptyPanelActions(),
-                    onArchiveRequest = {},
                     onCreateRequest = {},
                 )
             }
@@ -307,7 +501,6 @@ class WorktreeRepositoryRowsTest {
                     archivingWorktreePaths = emptySet(),
                 ),
                 panelActions = emptyPanelActions().copy(onToggleRepository = onToggleRepository),
-                onArchiveRequest = {},
                 onCreateRequest = {},
             )
         }

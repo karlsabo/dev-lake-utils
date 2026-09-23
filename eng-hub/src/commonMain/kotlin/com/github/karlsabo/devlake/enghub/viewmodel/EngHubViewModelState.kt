@@ -13,6 +13,7 @@ import com.github.karlsabo.git.WorktreeSetupHandle
 import com.github.karlsabo.git.WorktreeSetupStatus
 import com.github.karlsabo.github.GitHubRepositoryIdentity
 import com.github.karlsabo.notifications.NotificationIgnoreStore
+import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -133,6 +134,7 @@ internal class EngHubViewModelState(
         MutableStateFlow<List<WorktreeConflictResolutionRequest>>(emptyList())
     val localWorktreeMutationGuard = LocalWorktreeMutationGuard()
     val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
+    val queuedWorktreeArchives = MutableStateFlow<List<WorktreeArchiveJob>>(emptyList())
     val integratingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val updatingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val rebasingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
