@@ -11,6 +11,7 @@ data class WorktreeArchiveJob(
     val repositoryRootPath: String,
     val worktreePath: String,
     val branch: String,
+    val queueId: String,
     val state: WorktreeArchiveLifecycleState,
     val queuedAtEpochMs: Long,
     val stateUpdatedAtEpochMs: Long,
@@ -23,6 +24,13 @@ interface WorktreeArchiveStore {
 
     fun saveJob(job: WorktreeArchiveJob)
 
-    /** Deletes the job only while it is still cancelable. */
-    fun deleteQueuedJob(worktreePath: String): Boolean
+    /** Claims the identified queued job for removal. Returns false if it was canceled, replaced, or already claimed. */
+    fun transitionQueuedJobToRemoving(
+        worktreePath: String,
+        queueId: String,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean
+
+    /** Deletes only the identified job while it is still cancelable. */
+    fun deleteQueuedJob(worktreePath: String, queueId: String): Boolean
 }

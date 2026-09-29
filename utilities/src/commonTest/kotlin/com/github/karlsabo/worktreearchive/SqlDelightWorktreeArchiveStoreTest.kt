@@ -32,6 +32,51 @@ class SqlDelightWorktreeArchiveStoreTest {
     }
 
     @Test
+    fun queuedJobIsAtomicallyClaimedForRemovalOnce() {
+        val testDirectory = createTestDirectory()
+        val databasePath = Path(testDirectory, "archive.db").toString()
+        val queued = queuedJob("/repos/widgets-feature-login", "feature/login", 1_000)
+
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(queued)
+
+            assertTrue(store.transitionQueuedJobToRemoving(queued.worktreePath, queued.queueId, 61_000))
+            assertFalse(store.transitionQueuedJobToRemoving(queued.worktreePath, queued.queueId, 62_000))
+            assertEquals(
+                listOf(
+                    queued.copy(
+                        state = WorktreeArchiveLifecycleState.REMOVING,
+                        stateUpdatedAtEpochMs = 61_000,
+                    ),
+                ),
+                store.listJobs(),
+            )
+        } finally {
+            deleteRecursively(testDirectory)
+        }
+    }
+
+    @Test
+    fun staleClaimDoesNotTransitionReplacementJob() {
+        val testDirectory = createTestDirectory()
+        val databasePath = Path(testDirectory, "archive.db").toString()
+        val original = queuedJob("/repos/widgets-feature-login", "feature/login", 1_000)
+        val replacement = original.copy(queueId = "replacement")
+
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(original)
+            store.saveJob(replacement)
+
+            assertFalse(store.transitionQueuedJobToRemoving(original.worktreePath, original.queueId, 61_000))
+            assertEquals(listOf(replacement), store.listJobs())
+        } finally {
+            deleteRecursively(testDirectory)
+        }
+    }
+
+    @Test
     fun deletingQueuedJobRemovesItsPersistedRecord() {
         val testDirectory = createTestDirectory()
         val databasePath = Path(testDirectory, "archive.db").toString()
@@ -41,9 +86,28 @@ class SqlDelightWorktreeArchiveStoreTest {
             val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
             store.saveJob(queued)
 
-            assertTrue(store.deleteQueuedJob(queued.worktreePath))
+            assertTrue(store.deleteQueuedJob(queued.worktreePath, queued.queueId))
             assertEquals(emptyList(), store.listJobs())
-            assertFalse(store.deleteQueuedJob(queued.worktreePath))
+            assertFalse(store.deleteQueuedJob(queued.worktreePath, queued.queueId))
+        } finally {
+            deleteRecursively(testDirectory)
+        }
+    }
+
+    @Test
+    fun staleUndoDoesNotDeleteReplacementJob() {
+        val testDirectory = createTestDirectory()
+        val databasePath = Path(testDirectory, "archive.db").toString()
+        val original = queuedJob("/repos/widgets-feature-login", "feature/login", 1_000)
+        val replacement = original.copy(queueId = "replacement")
+
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(original)
+            store.saveJob(replacement)
+
+            assertFalse(store.deleteQueuedJob(original.worktreePath, original.queueId))
+            assertEquals(listOf(replacement), store.listJobs())
         } finally {
             deleteRecursively(testDirectory)
         }
@@ -62,7 +126,7 @@ class SqlDelightWorktreeArchiveStoreTest {
             val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
             store.saveJob(removing)
 
-            assertFalse(store.deleteQueuedJob(removing.worktreePath))
+            assertFalse(store.deleteQueuedJob(removing.worktreePath, removing.queueId))
             assertEquals(listOf(removing), store.listJobs())
         } finally {
             deleteRecursively(testDirectory)
@@ -99,6 +163,7 @@ private fun queuedJob(
     repositoryRootPath = "/repos/widgets",
     worktreePath = path,
     branch = branch,
+    queueId = "queue-$queuedAt",
     state = WorktreeArchiveLifecycleState.QUEUED,
     queuedAtEpochMs = queuedAt,
     stateUpdatedAtEpochMs = queuedAt,

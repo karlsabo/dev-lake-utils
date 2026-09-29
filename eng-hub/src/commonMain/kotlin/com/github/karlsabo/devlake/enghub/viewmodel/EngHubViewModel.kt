@@ -15,6 +15,7 @@ import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import com.github.karlsabo.worktreearchive.WorktreeArchiveStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,7 @@ internal data class ConfiguredRepositoryStartup(
 internal data class WorktreeArchiveDependencies(
     val store: WorktreeArchiveStore,
     val delay: kotlin.time.Duration = DEFAULT_WORKTREE_ARCHIVE_DELAY,
+    val waitForDeadline: suspend (kotlin.time.Duration) -> Unit = { delay(it) },
     val now: () -> kotlin.time.Instant = kotlin.time.Clock.System::now,
 )
 
@@ -125,10 +127,9 @@ class EngHubViewModel internal constructor(
     private val archiveController = LocalWorktreeArchiveController(
         viewModel = this,
         state = state,
-        archiveStore = persistenceDependencies.worktreeArchive.store,
+        gitWorktreeApi = worktreeServices.gitWorktreeApi,
+        archive = persistenceDependencies.worktreeArchive,
         errorReporter = errorReporter,
-        archiveDelay = persistenceDependencies.worktreeArchive.delay,
-        now = archiveNow,
     )
     private val rebaseController = LocalWorktreeRebaseController(
         viewModel = this,

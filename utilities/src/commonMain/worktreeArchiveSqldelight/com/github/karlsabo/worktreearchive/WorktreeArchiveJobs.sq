@@ -2,6 +2,7 @@ CREATE TABLE worktree_archive_jobs (
   worktree_path TEXT NOT NULL PRIMARY KEY,
   repository_root_path TEXT NOT NULL,
   branch TEXT NOT NULL,
+  queue_id TEXT NOT NULL,
   lifecycle_state TEXT NOT NULL,
   queued_at_epoch_ms INTEGER NOT NULL,
   state_updated_at_epoch_ms INTEGER NOT NULL,
@@ -14,6 +15,7 @@ SELECT
   worktree_path,
   repository_root_path,
   branch,
+  queue_id,
   lifecycle_state,
   queued_at_epoch_ms,
   state_updated_at_epoch_ms,
@@ -27,17 +29,23 @@ INSERT OR REPLACE INTO worktree_archive_jobs(
   worktree_path,
   repository_root_path,
   branch,
+  queue_id,
   lifecycle_state,
   queued_at_epoch_ms,
   state_updated_at_epoch_ms,
   deadline_at_epoch_ms,
   error_message
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+transitionQueuedJobToRemoving:
+UPDATE worktree_archive_jobs
+SET lifecycle_state = 'REMOVING', state_updated_at_epoch_ms = ?, error_message = NULL
+WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'QUEUED';
 
 deleteQueuedJob:
 DELETE FROM worktree_archive_jobs
-WHERE worktree_path = ? AND lifecycle_state = 'QUEUED';
+WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'QUEUED';
 
 changedRowCount:
 SELECT changes();

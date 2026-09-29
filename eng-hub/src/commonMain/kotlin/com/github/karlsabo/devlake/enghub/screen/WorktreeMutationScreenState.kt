@@ -8,6 +8,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
+import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlinx.coroutines.delay
 
 private const val COUNTDOWN_REFRESH_INTERVAL_MS = 1_000L
@@ -68,5 +69,6 @@ private fun WorktreeArchiveJob.toArchiveBinEntry(nowEpochMs: Long): WorktreeArch
         branch = branch,
         remainingSeconds = ((deadlineAtEpochMs - nowEpochMs).coerceAtLeast(0) + 999) / 1_000,
         worktreePath = worktreePath,
+        isRemoving = state == WorktreeArchiveLifecycleState.REMOVING,
     )
 }

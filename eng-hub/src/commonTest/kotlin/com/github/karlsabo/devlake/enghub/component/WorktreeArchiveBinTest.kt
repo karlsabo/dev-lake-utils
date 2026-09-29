@@ -3,9 +3,11 @@ package com.github.karlsabo.devlake.enghub.component
 import androidx.compose.material.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,6 +48,32 @@ class WorktreeArchiveBinTest {
         onNodeWithText("widgets").assertIsDisplayed()
         onNodeWithText("feature/login").assertIsDisplayed()
         onNodeWithText("60 seconds remaining").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun removingBinEntryDisablesUndoAndExplainsWhy() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                WorktreeArchiveBin(
+                    entries = listOf(
+                        WorktreeArchiveBinEntry(
+                            repository = "widgets",
+                            branch = "feature/login",
+                            remainingSeconds = 0,
+                            worktreePath = "/repos/widgets-feature-login",
+                            isRemoving = true,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Being removed").assertIsDisplayed()
+        onNodeWithText("Undo").assertIsNotEnabled().performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(1_000)
+        onNodeWithText("This worktree is being removed and can no longer be canceled.").assertIsDisplayed()
     }
 
     @OptIn(ExperimentalTestApi::class)

@@ -117,6 +117,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 
 ### 3. Start removal when the 60-second deadline expires
 
+**Status:** Done
+
 **Acceptance criteria:** Given queued `feature/login` reaches its deadline, when its timer expires, then its persisted state atomically changes to `Removing`, `GitWorktreeApi.archiveWorktree` starts exactly once, Undo is disabled, the bin displays `Being removed`, and hovering the disabled action shows `This worktree is being removed and can no longer be canceled.`
 
 **Expected edits:** `viewmodel/LocalWorktreeArchiveController.kt`, `EngHubViewModelState.kt`, `EngHubViewModel.kt`, `component/WorktreeArchiveBin.kt`, archive-store compare-and-set/update operations in `utilities/src/commonMain/kotlin/com/github/karlsabo/worktreearchive/` and `WorktreeArchiveJobs.sq`, plus `viewmodel/EngHubLocalWorktreeArchiveViewModelTest.kt` and archive-bin Compose tests.

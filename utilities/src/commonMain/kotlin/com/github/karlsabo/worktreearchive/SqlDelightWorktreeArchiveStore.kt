@@ -19,6 +19,7 @@ class SqlDelightWorktreeArchiveStore(
             worktreePath,
             repositoryRootPath,
             branch,
+            queueId,
             lifecycleState,
             queuedAtEpochMs,
             stateUpdatedAtEpochMs,
@@ -29,6 +30,7 @@ class SqlDelightWorktreeArchiveStore(
             repositoryRootPath = repositoryRootPath,
             worktreePath = worktreePath,
             branch = branch,
+            queueId = queueId,
             state = WorktreeArchiveLifecycleState.valueOf(lifecycleState),
             queuedAtEpochMs = queuedAtEpochMs,
             stateUpdatedAtEpochMs = stateUpdatedAtEpochMs,
@@ -42,6 +44,7 @@ class SqlDelightWorktreeArchiveStore(
             worktree_path = job.worktreePath,
             repository_root_path = job.repositoryRootPath,
             branch = job.branch,
+            queue_id = job.queueId,
             lifecycle_state = job.state.name,
             queued_at_epoch_ms = job.queuedAtEpochMs,
             state_updated_at_epoch_ms = job.stateUpdatedAtEpochMs,
@@ -50,8 +53,17 @@ class SqlDelightWorktreeArchiveStore(
         )
     }
 
-    override fun deleteQueuedJob(worktreePath: String): Boolean = queries.transactionWithResult {
-        queries.deleteQueuedJob(worktreePath)
+    override fun transitionQueuedJobToRemoving(
+        worktreePath: String,
+        queueId: String,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = queries.transactionWithResult {
+        queries.transitionQueuedJobToRemoving(stateUpdatedAtEpochMs, worktreePath, queueId)
+        queries.changedRowCount().executeAsOne() > 0
+    }
+
+    override fun deleteQueuedJob(worktreePath: String, queueId: String): Boolean = queries.transactionWithResult {
+        queries.deleteQueuedJob(worktreePath, queueId)
         queries.changedRowCount().executeAsOne() > 0
     }
 }

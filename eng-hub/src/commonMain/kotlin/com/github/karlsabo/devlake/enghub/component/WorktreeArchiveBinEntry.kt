@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
@@ -26,6 +29,7 @@ internal data class WorktreeArchiveBinEntry(
     val branch: String,
     val remainingSeconds: Long,
     val worktreePath: String,
+    val isRemoving: Boolean = false,
 )
 
 @Composable
@@ -65,6 +69,7 @@ internal fun WorktreeArchiveBin(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WorktreeArchiveBinEntryRow(
     entry: WorktreeArchiveBinEntry,
@@ -73,9 +78,27 @@ private fun WorktreeArchiveBinEntryRow(
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text(entry.branch, style = MaterialTheme.typography.body1)
         Text(entry.repository, style = MaterialTheme.typography.caption)
-        Text("${entry.remainingSeconds} seconds remaining", style = MaterialTheme.typography.caption)
-        TextButton(onClick = { onUndo(entry.worktreePath) }) {
-            Text("Undo")
+        if (entry.isRemoving) {
+            Text("Being removed", style = MaterialTheme.typography.caption)
+            TooltipArea(
+                tooltip = {
+                    Surface(elevation = 4.dp) {
+                        Text(
+                            "This worktree is being removed and can no longer be canceled.",
+                            modifier = Modifier.padding(8.dp),
+                        )
+                    }
+                },
+            ) {
+                TextButton(onClick = {}, enabled = false) {
+                    Text("Undo")
+                }
+            }
+        } else {
+            Text("${entry.remainingSeconds} seconds remaining", style = MaterialTheme.typography.caption)
+            TextButton(onClick = { onUndo(entry.worktreePath) }) {
+                Text("Undo")
+            }
         }
     }
 }

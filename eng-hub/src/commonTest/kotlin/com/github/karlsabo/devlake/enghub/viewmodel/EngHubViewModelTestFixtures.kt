@@ -47,6 +47,7 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlin.random.Random
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
@@ -275,6 +276,8 @@ data class LocalRepositoryViewModelServices(
     val gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()),
     val worktreeSetupCoordinator: WorktreeSetupCoordinator? = null,
     val worktreeArchiveStore: WorktreeArchiveStore = RecordingWorktreeArchiveStore(),
+    val archiveDelay: Duration = DEFAULT_WORKTREE_ARCHIVE_DELAY,
+    val waitForArchiveDeadline: suspend (Duration) -> Unit = { delay(it) },
     val archiveNow: () -> Instant = Clock.System::now,
 )
 
@@ -308,6 +311,8 @@ fun createLocalRepositoryViewModel(
         notificationIgnoreStore = NoOpNotificationIgnoreStore(),
         worktreeArchive = WorktreeArchiveDependencies(
             store = services.worktreeArchiveStore,
+            delay = services.archiveDelay,
+            waitForDeadline = services.waitForArchiveDeadline,
             now = services.archiveNow,
         ),
     ),
@@ -850,7 +855,11 @@ class RecordingWorktreeArchiveStore(
     private val saveFailure: RuntimeException? = null,
 ) : WorktreeArchiveStore {
     val jobs = MutableStateFlow<List<WorktreeArchiveJob>>(emptyList())
+    val transitionToRemovingCalls = MutableStateFlow<List<String>>(emptyList())
+    var transitionFailure: RuntimeException? = null
     val deleteQueuedJobCalls = MutableStateFlow<List<String>>(emptyList())
+    val deleteQueuedJobResults = MutableStateFlow<List<Boolean>>(emptyList())
+    var beforeDeleteQueuedJob: (String, String) -> Unit = { _, _ -> }
 
     override fun listJobs(): List<WorktreeArchiveJob> = jobs.value
 
@@ -859,15 +868,55 @@ class RecordingWorktreeArchiveStore(
         jobs.update { existing -> existing.filterNot { it.worktreePath == job.worktreePath } + job }
     }
 
-    override fun deleteQueuedJob(worktreePath: String): Boolean {
+    override fun transitionQueuedJobToRemoving(
+        worktreePath: String,
+        queueId: String,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean {
+        transitionToRemovingCalls.update { it + worktreePath }
+        transitionFailure?.let { failure ->
+            transitionFailure = null
+            throw failure
+        }
+        while (true) {
+            val existing = jobs.value
+            val queuedJob = existing.firstOrNull { job ->
+                job.worktreePath == worktreePath &&
+                    job.queueId == queueId &&
+                    job.state == WorktreeArchiveLifecycleState.QUEUED
+            } ?: return false
+            val updated = existing.map { job ->
+                if (job === queuedJob) {
+                    job.copy(
+                        state = WorktreeArchiveLifecycleState.REMOVING,
+                        stateUpdatedAtEpochMs = stateUpdatedAtEpochMs,
+                        errorMessage = null,
+                    )
+                } else {
+                    job
+                }
+            }
+            if (jobs.compareAndSet(existing, updated)) return true
+        }
+    }
+
+    override fun deleteQueuedJob(worktreePath: String, queueId: String): Boolean {
         deleteQueuedJobCalls.update { it + worktreePath }
+        beforeDeleteQueuedJob(worktreePath, queueId)
         while (true) {
             val existing = jobs.value
             val updated = existing.filterNot { job ->
-                job.worktreePath == worktreePath && job.state == WorktreeArchiveLifecycleState.QUEUED
+                job.worktreePath == worktreePath && job.queueId == queueId &&
+                    job.state == WorktreeArchiveLifecycleState.QUEUED
             }
-            if (updated.size == existing.size) return false
-            if (jobs.compareAndSet(existing, updated)) return true
+            if (updated.size == existing.size) {
+                deleteQueuedJobResults.update { it + false }
+                return false
+            }
+            if (jobs.compareAndSet(existing, updated)) {
+                deleteQueuedJobResults.update { it + true }
+                return true
+            }
         }
     }
 }
