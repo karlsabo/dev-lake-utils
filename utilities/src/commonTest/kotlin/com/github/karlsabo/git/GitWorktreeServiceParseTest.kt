@@ -158,6 +158,44 @@ class GitWorktreeServiceParseTest {
     }
 
     @Test
+    fun worktreeIsDirty_reportsCleanAndDirtyCheckouts() {
+        val fake = FakeGitCommandApi()
+        fake.statusAction = { path ->
+            when (path) {
+                "/tmp/repo" -> ""
+                "/tmp/repo-feature" -> " M README.md"
+                else -> error("Unexpected status path $path")
+            }
+        }
+        val service = GitWorktreeService(fake)
+
+        assertEquals(false, service.worktreeIsDirty("/tmp/repo"))
+        assertEquals(true, service.worktreeIsDirty("/tmp/repo-feature"))
+    }
+
+    @Test
+    fun worktreeIsDirty_statusFailure_isTreatedAsDirty() {
+        val fake = FakeGitCommandApi()
+        fake.statusAction = { path ->
+            when (path) {
+                "/tmp/repo" -> ""
+
+                "/tmp/repo-feature" -> throw GitCommandException(
+                    command = listOf("git", "status"),
+                    exitCode = 128,
+                    gitOutput = "fatal: not a git repository",
+                )
+
+                else -> error("Unexpected status path $path")
+            }
+        }
+        val service = GitWorktreeService(fake)
+
+        assertEquals(false, service.worktreeIsDirty("/tmp/repo"))
+        assertEquals(true, service.worktreeIsDirty("/tmp/repo-feature"))
+    }
+
+    @Test
     fun resolveRepositoryRoot_returnsMainRootForLinkedWorktree() {
         val fake = FakeGitCommandApi()
         fake.revParseAction = { _, args ->

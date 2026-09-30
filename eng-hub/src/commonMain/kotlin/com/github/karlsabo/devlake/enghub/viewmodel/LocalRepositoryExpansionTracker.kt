@@ -24,6 +24,7 @@ internal class LocalRepositoryExpansionTracker(
                         isLoading = true,
                         operationRequest = request,
                         refreshRequest = null,
+                        statusRequest = null,
                     )
                 } else {
                     currentRepository
@@ -42,6 +43,7 @@ internal class LocalRepositoryExpansionTracker(
                         isLoading = false,
                         operationRequest = null,
                         refreshRequest = null,
+                        statusRequest = null,
                     )
                 } else {
                     repository
@@ -64,7 +66,11 @@ internal class LocalRepositoryExpansionTracker(
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
-                    currentRepository.copy(isLoading = false, worktrees = worktrees)
+                    currentRepository.copy(
+                        isLoading = false,
+                        statusRequest = request,
+                        worktrees = worktrees,
+                    )
                 } else {
                     currentRepository
                 }
@@ -90,7 +96,17 @@ internal class LocalRepositoryExpansionTracker(
                     currentRepository.copy(
                         isLoading = false,
                         operationRequest = null,
-                        worktrees = worktrees ?: currentRepository.worktrees,
+                        worktrees = worktrees
+                            // Rows published by this request keep statuses hydrated since publishing;
+                            // a completion without a published base stands on its own.
+                            ?.let { enriched ->
+                                if (currentRepository.statusRequest === request) {
+                                    currentRepository.worktrees.withEnrichmentFrom(enriched)
+                                } else {
+                                    enriched
+                                }
+                            }
+                            ?: currentRepository.worktrees,
                     )
                 } else {
                     currentRepository

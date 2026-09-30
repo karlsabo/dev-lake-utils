@@ -482,6 +482,7 @@ data class AbortMergeCall(
 data class RecordingGitWorktreeApiResponses(
     val worktreesByRepoPath: Map<String, List<Worktree>>? = null,
     val worktreesForRepoPath: ((String) -> List<Worktree>)? = null,
+    val isDirtyForWorktreePath: ((String) -> Boolean)? = null,
     val defaultBranchRefsByRepoPath: Map<String, String?> = emptyMap(),
     val originDefaultBranchesByRepoPath: Map<String, String?> = emptyMap(),
     val existingBranchesByRepoPath: Map<String, List<String>> = emptyMap(),
@@ -559,6 +560,7 @@ class RecordingGitWorktreeApi(
 
     val resolvedPaths = mutableListOf<String>()
     val resolvedEntryPaths = mutableListOf<String>()
+    val worktreeIsDirtyCalls = mutableListOf<String>()
     private val recordedListWorktreeRepoPaths = MutableStateFlow<List<String>>(emptyList())
     val listWorktreeRepoPaths: List<String>
         get() = recordedListWorktreeRepoPaths.value
@@ -654,6 +656,12 @@ class RecordingGitWorktreeApi(
     override fun resolveRepositoryRootEntries(selectedPath: String): RepositoryWorktrees {
         resolvedEntryPaths += selectedPath
         return repositoryWorktreesBySelectedPath.getValue(selectedPath)
+    }
+
+    override fun worktreeIsDirty(worktreePath: String): Boolean {
+        worktreeIsDirtyCalls += worktreePath
+        return responses.isDirtyForWorktreePath?.invoke(worktreePath)
+            ?: error("worktreeIsDirty is not configured for $worktreePath")
     }
 
     override fun listWorktrees(repoPath: String): List<Worktree> {

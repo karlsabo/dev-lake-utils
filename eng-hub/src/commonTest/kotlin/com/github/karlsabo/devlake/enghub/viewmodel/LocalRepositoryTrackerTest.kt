@@ -156,6 +156,113 @@ class LocalRepositoryRefreshTrackerTest {
     }
 }
 
+class LocalWorktreeStatusTrackerTest {
+    @Test
+    fun publishFillsStatusOnlyForTheRowMatchingPathAndBranch() {
+        val state = trackerState()
+        val refreshTracker = LocalRepositoryRefreshTracker(state)
+        val statusTracker = LocalWorktreeStatusTracker(state)
+        val request = assertNotNull(refreshTracker.start(DEV_LAKE_ROOT))
+        assertTrue(
+            refreshTracker.publishDiscovered(
+                DEV_LAKE_ROOT,
+                request,
+                listOf(
+                    worktree("main").copy(path = "$DEV_LAKE_ROOT-main"),
+                    worktree("feature/login").copy(path = DEV_LAKE_SELECTED_WORKTREE),
+                ),
+            ),
+        )
+
+        assertTrue(
+            statusTracker.publish(
+                normalizedRepoRootPath = DEV_LAKE_ROOT,
+                request = request,
+                worktreePath = DEV_LAKE_SELECTED_WORKTREE,
+                branch = "feature/login",
+                isDirty = true,
+            ),
+        )
+
+        val repository = state.localRepositories.value.single()
+        assertEquals(null, repository.worktrees.single { it.branch == "main" }.isDirty)
+        assertEquals(true, repository.worktrees.single { it.branch == "feature/login" }.isDirty)
+
+        // A different branch at the same path must not receive the status.
+        assertTrue(
+            statusTracker.publish(
+                normalizedRepoRootPath = DEV_LAKE_ROOT,
+                request = request,
+                worktreePath = DEV_LAKE_SELECTED_WORKTREE,
+                branch = "feature/logout",
+                isDirty = false,
+            ),
+        )
+        val rowsAfterBranchMismatch = state.localRepositories.value.single().worktrees
+        assertEquals(null, rowsAfterBranchMismatch.singleOrNull { it.branch == "feature/logout" })
+        assertEquals(
+            true,
+            rowsAfterBranchMismatch.single { it.branch == "feature/login" }.isDirty,
+        )
+    }
+
+    @Test
+    fun publishIsDiscardedOnceANewerRequestOwnsTheRows() {
+        val state = trackerState()
+        val refreshTracker = LocalRepositoryRefreshTracker(state)
+        val statusTracker = LocalWorktreeStatusTracker(state)
+        val oldRequest = assertNotNull(refreshTracker.start(DEV_LAKE_ROOT))
+        assertTrue(
+            refreshTracker.publishDiscovered(DEV_LAKE_ROOT, oldRequest, listOf(worktree("feature/login"))),
+        )
+
+        val newRequest = assertNotNull(refreshTracker.start(DEV_LAKE_ROOT))
+        assertTrue(
+            refreshTracker.publishDiscovered(DEV_LAKE_ROOT, newRequest, listOf(worktree("feature/login"))),
+        )
+
+        assertFalse(
+            statusTracker.publish(
+                normalizedRepoRootPath = DEV_LAKE_ROOT,
+                request = oldRequest,
+                worktreePath = "$DEV_LAKE_ROOT/feature/login",
+                branch = "feature/login",
+                isDirty = true,
+            ),
+        )
+        assertEquals(
+            null,
+            state.localRepositories.value.single().worktrees.single().isDirty,
+        )
+    }
+
+    @Test
+    fun publishSurvivesEnrichmentCompletionUntilANewerRequestStarts() {
+        val state = trackerState()
+        val refreshTracker = LocalRepositoryRefreshTracker(state)
+        val statusTracker = LocalWorktreeStatusTracker(state)
+        val request = assertNotNull(refreshTracker.start(DEV_LAKE_ROOT))
+        assertTrue(
+            refreshTracker.publishDiscovered(DEV_LAKE_ROOT, request, listOf(worktree("feature/login"))),
+        )
+        assertTrue(refreshTracker.complete(DEV_LAKE_ROOT, request, listOf(worktree("feature/login"))))
+
+        assertTrue(
+            statusTracker.publish(
+                normalizedRepoRootPath = DEV_LAKE_ROOT,
+                request = request,
+                worktreePath = "$DEV_LAKE_ROOT/feature/login",
+                branch = "feature/login",
+                isDirty = true,
+            ),
+        )
+        assertEquals(
+            true,
+            state.localRepositories.value.single().worktrees.single().isDirty,
+        )
+    }
+}
+
 private fun trackerState(): EngHubViewModelState {
     val api = RecordingGitWorktreeApi()
     val configWriter = RecordingEngHubConfigWriter()

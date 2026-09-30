@@ -226,6 +226,8 @@ private class GitWorktreeDiscoveryService(
 
     override fun listWorktreeEntries(repoPath: String): List<Worktree> = lister.listWorktreeEntries(repoPath)
 
+    override fun worktreeIsDirty(worktreePath: String): Boolean = lister.isWorktreeDirty(worktreePath)
+
     override fun refreshAndListExistingBranches(
         repoPath: String,
     ): RefreshedExistingBranches = existingBranches.refreshAndList(repoPath)
@@ -1087,7 +1089,7 @@ private class GitWorktreeLister(
         return parseWorktreeListPorcelain(output)
     }
 
-    private fun isWorktreeDirty(worktreePath: String): Boolean {
+    fun isWorktreeDirty(worktreePath: String): Boolean {
         val output = try {
             gitCommandApi.status(worktreePath)
         } catch (e: GitCommandException) {
