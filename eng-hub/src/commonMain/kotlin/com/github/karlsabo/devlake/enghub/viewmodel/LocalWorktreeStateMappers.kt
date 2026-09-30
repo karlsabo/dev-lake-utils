@@ -18,12 +18,13 @@ internal fun GitWorktreeApi.toLocalWorktreeUiStates(
 
 internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
     enrichedWorktrees: List<LocalWorktreeUiState>,
+    preserveCheckout: Boolean = false,
 ): List<LocalWorktreeUiState> {
     val visibleBranches = mapTo(mutableSetOf()) { it.branch }
     val enrichmentByPath = enrichedWorktrees.associateBy { it.path.normalizedRepositoryPath() }
     return map { currentWorktree ->
         val enrichedWorktree = enrichmentByPath[currentWorktree.path.normalizedRepositoryPath()]
-            ?.takeIf { it.branch == currentWorktree.branch }
+            ?.takeIf { it.branch == currentWorktree.branch && it.baseCommitHash == currentWorktree.baseCommitHash }
         if (enrichedWorktree == null) {
             currentWorktree
         } else {
@@ -33,6 +34,7 @@ internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
                 needsRebase = parentBranch != null && enrichedWorktree.needsRebase,
                 canUpdateFromOrigin = enrichedWorktree.canUpdateFromOrigin,
                 integrationTargetBranch = enrichedWorktree.integrationTargetBranch,
+                checkout = if (preserveCheckout) enrichedWorktree.checkout else currentWorktree.checkout,
             )
         }
     }
