@@ -1686,7 +1686,7 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
     }
 
     @Test
-    fun refreshPublishingNewRowsDiscardsStatusFromSupersededRefresh() = runBlocking {
+    fun unchangedRefreshAllowsSlowStatusToCompleteBeforeStartingAnotherCheck() = runBlocking {
         val firstStatusStarted = CompletableDeferred<Unit>()
         val releaseFirstStatus = CompletableDeferred<Unit>()
         val secondStatusStarted = CompletableDeferred<Unit>()
@@ -1713,7 +1713,6 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
         }
         assertEquals(null, firstRefreshRepository.worktrees.single().isDirty)
 
-        withTimeout(2_000.milliseconds) { secondStatusStarted.await() }
         val secondRefreshRepository = withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->
                 api.listWorktreeRepoPaths.size >= 2 && repositories.singleOrNull()?.worktrees?.size == 1
@@ -1722,13 +1721,12 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
         assertEquals(null, secondRefreshRepository.worktrees.single().isDirty)
 
         releaseFirstStatus.complete(Unit)
-        delay(100.milliseconds)
-        assertEquals(
-            null,
-            viewModel.localRepositoriesStateFlow.value.single().worktrees.single().isDirty,
-            "status from the superseded refresh must not fill the newer refresh's rows",
-        )
-
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.singleOrNull()?.isDirty == true
+            }
+        }
+        withTimeout(2_000.milliseconds) { secondStatusStarted.await() }
         releaseSecondStatus.complete(Unit)
         val hydratedRepository = withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->

@@ -26,7 +26,7 @@ data class LocalRepositoryUiState(
     val operationRequest: LocalRepositoryWorktreeRequest? = null,
     val refreshRequest: LocalRepositoryWorktreeRequest? = null,
 
-    /** Owns the published rows' asynchronous status hydration; a newer request discards late status results. */
+    /** Enables status hydration; continuous checkout identities permit completion across unchanged refreshes. */
     val statusRequest: LocalRepositoryWorktreeRequest? = null,
     val repositoryIdentity: GitHubRepositoryIdentity? = null,
     val worktrees: List<LocalWorktreeUiState> = emptyList(),
