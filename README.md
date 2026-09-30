@@ -16,6 +16,9 @@
 * [ ] When archiving a worktree, don't prompt, move it into some archiving bucket, delayed by 60 seconds or so, with a cancel archive button.
   * Play a nice animation that moves it into a recycle bin in the bottom right of the screen, then you can click that bin and undo (stop the archive) withing 60 seconds. If archiving already began, grey out the button and have a hover text helper that says it's being removed. If there's a remote branch or some other way to recover it we should support that.
 * [ ] Show the closed PR on worktrees view
+* [ ] Loading worktrees is too slow. Probably when we don't have an internet connection, or it's slow.
+  * We need to load locally, and then add metadata from remote sources in different threads. We want worktrees to show up as fast as possible and then do slow tasks in other threads.
+* [ ] We need an updater. So the software should be able to detect if there's a new version, download it and update itself.
 * [ ] Add a way to create a worktree from a remote branch
 * [ ] Need a quick way to archive worktrees. Branches that aren't mine, branches that have been merged to origin/main or master.
 * [ ] Add a menu pane. So three dots in top left corner that launches a 'window' with a search for all the actions you can take.
