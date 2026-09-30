@@ -19,6 +19,8 @@ internal fun GitWorktreeApi.toLocalWorktreeUiStates(
 internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
     enrichedWorktrees: List<LocalWorktreeUiState>,
     preserveCheckout: Boolean = false,
+    unresolvedOrigin: Boolean = false,
+    unresolvedParents: Set<String> = emptySet(),
 ): List<LocalWorktreeUiState> {
     val visibleBranches = mapTo(mutableSetOf()) { it.branch }
     val enrichmentByPath = enrichedWorktrees.associateBy { it.path.normalizedRepositoryPath() }
@@ -28,13 +30,34 @@ internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
         if (enrichedWorktree == null) {
             currentWorktree
         } else {
-            val parentBranch = enrichedWorktree.parentBranch?.takeIf { it in visibleBranches }
+            val resolvedWorktree = enrichedWorktree.copy(
+                parentBranch = if (currentWorktree.branch in unresolvedParents) {
+                    currentWorktree.parentBranch
+                } else {
+                    enrichedWorktree.parentBranch
+                },
+                needsRebase = if (currentWorktree.branch in unresolvedParents) {
+                    currentWorktree.needsRebase
+                } else {
+                    enrichedWorktree.needsRebase
+                },
+                canUpdateFromOrigin = if (unresolvedOrigin) {
+                    currentWorktree.canUpdateFromOrigin
+                } else {
+                    enrichedWorktree.canUpdateFromOrigin
+                },
+            )
+            val parentBranch = resolvedWorktree.parentBranch?.takeIf {
+                it in visibleBranches && !resolvedWorktree.canUpdateFromOrigin
+            }
             currentWorktree.copy(
                 parentBranch = parentBranch,
-                needsRebase = parentBranch != null && enrichedWorktree.needsRebase,
-                canUpdateFromOrigin = enrichedWorktree.canUpdateFromOrigin,
-                integrationTargetBranch = if (enrichedWorktree.parentBranch != null) {
+                needsRebase = parentBranch != null && resolvedWorktree.needsRebase,
+                canUpdateFromOrigin = resolvedWorktree.canUpdateFromOrigin,
+                integrationTargetBranch = if (resolvedWorktree.parentBranch != null) {
                     parentBranch
+                } else if (unresolvedOrigin) {
+                    currentWorktree.integrationTargetBranch.takeIf { currentWorktree.parentBranch == null }
                 } else {
                     enrichedWorktree.integrationTargetBranch
                 },
@@ -60,13 +83,37 @@ internal fun List<LocalWorktreeUiState>.withWorktreeStatus(
 internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
     repoRootPath: String,
     worktrees: List<LocalWorktreeUiState>,
-): List<LocalWorktreeUiState> {
+): List<LocalWorktreeUiState> = lookupLocalWorktreeEnrichment(repoRootPath, worktrees).worktrees
+
+internal class LocalWorktreeEnrichment(
+    val worktrees: List<LocalWorktreeUiState>,
+    private val unresolvedOrigin: Boolean = false,
+    private val unresolvedParents: Set<String> = emptySet(),
+) {
+    // Resolve fallbacks inside the atomic publication, not against the queued snapshot.
+    fun mergeInto(current: List<LocalWorktreeUiState>): List<LocalWorktreeUiState> = current.withEnrichmentFrom(
+        worktrees,
+        unresolvedOrigin = unresolvedOrigin,
+        unresolvedParents = unresolvedParents,
+    )
+
+    fun retaining(worktrees: List<LocalWorktreeUiState>): LocalWorktreeEnrichment = LocalWorktreeEnrichment(
+        worktrees,
+        unresolvedOrigin,
+        unresolvedParents,
+    )
+}
+
+internal fun GitWorktreeApi.lookupLocalWorktreeEnrichment(
+    repoRootPath: String,
+    worktrees: List<LocalWorktreeUiState>,
+): LocalWorktreeEnrichment {
     val parentOutcomes = inferWorktreeParentBranchOutcomes(repoRootPath)
     val needsRebaseByChildBranch = rebaseNeedsByChildBranch(repoRootPath, parentOutcomes.parents)
     val originLookup = lookupOriginDefaultBranch(repoRootPath)
     val originDefaultBranch = originLookup.getOrNull()
     val visibleBranches = worktrees.mapTo(mutableSetOf()) { it.branch }
-    return worktrees.map { worktree ->
+    val enrichedWorktrees = worktrees.map { worktree ->
         val canUpdateFromOrigin = if (originLookup.isFailure) {
             worktree.canUpdateFromOrigin
         } else {
@@ -94,6 +141,7 @@ internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
             integrationTargetBranch = integrationTargetBranch,
         )
     }
+    return LocalWorktreeEnrichment(enrichedWorktrees, originLookup.isFailure, parentOutcomes.unresolvedBranches)
 }
 
 private fun GitWorktreeApi.rebaseNeedsByChildBranch(

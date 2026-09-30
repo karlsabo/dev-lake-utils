@@ -62,6 +62,21 @@ class LocalWorktreeLookupOutcomesTest {
         assertEquals(current.drop(1), merged.drop(1))
     }
 
+    @Test
+    fun unresolvedLookupsRetainCurrentHierarchyRatherThanQueuedHierarchy() {
+        val enrichment = offlineApi(setOf("child")).lookupLocalWorktreeEnrichment(DEV_LAKE_ROOT, knownRows())
+        val current = knownRows().map {
+            when (it.branch) {
+                "main" -> it.copy(canUpdateFromOrigin = false)
+                "child" -> it.copy(parentBranch = "main", integrationTargetBranch = "main", needsRebase = false)
+                "feature" -> it.copy(integrationTargetBranch = null)
+                else -> it
+            }.copy(isDirty = true)
+        }
+
+        assertEquals(current, enrichment.mergeInto(current))
+    }
+
     private fun offlineApi(
         unresolvedParents: Set<String> = emptySet(),
     ): RecordingGitWorktreeApi = RecordingGitWorktreeApi(

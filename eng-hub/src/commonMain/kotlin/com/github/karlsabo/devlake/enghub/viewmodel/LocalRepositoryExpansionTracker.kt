@@ -82,7 +82,7 @@ internal class LocalRepositoryExpansionTracker(
     fun complete(
         normalizedRepoRootPath: String,
         request: LocalRepositoryWorktreeRequest,
-        worktrees: List<LocalWorktreeUiState>? = null,
+        enrichment: LocalWorktreeEnrichment? = null,
     ): Boolean {
         while (true) {
             val repositories = state.localRepositories.value
@@ -96,14 +96,14 @@ internal class LocalRepositoryExpansionTracker(
                     currentRepository.copy(
                         isLoading = false,
                         operationRequest = null,
-                        worktrees = worktrees
+                        worktrees = enrichment
                             // Rows published by this request keep statuses hydrated since publishing;
                             // a completion without a published base stands on its own.
                             ?.let { enriched ->
                                 if (currentRepository.statusRequest === request) {
-                                    currentRepository.worktrees.withEnrichmentFrom(enriched)
+                                    enriched.mergeInto(currentRepository.worktrees)
                                 } else {
-                                    enriched
+                                    enriched.worktrees
                                 }
                             }
                             ?: currentRepository.worktrees,

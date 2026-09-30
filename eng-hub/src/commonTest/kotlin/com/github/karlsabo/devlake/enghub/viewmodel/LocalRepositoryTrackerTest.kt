@@ -39,11 +39,13 @@ class LocalRepositoryExpansionTrackerTest {
 
         assertFalse(tracker.publishDiscovered(DEV_LAKE_ROOT, oldRequest, listOf(worktree("late-discovery"))))
         assertEquals(collapsed, state.repositorySnapshot())
-        assertFalse(tracker.complete(DEV_LAKE_ROOT, oldRequest, listOf(worktree("late-completion"))))
+        assertFalse(
+            tracker.complete(DEV_LAKE_ROOT, oldRequest, LocalWorktreeEnrichment(listOf(worktree("late-completion")))),
+        )
         assertEquals(collapsed, state.repositorySnapshot())
 
         val newRequest = assertNotNull(tracker.start(DEV_LAKE_ROOT))
-        assertTrue(tracker.complete(DEV_LAKE_ROOT, newRequest, listOf(worktree("current"))))
+        assertTrue(tracker.complete(DEV_LAKE_ROOT, newRequest, LocalWorktreeEnrichment(listOf(worktree("current")))))
         assertEquals(
             RepositorySnapshot(isExpanded = true, isLoading = false, branches = listOf("current")),
             state.repositorySnapshot(),
@@ -60,7 +62,7 @@ class LocalRepositoryExpansionTrackerTest {
 
         val repository = state.repositorySnapshot()
         assertEquals(RepositorySnapshot(isExpanded = true, isLoading = false, branches = listOf("main")), repository)
-        assertTrue(tracker.complete(DEV_LAKE_ROOT, request, listOf(worktree("main"))))
+        assertTrue(tracker.complete(DEV_LAKE_ROOT, request, LocalWorktreeEnrichment(listOf(worktree("main")))))
     }
 
     @Test
@@ -75,11 +77,23 @@ class LocalRepositoryExpansionTrackerTest {
         val refreshing = state.repositorySnapshot()
         assertFalse(expansionTracker.publishDiscovered(DEV_LAKE_ROOT, expansionRequest, listOf(worktree("late"))))
         assertEquals(refreshing, state.repositorySnapshot())
-        assertFalse(expansionTracker.complete(DEV_LAKE_ROOT, expansionRequest, listOf(worktree("late"))))
+        assertFalse(
+            expansionTracker.complete(
+                DEV_LAKE_ROOT,
+                expansionRequest,
+                LocalWorktreeEnrichment(listOf(worktree("late"))),
+            ),
+        )
         assertEquals(refreshing, state.repositorySnapshot())
         assertTrue(refreshTracker.publishDiscovered(DEV_LAKE_ROOT, refreshRequest, listOf(worktree("refresh"))))
         assertEquals(listOf("refresh"), state.repositorySnapshot().branches)
-        assertTrue(refreshTracker.complete(DEV_LAKE_ROOT, refreshRequest, listOf(worktree("refresh"))))
+        assertTrue(
+            refreshTracker.complete(
+                DEV_LAKE_ROOT,
+                refreshRequest,
+                LocalWorktreeEnrichment(listOf(worktree("refresh"))),
+            ),
+        )
         assertEquals(listOf("refresh"), state.repositorySnapshot().branches)
     }
 }
@@ -96,7 +110,7 @@ class LocalRepositoryRefreshTrackerTest {
         val repository = state.localRepositories.value.single()
         assertEquals(false, repository.isLoading)
         assertNotNull(repository.refreshRequest)
-        assertTrue(tracker.complete(DEV_LAKE_ROOT, request, listOf(worktree("main"))))
+        assertTrue(tracker.complete(DEV_LAKE_ROOT, request, LocalWorktreeEnrichment(listOf(worktree("main")))))
         assertNull(state.localRepositories.value.single().refreshRequest)
     }
 
@@ -110,7 +124,9 @@ class LocalRepositoryRefreshTrackerTest {
         val newerRefresh = state.repositorySnapshot()
         assertFalse(tracker.publishDiscovered(DEV_LAKE_ROOT, oldRequest, listOf(worktree("old-discovery"))))
         assertEquals(newerRefresh, state.repositorySnapshot())
-        assertFalse(tracker.complete(DEV_LAKE_ROOT, oldRequest, listOf(worktree("old-complete"))))
+        assertFalse(
+            tracker.complete(DEV_LAKE_ROOT, oldRequest, LocalWorktreeEnrichment(listOf(worktree("old-complete")))),
+        )
         assertEquals(newerRefresh, state.repositorySnapshot())
         assertFalse(tracker.fail(DEV_LAKE_ROOT, oldRequest))
         assertEquals(newerRefresh, state.repositorySnapshot())
@@ -151,7 +167,7 @@ class LocalRepositoryRefreshTrackerTest {
         assertFalse(expansionTracker.publishDiscovered("/missing", unownedRequest, emptyList()))
         assertFalse(expansionTracker.complete("/missing", unownedRequest))
         assertFalse(refreshTracker.publishDiscovered("/missing", unownedRequest, emptyList()))
-        assertFalse(refreshTracker.complete("/missing", unownedRequest, emptyList()))
+        assertFalse(refreshTracker.complete("/missing", unownedRequest, LocalWorktreeEnrichment(emptyList())))
         assertFalse(refreshTracker.fail("/missing", unownedRequest))
     }
 }
@@ -245,7 +261,9 @@ class LocalWorktreeStatusTrackerTest {
         assertTrue(
             refreshTracker.publishDiscovered(DEV_LAKE_ROOT, request, listOf(worktree("feature/login"))),
         )
-        assertTrue(refreshTracker.complete(DEV_LAKE_ROOT, request, listOf(worktree("feature/login"))))
+        assertTrue(
+            refreshTracker.complete(DEV_LAKE_ROOT, request, LocalWorktreeEnrichment(listOf(worktree("feature/login")))),
+        )
 
         assertTrue(
             statusTracker.publish(

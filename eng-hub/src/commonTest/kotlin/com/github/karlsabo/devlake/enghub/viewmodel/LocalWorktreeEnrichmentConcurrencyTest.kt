@@ -52,6 +52,61 @@ class LocalWorktreeEnrichmentConcurrencyTest {
     }
 
     @Test
+    fun queuedFailureRetainsAuthoritativeClearAndResolvedLocalHierarchy() = runTest {
+        val state = enrichmentState()
+        val tracker = LocalRepositoryRefreshTracker(state)
+        val rows = listOf(
+            checkout().copy(canUpdateFromOrigin = true, isDirty = true),
+            checkout().copy(branch = "base", path = "/base", isDirty = false),
+            checkout().copy(branch = "child", path = "/child", isDirty = true),
+            checkout().copy(branch = "feature", path = "/feature", integrationTargetBranch = "main"),
+        )
+        state.localRepositories.value = state.localRepositories.value.map { it.copy(worktrees = rows) }
+        val first = assertNotNull(tracker.start(DEV_LAKE_ROOT))
+        assertTrue(tracker.publishDiscovered(DEV_LAKE_ROOT, first, rows))
+        val firstRows = state.localRepositories.value.single().worktrees
+        val applied = mutableListOf<String>()
+        lateinit var scheduler: LocalWorktreeEnrichmentScheduler
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                originDefaultBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to null),
+                parentBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to mapOf("child" to "base")),
+                branchNeedsRebaseByCall = mapOf(BranchNeedsRebaseCall(DEV_LAKE_ROOT, "base", "child") to true),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onInferOriginDefaultBranch = {
+                    if (applied.isNotEmpty()) error("offline without cached HEAD")
+                    val queued = assertNotNull(tracker.start(DEV_LAKE_ROOT))
+                    assertTrue(tracker.publishDiscovered(DEV_LAKE_ROOT, queued, rows))
+                    val queuedRows = state.localRepositories.value.single().worktrees
+                    assertTrue(queuedRows.first().canUpdateFromOrigin)
+                    scheduler.schedule(DEV_LAKE_ROOT, DEV_LAKE_ROOT, queued, queuedRows) { result ->
+                        assertTrue(tracker.complete(DEV_LAKE_ROOT, queued, result.getOrThrow()))
+                        applied += "failure"
+                    }
+                },
+            ),
+        )
+        scheduler = LocalWorktreeEnrichmentScheduler(backgroundScope, api)
+        scheduler.schedule(DEV_LAKE_ROOT, DEV_LAKE_ROOT, first, firstRows) { result ->
+            assertTrue(tracker.complete(DEV_LAKE_ROOT, first, result.getOrThrow()))
+            assertFalse(state.localRepositories.value.single().worktrees.first().canUpdateFromOrigin)
+            applied += "clear"
+        }
+        runCurrent()
+
+        assertEquals(listOf("clear", "failure"), applied)
+        val current = state.localRepositories.value.single().worktrees
+        assertFalse(current.first().canUpdateFromOrigin)
+        assertEquals(null, current.single { it.branch == "feature" }.integrationTargetBranch)
+        val child = current.single { it.branch == "child" }
+        assertEquals("base", child.parentBranch)
+        assertEquals("base", child.integrationTargetBranch)
+        assertTrue(child.needsRebase)
+        assertEquals(rows.map { it.isDirty }, current.map { it.isDirty })
+    }
+
+    @Test
     fun replacedCheckoutCannotReceiveOldEnrichmentEvenIfOriginalBranchReturns() {
         val state = enrichmentState()
         val tracker = LocalRepositoryRefreshTracker(state)
@@ -63,7 +118,13 @@ class LocalWorktreeEnrichmentConcurrencyTest {
             assertTrue(tracker.publishDiscovered(DEV_LAKE_ROOT, request, listOf(checkout().copy(branch = branch))))
         }
 
-        assertFalse(tracker.complete(DEV_LAKE_ROOT, oldRequest, oldRows.map { it.copy(canUpdateFromOrigin = true) }))
+        assertFalse(
+            tracker.complete(
+                DEV_LAKE_ROOT,
+                oldRequest,
+                LocalWorktreeEnrichment(oldRows.map { it.copy(canUpdateFromOrigin = true) }),
+            ),
+        )
         assertFalse(state.localRepositories.value.single().worktrees.single().canUpdateFromOrigin)
     }
 
@@ -86,7 +147,7 @@ class LocalWorktreeEnrichmentConcurrencyTest {
             ),
         )
 
-        assertTrue(tracker.complete(DEV_LAKE_ROOT, original, oldRows))
+        assertTrue(tracker.complete(DEV_LAKE_ROOT, original, LocalWorktreeEnrichment(oldRows)))
         val current = state.localRepositories.value.single()
         assertTrue(current.worktrees.first().canUpdateFromOrigin)
         assertEquals(true, current.worktrees.first().isDirty)
@@ -94,7 +155,7 @@ class LocalWorktreeEnrichmentConcurrencyTest {
         assertSame(newest, current.refreshRequest)
 
         LocalRepositoryExpansionTracker(state).collapse(DEV_LAKE_ROOT)
-        assertFalse(tracker.complete(DEV_LAKE_ROOT, original, oldRows))
+        assertFalse(tracker.complete(DEV_LAKE_ROOT, original, LocalWorktreeEnrichment(oldRows)))
     }
 
     @Test
