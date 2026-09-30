@@ -509,6 +509,7 @@ data class RecordingGitWorktreeApiCallbacks(
     val onListWorktrees: (String) -> Unit = {},
     val onListWorktreeEntries: (String) -> Unit = {},
     val onInferWorktreeParentBranches: (String) -> Unit = {},
+    val onInferOriginDefaultBranch: (String) -> Unit = {},
     val onArchiveWorktree: (String, String, Boolean) -> Unit = { _, _, _ -> },
     val onCheckoutExistingBranchWorktree: (CheckoutExistingBranchWorktreeCall) -> String = {
         error("Unexpected call")
@@ -578,6 +579,9 @@ class RecordingGitWorktreeApi(
     val createBranchWorktreeCalls = mutableListOf<CreateBranchWorktreeCall>()
     val createBranchWorktreeFromCommitIshCalls = mutableListOf<CreateBranchWorktreeFromCommitIshCall>()
     val inferDefaultBranchRefCalls = mutableListOf<String>()
+    private val recordedInferOriginDefaultBranchRepoPaths = MutableStateFlow<List<String>>(emptyList())
+    val inferOriginDefaultBranchRepoPaths: List<String>
+        get() = recordedInferOriginDefaultBranchRepoPaths.value
     val branchNeedsRebaseCalls = mutableListOf<BranchNeedsRebaseCall>()
     val updateWorktreeFromOriginCalls = mutableListOf<UpdateWorktreeFromOriginCall>()
     val updateWorktreeFromParentCalls = mutableListOf<UpdateWorktreeFromParentCall>()
@@ -715,7 +719,11 @@ class RecordingGitWorktreeApi(
         return responses.defaultBranchRefsByRepoPath[repoPath]
     }
 
-    override fun inferOriginDefaultBranch(repoPath: String): String? = responses.originDefaultBranchesByRepoPath[repoPath]
+    override fun inferOriginDefaultBranch(repoPath: String): String? {
+        recordedInferOriginDefaultBranchRepoPaths.update { it + repoPath }
+        callbacks.onInferOriginDefaultBranch(repoPath)
+        return responses.originDefaultBranchesByRepoPath[repoPath]
+    }
 
     override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> {
         callbacks.onInferWorktreeParentBranches(repoPath)

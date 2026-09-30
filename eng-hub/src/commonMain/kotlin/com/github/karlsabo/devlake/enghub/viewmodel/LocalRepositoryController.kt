@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -37,11 +38,19 @@ internal class LocalRepositoryController(
     private val refreshTracker = LocalRepositoryRefreshTracker(state)
     private val statusTracker = LocalWorktreeStatusTracker(state)
 
-    // Owned by the view model's scope, so disposal cancels in-flight checks, but supervised so one failed
-    // status check neither cancels its siblings nor surfaces in the view model's own job tree.
-    private val statusHydrationScope = CoroutineScope(
-        SupervisorJob(viewModel.viewModelScope.coroutineContext[Job]) + Dispatchers.IO,
+    // Lives as long as the view model, but outside viewModelScope's job tree: background status and
+    // enrichment work must outlive the discovery, refresh, and polling jobs that schedule it, so
+    // cancelling those jobs must neither cancel nor wait on in-flight background work. Supervised so
+    // one failed job neither cancels its siblings nor surfaces upstream.
+    private val backgroundWorkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val worktreeEnrichmentScheduler = LocalWorktreeEnrichmentScheduler(
+        scope = backgroundWorkScope,
+        gitWorktreeApi = gitWorktreeApi,
     )
+
+    init {
+        viewModel.viewModelScope.coroutineContext[Job]?.invokeOnCompletion { backgroundWorkScope.cancel() }
+    }
 
     fun pickAndAddLocalRepository() {
         viewModel.viewModelScope.launch {
@@ -140,16 +149,17 @@ internal class LocalRepositoryController(
         hydrateWorktreeStatuses(normalizedRootPath, enrichmentRequest, basicWorktrees)
 
         githubIdentityResolver.resolveAndStore(rootPath, normalizedRootPath)
-
-        runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(rootPath, basicWorktrees) }
-            .rethrowCancellation()
-            .onSuccess { enrichedWorktrees ->
-                refreshTracker.complete(normalizedRootPath, enrichmentRequest, enrichedWorktrees)
-            }
-            .onFailure { failure ->
-                logger.error(failure) { "Failed to enrich worktrees for newly added repository $rootPath" }
-                refreshTracker.complete(normalizedRootPath, enrichmentRequest, basicWorktrees)
-            }
+        worktreeEnrichmentScheduler.schedule(
+            repoRootPath = rootPath,
+            normalizedRepoRootPath = normalizedRootPath,
+            worktrees = basicWorktrees,
+        ) { enrichment ->
+            refreshTracker.complete(
+                normalizedRootPath,
+                enrichmentRequest,
+                enrichment.getOrElse { basicWorktrees },
+            )
+        }
     }
 
     private fun expandLocalRepository(
@@ -173,15 +183,15 @@ internal class LocalRepositoryController(
             hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
 
             githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
-            runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees) }
-                .rethrowCancellation()
-                .onSuccess { worktrees ->
-                    expansionTracker.complete(normalizedRepoRootPath, request, worktrees)
-                }
-                .onFailure { failure ->
-                    logger.error(failure) { "Failed to enrich worktrees for $repoRootPath" }
-                    expansionTracker.complete(normalizedRepoRootPath, request)
-                }
+            worktreeEnrichmentScheduler.schedule(
+                repoRootPath = repoRootPath,
+                normalizedRepoRootPath = normalizedRepoRootPath,
+                worktrees = basicWorktrees,
+            ) { enrichment ->
+                enrichment
+                    .onSuccess { expansionTracker.complete(normalizedRepoRootPath, request, it) }
+                    .onFailure { expansionTracker.complete(normalizedRepoRootPath, request) }
+            }
         }
     }
 
@@ -195,7 +205,7 @@ internal class LocalRepositoryController(
         worktrees: List<LocalWorktreeUiState>,
     ) {
         worktrees.forEach { worktree ->
-            statusHydrationScope.launch {
+            backgroundWorkScope.launch {
                 val isDirty = runCatching { gitWorktreeApi.worktreeIsDirty(worktree.path) }
                     .rethrowCancellation()
                     .getOrElse { failure ->
@@ -242,15 +252,17 @@ internal class LocalRepositoryController(
         hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
 
         githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
-        runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees) }
-            .rethrowCancellation()
-            .onSuccess { enrichedWorktrees ->
-                refreshTracker.complete(normalizedRepoRootPath, request, enrichedWorktrees)
-            }
-            .onFailure { failure ->
-                logger.error(failure) { "Failed to enrich worktrees for $repoRootPath" }
-                refreshTracker.complete(normalizedRepoRootPath, request, basicWorktrees)
-            }
+        worktreeEnrichmentScheduler.schedule(
+            repoRootPath = repoRootPath,
+            normalizedRepoRootPath = normalizedRepoRootPath,
+            worktrees = basicWorktrees,
+        ) { enrichment ->
+            refreshTracker.complete(
+                normalizedRepoRootPath,
+                request,
+                enrichment.getOrElse { basicWorktrees },
+            )
+        }
     }
 }
 
