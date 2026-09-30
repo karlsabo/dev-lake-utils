@@ -181,7 +181,7 @@ internal class LocalRepositoryController(
             refreshTracker.complete(
                 normalizedRootPath,
                 enrichmentRequest,
-                enrichment.getOrElse { basicWorktrees },
+                enrichment.getOrNull(),
             )
         }
     }
@@ -293,7 +293,7 @@ internal class LocalRepositoryController(
             refreshTracker.complete(
                 normalizedRepoRootPath,
                 request,
-                enrichment.getOrElse { basicWorktrees },
+                enrichment.getOrNull(),
             )
         }
     }
@@ -388,7 +388,7 @@ internal class LocalRepositoryRefreshTracker(
     fun complete(
         normalizedRepoRootPath: String,
         request: LocalRepositoryWorktreeRequest,
-        enrichedWorktrees: List<LocalWorktreeUiState>,
+        enrichedWorktrees: List<LocalWorktreeUiState>?,
     ): Boolean {
         while (true) {
             val repositories = state.localRepositories.value
@@ -397,16 +397,16 @@ internal class LocalRepositoryRefreshTracker(
             }?.takeIf { current ->
                 current.refreshRequest === request ||
                     (
-                        current.statusRequest != null && enrichedWorktrees.any { enriched ->
+                        current.statusRequest != null && enrichedWorktrees?.any { enriched ->
                             current.worktrees.any { it.checkout === enriched.checkout }
-                        }
+                        } == true
                         )
             } ?: return false
             val ownsRequest = repository.refreshRequest === request
             val applicableEnrichment = if (ownsRequest) {
                 enrichedWorktrees
             } else {
-                enrichedWorktrees.filter { enriched ->
+                enrichedWorktrees?.filter { enriched ->
                     repository.worktrees.any { it.checkout === enriched.checkout }
                 }
             }
@@ -416,7 +416,9 @@ internal class LocalRepositoryRefreshTracker(
                         isLoading = if (ownsRequest) false else currentRepository.isLoading,
                         operationRequest = if (ownsRequest) null else currentRepository.operationRequest,
                         refreshRequest = if (ownsRequest) null else currentRepository.refreshRequest,
-                        worktrees = currentRepository.worktrees.withEnrichmentFrom(applicableEnrichment),
+                        worktrees = applicableEnrichment?.let {
+                            currentRepository.worktrees.withEnrichmentFrom(it)
+                        } ?: currentRepository.worktrees,
                     )
                 } else {
                     currentRepository
