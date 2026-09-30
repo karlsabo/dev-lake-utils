@@ -1563,6 +1563,57 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
     }
 
     @Test
+    fun failingStatusCheckHydratesSiblingRowAndLeavesFailedRowUnknown() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/login",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+                isDirtyForWorktreePath = { worktreePath ->
+                    when (worktreePath) {
+                        DEV_LAKE_ROOT -> error("status check failed for $worktreePath")
+                        DEV_LAKE_SELECTED_WORKTREE -> true
+                        else -> error("Unexpected worktree path $worktreePath")
+                    }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                api.worktreeIsDirtyCalls.containsAll(listOf(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)) &&
+                    repositories.singleOrNull()?.isLoading == false
+            }
+        }
+        val hydratedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.singleOrNull()?.worktrees
+                    ?.singleOrNull { it.branch == "feature/login" }?.isDirty == true
+            }.single()
+        }
+
+        assertEquals(null, hydratedRepository.worktrees.single { it.branch == "main" }.isDirty)
+        assertEquals(
+            listOf(null, true),
+            hydratedRepository.worktrees.map { it.isDirty },
+        )
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
     fun addingRepositoryHydratesDirtyStatusAfterPublishingUnknownRows() = runBlocking {
         val statusStarted = CompletableDeferred<Unit>()
         val releaseStatus = CompletableDeferred<Unit>()
