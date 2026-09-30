@@ -33,7 +33,11 @@ internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
                 parentBranch = parentBranch,
                 needsRebase = parentBranch != null && enrichedWorktree.needsRebase,
                 canUpdateFromOrigin = enrichedWorktree.canUpdateFromOrigin,
-                integrationTargetBranch = enrichedWorktree.integrationTargetBranch,
+                integrationTargetBranch = if (enrichedWorktree.parentBranch != null) {
+                    parentBranch
+                } else {
+                    enrichedWorktree.integrationTargetBranch
+                },
                 checkout = if (preserveCheckout) enrichedWorktree.checkout else currentWorktree.checkout,
             )
         }
@@ -57,26 +61,31 @@ internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
     repoRootPath: String,
     worktrees: List<LocalWorktreeUiState>,
 ): List<LocalWorktreeUiState> {
-    val parentBranchesByChildBranch = inferWorktreeParentBranches(repoRootPath)
-    val needsRebaseByChildBranch = rebaseNeedsByChildBranch(repoRootPath, parentBranchesByChildBranch)
-    val originDefaultBranch = inferOriginDefaultBranch(repoRootPath)
+    val parentOutcomes = inferWorktreeParentBranchOutcomes(repoRootPath)
+    val needsRebaseByChildBranch = rebaseNeedsByChildBranch(repoRootPath, parentOutcomes.parents)
+    val originLookup = lookupOriginDefaultBranch(repoRootPath)
+    val originDefaultBranch = originLookup.getOrNull()
     val visibleBranches = worktrees.mapTo(mutableSetOf()) { it.branch }
     return worktrees.map { worktree ->
-        val canUpdateFromOrigin = originDefaultBranch?.let { worktree.branch == it }
-            ?: worktree.canUpdateFromOrigin
-        val inferredParent = parentBranchesByChildBranch[worktree.branch]
-        // An unresolved origin is not evidence that previously known metadata stopped applying.
-        // Refresh supplies retained metadata only for the same normalized path and branch.
-        val retained = worktree.takeIf { originDefaultBranch == null }
-        val parentBranch = (inferredParent ?: retained?.parentBranch)
+        val canUpdateFromOrigin = if (originLookup.isFailure) {
+            worktree.canUpdateFromOrigin
+        } else {
+            worktree.branch == originDefaultBranch
+        }
+        val parentUnresolved = worktree.branch in parentOutcomes.unresolvedBranches
+        val inferredParent = parentOutcomes.parents[worktree.branch]
+        val parentBranch = (if (parentUnresolved) worktree.parentBranch else inferredParent)
             ?.takeIf { !canUpdateFromOrigin && it in visibleBranches }
+        val retainedTarget = worktree.integrationTargetBranch.takeIf {
+            originLookup.isFailure && worktree.parentBranch == null
+        }
         val integrationTargetBranch = parentBranch ?: originDefaultBranch?.takeIf {
             it.isNotBlank() && worktree.branch != DETACHED_BRANCH && !canUpdateFromOrigin
-        } ?: retained?.integrationTargetBranch
-        val needsRebase = if (inferredParent != null) {
-            needsRebaseByChildBranch[worktree.branch] == true
+        } ?: retainedTarget
+        val needsRebase = if (parentUnresolved) {
+            worktree.needsRebase
         } else {
-            retained?.needsRebase == true
+            needsRebaseByChildBranch[worktree.branch] == true
         }
         worktree.copy(
             parentBranch = parentBranch,

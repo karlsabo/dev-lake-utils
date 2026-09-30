@@ -11,6 +11,7 @@ import com.github.karlsabo.git.RefreshedExistingBranches
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.WorktreeIntegrationStrategy
+import com.github.karlsabo.git.WorktreeParentBranchOutcomes
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupCommandResult
 import com.github.karlsabo.git.WorktreeSetupCommandRunner
@@ -485,6 +486,8 @@ data class RecordingGitWorktreeApiResponses(
     val isDirtyForWorktreePath: ((String) -> Boolean)? = null,
     val defaultBranchRefsByRepoPath: Map<String, String?> = emptyMap(),
     val originDefaultBranchesByRepoPath: Map<String, String?> = emptyMap(),
+    val originDefaultBranchFailure: RuntimeException? = null,
+    val unresolvedParentBranches: Set<String> = emptySet(),
     val existingBranchesByRepoPath: Map<String, List<String>> = emptyMap(),
     val existingBranchesForRepoPath: ((String) -> List<String>)? = null,
     val existingBranchDiscoveryFailure: RuntimeException? = null,
@@ -722,6 +725,7 @@ class RecordingGitWorktreeApi(
     override fun inferOriginDefaultBranch(repoPath: String): String? {
         recordedInferOriginDefaultBranchRepoPaths.update { it + repoPath }
         callbacks.onInferOriginDefaultBranch(repoPath)
+        responses.originDefaultBranchFailure?.let { throw it }
         return responses.originDefaultBranchesByRepoPath[repoPath]
     }
 
@@ -729,6 +733,13 @@ class RecordingGitWorktreeApi(
         callbacks.onInferWorktreeParentBranches(repoPath)
         return responses.parentBranchesByRepoPath[repoPath].orEmpty()
     }
+
+    override fun inferWorktreeParentBranchOutcomes(
+        repoPath: String,
+    ): WorktreeParentBranchOutcomes = WorktreeParentBranchOutcomes(
+        inferWorktreeParentBranches(repoPath),
+        responses.unresolvedParentBranches,
+    )
 
     override fun branchNeedsRebase(
         repoPath: String,

@@ -100,6 +100,37 @@ class GitWorktreeServiceHierarchyTest {
     }
 
     @Test
+    fun successfulNoSymbolicHeadDoesNotFallBackToStaleTrackingHead() {
+        val fake = FakeGitCommandApi().apply {
+            remoteDefaultBranchRefAction = { _, _ -> "origin/main" }
+            queryRemoteDefaultBranchAction = { _, _ -> null }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        val outcome = service.lookupOriginDefaultBranch("/repo")
+
+        assertEquals(true, outcome.isSuccess)
+        assertNull(outcome.getOrNull())
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("queryRemoteDefaultBranch", listOf("/repo", "origin"))),
+            fake.calls,
+        )
+    }
+
+    @Test
+    fun failedRemoteLookupWithoutUsableCachedHeadIsUnresolved() {
+        val fake = FakeGitCommandApi().apply {
+            remoteDefaultBranchRefAction = { _, _ -> "origin/HEAD" }
+            queryRemoteDefaultBranchAction = { _, _ ->
+                throw GitCommandException(listOf("git", "ls-remote"), 128, "offline")
+            }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        assertEquals(true, service.lookupOriginDefaultBranch("/repo").isFailure)
+    }
+
+    @Test
     fun inferOriginDefaultBranchFallsBackToCachedTrackingHeadWhenServerQueryFails() {
         val fake = FakeGitCommandApi().apply {
             remoteDefaultBranchRefAction = { _, _ -> "origin/main" }
@@ -368,6 +399,25 @@ class GitWorktreeServiceHierarchyTest {
     }
 
     @Test
+    fun unrelatedLocalHistoryConfirmsNoParentInsteadOfUnresolvedInference() {
+        val fake = FakeGitCommandApi().apply {
+            worktreeListResult = """
+                worktree /repo
+                HEAD abc123
+                branch refs/heads/main
+
+                worktree /repo-child
+                HEAD def456
+                branch refs/heads/child
+            """.trimIndent()
+            isAncestorAction = { _, _, _ -> false }
+        }
+        val service: GitWorktreeApi = GitWorktreeService(fake)
+
+        assertEquals(WorktreeParentBranchOutcomes(emptyMap()), service.inferWorktreeParentBranchOutcomes("/repo"))
+    }
+
+    @Test
     fun inferWorktreeParentBranches_ancestryFailureLeavesAffectedWorktreeWithoutParent() {
         val fake = FakeGitCommandApi()
         val repoPath = "/repos/dev-lake-utils"
@@ -399,8 +449,9 @@ class GitWorktreeServiceHierarchyTest {
         }
         val service: GitWorktreeApi = GitWorktreeService(fake)
 
-        val parents = service.inferWorktreeParentBranches(repoPath)
+        val outcomes = service.inferWorktreeParentBranchOutcomes(repoPath)
 
-        assertEquals(mapOf("feature/base-pr" to "main"), parents)
+        assertEquals(mapOf("feature/base-pr" to "main"), outcomes.parents)
+        assertEquals(setOf("feature/stacked-pr"), outcomes.unresolvedBranches)
     }
 }

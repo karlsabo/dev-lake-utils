@@ -134,12 +134,14 @@ class LocalWorktreeStateMappersTest {
                 path = childPath,
                 parentBranch = "feature/base-pr",
                 needsRebase = true,
+                integrationTargetBranch = "feature/base-pr",
             ),
         )
 
         val child = discoveredWorktrees.withEnrichmentFrom(previousWorktrees).single()
 
         assertEquals(null, child.parentBranch)
+        assertEquals(null, child.integrationTargetBranch)
         assertEquals(false, child.needsRebase)
     }
 }

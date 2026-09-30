@@ -1742,6 +1742,12 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
 }
 
 class EngHubLocalRepositoryOfflineMetadataViewModelTest {
+    private fun assertRetainedHierarchy(feature: LocalWorktreeUiState) {
+        assertEquals("main", feature.parentBranch)
+        assertEquals("main", feature.integrationTargetBranch)
+        assertEquals(true, feature.needsRebase)
+    }
+
     @Test
     fun unresolvedOriginRetainsMetadataOnlyForMatchingPathAndBranch() = runBlocking {
         val featurePath = "$DEV_LAKE_ROOT-feature"
@@ -1756,6 +1762,8 @@ class EngHubLocalRepositoryOfflineMetadataViewModelTest {
                         Worktree(path = "$featurePath-new", branch = "feature/login", commitHash = "jkl"),
                     ),
                 ),
+                originDefaultBranchFailure = IllegalStateException("offline"),
+                unresolvedParentBranches = setOf("feature/login"),
                 isDirtyForWorktreePath = { _ -> true },
             ),
         )
@@ -1792,10 +1800,7 @@ class EngHubLocalRepositoryOfflineMetadataViewModelTest {
             }.single()
         }
         assertEquals(true, repository.worktrees.single { it.path == DEV_LAKE_ROOT }.canUpdateFromOrigin)
-        val feature = repository.worktrees.single { it.path == featurePath }
-        assertEquals("main", feature.parentBranch)
-        assertEquals("main", feature.integrationTargetBranch)
-        assertEquals(true, feature.needsRebase)
+        assertRetainedHierarchy(repository.worktrees.single { it.path == featurePath })
         repository.worktrees.filter { it.path == replacedPath || it.path == "$featurePath-new" }.forEach {
             assertEquals(null, it.integrationTargetBranch)
             assertEquals(null, it.parentBranch)
