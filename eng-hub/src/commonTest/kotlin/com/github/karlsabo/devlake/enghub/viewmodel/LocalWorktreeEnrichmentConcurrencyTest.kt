@@ -107,6 +107,48 @@ class LocalWorktreeEnrichmentConcurrencyTest {
     }
 
     @Test
+    fun featureLogoutNeverReceivesInFlightFeatureLoginMetadata() = runTest {
+        val state = enrichmentState()
+        val tracker = LocalRepositoryRefreshTracker(state)
+        val oldRequest = assertNotNull(tracker.start(DEV_LAKE_ROOT))
+        val login = checkout().copy(branch = "feature/login", path = DEV_LAKE_SELECTED_WORKTREE)
+        assertTrue(tracker.publishDiscovered(DEV_LAKE_ROOT, oldRequest, listOf(checkout(), login)))
+        val oldRows = state.localRepositories.value.single().worktrees
+        val logout = login.copy(branch = "feature/logout", isDirty = true)
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                parentBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to mapOf("feature/login" to "main")),
+                originDefaultBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to "main"),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onInferOriginDefaultBranch = {
+                    val newest = assertNotNull(tracker.start(DEV_LAKE_ROOT))
+                    assertTrue(tracker.publishDiscovered(DEV_LAKE_ROOT, newest, listOf(checkout(), logout)))
+                },
+            ),
+        )
+        var completed = false
+        LocalWorktreeEnrichmentScheduler(backgroundScope, api).schedule(
+            DEV_LAKE_ROOT,
+            DEV_LAKE_ROOT,
+            oldRequest,
+            oldRows,
+        ) { result ->
+            val enriched = result.getOrThrow()
+            assertEquals("main", enriched.worktrees.last().parentBranch)
+            assertEquals("main", enriched.worktrees.last().integrationTargetBranch)
+            assertTrue(tracker.complete(DEV_LAKE_ROOT, oldRequest, enriched))
+            completed = true
+        }
+        runCurrent()
+
+        assertTrue(completed)
+        val rows = state.localRepositories.value.single().worktrees
+        assertEquals(logout, rows.last())
+        assertTrue(rows.first().canUpdateFromOrigin)
+    }
+
+    @Test
     fun replacedCheckoutCannotReceiveOldEnrichmentEvenIfOriginalBranchReturns() {
         val state = enrichmentState()
         val tracker = LocalRepositoryRefreshTracker(state)

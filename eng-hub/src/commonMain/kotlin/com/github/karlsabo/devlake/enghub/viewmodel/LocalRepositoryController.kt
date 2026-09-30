@@ -171,7 +171,7 @@ internal class LocalRepositoryController(
         }?.refreshRequest ?: return
         hydrateWorktreeStatuses(normalizedRootPath, enrichmentRequest, basicWorktrees)
 
-        githubIdentityResolver.resolveAndStore(rootPath, normalizedRootPath)
+        githubIdentityResolver.resolveAndStore(rootPath, normalizedRootPath, enrichmentRequest)
         worktreeEnrichmentScheduler.schedule(
             repoRootPath = rootPath,
             normalizedRepoRootPath = normalizedRootPath,
@@ -206,7 +206,7 @@ internal class LocalRepositoryController(
 
             hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
 
-            githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
+            githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath, request)
             worktreeEnrichmentScheduler.schedule(
                 repoRootPath = repoRootPath,
                 normalizedRepoRootPath = normalizedRepoRootPath,
@@ -282,7 +282,7 @@ internal class LocalRepositoryController(
         hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
 
         checkActive()
-        githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
+        githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath, request)
         checkActive()
         worktreeEnrichmentScheduler.schedule(
             repoRootPath = repoRootPath,
@@ -304,16 +304,23 @@ private data class PollRefreshTask(
     val requestOwner: Job,
 )
 
-private class LocalRepositoryGitHubIdentityResolver(
+internal class LocalRepositoryGitHubIdentityResolver(
     private val state: EngHubViewModelState,
     private val gitWorktreeApi: GitWorktreeApi,
     private val repositoryIdentity: (String) -> String,
 ) {
-    fun resolveAndStore(repoRootPath: String, normalizedRepoRootPath: String) {
+    fun resolveAndStore(
+        repoRootPath: String,
+        normalizedRepoRootPath: String,
+        request: LocalRepositoryWorktreeRequest,
+    ) {
         read(repoRootPath).onSuccess { githubIdentity ->
             state.localRepositories.update { repositories ->
                 repositories.map { repository ->
-                    if (repositoryIdentity(repository.path) == normalizedRepoRootPath) {
+                    // Identity belongs to the request, not to retained checkout metadata across polls.
+                    if (repositoryIdentity(repository.path) == normalizedRepoRootPath &&
+                        (repository.operationRequest === request || repository.refreshRequest === request)
+                    ) {
                         repository.copy(repositoryIdentity = githubIdentity)
                     } else {
                         repository
