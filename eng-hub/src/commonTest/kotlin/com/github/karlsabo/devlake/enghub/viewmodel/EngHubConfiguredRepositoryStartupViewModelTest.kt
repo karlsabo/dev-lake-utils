@@ -61,8 +61,16 @@ class EngHubConfiguredRepositoryStartupViewModelTest {
             discoveredRepositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.branch },
         )
         assertEquals(
+            listOf(null),
+            discoveredRepositories.single { it.path == DEV_LAKE_ROOT }.worktrees.map { it.isDirty },
+        )
+        assertEquals(
             listOf("docs-main"),
             discoveredRepositories.single { it.path == DOCS_ROOT }.worktrees.map { it.branch },
+        )
+        assertEquals(
+            listOf(null),
+            discoveredRepositories.single { it.path == DOCS_ROOT }.worktrees.map { it.isDirty },
         )
     }
 

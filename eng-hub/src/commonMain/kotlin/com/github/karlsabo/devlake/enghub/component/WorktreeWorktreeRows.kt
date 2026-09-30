@@ -209,10 +209,19 @@ private fun ConnectedPullRequestDetails(
 
 @Composable
 private fun WorktreeDirtyIndicator(worktree: LocalWorktreeUiState) {
+    val isDirty = worktree.isDirty
+    if (isDirty == null) {
+        Text(
+            text = "Checking status…",
+            modifier = Modifier.semantics { contentDescription = "Checking status" },
+            style = MaterialTheme.typography.caption,
+        )
+        return
+    }
     Text(
-        text = if (worktree.isDirty) "🟡" else "🟢",
+        text = if (isDirty) "🟡" else "🟢",
         modifier = Modifier.semantics {
-            contentDescription = if (worktree.isDirty) "Dirty worktree" else "Clean worktree"
+            contentDescription = if (isDirty) "Dirty worktree" else "Clean worktree"
         },
         style = MaterialTheme.typography.body2,
     )

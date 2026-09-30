@@ -21,7 +21,7 @@ data class LocalRepositoryUiState(
 data class LocalWorktreeUiState(
     val branch: String,
     val path: String,
-    val isDirty: Boolean = false,
+    val isDirty: Boolean? = null,
     val isRoot: Boolean = false,
     val parentBranch: String? = null,
     val baseCommitHash: String? = null,
@@ -73,6 +73,13 @@ fun List<Worktree>.toLocalWorktreeUiStates(
             needsRebase = needsRebaseByChildBranch[worktree.branch] == true,
         )
     }
+}
+
+/** Maps worktree entries for first paint; dirty status stays unknown until a local status check resolves. */
+fun List<Worktree>.toLocalWorktreeUiStatesWithUnknownDirtyStatus(
+    repositoryRootPath: String,
+): List<LocalWorktreeUiState> = toLocalWorktreeUiStates(repositoryRootPath).map { worktree ->
+    worktree.copy(isDirty = null)
 }
 
 private fun String.repositoryFolderName(): String {

@@ -65,6 +65,17 @@ class LocalRepositoryUiStateTest {
     }
 
     @Test
+    fun mapsWorktreeEntriesToUnknownDirtyStatus() {
+        val uiStates = listOf(
+            Worktree(path = "/repo", branch = "main", commitHash = "abc123"),
+            Worktree(path = "/repo-feature", branch = "feature/x", commitHash = "def456", isDirty = true),
+        ).toLocalWorktreeUiStatesWithUnknownDirtyStatus("/repo/")
+
+        assertEquals(listOf(null, null), uiStates.map { it.isDirty })
+        assertEquals(listOf(true, false), uiStates.map { it.isRoot })
+    }
+
+    @Test
     fun mapsDetachedWorktreeDisplayBranchAndBaseCommitHash() {
         val uiStates = listOf(
             Worktree(path = "/repo-detached", branch = "", commitHash = "abc123"),

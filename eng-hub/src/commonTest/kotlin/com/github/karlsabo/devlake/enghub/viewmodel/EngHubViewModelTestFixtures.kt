@@ -557,6 +557,7 @@ class RecordingGitWorktreeApi(
     )
 
     val resolvedPaths = mutableListOf<String>()
+    val resolvedEntryPaths = mutableListOf<String>()
     private val recordedListWorktreeRepoPaths = MutableStateFlow<List<String>>(emptyList())
     val listWorktreeRepoPaths: List<String>
         get() = recordedListWorktreeRepoPaths.value
@@ -643,7 +644,16 @@ class RecordingGitWorktreeApi(
         return repositoryWorktreesBySelectedPath.getValue(selectedPath)
     }
 
-    override fun listWorktrees(repoPath: String): List<Worktree> {
+    override fun resolveRepositoryRootEntries(selectedPath: String): RepositoryWorktrees {
+        resolvedEntryPaths += selectedPath
+        return repositoryWorktreesBySelectedPath.getValue(selectedPath)
+    }
+
+    override fun listWorktrees(repoPath: String): List<Worktree> = listWorktreesOrEntries(repoPath)
+
+    override fun listWorktreeEntries(repoPath: String): List<Worktree> = listWorktreesOrEntries(repoPath)
+
+    private fun listWorktreesOrEntries(repoPath: String): List<Worktree> {
         recordedListWorktreeRepoPaths.update { it + repoPath }
         callbacks.onListWorktrees(repoPath)
         responses.listWorktreesFailure?.let { throw it }

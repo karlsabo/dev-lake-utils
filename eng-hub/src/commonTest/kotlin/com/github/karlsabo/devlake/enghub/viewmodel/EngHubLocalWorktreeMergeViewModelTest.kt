@@ -22,9 +22,8 @@ class EngHubLocalWorktreeMergeViewModelTest {
             path = childWorktreePath,
             branch = "feature/stacked-pr",
             commitHash = "def456",
-            isDirty = true,
         )
-        val childAfterMerge = childBeforeMerge.copy(isDirty = false)
+        val childAfterMerge = childBeforeMerge.copy(commitHash = "fed654")
         var currentWorktrees = listOf(baseWorktree, childBeforeMerge)
         val api = RecordingGitWorktreeApi(
             responses = RecordingGitWorktreeApiResponses(
@@ -49,23 +48,25 @@ class EngHubLocalWorktreeMergeViewModelTest {
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
         withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->
-                repositories.single().worktrees.any { it.isDirty }
+                repositories.single().worktrees.singleOrNull { it.branch == "feature/stacked-pr" }
+                    ?.parentBranch == "feature/base-pr"
             }
         }
 
         viewModel.mergeLocalWorktreeWithParent(DEV_LAKE_ROOT, childWorktreePath, "feature/base-pr")
 
-        val repository = withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { repositories ->
-                repositories.single().worktrees.none { it.isDirty }
-            }.single()
+        withTimeout(2_000.milliseconds) {
+            viewModel.mergingLocalWorktreePathsStateFlow.first { it.isEmpty() }
         }
 
         assertEquals(
             listOf(MergeWorktreeWithParentCall(childWorktreePath, "feature/base-pr")),
             api.mergeWorktreeWithParentCalls,
         )
-        assertEquals(listOf("feature/base-pr", "feature/stacked-pr"), repository.worktrees.map { it.branch })
+        assertEquals(
+            listOf("feature/base-pr", "feature/stacked-pr"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
         assertEquals(emptySet(), viewModel.mergingLocalWorktreePathsStateFlow.value)
         assertEquals(null, viewModel.actionErrorStateFlow.value)
     }

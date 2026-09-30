@@ -51,6 +51,19 @@ class LocalRepositoryExpansionTrackerTest {
     }
 
     @Test
+    fun publishDiscoveredStopsLoadingWhileKeepingRequestOwnership() {
+        val state = trackerState()
+        val tracker = LocalRepositoryExpansionTracker(state)
+        val request = assertNotNull(tracker.start(DEV_LAKE_ROOT))
+
+        assertTrue(tracker.publishDiscovered(DEV_LAKE_ROOT, request, listOf(worktree("main"))))
+
+        val repository = state.repositorySnapshot()
+        assertEquals(RepositorySnapshot(isExpanded = true, isLoading = false, branches = listOf("main")), repository)
+        assertTrue(tracker.complete(DEV_LAKE_ROOT, request, listOf(worktree("main"))))
+    }
+
+    @Test
     fun refreshOwnershipPreventsExpansionFromPublishingOrCompleting() {
         val state = trackerState()
         val expansionTracker = LocalRepositoryExpansionTracker(state)
@@ -72,6 +85,21 @@ class LocalRepositoryExpansionTrackerTest {
 }
 
 class LocalRepositoryRefreshTrackerTest {
+    @Test
+    fun publishDiscoveredStopsLoadingWhileKeepingRequestOwnership() {
+        val state = trackerState()
+        val tracker = LocalRepositoryRefreshTracker(state)
+        val request = assertNotNull(tracker.start(DEV_LAKE_ROOT))
+
+        assertTrue(tracker.publishDiscovered(DEV_LAKE_ROOT, request, listOf(worktree("main"))))
+
+        val repository = state.localRepositories.value.single()
+        assertEquals(false, repository.isLoading)
+        assertNotNull(repository.refreshRequest)
+        assertTrue(tracker.complete(DEV_LAKE_ROOT, request, listOf(worktree("main"))))
+        assertNull(state.localRepositories.value.single().refreshRequest)
+    }
+
     @Test
     fun newerRefreshIdentityRejectsEveryCommitFromTheOlderRequest() {
         val state = trackerState()

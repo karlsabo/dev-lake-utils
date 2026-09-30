@@ -80,6 +80,7 @@ class WorktreeRepositoryRowsTest {
                                 LocalWorktreeUiState(
                                     branch = "feature/login",
                                     path = "/repos/dev-lake-utils-feature-login",
+                                    isDirty = false,
                                     parentBranch = "main",
                                 ),
                             ),
@@ -129,6 +130,7 @@ class WorktreeRepositoryRowsTest {
                                 LocalWorktreeUiState(
                                     branch = "feature/login",
                                     path = "/repos/widgets-feature-login",
+                                    isDirty = false,
                                     integrationTargetBranch = "main",
                                 ),
                             ),
@@ -178,6 +180,7 @@ class WorktreeRepositoryRowsTest {
                                 LocalWorktreeUiState(
                                     branch = "feature/audit",
                                     path = "/repos/legacy-api-feature-audit",
+                                    isDirty = false,
                                     integrationTargetBranch = "master",
                                 ),
                             ),
@@ -228,6 +231,7 @@ class WorktreeRepositoryRowsTest {
                                 LocalWorktreeUiState(
                                     branch = "feature/login",
                                     path = "/repos/widgets-feature-login",
+                                    isDirty = false,
                                     integrationTargetBranch = "main",
                                 ),
                             ),
@@ -281,6 +285,7 @@ class WorktreeRepositoryRowsTest {
                                 LocalWorktreeUiState(
                                     branch = "feature/stacked",
                                     path = "/repos/widgets-feature-stacked",
+                                    isDirty = false,
                                     parentBranch = "feature/base",
                                 ),
                             ),
@@ -328,6 +333,7 @@ class WorktreeRepositoryRowsTest {
                                     branch = "main",
                                     path = "/repos/dev-lake-utils",
                                     parentBranch = "develop",
+                                    isDirty = false,
                                     canUpdateFromOrigin = true,
                                 ),
                             ),

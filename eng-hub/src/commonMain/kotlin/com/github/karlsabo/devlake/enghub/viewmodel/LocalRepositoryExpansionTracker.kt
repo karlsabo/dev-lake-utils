@@ -64,7 +64,7 @@ internal class LocalRepositoryExpansionTracker(
             } ?: return false
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
-                    currentRepository.copy(worktrees = worktrees)
+                    currentRepository.copy(isLoading = false, worktrees = worktrees)
                 } else {
                     currentRepository
                 }

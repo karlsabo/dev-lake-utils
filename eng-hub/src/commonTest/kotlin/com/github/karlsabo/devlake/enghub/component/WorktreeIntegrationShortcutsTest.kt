@@ -212,6 +212,7 @@ class WorktreeIntegrationShortcutsTest {
                         worktree = LocalWorktreeUiState(
                             branch = "main",
                             path = "/repos/dev-lake-utils",
+                            isDirty = false,
                             canUpdateFromOrigin = true,
                         ),
                     ),
@@ -362,6 +363,7 @@ class WorktreeIntegrationShortcutsTest {
         worktree = LocalWorktreeUiState(
             branch = "feature/login",
             path = WORKTREE_PATH,
+            isDirty = false,
             parentBranch = "main",
         ),
         setupStatus = null,
@@ -371,6 +373,7 @@ class WorktreeIntegrationShortcutsTest {
     private fun defaultTargetWorktree() = LocalWorktreeUiState(
         branch = "feature/login",
         path = WORKTREE_PATH,
+        isDirty = false,
         integrationTargetBranch = "main",
     )
 
