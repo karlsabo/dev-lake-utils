@@ -4,6 +4,7 @@ import java.io.File
 import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 
 internal object FakePiProcess {
     @JvmStatic
@@ -22,9 +23,25 @@ internal object FakePiProcess {
     }
 
     private fun sleep(args: Array<String>) {
-        Files.writeString(Path.of(args[1]), ProcessHandle.current().pid().toString())
+        publishFakePiPid(Path.of(args[1]), ProcessHandle.current().pid())
         System.`in`.transferTo(OutputStream.nullOutputStream())
         Thread.sleep(30_000)
+    }
+}
+
+internal fun publishFakePiPid(
+    pidFile: Path,
+    pid: Long,
+    beforePublication: (Path) -> Unit = {},
+) {
+    val staged = Files.createTempFile(pidFile.parent, "fake-pi-pid-", ".tmp")
+    try {
+        Files.writeString(staged, pid.toString())
+        beforePublication(staged)
+        // Existence is the cancellation test's readiness signal, so publish only a closed, complete file.
+        Files.move(staged, pidFile, StandardCopyOption.ATOMIC_MOVE)
+    } finally {
+        Files.deleteIfExists(staged)
     }
 }
 
