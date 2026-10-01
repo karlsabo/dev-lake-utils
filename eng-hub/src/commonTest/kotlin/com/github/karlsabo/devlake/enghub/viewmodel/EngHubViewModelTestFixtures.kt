@@ -560,7 +560,9 @@ class RecordingGitWorktreeApi(
 
     val resolvedPaths = mutableListOf<String>()
     val resolvedEntryPaths = mutableListOf<String>()
-    val worktreeIsDirtyCalls = mutableListOf<String>()
+    private val recordedWorktreeIsDirtyCalls = MutableStateFlow<List<String>>(emptyList())
+    val worktreeIsDirtyCalls: List<String>
+        get() = recordedWorktreeIsDirtyCalls.value
     private val recordedListWorktreeRepoPaths = MutableStateFlow<List<String>>(emptyList())
     val listWorktreeRepoPaths: List<String>
         get() = recordedListWorktreeRepoPaths.value
@@ -659,7 +661,7 @@ class RecordingGitWorktreeApi(
     }
 
     override fun worktreeIsDirty(worktreePath: String): Boolean {
-        worktreeIsDirtyCalls += worktreePath
+        recordedWorktreeIsDirtyCalls.update { it + worktreePath }
         return responses.isDirtyForWorktreePath?.invoke(worktreePath)
             ?: error("worktreeIsDirty is not configured for $worktreePath")
     }
