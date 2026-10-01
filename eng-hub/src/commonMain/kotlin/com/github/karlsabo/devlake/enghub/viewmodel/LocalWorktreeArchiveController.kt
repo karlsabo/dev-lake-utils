@@ -26,9 +26,13 @@ internal class LocalWorktreeArchiveController(
     private val state: EngHubViewModelState,
     private val gitWorktreeApi: GitWorktreeApi,
     private val archive: WorktreeArchiveDependencies,
+    localRepositories: LocalRepositoryController,
     private val errorReporter: ActionErrorReporter,
 ) {
     private val queuedArchiveLeases = MutableStateFlow<Map<String, LocalWorktreeMutationGuard.Lease>>(emptyMap())
+    private val completion = LocalWorktreeArchiveCompletion(viewModel, localRepositories, archive.store) { job ->
+        clearArchiveEntry(job.worktreePath, job.queueId)
+    }
 
     fun archiveLocalWorktree(repoRootPath: String, worktreePath: String) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepositoryPath()
@@ -54,7 +58,7 @@ internal class LocalWorktreeArchiveController(
             runCatching { archive.store.deleteQueuedJob(normalizedWorktreePath, queueId) }
                 .rethrowCancellation()
                 .onSuccess { deleted ->
-                    if (deleted) completeQueuedArchiveUndo(normalizedWorktreePath, queueId)
+                    if (deleted) clearArchiveEntry(normalizedWorktreePath, queueId)
                 }
                 .onFailure { failure ->
                     logger.error(failure) { "Failed to cancel queued archive for worktree $normalizedWorktreePath" }
@@ -176,7 +180,13 @@ internal class LocalWorktreeArchiveController(
                 stateUpdatedAtEpochMs = removingAt,
             )
             state.queuedWorktreeArchives.update { jobs ->
-                jobs.map { job -> if (job.worktreePath == queuedJob.worktreePath) removingJob else job }
+                jobs.map { job ->
+                    if (job.worktreePath == queuedJob.worktreePath && job.queueId == queuedJob.queueId) {
+                        removingJob
+                    } else {
+                        job
+                    }
+                }
             }
             logger.info { "Removing archived worktree ${queuedJob.worktreePath}" }
             runCatching {
@@ -185,20 +195,25 @@ internal class LocalWorktreeArchiveController(
                     worktreePath = queuedJob.worktreePath,
                     force = false,
                 )
+                completion.complete(removingJob)
             }.rethrowCancellation().onFailure { failure ->
                 logger.error(failure) { "Worktree removal failed for ${queuedJob.worktreePath}" }
+                errorReporter.enqueueActionError(
+                    failure.message?.let { "Failed to complete worktree archive: $it" }
+                        ?: "Failed to complete worktree archive",
+                )
             }
         }
         return true
     }
 
-    private fun completeQueuedArchiveUndo(worktreePath: String, queueId: String) {
-        // Observers of completed Undo must be able to acquire the worktree for another mutation.
+    private fun clearArchiveEntry(worktreePath: String, queueId: String) {
+        // Observers of a cleared entry must be able to acquire the worktree for another mutation.
         releaseQueuedArchiveLease(worktreePath)
         state.queuedWorktreeArchives.update { jobs ->
             jobs.filterNot { it.worktreePath.normalizedRepositoryPath() == worktreePath && it.queueId == queueId }
         }
-        logger.info { "Canceled queued archive for worktree $worktreePath" }
+        logger.info { "Cleared archive entry for worktree $worktreePath" }
     }
 
     private fun releaseQueuedArchiveLease(worktreePath: String) {

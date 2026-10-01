@@ -31,6 +31,9 @@ interface WorktreeArchiveStore {
         stateUpdatedAtEpochMs: Long,
     ): Boolean
 
+    /** Deletes only the identified removing job after successful cleanup and reconciliation. */
+    fun deleteRemovingJob(worktreePath: String, queueId: String): Boolean
+
     /** Deletes only the identified job while it is still cancelable. */
     fun deleteQueuedJob(worktreePath: String, queueId: String): Boolean
 }

@@ -129,6 +129,7 @@ class EngHubViewModel internal constructor(
         state = state,
         gitWorktreeApi = worktreeServices.gitWorktreeApi,
         archive = persistenceDependencies.worktreeArchive,
+        localRepositories = localRepositoriesController,
         errorReporter = errorReporter,
     )
     private val rebaseController = LocalWorktreeRebaseController(

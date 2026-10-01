@@ -2,6 +2,8 @@
 
 **Goal:** Let users archive a worktree without an initial confirmation, provide a 60-second undo window in a recycle-bin UI, and make archive progress and recoverability explicit.
 
+**Merged progress:** Stories 1–3 are Done on `main`. Stories 4–11 remain to be merged; implementation or review alone does not mark them Done.
+
 ## Context
 
 - The request originates in the repository TODO at `README.md:16-17`: archive without prompting, delay removal by roughly 60 seconds, animate the worktree into a recycle bin, allow cancellation, and support recovery when possible.
@@ -103,7 +105,7 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 
 **Notes:** Persist repository root, normalized worktree path, display branch, lifecycle state, and state timestamps. Acquire the existing `LocalWorktreeMutationGuard` before accepting a queue request so programmatic mutations cannot race the hidden row. Store writes must complete before the UI claims the item is safely queued; report persistence failure and leave the row active. Use a dedicated database rather than extending `NotificationDatabase`. Relevant current boundaries are `LocalWorktreeArchiveController.kt`, `EngHubScreen.kt`, and `EngHubComponent.kt`.
 
-### 2. Undo a queued worktree archive - Done
+### 2. Undo a queued worktree archive
 
 **Status:** Done
 

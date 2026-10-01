@@ -47,5 +47,9 @@ deleteQueuedJob:
 DELETE FROM worktree_archive_jobs
 WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'QUEUED';
 
+deleteRemovingJob:
+DELETE FROM worktree_archive_jobs
+WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'REMOVING';
+
 changedRowCount:
 SELECT changes();
