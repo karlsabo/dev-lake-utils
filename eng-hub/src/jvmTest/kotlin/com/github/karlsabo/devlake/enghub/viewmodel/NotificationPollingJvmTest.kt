@@ -1,6 +1,12 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import androidx.lifecycle.viewModelScope
+import com.github.karlsabo.github.GitHubApi
+import com.github.karlsabo.github.Notification
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -25,20 +31,40 @@ class NotificationPollingJvmTest {
             ),
             listNotificationFailuresBeforeSuccess = listOf(UnresolvedAddressException()),
         )
+        val failureObserved = CompletableDeferred<Unit>()
+        val gatedApi = object : GitHubApi by api {
+            override suspend fun listNotifications(): List<Notification> {
+                // StateFlow may conflate recovery with failure unless observation is acknowledged.
+                if (failureDelivered) failureObserved.await()
+                failureDelivered = true
+                return api.listNotifications()
+            }
+
+            private var failureDelivered = false
+        }
         val viewModel = createViewModel(
-            api = api,
+            api = gatedApi,
             store = RecordingNotificationIgnoreStore(),
             pollIntervalMs = 1,
         )
 
-        val results = withTimeout(10.seconds) {
-            viewModel.notifications.filterNotNull().take(2).toList()
-        }
+        try {
+            val results = withTimeout(10.seconds) {
+                viewModel.notifications.filterNotNull().onEach { result ->
+                    if (!failureObserved.isCompleted) {
+                        assertIs<UnresolvedAddressException>(result.exceptionOrNull())
+                        failureObserved.complete(Unit)
+                    }
+                }.take(2).toList()
+            }
 
-        assertIs<UnresolvedAddressException>(results.first().exceptionOrNull())
-        assertEquals(
-            listOf("thread-1234"),
-            results.last().getOrThrow().map { it.notificationThreadId },
-        )
+            assertIs<UnresolvedAddressException>(results.first().exceptionOrNull())
+            assertEquals(
+                listOf("thread-1234"),
+                results.last().getOrThrow().map { it.notificationThreadId },
+            )
+        } finally {
+            viewModel.viewModelScope.cancel()
+        }
     }
 }

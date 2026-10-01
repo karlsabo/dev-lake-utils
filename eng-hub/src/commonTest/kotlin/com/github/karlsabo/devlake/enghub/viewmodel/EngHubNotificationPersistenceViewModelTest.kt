@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 fun createViewModel(
-    api: NotificationPersistenceGitHubApi,
+    api: GitHubApi,
     store: RecordingNotificationIgnoreStore,
     pollIntervalMs: Long = 60_000,
 ): EngHubViewModel {
