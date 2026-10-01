@@ -147,6 +147,43 @@ class EngHubWorktreeArchiveRestartTest {
     }
 
     @Test
+    fun identityFailuresCannotRetryRemovalOfReplacementCheckoutOrUnregisteredDirectory() = runBlocking {
+        val identities = listOf(
+            emptyList(),
+            listOf(Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/other", "def")),
+        )
+        identities.forEach { worktrees ->
+            val fixture = ArchiveRestartFixture(worktrees)
+            try {
+                val viewModel = fixture.start(100_000)
+                val failed = fixture.awaitRestored(viewModel)
+                assertEquals(WorktreeArchiveLifecycleState.FAILED, failed.state)
+                fixture.awaitError(viewModel, requireNotNull(failed.errorMessage))
+                viewModel.clearActionError()
+                viewModel.retryFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+                fixture.awaitError(
+                    viewModel,
+                    "Failed to retry worktree archive: Cannot retry archive: " +
+                        "worktree registration or branch no longer matches: $DEV_LAKE_SELECTED_WORKTREE",
+                )
+                assertEquals(listOf(failed), fixture.store.listJobs())
+                assertEquals(listOf(failed), viewModel.queuedWorktreeArchivesStateFlow.value)
+                assertEquals(listOf("restore" to true), fixture.store.failedOperationResults.value)
+                assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+                assertFalse(fixture.deadlines.tryReceive().isSuccess)
+                viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+                assertEquals(emptyList(), fixture.api.updateWorktreeFromOriginCalls)
+                viewModel.dismissFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+                withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+                assertEquals(emptyList(), fixture.store.listJobs())
+                assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+            } finally {
+                fixture.close()
+            }
+        }
+    }
+
+    @Test
     fun nonQueuedRecordsRemainUntouchedWhileQueuedRecordsRestore() = runBlocking {
         val fixture = ArchiveRestartFixture()
         val deferred = WorktreeArchiveLifecycleState.entries.filterNot { it == WorktreeArchiveLifecycleState.QUEUED }

@@ -61,6 +61,7 @@ internal class LocalWorktreeArchiveRemoval(
         val job = failedJob(worktreePath) ?: return
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
+                verifyRetryIdentity(gitWorktreeApi, job)
                 val removing = job.copy(
                     state = WorktreeArchiveLifecycleState.REMOVING,
                     stateUpdatedAtEpochMs = nextStateTime(job),
