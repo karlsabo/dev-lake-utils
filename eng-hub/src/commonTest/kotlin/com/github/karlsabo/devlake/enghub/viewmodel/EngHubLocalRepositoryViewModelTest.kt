@@ -454,7 +454,7 @@ class EngHubLocalRepositoryViewModelTest {
                 ),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onListWorktrees = {
+                onListWorktreeEntries = {
                     listStarted.complete(Unit)
                     runBlocking { releaseList.await() }
                 },
@@ -961,7 +961,7 @@ class EngHubLocalRepositoryRefreshViewModelTest {
                     ),
                 ),
                 callbacks = RecordingGitWorktreeApiCallbacks(
-                    onListWorktrees = { listCalls.tryReceive().getOrThrow().invoke() },
+                    onListWorktreeEntries = { listCalls.tryReceive().getOrThrow().invoke() },
                 ),
             ),
             configWriter = RecordingEngHubConfigWriter(),
@@ -1026,7 +1026,7 @@ class EngHubLocalRepositoryRefreshViewModelTest {
                 parentBranchesByRepoPath = mapOf(DEV_LAKE_ROOT to mapOf("feature/stacked-pr" to "main")),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onListWorktrees = { listCalls.tryReceive().getOrThrow().invoke() },
+                onListWorktreeEntries = { listCalls.tryReceive().getOrThrow().invoke() },
                 onInferWorktreeParentBranches = {
                     expansionEnrichmentStarted.complete(Unit)
                     runBlocking { releaseExpansionEnrichment.await() }
@@ -1140,7 +1140,7 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
                         Worktree(path = DEV_LAKE_ROOT, branch = "late-main", commitHash = "late"),
                     ),
                 ),
-                onListWorktrees = {
+                onListWorktreeEntries = {
                     discoveryStarted.complete(Unit)
                     runBlocking { releaseDiscovery.await() }
                 },
@@ -1334,7 +1334,7 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
                 ),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onListWorktrees = { repoPath ->
+                onListWorktreeEntries = { repoPath ->
                     when (repoPath) {
                         DEV_LAKE_ROOT -> devLakeListStarted.complete(Unit)
                         DOCS_ROOT -> docsListStarted.complete(Unit)
@@ -1416,7 +1416,7 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
                     listWorktreesFailure = IllegalStateException("git worktree list failed"),
                 ),
                 callbacks = RecordingGitWorktreeApiCallbacks(
-                    onListWorktrees = { listCalls.tryReceive().getOrThrow().invoke() },
+                    onListWorktreeEntries = { listCalls.tryReceive().getOrThrow().invoke() },
                 ),
             ),
             configWriter = RecordingEngHubConfigWriter(),
@@ -1461,7 +1461,7 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
                 ),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onListWorktrees = {
+                onListWorktreeEntries = {
                     listStarted.complete(Unit)
                     runBlocking { releaseList.await() }
                 },

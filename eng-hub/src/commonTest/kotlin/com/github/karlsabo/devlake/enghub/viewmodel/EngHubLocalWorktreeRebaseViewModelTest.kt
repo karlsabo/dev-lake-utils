@@ -48,18 +48,17 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         )
 
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
-        withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { repositories ->
-                repositories.single().worktrees.singleOrNull { it.branch == "feature/stacked-pr" }
-                    ?.parentBranch == "feature/base-pr"
-            }
+        viewModel.localRepositoriesStateFlow.first { repositories ->
+            repositories.single().worktrees.singleOrNull { it.branch == "feature/stacked-pr" }
+                ?.parentBranch == "feature/base-pr" && repositories.single().operationRequest == null
         }
+        assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeEntryRepoPaths)
 
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, "feature/base-pr")
+        viewModel.rebasingLocalWorktreePathsStateFlow.first { it.isEmpty() }
 
-        withTimeout(2_000.milliseconds) {
-            viewModel.rebasingLocalWorktreePathsStateFlow.first { it.isEmpty() }
-        }
+        assertEquals(listOf(DEV_LAKE_ROOT, DEV_LAKE_ROOT), api.listWorktreeEntryRepoPaths)
+        assertEquals(emptyList(), api.listWorktreesWithStatusRepoPaths)
 
         assertEquals(
             listOf(RebaseWorktreeOntoParentCall(childWorktreePath, "feature/base-pr")),

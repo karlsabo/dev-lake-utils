@@ -26,7 +26,7 @@ class EngHubConfiguredRepositoryStartupViewModelTest {
                 ),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onListWorktrees = {
+                onListWorktreeEntries = {
                     discoveryStarted.complete(Unit)
                     runBlocking { releaseDiscovery.await() }
                 },
