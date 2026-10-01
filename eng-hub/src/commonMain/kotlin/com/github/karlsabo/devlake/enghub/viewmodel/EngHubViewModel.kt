@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import me.tatarka.inject.annotations.Inject
 
 internal data class ConfiguredRepositoryStartup(
@@ -33,7 +35,14 @@ internal data class WorktreeArchiveDependencies(
     val delay: kotlin.time.Duration = DEFAULT_WORKTREE_ARCHIVE_DELAY,
     val waitForDeadline: suspend (kotlin.time.Duration) -> Unit = { delay(it) },
     val now: () -> kotlin.time.Instant = kotlin.time.Clock.System::now,
+    val checkoutPresent: (String) -> Boolean = ::worktreeCheckoutPresent,
 )
+
+internal fun worktreeCheckoutPresent(path: String): Boolean {
+    val checkout = Path(path)
+    return SystemFileSystem.metadataOrNull(checkout)?.isDirectory == true &&
+        SystemFileSystem.exists(Path(checkout, ".git"))
+}
 
 internal data class EngHubPersistenceDependencies(
     val notificationIgnoreStore: NotificationIgnoreStore,

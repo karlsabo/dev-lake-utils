@@ -10,6 +10,7 @@ internal suspend fun verifyRetryIdentity(
     gitWorktreeApi: GitWorktreeApi,
     job: WorktreeArchiveJob,
     removalAttempted: Boolean,
+    checkoutPresent: (String) -> Boolean,
 ) {
     val worktrees = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
     currentCoroutineContext().ensureActive()
@@ -18,5 +19,8 @@ internal suspend fun verifyRetryIdentity(
     // Startup identity failures and registered replacement branches still require a matching identity.
     check(if (registration == null) removalAttempted else registration.branch == job.branch) {
         "Cannot retry archive: worktree registration or branch no longer matches: ${job.worktreePath}"
+    }
+    check(removalAttempted || checkoutPresent(job.worktreePath)) {
+        "Cannot retry archive: worktree checkout is missing: ${job.worktreePath}"
     }
 }

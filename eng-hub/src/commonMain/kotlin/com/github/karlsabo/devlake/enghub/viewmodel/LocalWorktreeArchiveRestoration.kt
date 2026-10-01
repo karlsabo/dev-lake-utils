@@ -40,6 +40,7 @@ internal class LocalWorktreeArchiveRestoration(
         val error = when {
             worktree == null -> "Queued worktree is no longer registered: $path"
             worktree.branch != job.branch -> "Queued worktree branch has changed: $path"
+            !archive.checkoutPresent(path) -> "Queued worktree checkout is missing: $path"
             else -> null
         }
         val lease = checkNotNull(state.localWorktreeMutationGuard.tryAcquire(path)) {

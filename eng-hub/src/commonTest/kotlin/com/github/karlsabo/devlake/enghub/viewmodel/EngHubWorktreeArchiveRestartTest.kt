@@ -11,6 +11,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -143,6 +146,40 @@ class EngHubWorktreeArchiveRestartTest {
             assertEquals(emptyList(), fixture.store.listJobs())
         } finally {
             fixture.close()
+        }
+    }
+
+    @Test
+    fun staleRegistrationWithMissingCheckoutCannotScheduleDeletionOfReplacementFiles() = runBlocking {
+        val directory = "/tmp/archive-stale-registration-${Random.nextLong().toULong().toString(16)}"
+        val checkout = Path(directory, "checkout")
+        val unrelated = Path(checkout, "unrelated.txt")
+        SystemFileSystem.createDirectories(checkout)
+        writeText(unrelated, "keep me")
+        val fixture = ArchiveRestartFixture(
+            worktrees = listOf(Worktree(checkout.toString(), "feature/login", "def")),
+            checkoutPresent = ::worktreeCheckoutPresent,
+        )
+        fixture.store.jobs.value = listOf(restartQueuedJob().copy(worktreePath = checkout.toString()))
+        try {
+            val viewModel = fixture.start(100_000)
+            val failed = fixture.awaitRestored(viewModel)
+            assertEquals(WorktreeArchiveLifecycleState.FAILED, failed.state)
+            assertEquals("Queued worktree checkout is missing: $checkout", failed.errorMessage)
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertFalse(fixture.deadlines.tryReceive().isSuccess)
+            viewModel.clearActionError()
+            viewModel.retryFailedWorktreeArchive(checkout.toString())
+            fixture.awaitError(
+                viewModel,
+                "Failed to retry worktree archive: Cannot retry archive: worktree checkout is missing: $checkout",
+            )
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+            assertEquals("keep me", readText(unrelated))
+        } finally {
+            fixture.close()
+            removeTempDir(directory)
         }
     }
 
@@ -328,6 +365,7 @@ private class ArchiveRestartFixture(
         Worktree(DEV_LAKE_ROOT, "main", "abc"),
         Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/login", "def"),
     ),
+    private val checkoutPresent: (String) -> Boolean = { true },
 ) {
     val store = RecordingWorktreeArchiveStore().also { it.jobs.value = listOf(restartQueuedJob()) }
     val deadlines = Channel<Pair<Duration, CompletableDeferred<Unit>>>(Channel.UNLIMITED)
@@ -360,6 +398,7 @@ private class ArchiveRestartFixture(
         services = LocalRepositoryViewModelServices(
             worktreeArchiveStore = store,
             archiveNow = { Instant.fromEpochMilliseconds(now) },
+            checkoutPresent = checkoutPresent,
             waitForArchiveDeadline = { duration ->
                 val release = CompletableDeferred<Unit>()
                 deadlines.send(duration to release)

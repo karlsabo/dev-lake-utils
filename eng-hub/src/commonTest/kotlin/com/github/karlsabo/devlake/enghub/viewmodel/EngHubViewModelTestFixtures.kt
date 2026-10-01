@@ -283,6 +283,7 @@ data class LocalRepositoryViewModelServices(
     val archiveDelay: Duration = DEFAULT_WORKTREE_ARCHIVE_DELAY,
     val waitForArchiveDeadline: suspend (Duration) -> Unit = { delay(it) },
     val archiveNow: () -> Instant = Clock.System::now,
+    val checkoutPresent: (String) -> Boolean = { true },
 )
 
 fun createLocalRepositoryViewModel(
@@ -318,6 +319,7 @@ fun createLocalRepositoryViewModel(
             delay = services.archiveDelay,
             waitForDeadline = services.waitForArchiveDeadline,
             now = services.archiveNow,
+            checkoutPresent = services.checkoutPresent,
         ),
     ),
     configuredRepositoryStartup = ConfiguredRepositoryStartup(
