@@ -48,11 +48,9 @@ class LlmSkillSyncTest {
         sourceDir: Path,
         skills: Map<String, Map<String, String>> = emptyMap(),
         agentsContent: String? = null,
-        notesContent: String? = null,
     ) {
         writeSkillFiles(sourceDir, skills)
         writeOptionalFile(Path(sourceDir, "AGENTS.md"), agentsContent)
-        writeOptionalFile(Path(sourceDir, "notes.md"), notesContent)
     }
 
     private fun writeSkillFiles(sourceDir: Path, skills: Map<String, Map<String, String>>) {
@@ -99,7 +97,6 @@ class LlmSkillSyncTest {
                 sourceDir,
                 skills = mapOf("my-skill" to mapOf("prompt.md" to "skill content")),
                 agentsContent = "guidelines",
-                notesContent = "notes",
             )
 
             val result = sync.sync(sourceDir, homeDir, ToolTarget.CLAUDE, planningDir.toString())
@@ -169,30 +166,6 @@ class LlmSkillSyncTest {
     }
 
     @Test
-    fun copiesGuidelinesAndNotesToTargetFiles() {
-        val sourceDir = createTempDir()
-        val homeDir = createTempDir()
-        val planningDir = Path(homeDir, "planning")
-        try {
-            setupSourceDir(
-                sourceDir,
-                agentsContent = "# Guidelines\nDo the thing.",
-                notesContent = "# Notes\nRemember this.",
-            )
-
-            val result = sync.sync(sourceDir, homeDir, ToolTarget.CLAUDE, planningDir.toString())
-
-            assertTrue(result.guidelinesCopied)
-            assertTrue(result.notesCopied)
-            assertEquals("# Guidelines\nDo the thing.", readFile(Path(homeDir, ".claude", "CLAUDE.md")))
-            assertEquals("# Notes\nRemember this.", readFile(Path(homeDir, ".claude", "notes.md")))
-        } finally {
-            deleteRecursively(sourceDir)
-            deleteRecursively(homeDir)
-        }
-    }
-
-    @Test
     fun replacesPlanningMarkdownPlaceholderInMarkdownFiles() {
         val sourceDir = createTempDir()
         val homeDir = createTempDir()
@@ -208,7 +181,6 @@ class LlmSkillSyncTest {
                     ),
                 ),
                 agentsContent = "Guide path: \${PLANNING_MARKDOWN_DIR}/guide.md",
-                notesContent = "Notes path: \${PLANNING_MARKDOWN_DIR}/notes.md",
             )
 
             val result = sync.sync(sourceDir, homeDir, ToolTarget.CODEX, planningDir.toString())
@@ -229,10 +201,6 @@ class LlmSkillSyncTest {
             assertEquals(
                 "Guide path: $planningDir/guide.md",
                 readFile(Path(homeDir, ".codex", "instructions.md")),
-            )
-            assertEquals(
-                "Notes path: $planningDir/notes.md",
-                readFile(Path(homeDir, ".codex", "notes.md")),
             )
         } finally {
             deleteRecursively(sourceDir)
@@ -337,7 +305,6 @@ class LlmSkillSyncTest {
                     ),
                 ),
                 agentsContent = "Shared guidance:\n\${ALERT_TRIAGE_WHERE_TO_LOOK}",
-                notesContent = "Shared notes:\n\${ALERT_TRIAGE_WHERE_TO_LOOK}",
             )
 
             sync.sync(
@@ -356,7 +323,6 @@ class LlmSkillSyncTest {
                 readFile(Path(installedSkillDir, "script.txt")),
             )
             assertEquals("Shared guidance:\n$guidance", readFile(Path(homeDir, ".pi", "agent", "AGENTS.md")))
-            assertEquals("Shared notes:\n$guidance", readFile(Path(homeDir, ".pi", "agent", "notes.md")))
         } finally {
             deleteRecursively(sourceDir)
             deleteRecursively(homeDir)
@@ -489,7 +455,6 @@ class LlmSkillSyncTest {
                 sourceDir,
                 skills = mapOf("templated" to mapOf("SKILL.md" to "Path: \${PLANNING_MARKDOWN_DIR}/story.md")),
                 agentsContent = "guidelines",
-                notesContent = "notes",
             )
 
             val result = sync.sync(sourceDir, homeDir, ToolTarget.CLAUDE, "   ")
@@ -515,7 +480,6 @@ class LlmSkillSyncTest {
                 sourceDir,
                 skills = mapOf("templated" to mapOf("SKILL.md" to "content")),
                 agentsContent = "guidelines",
-                notesContent = "notes",
             )
 
             assertFailsWith<IllegalArgumentException> {
@@ -537,36 +501,11 @@ class LlmSkillSyncTest {
                 sourceDir,
                 skills = mapOf("templated" to mapOf("SKILL.md" to "content")),
                 agentsContent = "guidelines",
-                notesContent = "notes",
             )
 
             sync.sync(sourceDir, homeDir, ToolTarget.CLAUDE, planningDir.toString())
 
             assertTrue(fs.exists(planningDir))
-        } finally {
-            deleteRecursively(sourceDir)
-            deleteRecursively(homeDir)
-        }
-    }
-
-    @Test
-    fun gooseTargetSkipsGuidelinesButCopiesNotes() {
-        val sourceDir = createTempDir()
-        val homeDir = createTempDir()
-        val planningDir = Path(homeDir, "planning")
-        try {
-            setupSourceDir(
-                sourceDir,
-                skills = mapOf("my-skill" to mapOf("prompt.md" to "content")),
-                agentsContent = "guidelines",
-                notesContent = "notes",
-            )
-
-            val result = sync.sync(sourceDir, homeDir, ToolTarget.GOOSE, planningDir.toString())
-
-            assertFalse(result.guidelinesCopied)
-            assertTrue(result.notesCopied)
-            assertEquals("notes", readFile(Path(homeDir, ".config", "goose", "notes.md")))
         } finally {
             deleteRecursively(sourceDir)
             deleteRecursively(homeDir)
@@ -583,7 +522,6 @@ class LlmSkillSyncTest {
                 sourceDir,
                 skills = mapOf("skill1" to mapOf("prompt.md" to "content")),
                 agentsContent = "guidelines",
-                notesContent = "notes",
             )
 
             val results = sync.syncAll(sourceDir, homeDir, planningDir.toString())
@@ -596,7 +534,6 @@ class LlmSkillSyncTest {
 
             results.forEach { result ->
                 assertEquals(listOf("skill1"), result.skillsCopied)
-                assertTrue(result.notesCopied)
             }
 
             assertTrue(results[0].guidelinesCopied)
@@ -618,13 +555,11 @@ class LlmSkillSyncTest {
             setupSourceDir(
                 sourceDir,
                 skills = mapOf("skill1" to mapOf("prompt.md" to "content")),
-                notesContent = "notes",
             )
 
             val result = sync.sync(sourceDir, homeDir, ToolTarget.CLAUDE, planningDir.toString())
 
             assertFalse(result.guidelinesCopied)
-            assertTrue(result.notesCopied)
         } finally {
             deleteRecursively(sourceDir)
             deleteRecursively(homeDir)

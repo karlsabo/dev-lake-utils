@@ -1,7 +1,6 @@
 import {existsSync} from "node:fs";
 import {homedir} from "node:os";
 import {join} from "node:path";
-import {fileURLToPath} from "node:url";
 import type {ExtensionAPI} from "@earendil-works/pi-coding-agent";
 import {CancellationError, cancellationError} from "./cancellation.ts";
 import {createHandoffLedger} from "./handoff.ts";
@@ -19,7 +18,6 @@ import {
 } from "./workflow.ts";
 import {captureWorktreeBaseline} from "./worktree.ts";
 
-const GUIDANCE_PATH = fileURLToPath(new URL("../notes.md", import.meta.url));
 const PR_REVIEW_SKILL_PATH = join(homedir(), ".pi", "agent", "skills", "eh-pr-review", "SKILL.md");
 
 export default function (pi: ExtensionAPI) {
@@ -73,7 +71,6 @@ export default function (pi: ExtensionAPI) {
 											signal,
 										}),
 									{
-										guidancePath: GUIDANCE_PATH,
 										initialChanges: baseline.changes,
 										reviewEvidence: createReviewEvidence(ctx.cwd),
 										handoffLedger: createHandoffLedger(ctx.cwd),

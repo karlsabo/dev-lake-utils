@@ -38,7 +38,6 @@ export interface WorkflowResult {
 }
 
 export interface WorkflowOptions {
-	guidancePath: string;
 	initialChanges: readonly InitialChange[];
 	reviewEvidence: ReviewEvidence;
 	handoffLedger?: HandoffLedger;
@@ -232,7 +231,7 @@ class WorkflowExecution {
 	}
 
 	private context(): PromptContext {
-		return {task: this.task, guidancePath: this.options.guidancePath, initialChanges: this.options.initialChanges, prReviewSkillPath: this.options.prReviewSkillPath};
+		return {task: this.task, initialChanges: this.options.initialChanges, prReviewSkillPath: this.options.prReviewSkillPath};
 	}
 
 	private async initialValidation(): Promise<void> {
@@ -375,7 +374,6 @@ function exhausted(label: string, repairs: number, detail: string): Error {
 
 interface PromptContext {
 	task: string;
-	guidancePath: string;
 	initialChanges: readonly InitialChange[];
 	prReviewSkillPath?: string;
 }
@@ -386,7 +384,7 @@ function basePrompt(context: PromptContext, responsibility: string): string {
 Task:
 ${context.task}
 
-Before acting, read the repository's applicable AGENTS.md files and ${context.guidancePath}. Work directly in the current repository.
+Before acting, read the repository's applicable AGENTS.md files. Work directly in the current repository.
 
 Minimize no-op work. First determine whether this state's specific responsibility applies, using the task, retained evidence, and the narrowest direct inspection needed. If it does not apply, stop: do not edit files, repeat broad repository discovery, or run unrelated commands. Return the no-work form of the requested JSON. Do not run validation commands outside a validation state unless they are necessary to make the assigned edit safely.
 

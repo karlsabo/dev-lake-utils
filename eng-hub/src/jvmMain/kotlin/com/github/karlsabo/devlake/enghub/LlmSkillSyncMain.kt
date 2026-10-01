@@ -22,6 +22,5 @@ fun main(args: Array<String>) {
         println("${result.target.name}: ${result.skillsCopied.size} skills synced")
         result.skillsCopied.forEach { println("  - $it") }
         if (result.guidelinesCopied) println("  - guidelines -> ${result.target.guidelinesFileName}")
-        if (result.notesCopied) println("  - notes -> notes.md")
     }
 }

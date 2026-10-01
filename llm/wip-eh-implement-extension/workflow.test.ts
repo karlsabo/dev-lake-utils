@@ -15,7 +15,6 @@ const COMPLETED = '{"outcome":"completed","workPerformed":true,"continueWorkflow
 const NO_WORK = '{"outcome":"completed","workPerformed":false,"continueWorkflow":true,"summary":"no work needed"}';
 const PASSING = '{"passed":true,"summary":"tests passed"}';
 const CLEAN = '{"findings":[],"summary":"clean"}';
-const GUIDANCE_PATH = "/repo/llm/notes.md";
 
 class FakeEvidence implements ReviewEvidence {
 	attempts = 0;
@@ -70,8 +69,7 @@ function exhaustiveStandardResponse(state: WorkflowState): string {
 		case "fix-review-findings":
 			return COMPLETED;
 		default: {
-			const unreachable: never = state;
-			throw new Error(`Unhandled state ${unreachable}`);
+      throw new Error(`Unhandled state ${state}`);
 		}
 	}
 }
@@ -93,7 +91,7 @@ function agent(overrides?: (state: WorkflowState, prompt: string) => string | un
 }
 
 function options(evidence: ReviewEvidence, overrides: Record<string, unknown> = {}) {
-	return {guidancePath: GUIDANCE_PATH, initialChanges: [], reviewEvidence: evidence, ...overrides};
+	return {initialChanges: [], reviewEvidence: evidence, ...overrides};
 }
 
 class FakeHandoffLedger implements HandoffLedger {
@@ -159,7 +157,10 @@ test("runs each required clean implementation state through a separate agent inv
 	assert.equal(result.initialTestFixes, 0);
 	assert.equal(result.finalTestFixes, 0);
 	assert.equal(result.reviewFixes, 0);
-	assert.ok(calls.every(({prompt}) => prompt.includes(GUIDANCE_PATH)));
+	for (const {prompt} of calls) {
+		assert.match(prompt, /Before acting, read the repository's applicable AGENTS\.md files\./);
+		assert.doesNotMatch(prompt, /notes\.md/);
+	}
 	assert.ok(calls.every(({prompt}) => prompt.includes("implement one observable behavior")));
 });
 

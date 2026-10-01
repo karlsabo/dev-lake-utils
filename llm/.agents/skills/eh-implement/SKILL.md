@@ -1,6 +1,6 @@
 ---
 name: eh-implement
-description: Implement a planned story, feature slice, or description. Follow llm/notes.md while making small, testable, low-coupling code changes with disciplined comments.
+description: Implement a planned story, feature slice, or description. Follow the guidance embedded in this skill while making small, testable, low-coupling code changes with disciplined comments.
 user-invocable: true
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *)
 ---
@@ -8,10 +8,6 @@ allowed-tools: Bash, Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *
 # Implementation Skill
 
 ## Required context
-
-Before changing code, read:
-
-- `../../notes.md`
 
 Expect input to be one of:
 
@@ -80,9 +76,23 @@ Expect input to be one of:
 
 ## Red flags
 
-- More than one acceptance test in the change
 - Comments explaining obvious control flow, assignments, or syntax
 - Large functions mixing orchestration, validation, IO, and transformation
 - Hidden duplication across files or modules
 - New abstractions added before the first real use
 - Distributed behavior is added without naming consistency or failure guarantees
+
+# The Pragmatic Programmer
+
+* DRY (Don't Repeat Yourself) — Every piece of knowledge should have a single, authoritative representation.
+* Don't live with broken windows — Fix bad code, poor design, and wrong decisions as soon as you see them.
+* Make it easy to change — Good design is code that's easy to modify. If in doubt, make it replaceable.
+* Use tracer bullets — Build thin, end-to-end slices of functionality early to validate your approach.
+* Design with contracts — Use preconditions, postconditions, and invariants to make expectations explicit.
+* Crash early — A dead program causes less damage than a broken, limping one.
+* Decouple ruthlessly — Avoid coupling between components so changes don't ripple everywhere.
+* Use the power of plain text — Store knowledge in plain text; it outlives all other formats.
+* Iterate with users — Requirements are found, not given. Work closely and continuously with users.
+* Test relentlessly — Test your software, or your users will.
+* Don't assume — prove it — Assumptions in code are the root of most bugs.
+* Delight your users — The goal isn't to deliver what they asked for, but what they actually need.

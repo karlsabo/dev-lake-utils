@@ -107,14 +107,16 @@ class RecordingGitHubApi(
     private val notifications: List<Notification>? = null,
     private val pollingGate: CompletableDeferred<Unit>? = null,
 ) : GitHubApi {
-    val pullRequestByUrlCalls = mutableListOf<String>()
+    private val recordedPullRequestByUrlCalls = MutableStateFlow<List<String>>(emptyList())
+    val pullRequestByUrlCalls: List<String>
+        get() = recordedPullRequestByUrlCalls.value
     var openPullRequestCalls = 0
         private set
     var notificationListCalls = 0
         private set
 
     override suspend fun getPullRequestByUrl(url: String): PullRequest {
-        pullRequestByUrlCalls += url
+        recordedPullRequestByUrlCalls.update { it + url }
         return pullRequestsByUrl.getValue(url)
     }
 
@@ -765,22 +767,10 @@ class RecordingGitWorktreeApi(
 
 fun nativeSetupShell(): String = if (osFamily() == OsFamily.WINDOWS) "powershell.exe" else "/bin/bash"
 
-fun writeWorkingDirectorySetupCommand(fileName: String): String = if (osFamily() == OsFamily.WINDOWS) {
-    "[IO.File]::WriteAllText('$fileName', (Get-Location).Path)"
-} else {
-    "pwd > '$fileName'"
-}
-
 fun waitForSetupFileCommand(fileName: String): String = if (osFamily() == OsFamily.WINDOWS) {
     "while (-not (Test-Path -LiteralPath '$fileName')) { Start-Sleep -Milliseconds 10 }"
 } else {
     "while [ ! -f '$fileName' ]; do sleep 0.01; done"
-}
-
-fun writeSetupFileCommand(fileName: String, contents: String): String = if (osFamily() == OsFamily.WINDOWS) {
-    "[IO.File]::WriteAllText('$fileName', '$contents')"
-} else {
-    "printf '%s' '$contents' > '$fileName'"
 }
 
 fun appendSetupFileCommand(path: Path, contents: String): String = if (osFamily() == OsFamily.WINDOWS) {

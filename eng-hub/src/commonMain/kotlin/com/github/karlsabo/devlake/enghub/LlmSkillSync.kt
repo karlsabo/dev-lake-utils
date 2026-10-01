@@ -46,7 +46,6 @@ data class SyncResult(
     val target: ToolTarget,
     val skillsCopied: List<String>,
     val guidelinesCopied: Boolean,
-    val notesCopied: Boolean,
 )
 
 /**
@@ -90,8 +89,7 @@ class LlmSkillSync(
     ): SyncResult {
         val skillsCopied = syncSkills(sourceLlmDir, homeDir, target, replacements)
         val guidelinesCopied = syncGuidelines(sourceLlmDir, homeDir, target, replacements)
-        val notesCopied = syncNotes(sourceLlmDir, homeDir, target, replacements)
-        return SyncResult(target, skillsCopied, guidelinesCopied, notesCopied)
+        return SyncResult(target, skillsCopied, guidelinesCopied)
     }
 
     private fun prepareMarkdownReplacements(
@@ -192,24 +190,6 @@ class LlmSkillSync(
             }
         }
         return copied
-    }
-
-    private fun syncNotes(
-        sourceLlmDir: Path,
-        homeDir: Path,
-        target: ToolTarget,
-        replacements: MarkdownReplacements,
-    ): Boolean {
-        val notesFile = Path(sourceLlmDir, "notes.md")
-        if (!fileSystem.exists(notesFile)) {
-            logger.warn { "Notes file not found: $notesFile" }
-            return false
-        }
-
-        val destFile = Path(homeDir, target.toolDir, "notes.md")
-        fileCopier.writeFileWithReplacement(notesFile, destFile, replacements)
-        logger.info { "${target.name}: synced notes → notes.md" }
-        return true
     }
 }
 
