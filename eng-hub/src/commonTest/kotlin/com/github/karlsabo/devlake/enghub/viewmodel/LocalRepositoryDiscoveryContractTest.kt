@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.EngHubConfig
+import com.github.karlsabo.devlake.enghub.state.LocalRepositoryWorktreeRequest
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.WorktreeSetupCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,10 +47,12 @@ class LocalRepositoryDiscoveryContractTest {
         val pollingJob = backgroundScope.launch { fixture.controller.pollConfiguredLocalRepositoryWorktrees() }
         try {
             runCurrent()
+            val initialPublication = fixture.awaitDiscoveryPublication()
             assertEquals(listOf(DEV_LAKE_ROOT), fixture.api.listWorktreeEntryRepoPaths)
 
             advanceTimeBy(1_000)
             runCurrent()
+            fixture.awaitDiscoveryPublication(after = initialPublication)
 
             assertEquals(listOf(DEV_LAKE_ROOT, DEV_LAKE_ROOT), fixture.api.listWorktreeEntryRepoPaths)
             assertEquals(emptyList(), fixture.api.listWorktreesWithStatusRepoPaths)
@@ -90,6 +93,18 @@ private data class DiscoveryFixture(
     val viewModel: ViewModel,
     val controller: LocalRepositoryController,
 )
+
+private fun DiscoveryFixture.awaitDiscoveryPublication(
+    after: LocalRepositoryWorktreeRequest? = null,
+): LocalRepositoryWorktreeRequest = runBlocking {
+    // Keep virtual polling time stationary while the real IO worker publishes this tick's rows.
+    withTimeout(5_000) {
+        state.localRepositories.first { repositories ->
+            val repository = repositories.single()
+            repository.statusRequest != null && repository.statusRequest !== after && repository.worktrees.isNotEmpty()
+        }.single().statusRequest!!
+    }
+}
 
 private fun discoveryFixture(): DiscoveryFixture {
     val api = RecordingGitWorktreeApi(
