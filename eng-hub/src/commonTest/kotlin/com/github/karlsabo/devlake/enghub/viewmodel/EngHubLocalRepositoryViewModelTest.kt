@@ -24,6 +24,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.time.Duration.Companion.milliseconds
 
 private suspend fun awaitRebaseCall(api: RecordingGitWorktreeApi, call: BranchNeedsRebaseCall) {
@@ -1191,6 +1192,11 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
         withTimeout(2_000.milliseconds) { enrichmentStarted.await() }
         val discoveredWorktrees = viewModel.localRepositoriesStateFlow.value.single().worktrees
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        val collapsedWorktrees = viewModel.localRepositoriesStateFlow.value.single().worktrees
+        discoveredWorktrees.zip(collapsedWorktrees).forEach { (discovered, collapsed) ->
+            assertFalse(discovered.checkout === collapsed.checkout)
+            assertEquals(discovered, collapsed.copy(checkout = discovered.checkout))
+        }
 
         releaseEnrichment.complete(Unit)
         withTimeout(2_000.milliseconds) { enrichmentLookupDone.await() }
@@ -1200,7 +1206,7 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
         val repository = viewModel.localRepositoriesStateFlow.value.single()
         assertEquals(false, repository.isExpanded)
         assertEquals(false, repository.isLoading)
-        assertEquals(discoveredWorktrees, repository.worktrees)
+        assertEquals(collapsedWorktrees, repository.worktrees)
         assertEquals(listOf(null, null), repository.worktrees.map { it.parentBranch })
         assertEquals(listOf(false, false), repository.worktrees.map { it.needsRebase })
     }
@@ -1686,7 +1692,7 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
     }
 
     @Test
-    fun refreshPublishingNewRowsDiscardsStatusFromSupersededRefresh() = runBlocking {
+    fun unchangedRefreshAllowsSlowStatusToCompleteBeforeStartingAnotherCheck() = runBlocking {
         val firstStatusStarted = CompletableDeferred<Unit>()
         val releaseFirstStatus = CompletableDeferred<Unit>()
         val secondStatusStarted = CompletableDeferred<Unit>()
@@ -1713,7 +1719,6 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
         }
         assertEquals(null, firstRefreshRepository.worktrees.single().isDirty)
 
-        withTimeout(2_000.milliseconds) { secondStatusStarted.await() }
         val secondRefreshRepository = withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->
                 api.listWorktreeRepoPaths.size >= 2 && repositories.singleOrNull()?.worktrees?.size == 1
@@ -1722,13 +1727,12 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
         assertEquals(null, secondRefreshRepository.worktrees.single().isDirty)
 
         releaseFirstStatus.complete(Unit)
-        delay(100.milliseconds)
-        assertEquals(
-            null,
-            viewModel.localRepositoriesStateFlow.value.single().worktrees.single().isDirty,
-            "status from the superseded refresh must not fill the newer refresh's rows",
-        )
-
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.singleOrNull()?.isDirty == true
+            }
+        }
+        withTimeout(2_000.milliseconds) { secondStatusStarted.await() }
         releaseSecondStatus.complete(Unit)
         val hydratedRepository = withTimeout(2_000.milliseconds) {
             viewModel.localRepositoriesStateFlow.first { repositories ->

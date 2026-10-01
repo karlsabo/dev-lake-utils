@@ -39,11 +39,13 @@ internal class LocalRepositoryController(
     )
     private val expansionTracker = LocalRepositoryExpansionTracker(state)
     private val refreshTracker = LocalRepositoryRefreshTracker(state)
-    private val statusTracker = LocalWorktreeStatusTracker(state)
 
     // Outside viewModelScope's job tree so cancelling polling never waits on blocking Git calls.
     // Disposal cancels this scope immediately, independently of discovery's blocking children.
     private val backgroundWorkScope = viewModel.localRepositoryBackgroundScope()
+    private val statusScheduler = LocalWorktreeStatusScheduler(backgroundWorkScope, state) { path ->
+        gitWorktreeApi.worktreeIsDirty(path)
+    }
     private val worktreeEnrichmentScheduler = LocalWorktreeEnrichmentScheduler(
         scope = backgroundWorkScope,
         gitWorktreeApi = gitWorktreeApi,
@@ -169,9 +171,9 @@ internal class LocalRepositoryController(
         val enrichmentRequest = publishedRepositories.firstOrNull {
             repositoryIdentity(it.path) == normalizedRootPath
         }?.refreshRequest ?: return
-        hydrateWorktreeStatuses(normalizedRootPath, enrichmentRequest, basicWorktrees)
+        hydrateWorktreeStatuses(normalizedRootPath, enrichmentRequest)
 
-        githubIdentityResolver.resolveAndStore(rootPath, normalizedRootPath)
+        githubIdentityResolver.resolveAndStore(rootPath, normalizedRootPath, enrichmentRequest)
         worktreeEnrichmentScheduler.schedule(
             repoRootPath = rootPath,
             normalizedRepoRootPath = normalizedRootPath,
@@ -204,9 +206,9 @@ internal class LocalRepositoryController(
             }
             if (!expansionTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return@launch
 
-            hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
+            hydrateWorktreeStatuses(normalizedRepoRootPath, request)
 
-            githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
+            githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath, request)
             worktreeEnrichmentScheduler.schedule(
                 repoRootPath = repoRootPath,
                 normalizedRepoRootPath = normalizedRepoRootPath,
@@ -220,32 +222,15 @@ internal class LocalRepositoryController(
         }
     }
 
-    /**
-     * Resolves the unknown dirty status of each published worktree on view-model IO jobs; results apply only
-     * while [request] still owns the rows, so a checkout replaced by a newer request never shows stale status.
-     */
+    /** Schedules published checkout identities, not temporary discovery rows. */
     private fun hydrateWorktreeStatuses(
         normalizedRepoRootPath: String,
         request: LocalRepositoryWorktreeRequest,
-        worktrees: List<LocalWorktreeUiState>,
     ) {
-        worktrees.forEach { worktree ->
-            backgroundWorkScope.launch {
-                val isDirty = runCatching { gitWorktreeApi.worktreeIsDirty(worktree.path) }
-                    .rethrowCancellation()
-                    .getOrElse { failure ->
-                        logger.error(failure) { "Failed to check worktree status for ${worktree.path}" }
-                        return@launch
-                    }
-                statusTracker.publish(
-                    normalizedRepoRootPath = normalizedRepoRootPath,
-                    request = request,
-                    worktreePath = worktree.path,
-                    branch = worktree.branch,
-                    isDirty = isDirty,
-                )
-            }
-        }
+        val publishedRows = state.localRepositories.value.firstOrNull {
+            it.path.normalizedRepositoryPath() == normalizedRepoRootPath && it.statusRequest === request
+        }?.worktrees ?: return
+        statusScheduler.schedule(normalizedRepoRootPath, request, publishedRows)
     }
 
     private fun refreshConfiguredLocalRepositoryWorktrees(requestOwner: Job) {
@@ -279,10 +264,10 @@ internal class LocalRepositoryController(
             published && it.path.normalizedRepositoryPath() == normalizedRepoRootPath && it.statusRequest === request
         }?.worktrees ?: return
 
-        hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
+        hydrateWorktreeStatuses(normalizedRepoRootPath, request)
 
         checkActive()
-        githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
+        githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath, request)
         checkActive()
         worktreeEnrichmentScheduler.schedule(
             repoRootPath = repoRootPath,
@@ -304,16 +289,23 @@ private data class PollRefreshTask(
     val requestOwner: Job,
 )
 
-private class LocalRepositoryGitHubIdentityResolver(
+internal class LocalRepositoryGitHubIdentityResolver(
     private val state: EngHubViewModelState,
     private val gitWorktreeApi: GitWorktreeApi,
     private val repositoryIdentity: (String) -> String,
 ) {
-    fun resolveAndStore(repoRootPath: String, normalizedRepoRootPath: String) {
+    fun resolveAndStore(
+        repoRootPath: String,
+        normalizedRepoRootPath: String,
+        request: LocalRepositoryWorktreeRequest,
+    ) {
         read(repoRootPath).onSuccess { githubIdentity ->
             state.localRepositories.update { repositories ->
                 repositories.map { repository ->
-                    if (repositoryIdentity(repository.path) == normalizedRepoRootPath) {
+                    // Identity belongs to the request, not to retained checkout metadata across polls.
+                    if (repositoryIdentity(repository.path) == normalizedRepoRootPath &&
+                        (repository.operationRequest === request || repository.refreshRequest === request)
+                    ) {
                         repository.copy(repositoryIdentity = githubIdentity)
                     } else {
                         repository
@@ -345,7 +337,6 @@ internal class LocalRepositoryRefreshTracker(
                     currentRepository.copy(
                         operationRequest = null,
                         refreshRequest = request,
-                        statusRequest = null,
                     )
                 } else {
                     currentRepository

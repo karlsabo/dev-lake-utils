@@ -20,6 +20,9 @@ internal fun List<LocalRepositoryUiState>.withPreservedWorktrees(
     return map { repository ->
         val normalizedPath = repository.path.normalizedRepositoryPath()
         val previousRepository = previousRepositoriesByPath[normalizedPath]
+        if (normalizedPath != normalizedUpdatedRootPath && previousRepository != null) {
+            return@map previousRepository
+        }
         val worktrees = if (normalizedPath == normalizedUpdatedRootPath) {
             updatedWorktrees
         } else {
