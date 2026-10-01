@@ -6,13 +6,17 @@ import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-internal suspend fun verifyRetryIdentity(gitWorktreeApi: GitWorktreeApi, job: WorktreeArchiveJob) {
+internal suspend fun verifyRetryIdentity(
+    gitWorktreeApi: GitWorktreeApi,
+    job: WorktreeArchiveJob,
+    removalAttempted: Boolean,
+) {
     val worktrees = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
     currentCoroutineContext().ensureActive()
-    // A failed startup identity check must not authorize deletion of a replacement checkout or directory.
-    check(
-        worktrees.any {
-            it.path.normalizedRepositoryPath() == job.worktreePath && it.branch == job.branch
-        },
-    ) { "Cannot retry archive: worktree registration or branch no longer matches: ${job.worktreePath}" }
+    val registration = worktrees.firstOrNull { it.path.normalizedRepositoryPath() == job.worktreePath }
+    // Only an in-process removal attempt authorizes cleanup after registration has disappeared.
+    // Startup identity failures and registered replacement branches still require a matching identity.
+    check(if (registration == null) removalAttempted else registration.branch == job.branch) {
+        "Cannot retry archive: worktree registration or branch no longer matches: ${job.worktreePath}"
+    }
 }

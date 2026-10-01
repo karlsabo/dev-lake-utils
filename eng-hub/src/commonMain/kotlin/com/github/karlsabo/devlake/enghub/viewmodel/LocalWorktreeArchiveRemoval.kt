@@ -10,6 +10,7 @@ import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -22,11 +23,15 @@ internal class LocalWorktreeArchiveRemoval(
     private val errorReporter: ActionErrorReporter,
 ) {
 
+    private val attemptedQueueIds = MutableStateFlow<Set<String>>(emptySet())
+
     suspend fun remove(job: WorktreeArchiveJob, force: Boolean = false) {
         runCatching {
             currentCoroutineContext().ensureActive()
+            attemptedQueueIds.update { it + job.queueId }
             gitWorktreeApi.archiveWorktree(job.repositoryRootPath, job.worktreePath, force = force)
             completion.complete(job)
+            attemptedQueueIds.update { it - job.queueId }
         }.rethrowCancellation().onFailure { failure ->
             currentCoroutineContext().ensureActive()
             retainFailure(job, failure, force)
@@ -61,7 +66,7 @@ internal class LocalWorktreeArchiveRemoval(
         val job = failedJob(worktreePath) ?: return
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                verifyRetryIdentity(gitWorktreeApi, job)
+                verifyRetryIdentity(gitWorktreeApi, job, job.queueId in attemptedQueueIds.value)
                 val removing = job.copy(
                     state = WorktreeArchiveLifecycleState.REMOVING,
                     stateUpdatedAtEpochMs = nextStateTime(job),
@@ -82,6 +87,7 @@ internal class LocalWorktreeArchiveRemoval(
             runCatching {
                 if (archive.store.deleteFailedJob(job)) {
                     currentCoroutineContext().ensureActive()
+                    attemptedQueueIds.update { it - job.queueId }
                     reconcileAfterDismiss(job)
                 }
             }.rethrowCancellation().onFailure { report("Failed to dismiss worktree archive", it) }
