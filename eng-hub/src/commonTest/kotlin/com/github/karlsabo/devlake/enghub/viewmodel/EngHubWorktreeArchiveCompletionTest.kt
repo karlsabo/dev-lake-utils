@@ -8,6 +8,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
@@ -116,7 +117,7 @@ class EngHubWorktreeArchiveCompletionTest {
     }
 
     @Test
-    fun staleRefreshCannotCompleteArchive() = runBlocking {
+    fun collapsedRepositoryRetriesFreshDiscoveryBeforeCompletingArchive() = runBlocking {
         val fixture = ArchiveCompletionFixture()
         try {
             fixture.startRemoval()
@@ -124,9 +125,46 @@ class EngHubWorktreeArchiveCompletionTest {
             fixture.awaitRefresh()
             fixture.viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
             fixture.allowRefresh.complete(Unit)
-            fixture.awaitReconciliationError()
-            fixture.assertRetained()
-            assertEquals(emptyList(), fixture.store.deleteRemovingJobResults.value)
+            withTimeout(2_000.milliseconds) {
+                fixture.viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() }
+            }
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(listOf(true), fixture.store.deleteRemovingJobResults.value)
+            assertEquals(null, fixture.viewModel.actionErrorStateFlow.value)
+            fixture.assertOnlyRootDiscovered()
+            fixture.viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+            withTimeout(2_000.milliseconds) { fixture.updateStarted.await() }
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun overlappingSuccessfulArchivesBothReconcileAndReleaseTheirLeases() = runBlocking {
+        val secondPath = "$DEV_LAKE_ROOT-second"
+        val fixture = ArchiveCompletionFixture(secondPath = secondPath)
+        try {
+            fixture.startRemoval()
+            fixture.viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, secondPath)
+            withTimeout(2_000.milliseconds) {
+                fixture.viewModel.queuedWorktreeArchivesStateFlow.first { it.size == 2 }
+            }
+            fixture.allowArchive.complete(Unit)
+            fixture.awaitRefresh()
+            withTimeout(2_000.milliseconds) { fixture.secondRefreshStarted.await() }
+            fixture.assertBothRetained()
+            fixture.allowRefresh.complete(Unit)
+            withTimeout(2_000.milliseconds) {
+                fixture.viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() }
+            }
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(listOf(true, true), fixture.store.deleteRemovingJobResults.value)
+            assertEquals(listOf(false, false), fixture.api.archiveWorktreeForceValues)
+            assertEquals(null, fixture.viewModel.actionErrorStateFlow.value)
+            fixture.assertOnlyRootDiscovered()
+            fixture.viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+            fixture.viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, secondPath, "feature/second")
+            withTimeout(2_000.milliseconds) { fixture.bothUpdatesStarted.await() }
         } finally {
             fixture.close()
         }
@@ -145,6 +183,23 @@ class EngHubWorktreeArchiveCompletionTest {
                 fixture.viewModel.queuedWorktreeArchivesStateFlow.value.single().state,
             )
             assertEquals(false, fixture.refreshStarted.isCompleted)
+            assertEquals(emptyList(), fixture.store.deleteRemovingJobResults.value)
+            assertEquals(null, fixture.viewModel.actionErrorStateFlow.value)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun disposalDuringDiscoveryDoesNotDeleteRecordOrPublishCompletion() = runBlocking {
+        val fixture = ArchiveCompletionFixture()
+        try {
+            fixture.startRemoval()
+            fixture.allowArchive.complete(Unit)
+            fixture.awaitRefresh()
+            fixture.close()
+            withTimeout(2_000.milliseconds) { fixture.viewModel.viewModelScope.coroutineContext[Job]?.join() }
+            fixture.assertRetained()
             assertEquals(emptyList(), fixture.store.deleteRemovingJobResults.value)
             assertEquals(null, fixture.viewModel.actionErrorStateFlow.value)
         } finally {
@@ -177,19 +232,24 @@ private class ArchiveCompletionFixture(
     private val archiveFailure: RuntimeException? = null,
     private val refreshFailure: RuntimeException? = null,
     private val retainDiscoveredWorktree: Boolean = false,
+    secondPath: String? = null,
 ) {
     val store = RecordingWorktreeArchiveStore()
     val allowArchive = CompletableDeferred<Unit>()
     val allowRefresh = CompletableDeferred<Unit>()
     val refreshStarted = CompletableDeferred<Unit>()
     val updateStarted = CompletableDeferred<Unit>()
+    val bothUpdatesStarted = CompletableDeferred<Unit>()
+    val secondRefreshStarted = CompletableDeferred<Unit>()
+    private val refreshCount = MutableStateFlow(0)
+    private val updateCount = MutableStateFlow(0)
     private val deadline = CompletableDeferred<Unit>()
     private val archiveStarted = CompletableDeferred<Unit>()
     private val archived = MutableStateFlow(false)
     private val worktrees = listOf(
         Worktree(DEV_LAKE_ROOT, "main", "abc"),
         Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/login", "def"),
-    )
+    ) + listOfNotNull(secondPath?.let { Worktree(it, "feature/second", "ghi") })
     val api = RecordingGitWorktreeApi(
         responses = RecordingGitWorktreeApiResponses(
             worktreesForRepoPath = {
@@ -205,12 +265,17 @@ private class ArchiveCompletionFixture(
             },
             onListWorktreeEntries = {
                 if (archived.value) {
+                    val count = refreshCount.updateAndGet { it + 1 }
+                    if (count == 2) secondRefreshStarted.complete(Unit)
                     refreshStarted.complete(Unit)
                     runBlocking { allowRefresh.await() }
                     refreshFailure?.let { throw it }
                 }
             },
-            onUpdateWorktreeFromOrigin = { updateStarted.complete(Unit) },
+            onUpdateWorktreeFromOrigin = {
+                updateStarted.complete(Unit)
+                if (updateCount.updateAndGet { it + 1 } == 2) bothUpdatesStarted.complete(Unit)
+            },
         ),
     )
     val viewModel = createLocalRepositoryViewModel(
@@ -227,7 +292,7 @@ private class ArchiveCompletionFixture(
     suspend fun startRemoval() {
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
         withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { it.single().worktrees.size == 2 }
+            viewModel.localRepositoriesStateFlow.first { it.single().worktrees.size == worktrees.size }
         }
         viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
         withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isNotEmpty() } }
@@ -253,6 +318,15 @@ private class ArchiveCompletionFixture(
             listOf(DEV_LAKE_ROOT),
             viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.path },
         )
+    }
+
+    fun assertBothRetained() {
+        assertEquals(
+            listOf(WorktreeArchiveLifecycleState.REMOVING, WorktreeArchiveLifecycleState.REMOVING),
+            store.listJobs().map { it.state },
+        )
+        assertEquals(2, viewModel.queuedWorktreeArchivesStateFlow.value.size)
+        assertEquals(emptyList(), store.deleteRemovingJobResults.value)
     }
 
     fun assertRetained() {

@@ -30,7 +30,7 @@ internal class LocalWorktreeArchiveController(
     private val errorReporter: ActionErrorReporter,
 ) {
     private val queuedArchiveLeases = MutableStateFlow<Map<String, LocalWorktreeMutationGuard.Lease>>(emptyMap())
-    private val completion = LocalWorktreeArchiveCompletion(viewModel, localRepositories, archive.store) { job ->
+    private val completion = LocalWorktreeArchiveCompletion(viewModel, state, localRepositories, archive.store) { job ->
         clearArchiveEntry(job.worktreePath, job.queueId)
     }
 
@@ -156,7 +156,7 @@ internal class LocalWorktreeArchiveController(
         }
     }
 
-    private fun startArchiveRemoval(queuedJob: WorktreeArchiveJob, reportFailure: Boolean): Boolean {
+    private suspend fun startArchiveRemoval(queuedJob: WorktreeArchiveJob, reportFailure: Boolean): Boolean {
         val removingAt = archive.now().toEpochMilliseconds()
         val claimed = runCatching {
             archive.store.transitionQueuedJobToRemoving(
