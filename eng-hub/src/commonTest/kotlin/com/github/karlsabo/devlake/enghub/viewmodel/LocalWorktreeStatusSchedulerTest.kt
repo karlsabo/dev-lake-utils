@@ -99,6 +99,45 @@ class LocalWorktreeStatusSchedulerTest {
     }
 
     @Test
+    fun collapseThenUnchangedPollRejectsPreCollapseStatus() = runTest {
+        val state = statusState()
+        val oldResult = CompletableDeferred<Boolean>()
+        val newResult = CompletableDeferred<Boolean>()
+        var calls = 0
+        val scheduler = LocalWorktreeStatusScheduler(backgroundScope, state) {
+            calls++
+            if (calls == 1) oldResult.await() else newResult.await()
+        }
+        discoverAndSchedule(state, scheduler)
+        runCurrent()
+        val repository = state.localRepositories.value.single()
+        val oldRow = repository.worktrees.single().copy(
+            isDirty = false,
+            canUpdateFromOrigin = true,
+            integrationTargetBranch = "main",
+        )
+        state.localRepositories.value = listOf(repository.copy(worktrees = listOf(oldRow)))
+
+        LocalRepositoryExpansionTracker(state).collapse(DEV_LAKE_ROOT)
+        val collapsed = state.localRepositories.value.single()
+        assertFalse(collapsed.isExpanded)
+        assertFalse(oldRow.checkout === collapsed.worktrees.single().checkout)
+        assertEquals(oldRow, collapsed.worktrees.single().copy(checkout = oldRow.checkout))
+        discoverAndSchedule(state, scheduler)
+        runCurrent()
+        assertEquals(1, calls)
+        assertFalse(state.localRepositories.value.single().isExpanded)
+
+        oldResult.complete(true)
+        runCurrent()
+        assertEquals(null, state.localRepositories.value.single().worktrees.single().isDirty)
+        assertEquals(2, calls)
+        newResult.complete(false)
+        runCurrent()
+        assertEquals(false, state.localRepositories.value.single().worktrees.single().isDirty)
+    }
+
+    @Test
     fun disposalRejectsNonCooperativeCompletionAndDoesNotStartQueuedWork() = runTest {
         val state = statusState()
         val release = CompletableDeferred<Boolean>()

@@ -24,6 +24,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.time.Duration.Companion.milliseconds
 
 private suspend fun awaitRebaseCall(api: RecordingGitWorktreeApi, call: BranchNeedsRebaseCall) {
@@ -1191,6 +1192,11 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
         withTimeout(2_000.milliseconds) { enrichmentStarted.await() }
         val discoveredWorktrees = viewModel.localRepositoriesStateFlow.value.single().worktrees
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        val collapsedWorktrees = viewModel.localRepositoriesStateFlow.value.single().worktrees
+        discoveredWorktrees.zip(collapsedWorktrees).forEach { (discovered, collapsed) ->
+            assertFalse(discovered.checkout === collapsed.checkout)
+            assertEquals(discovered, collapsed.copy(checkout = discovered.checkout))
+        }
 
         releaseEnrichment.complete(Unit)
         withTimeout(2_000.milliseconds) { enrichmentLookupDone.await() }
@@ -1200,7 +1206,7 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
         val repository = viewModel.localRepositoriesStateFlow.value.single()
         assertEquals(false, repository.isExpanded)
         assertEquals(false, repository.isLoading)
-        assertEquals(discoveredWorktrees, repository.worktrees)
+        assertEquals(collapsedWorktrees, repository.worktrees)
         assertEquals(listOf(null, null), repository.worktrees.map { it.parentBranch })
         assertEquals(listOf(false, false), repository.worktrees.map { it.needsRebase })
     }

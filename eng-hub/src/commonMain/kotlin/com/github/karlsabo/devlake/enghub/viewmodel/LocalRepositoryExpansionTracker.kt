@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryWorktreeRequest
+import com.github.karlsabo.devlake.enghub.state.LocalWorktreeCheckout
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import kotlinx.coroutines.flow.update
 
@@ -44,6 +45,8 @@ internal class LocalRepositoryExpansionTracker(
                         operationRequest = null,
                         refreshRequest = null,
                         statusRequest = null,
+                        // A later unchanged poll must not revive pre-collapse work.
+                        worktrees = repository.worktrees.map { it.copy(checkout = LocalWorktreeCheckout()) },
                     )
                 } else {
                     repository
