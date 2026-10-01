@@ -33,7 +33,7 @@ internal fun emptyPanelActions(): WorktreePanelActions = WorktreePanelActions(
         onMergeOntoParent = { _, _, _ -> },
     ),
     forceArchive = ForceArchiveWorktreeActions(
-        onConfirm = { _, _ -> },
+        onConfirm = {},
         onDismiss = {},
     ),
 )

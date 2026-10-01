@@ -32,15 +32,21 @@ internal data class WorktreeArchiveBinEntry(
     val isRemoving: Boolean = false,
     val isFailed: Boolean = false,
     val errorMessage: String? = null,
+    val needsForceConfirmation: Boolean = false,
+)
+
+internal data class WorktreeArchiveBinActions(
+    val onUndo: (String) -> Unit = {},
+    val onRetry: (String) -> Unit = {},
+    val onDismiss: (String) -> Unit = {},
+    val onRequestForceConfirmation: (String) -> Unit = {},
 )
 
 @Composable
 internal fun WorktreeArchiveBin(
     entries: List<WorktreeArchiveBinEntry>,
     modifier: Modifier = Modifier,
-    onUndo: (String) -> Unit = {},
-    onRetry: (String) -> Unit = {},
-    onDismiss: (String) -> Unit = {},
+    actions: WorktreeArchiveBinActions = WorktreeArchiveBinActions(),
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
@@ -64,7 +70,7 @@ internal fun WorktreeArchiveBin(
                 } else {
                     entries.forEach { entry ->
                         key(entry.worktreePath) {
-                            WorktreeArchiveBinEntryRow(entry, onUndo, onRetry, onDismiss)
+                            WorktreeArchiveBinEntryRow(entry, actions)
                         }
                     }
                 }
@@ -77,18 +83,21 @@ internal fun WorktreeArchiveBin(
 @Composable
 private fun WorktreeArchiveBinEntryRow(
     entry: WorktreeArchiveBinEntry,
-    onUndo: (String) -> Unit,
-    onRetry: (String) -> Unit,
-    onDismiss: (String) -> Unit,
+    actions: WorktreeArchiveBinActions,
 ) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text(entry.branch, style = MaterialTheme.typography.body1)
         Text(entry.repository, style = MaterialTheme.typography.caption)
-        if (entry.isFailed) {
+        if (entry.needsForceConfirmation) {
+            Text("Confirmation required", style = MaterialTheme.typography.caption)
+            TextButton(onClick = { actions.onRequestForceConfirmation(entry.worktreePath) }) {
+                Text("Review force removal")
+            }
+        } else if (entry.isFailed) {
             Text("Removal failed", style = MaterialTheme.typography.caption)
             entry.errorMessage?.let { Text(it, style = MaterialTheme.typography.caption) }
-            TextButton(onClick = { onRetry(entry.worktreePath) }) { Text("Retry") }
-            TextButton(onClick = { onDismiss(entry.worktreePath) }) { Text("Dismiss") }
+            TextButton(onClick = { actions.onRetry(entry.worktreePath) }) { Text("Retry") }
+            TextButton(onClick = { actions.onDismiss(entry.worktreePath) }) { Text("Dismiss") }
         } else if (entry.isRemoving) {
             Text("Being removed", style = MaterialTheme.typography.caption)
             TooltipArea(
@@ -107,7 +116,7 @@ private fun WorktreeArchiveBinEntryRow(
             }
         } else {
             Text("${entry.remainingSeconds} seconds remaining", style = MaterialTheme.typography.caption)
-            TextButton(onClick = { onUndo(entry.worktreePath) }) {
+            TextButton(onClick = { actions.onUndo(entry.worktreePath) }) {
                 Text("Undo")
             }
         }

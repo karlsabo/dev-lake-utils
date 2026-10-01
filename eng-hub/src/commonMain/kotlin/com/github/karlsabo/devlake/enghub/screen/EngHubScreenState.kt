@@ -65,12 +65,7 @@ internal data class EngHubScreenActions(
     val settings: EngHubSettingsActions,
     val onRetryFailedWorktreeArchive: (String) -> Unit = {},
     val onDismissFailedWorktreeArchive: (String) -> Unit = {},
-)
-
-internal data class ArchiveBinActions(
-    val onUndo: (String) -> Unit = {},
-    val onRetry: (String) -> Unit = {},
-    val onDismiss: (String) -> Unit = {},
+    val onRequestForceArchiveLocalWorktree: (String) -> Unit = {},
 )
 
 internal data class EngHubSettingsActions(
@@ -206,6 +201,7 @@ internal fun engHubScreenActions(
     onUndoQueuedWorktreeArchive = viewModel.undoQueuedWorktreeArchive,
     onRetryFailedWorktreeArchive = viewModel.retryFailedWorktreeArchive,
     onDismissFailedWorktreeArchive = viewModel.dismissFailedWorktreeArchive,
+    onRequestForceArchiveLocalWorktree = viewModel.requestForceArchiveLocalWorktree,
     checkoutWorktreePath = viewModel.checkoutWorktreePath,
     onDiscoverGlobalExistingBranches = viewModel.discoverGlobalExistingBranches,
     onDiscoverGlobalExistingPullRequests = viewModel.discoverGlobalExistingPullRequests,

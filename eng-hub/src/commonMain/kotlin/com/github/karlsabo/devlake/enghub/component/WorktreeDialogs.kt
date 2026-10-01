@@ -27,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
-import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.git.WorktreeBranchNameValidator
 import dev_lake_utils.shared_resources.generated.resources.Res
 import dev_lake_utils.shared_resources.generated.resources.icon
@@ -41,7 +40,6 @@ internal data class WorktreeDialogState(
     val existingBranchDiscovery: ExistingBranchDiscoveryUiState = ExistingBranchDiscoveryUiState(),
     val useUnrelatedExistingBranchConfirmationRequest: PendingUseUnrelatedExistingBranch?,
     val worktreeConflictResolutionRequest: PendingWorktreeConflictResolution?,
-    val forceArchiveRequest: ForceArchiveWorktreeUiState?,
 )
 
 internal data class WorktreeDialogActions(
@@ -52,7 +50,6 @@ internal data class WorktreeDialogActions(
     val onDismissUseUnrelatedExistingBranchConfirmation: () -> Unit,
     val onAbortWorktreeConflict: (PendingWorktreeConflictResolution) -> Unit,
     val onLeaveWorktreeConflictAsIs: (PendingWorktreeConflictResolution) -> Unit,
-    val forceArchive: ForceArchiveWorktreeActions,
 )
 
 private data class CreateWorktreeDialogModel(
@@ -84,14 +81,6 @@ internal fun WorktreeDialogHost(
     state: WorktreeDialogState,
     actions: WorktreeDialogActions,
 ) {
-    state.forceArchiveRequest?.let { archive ->
-        ForceArchiveWorktreeDialog(
-            worktreePath = archive.worktreePath,
-            onConfirm = { actions.forceArchive.onConfirm(archive.repoRootPath, archive.worktreePath) },
-            onDismiss = actions.forceArchive.onDismiss,
-        )
-    }
-
     state.useUnrelatedExistingBranchConfirmationRequest?.let { request ->
         UseUnrelatedExistingBranchConfirmationDialog(
             request = request,

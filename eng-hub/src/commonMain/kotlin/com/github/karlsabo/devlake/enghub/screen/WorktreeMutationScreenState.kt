@@ -71,6 +71,7 @@ private fun WorktreeArchiveJob.toArchiveBinEntry(nowEpochMs: Long): WorktreeArch
         worktreePath = worktreePath,
         isRemoving = state == WorktreeArchiveLifecycleState.REMOVING,
         isFailed = state == WorktreeArchiveLifecycleState.FAILED,
+        needsForceConfirmation = state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
         errorMessage = errorMessage,
     )
 }

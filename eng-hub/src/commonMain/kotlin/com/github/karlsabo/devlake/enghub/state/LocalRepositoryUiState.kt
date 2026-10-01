@@ -48,6 +48,8 @@ data class LocalWorktreeUiState(
 data class ForceArchiveWorktreeUiState(
     val repoRootPath: String,
     val worktreePath: String,
+    val queueId: String,
+    val stateUpdatedAtEpochMs: Long,
 )
 
 fun List<LocalRepositoryConfig>.toLocalRepositoryUiStates(

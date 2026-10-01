@@ -320,9 +320,10 @@ class EngHubViewModel internal constructor(
         clearWorktreeConflictResolutionRequest(state.worktreeConflictResolutionRequests, request)
     }
 
-    val confirmForceArchiveLocalWorktree: (String, String) -> Unit =
-        archiveController::confirmForceArchiveLocalWorktree
-    val dismissForceArchiveWorktreeRequest: () -> Unit =
+    val requestForceArchiveLocalWorktree: (String) -> Unit = archiveController::requestForceArchiveLocalWorktree
+    val confirmForceArchiveLocalWorktree: (ForceArchiveWorktreeUiState) -> Unit =
+        archiveController.confirmForceArchiveLocalWorktree
+    val dismissForceArchiveWorktreeRequest: (ForceArchiveWorktreeUiState) -> Unit =
         archiveController::dismissForceArchiveWorktreeRequest
     val approvePullRequest: (NotificationUiState) -> Unit = notificationActionController::approvePullRequest
     val markNotificationDone: (NotificationUiState) -> Unit = notificationActionController::markNotificationDone

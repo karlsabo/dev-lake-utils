@@ -77,6 +77,34 @@ class SqlDelightWorktreeArchiveStore(
         queries.changedRowCount().executeAsOne() > 0
     }
 
+    override fun transitionRemovingJobToNeedsForceConfirmation(
+        job: WorktreeArchiveJob,
+        errorMessage: String,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = queries.transactionWithResult {
+        queries.transitionRemovingJobToNeedsForceConfirmation(
+            stateUpdatedAtEpochMs,
+            errorMessage,
+            job.worktreePath,
+            job.queueId,
+            job.stateUpdatedAtEpochMs,
+        )
+        queries.changedRowCount().executeAsOne() > 0
+    }
+
+    override fun transitionNeedsForceConfirmationJobToRemoving(
+        job: WorktreeArchiveJob,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = queries.transactionWithResult {
+        queries.transitionNeedsForceConfirmationJobToRemoving(
+            stateUpdatedAtEpochMs,
+            job.worktreePath,
+            job.queueId,
+            job.stateUpdatedAtEpochMs,
+        )
+        queries.changedRowCount().executeAsOne() > 0
+    }
+
     override fun transitionFailedJobToRemoving(
         job: WorktreeArchiveJob,
         stateUpdatedAtEpochMs: Long,

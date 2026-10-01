@@ -81,16 +81,24 @@ internal class LocalWorktreeArchiveController(
     val retryFailedWorktreeArchive: (String) -> Unit = removal::retry
     val dismissFailedWorktreeArchive: (String) -> Unit = removal::dismiss
 
-    fun confirmForceArchiveLocalWorktree(repoRootPath: String, worktreePath: String) {
-        val request = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
-        if (state.forceArchiveWorktreeRequest.compareAndSet(expect = request, update = null)) {
-            archiveLocalWorktree(repoRootPath, worktreePath)
-        }
+    fun requestForceArchiveLocalWorktree(worktreePath: String) {
+        val job = state.queuedWorktreeArchives.value.firstOrNull {
+            it.worktreePath == worktreePath.normalizedRepositoryPath() &&
+                it.state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
+        } ?: return
+        state.forceArchiveWorktreeRequest.value = ForceArchiveWorktreeUiState(
+            job.repositoryRootPath,
+            job.worktreePath,
+            job.queueId,
+            job.stateUpdatedAtEpochMs,
+        )
     }
 
-    fun dismissForceArchiveWorktreeRequest() {
-        state.forceArchiveWorktreeRequest.value = null
+    fun dismissForceArchiveWorktreeRequest(request: ForceArchiveWorktreeUiState) {
+        state.forceArchiveWorktreeRequest.compareAndSet(request, null)
     }
+
+    val confirmForceArchiveLocalWorktree = removal::confirmForceRemoval
 
     private fun queueKnownWorktree(repositoryRootPath: String, worktreePath: String) {
         val repository = state.localRepositories.value.firstOrNull {
