@@ -69,7 +69,7 @@ internal class LocalRepositoryExpansionTracker(
                     currentRepository.copy(
                         isLoading = false,
                         statusRequest = request,
-                        worktrees = worktrees,
+                        worktrees = worktrees.withEnrichmentFrom(currentRepository.worktrees),
                     )
                 } else {
                     currentRepository
