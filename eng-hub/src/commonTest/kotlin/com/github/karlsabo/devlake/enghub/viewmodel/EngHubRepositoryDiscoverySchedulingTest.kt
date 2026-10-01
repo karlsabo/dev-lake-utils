@@ -152,7 +152,7 @@ class EngHubRepositoryDiscoverySchedulingTest {
                 DOCS_ROOT to listOf(Worktree(DOCS_ROOT, "feature/nav", "def")),
             ),
         ),
-        callbacks = RecordingGitWorktreeApiCallbacks(onListWorktrees = onList),
+        callbacks = RecordingGitWorktreeApiCallbacks(onListWorktreeEntries = onList),
     )
 
     private fun pollingViewModel(api: RecordingGitWorktreeApi) = createLocalRepositoryViewModel(

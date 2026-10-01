@@ -324,7 +324,7 @@ class EngHubLocalWorktreeRebaseViewModelTest {
                 ),
             ),
             callbacks = RecordingGitWorktreeApiCallbacks(
-                onListWorktrees = { refreshStarted.trySend(Unit).getOrThrow() },
+                onListWorktreeEntries = { refreshStarted.trySend(Unit).getOrThrow() },
             ),
         )
         val viewModel = createLocalRepositoryViewModel(
