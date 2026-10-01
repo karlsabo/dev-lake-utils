@@ -193,10 +193,11 @@ internal class LocalWorktreeArchiveController(
     }
 
     private fun completeQueuedArchiveUndo(worktreePath: String, queueId: String) {
+        // Observers of completed Undo must be able to acquire the worktree for another mutation.
+        releaseQueuedArchiveLease(worktreePath)
         state.queuedWorktreeArchives.update { jobs ->
             jobs.filterNot { it.worktreePath.normalizedRepositoryPath() == worktreePath && it.queueId == queueId }
         }
-        releaseQueuedArchiveLease(worktreePath)
         logger.info { "Canceled queued archive for worktree $worktreePath" }
     }
 
