@@ -53,7 +53,7 @@ interface GitWorktreeCreationApi {
     ): Boolean
 }
 
-interface GitWorktreeDiscoveryApi {
+interface GitWorktreeDiscoveryApi : GitWorktreeMetadataApi {
     fun listWorktrees(repoPath: String): List<Worktree>
 
     /** Lists worktree entries without local status; entry [Worktree.isDirty] carries no status information. */
@@ -71,12 +71,23 @@ interface GitWorktreeDiscoveryApi {
     ): RefreshedExistingBranches = throw UnsupportedOperationException(
         "refreshAndListExistingBranches is not implemented",
     )
+}
+
+interface GitWorktreeMetadataApi {
     fun inferDefaultBranchRef(repoPath: String): String?
     fun inferOriginDefaultBranch(repoPath: String): String? = inferDefaultBranchRef(repoPath)
         ?.takeIf { it.startsWith("origin/") }
         ?.removePrefix("origin/")
         ?.takeIf { it.isNotBlank() && it != "HEAD" }
+
+    /** A successful null is authoritative absence; failure means no usable remote or cached answer. */
+    fun lookupOriginDefaultBranch(repoPath: String): Result<String?> = runCatching {
+        inferOriginDefaultBranch(repoPath)
+    }
     fun inferWorktreeParentBranches(repoPath: String): Map<String, String>
+    fun inferWorktreeParentBranchOutcomes(
+        repoPath: String,
+    ): WorktreeParentBranchOutcomes = WorktreeParentBranchOutcomes(inferWorktreeParentBranches(repoPath))
     fun branchNeedsRebase(
         repoPath: String,
         parentBranch: String,
@@ -141,6 +152,12 @@ enum class WorktreeIntegrationStrategy {
     Rebase,
     Merge,
 }
+
+/** Missing parents are confirmed absent unless the branch is listed as unresolved. */
+data class WorktreeParentBranchOutcomes(
+    val parents: Map<String, String>,
+    val unresolvedBranches: Set<String> = emptySet(),
+)
 
 data class RefreshedExistingBranches(
     val branches: List<String>,

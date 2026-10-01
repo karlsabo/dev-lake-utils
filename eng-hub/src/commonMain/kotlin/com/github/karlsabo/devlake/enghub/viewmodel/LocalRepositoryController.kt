@@ -181,7 +181,7 @@ internal class LocalRepositoryController(
             refreshTracker.complete(
                 normalizedRootPath,
                 enrichmentRequest,
-                enrichment.getOrElse { basicWorktrees },
+                enrichment.getOrNull(),
             )
         }
     }
@@ -293,7 +293,7 @@ internal class LocalRepositoryController(
             refreshTracker.complete(
                 normalizedRepoRootPath,
                 request,
-                enrichment.getOrElse { basicWorktrees },
+                enrichment.getOrNull(),
             )
         }
     }
@@ -388,7 +388,7 @@ internal class LocalRepositoryRefreshTracker(
     fun complete(
         normalizedRepoRootPath: String,
         request: LocalRepositoryWorktreeRequest,
-        enrichedWorktrees: List<LocalWorktreeUiState>,
+        enrichment: LocalWorktreeEnrichment?,
     ): Boolean {
         while (true) {
             val repositories = state.localRepositories.value
@@ -397,18 +397,20 @@ internal class LocalRepositoryRefreshTracker(
             }?.takeIf { current ->
                 current.refreshRequest === request ||
                     (
-                        current.statusRequest != null && enrichedWorktrees.any { enriched ->
+                        current.statusRequest != null && enrichment?.worktrees?.any { enriched ->
                             current.worktrees.any { it.checkout === enriched.checkout }
-                        }
+                        } == true
                         )
             } ?: return false
             val ownsRequest = repository.refreshRequest === request
             val applicableEnrichment = if (ownsRequest) {
-                enrichedWorktrees
+                enrichment
             } else {
-                enrichedWorktrees.filter { enriched ->
-                    repository.worktrees.any { it.checkout === enriched.checkout }
-                }
+                enrichment?.retaining(
+                    enrichment.worktrees.filter { enriched ->
+                        repository.worktrees.any { it.checkout === enriched.checkout }
+                    },
+                )
             }
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
@@ -416,7 +418,9 @@ internal class LocalRepositoryRefreshTracker(
                         isLoading = if (ownsRequest) false else currentRepository.isLoading,
                         operationRequest = if (ownsRequest) null else currentRepository.operationRequest,
                         refreshRequest = if (ownsRequest) null else currentRepository.refreshRequest,
-                        worktrees = currentRepository.worktrees.withEnrichmentFrom(applicableEnrichment),
+                        worktrees = applicableEnrichment?.let {
+                            it.mergeInto(currentRepository.worktrees)
+                        } ?: currentRepository.worktrees,
                     )
                 } else {
                     currentRepository

@@ -6,8 +6,6 @@ import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.Worktree
 
-private const val DETACHED_BRANCH = "(detached)"
-
 internal fun GitWorktreeApi.toLocalWorktreeUiStates(
     repoRootPath: String,
     worktrees: List<Worktree>,
@@ -28,12 +26,18 @@ internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
         if (enrichedWorktree == null) {
             currentWorktree
         } else {
-            val parentBranch = enrichedWorktree.parentBranch?.takeIf { it in visibleBranches }
+            val parentBranch = enrichedWorktree.parentBranch?.takeIf {
+                it in visibleBranches && !enrichedWorktree.canUpdateFromOrigin
+            }
             currentWorktree.copy(
                 parentBranch = parentBranch,
                 needsRebase = parentBranch != null && enrichedWorktree.needsRebase,
                 canUpdateFromOrigin = enrichedWorktree.canUpdateFromOrigin,
-                integrationTargetBranch = enrichedWorktree.integrationTargetBranch,
+                integrationTargetBranch = if (enrichedWorktree.parentBranch != null) {
+                    parentBranch
+                } else {
+                    enrichedWorktree.integrationTargetBranch
+                },
                 checkout = if (preserveCheckout) enrichedWorktree.checkout else currentWorktree.checkout,
             )
         }
@@ -56,30 +60,19 @@ internal fun List<LocalWorktreeUiState>.withWorktreeStatus(
 internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
     repoRootPath: String,
     worktrees: List<LocalWorktreeUiState>,
-): List<LocalWorktreeUiState> {
-    val parentBranchesByChildBranch = inferWorktreeParentBranches(repoRootPath)
-    val needsRebaseByChildBranch = rebaseNeedsByChildBranch(repoRootPath, parentBranchesByChildBranch)
-    val originDefaultBranch = inferOriginDefaultBranch(repoRootPath)
-    val visibleBranches = worktrees.mapTo(mutableSetOf()) { it.branch }
-    return worktrees.map { worktree ->
-        val canUpdateFromOrigin = worktree.branch == originDefaultBranch
-        val parentBranch = parentBranchesByChildBranch[worktree.branch]
-            ?.takeIf { !canUpdateFromOrigin && it in visibleBranches }
-        val integrationTargetBranch = parentBranch ?: originDefaultBranch?.takeIf {
-            it.isNotBlank() && worktree.branch != DETACHED_BRANCH && !canUpdateFromOrigin
-        }
-        worktree.copy(
-            parentBranch = parentBranch,
-            needsRebase = parentBranch != null && needsRebaseByChildBranch[worktree.branch] == true,
-            canUpdateFromOrigin = canUpdateFromOrigin,
-            integrationTargetBranch = integrationTargetBranch,
-        )
-    }
-}
+): List<LocalWorktreeUiState> = lookupLocalWorktreeEnrichment(repoRootPath, worktrees).worktrees
 
-private fun GitWorktreeApi.rebaseNeedsByChildBranch(
+internal fun GitWorktreeApi.lookupLocalWorktreeEnrichment(
     repoRootPath: String,
-    parentBranchesByChildBranch: Map<String, String>,
-): Map<String, Boolean> = parentBranchesByChildBranch.mapValues { (childBranch, parentBranch) ->
-    branchNeedsRebase(repoRootPath, parentBranch, childBranch)
+    worktrees: List<LocalWorktreeUiState>,
+): LocalWorktreeEnrichment {
+    val parentOutcomes = inferWorktreeParentBranchOutcomes(repoRootPath)
+    return LocalWorktreeEnrichment(
+        worktrees,
+        parentOutcomes,
+        lookupOriginDefaultBranch(repoRootPath),
+        parentOutcomes.parents.mapValues { (childBranch, parentBranch) ->
+            branchNeedsRebase(repoRootPath, parentBranch, childBranch)
+        },
+    )
 }

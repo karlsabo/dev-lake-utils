@@ -22,7 +22,7 @@ internal class LocalWorktreeEnrichmentScheduler(
         normalizedRepoRootPath: String,
         request: LocalRepositoryWorktreeRequest,
         worktrees: List<LocalWorktreeUiState>,
-        applyEnrichment: (Result<List<LocalWorktreeUiState>>) -> Unit,
+        applyEnrichment: (Result<LocalWorktreeEnrichment>) -> Unit,
     ) {
         taskQueueFor(normalizedRepoRootPath).offer(
             EnrichmentTask(repoRootPath, request.order, worktrees, applyEnrichment),
@@ -46,7 +46,7 @@ internal class LocalWorktreeEnrichmentScheduler(
             val task = taskQueue.take() ?: continue
             scope.coroutineContext.ensureActive()
             val enrichedWorktrees = runCatching {
-                gitWorktreeApi.enrichLocalWorktreeUiStates(task.repoRootPath, task.worktrees)
+                gitWorktreeApi.lookupLocalWorktreeEnrichment(task.repoRootPath, task.worktrees)
             }.rethrowCancellation()
             scope.coroutineContext.ensureActive()
             task.applyEnrichment(
@@ -85,6 +85,6 @@ internal class LocalWorktreeEnrichmentScheduler(
         val repoRootPath: String,
         val order: Long,
         val worktrees: List<LocalWorktreeUiState>,
-        val applyEnrichment: (Result<List<LocalWorktreeUiState>>) -> Unit,
+        val applyEnrichment: (Result<LocalWorktreeEnrichment>) -> Unit,
     )
 }

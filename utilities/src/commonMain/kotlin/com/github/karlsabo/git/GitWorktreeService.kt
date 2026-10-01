@@ -131,9 +131,7 @@ private fun buildGitWorktreeServiceParts(
             lister,
             existingBranchDiscovery,
             originUrlResolver,
-            defaultBranchRefResolver,
-            parentInferer,
-            ancestryChecker,
+            GitWorktreeMetadataService(defaultBranchRefResolver, parentInferer, ancestryChecker),
         ),
         archiveApi = GitWorktreeArchiveService(archiver),
         rebaseApi = GitWorktreeRebaseService(rebaser),
@@ -218,10 +216,9 @@ private class GitWorktreeDiscoveryService(
     private val lister: GitWorktreeLister,
     private val existingBranches: GitExistingBranchDiscovery,
     private val originUrlResolver: GitOriginUrlResolver,
-    private val defaultRefs: GitDefaultBranchRefResolver,
-    private val parents: GitWorktreeParentInferer,
-    private val ancestryChecker: GitBranchAncestryChecker,
-) : GitWorktreeDiscoveryApi {
+    metadata: GitWorktreeMetadataApi,
+) : GitWorktreeDiscoveryApi,
+    GitWorktreeMetadataApi by metadata {
     override fun listWorktrees(repoPath: String): List<Worktree> = lister.listWorktrees(repoPath)
 
     override fun listWorktreeEntries(repoPath: String): List<Worktree> = lister.listWorktreeEntries(repoPath)
@@ -233,15 +230,28 @@ private class GitWorktreeDiscoveryService(
     ): RefreshedExistingBranches = existingBranches.refreshAndList(repoPath)
 
     override fun originUrl(repoPath: String): String? = originUrlResolver.resolve(repoPath)
+}
 
+private class GitWorktreeMetadataService(
+    private val defaultRefs: GitDefaultBranchRefResolver,
+    private val parents: GitWorktreeParentInferer,
+    private val ancestryChecker: GitBranchAncestryChecker,
+) : GitWorktreeMetadataApi {
     override fun inferDefaultBranchRef(repoPath: String): String? = defaultRefs.inferDefaultBranchRef(repoPath)
 
     override fun inferOriginDefaultBranch(repoPath: String): String? = defaultRefs.inferOriginDefaultBranch(repoPath)
 
-    override fun inferWorktreeParentBranches(repoPath: String): Map<String, String> {
-        val parentBranches = parents.inferParentBranches(repoPath)
-        return parentBranches
-    }
+    override fun lookupOriginDefaultBranch(
+        repoPath: String,
+    ): Result<String?> = defaultRefs.lookupOriginDefaultBranch(repoPath)
+
+    override fun inferWorktreeParentBranches(
+        repoPath: String,
+    ): Map<String, String> = inferWorktreeParentBranchOutcomes(repoPath).parents
+
+    override fun inferWorktreeParentBranchOutcomes(
+        repoPath: String,
+    ): WorktreeParentBranchOutcomes = parents.inferParentBranches(repoPath)
 
     override fun branchNeedsRebase(
         repoPath: String,
@@ -874,13 +884,16 @@ private class GitDefaultBranchRefResolver(
         return null
     }
 
-    fun inferOriginDefaultBranch(repoPath: String): String? = try {
-        gitCommandApi.queryRemoteDefaultBranch(repoPath, DEFAULT_REMOTE)
-    } catch (_: GitCommandException) {
-        remoteDefaultBranchRef(repoPath, DEFAULT_REMOTE)
+    fun inferOriginDefaultBranch(repoPath: String): String? = lookupOriginDefaultBranch(repoPath).getOrNull()
+
+    fun lookupOriginDefaultBranch(repoPath: String): Result<String?> = try {
+        Result.success(gitCommandApi.queryRemoteDefaultBranch(repoPath, DEFAULT_REMOTE))
+    } catch (failure: GitCommandException) {
+        val cachedBranch = remoteDefaultBranchRef(repoPath, DEFAULT_REMOTE)
             ?.takeIf { it.startsWith("$DEFAULT_REMOTE/") }
             ?.removePrefix("$DEFAULT_REMOTE/")
             ?.takeIf { it.isNotBlank() && it != "HEAD" }
+        if (cachedBranch != null) Result.success(cachedBranch) else Result.failure(failure)
     }
 
     private fun candidateDefaultBranchRemotes(repoPath: String): List<String> = listOfNotNull(
@@ -929,7 +942,7 @@ private class GitWorktreeParentInferer(
     private val defaultBranchRefResolver: GitDefaultBranchRefResolver,
     private val logWarning: (message: String, cause: Throwable) -> Unit,
 ) {
-    fun inferParentBranches(repoPath: String): Map<String, String> {
+    fun inferParentBranches(repoPath: String): WorktreeParentBranchOutcomes {
         val visibleBranches = lister.listWorktreeEntries(repoPath)
             .asSequence()
             .filter { it.branch.isNotBlank() }
@@ -944,12 +957,14 @@ private class GitWorktreeParentInferer(
             .toList()
         val defaultBranchRef = defaultBranchRefResolver.inferDefaultBranchRef(repoPath)
 
-        return visibleBranches.mapNotNull { child ->
+        val unresolvedBranches = mutableSetOf<String>()
+        val parents = visibleBranches.mapNotNull { child ->
             val childBranch = requireNotNull(child.branch)
-            nearestParentBranch(repoPath, child, visibleBranches, defaultBranchRef)?.let { parentBranch ->
-                childBranch to parentBranch
-            }
+            val outcome = nearestParentBranch(repoPath, child, visibleBranches, defaultBranchRef)
+            if (outcome == null) unresolvedBranches += childBranch
+            outcome?.singleOrNull()?.branch?.let { parentBranch -> childBranch to parentBranch }
         }.toMap()
+        return WorktreeParentBranchOutcomes(parents, unresolvedBranches)
     }
 
     private fun nearestParentBranch(
@@ -957,14 +972,11 @@ private class GitWorktreeParentInferer(
         child: GitWorktreeParentCandidate,
         visibleBranches: List<GitWorktreeParentCandidate>,
         defaultBranchRef: String?,
-    ): String? = parentCandidates(child, visibleBranches, defaultBranchRef)
+    ): List<GitWorktreeParentCandidate>? = parentCandidates(child, visibleBranches, defaultBranchRef)
         .ancestorCandidatesOrNull(repoPath, child.ref)
-        ?.takeIf { it.isNotEmpty() }
         ?.let { ancestors -> dropVisibleCommitDuplicates(ancestors) }
         ?.let { ancestors -> dropDefaultRefDuplicates(repoPath, ancestors) }
         ?.let { uniqueAncestors -> nearestAncestorsOrNull(repoPath, uniqueAncestors) }
-        ?.singleOrNull()
-        ?.branch
 
     private fun List<GitWorktreeParentCandidate>.ancestorCandidatesOrNull(
         repoPath: String,
@@ -1066,7 +1078,7 @@ private class GitWorktreeParentInferer(
         gitCommandApi.isAncestor(repoPath, ancestorRef, descendantRef)
     } catch (e: GitCommandException) {
         logWarning(
-            "Failed to infer worktree parent from $ancestorRef to $descendantRef; leaving affected worktree flat",
+            "Failed to infer worktree parent from $ancestorRef to $descendantRef; parent inference unresolved",
             e,
         )
         null

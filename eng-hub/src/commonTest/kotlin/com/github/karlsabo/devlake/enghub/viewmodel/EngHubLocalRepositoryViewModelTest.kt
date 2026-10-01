@@ -6,6 +6,7 @@ import com.github.karlsabo.devlake.enghub.DirectoryPicker
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
+import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
 import com.github.karlsabo.git.RepositoryWorktrees
 import com.github.karlsabo.git.Worktree
@@ -895,7 +896,7 @@ class EngHubLocalRepositoryRefreshViewModelTest {
     }
 
     @Test
-    fun refreshEnrichmentFailureClearsStaleEnrichmentAndAllowsNextRefresh() = runBlocking {
+    fun refreshEnrichmentFailureRetainsMatchingMetadataAndAllowsNextRefresh() = runBlocking {
         val api = RecordingGitWorktreeApi(
             responses = RecordingGitWorktreeApiResponses(
                 worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to stackedPollWorktrees()),
@@ -922,14 +923,14 @@ class EngHubLocalRepositoryRefreshViewModelTest {
             fixture.state.localRepositories.first { repositories ->
                 val currentRepository = repositories.singleOrNull()
                 val stackedWorktree = currentRepository?.worktrees?.singleOrNull { it.branch == "feature/stacked-pr" }
-                currentRepository?.refreshRequest == null && stackedWorktree?.parentBranch == null
+                currentRepository?.refreshRequest == null && stackedWorktree?.parentBranch == "main"
             }.single()
         }
 
         assertEquals(listOf(DEV_LAKE_ROOT, DEV_LAKE_ROOT), api.listWorktreeRepoPaths)
         assertEquals(listOf("main", "feature/stacked-pr"), repository.worktrees.map { it.branch })
-        assertEquals(listOf(null, null), repository.worktrees.map { it.parentBranch })
-        assertEquals(listOf(false, false), repository.worktrees.map { it.needsRebase })
+        assertEquals(listOf(null, "main"), repository.worktrees.map { it.parentBranch })
+        assertEquals(listOf(false, true), repository.worktrees.map { it.needsRebase })
         assertEquals(false, repository.isLoading)
         assertEquals(null, repository.refreshRequest)
     }
@@ -1740,6 +1741,74 @@ class EngHubLocalWorktreeStatusHydrationViewModelTest {
     }
 }
 
+class EngHubLocalRepositoryOfflineMetadataViewModelTest {
+    private fun assertRetainedHierarchy(feature: LocalWorktreeUiState) {
+        assertEquals("main", feature.parentBranch)
+        assertEquals("main", feature.integrationTargetBranch)
+        assertEquals(true, feature.needsRebase)
+    }
+
+    @Test
+    fun unresolvedOriginRetainsMetadataOnlyForMatchingPathAndBranch() = runBlocking {
+        val featurePath = "$DEV_LAKE_ROOT-feature"
+        val replacedPath = "$DEV_LAKE_ROOT-replaced"
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc"),
+                        Worktree(path = featurePath, branch = "feature/login", commitHash = "def"),
+                        Worktree(path = replacedPath, branch = "feature/logout", commitHash = "ghi"),
+                        Worktree(path = "$featurePath-new", branch = "feature/login", commitHash = "jkl"),
+                    ),
+                ),
+                originDefaultBranchFailure = IllegalStateException("offline"),
+                unresolvedParentBranches = setOf("feature/login"),
+                isDirtyForWorktreePath = { _ -> true },
+            ),
+        )
+        val fixture = createRefreshControllerFixture(api)
+        fixture.state.localRepositories.value = fixture.state.localRepositories.value.map { repository ->
+            repository.copy(
+                worktrees = listOf(
+                    LocalWorktreeUiState(
+                        branch = "main",
+                        path = DEV_LAKE_ROOT,
+                        canUpdateFromOrigin = true,
+                    ),
+                    LocalWorktreeUiState(
+                        branch = "feature/login",
+                        path = featurePath,
+                        parentBranch = "main",
+                        needsRebase = true,
+                        integrationTargetBranch = "main",
+                    ),
+                    LocalWorktreeUiState(
+                        branch = "feature/old",
+                        path = replacedPath,
+                        integrationTargetBranch = "main",
+                    ),
+                ),
+            )
+        }
+
+        fixture.controller.refreshLocalRepositoryWorktreesBestEffort(DEV_LAKE_ROOT, "offline refresh")
+        val repository = withTimeout(2_000.milliseconds) {
+            fixture.state.localRepositories.first { repositories ->
+                val current = repositories.single()
+                current.refreshRequest == null && current.worktrees.all { it.isDirty == true }
+            }.single()
+        }
+        assertEquals(true, repository.worktrees.single { it.path == DEV_LAKE_ROOT }.canUpdateFromOrigin)
+        assertRetainedHierarchy(repository.worktrees.single { it.path == featurePath })
+        repository.worktrees.filter { it.path == replacedPath || it.path == "$featurePath-new" }.forEach {
+            assertEquals(null, it.integrationTargetBranch)
+            assertEquals(null, it.parentBranch)
+            assertEquals(false, it.canUpdateFromOrigin)
+        }
+    }
+}
+
 class EngHubLocalRepositoryRemoteLookupViewModelTest {
     @Test
     fun pollPublishesRowsWithLocalStatusWhileServerDefaultBranchLookupBlocks() = runBlocking {
@@ -1849,6 +1918,8 @@ class EngHubLocalRepositoryRemoteLookupViewModelTest {
         }
         assertEquals(listOf("main", "feature/login"), repository.worktrees.map { it.branch })
         assertEquals(true, repository.isExpanded)
+        val featureBefore = repository.worktrees.single { it.branch == "feature/login" }
+        assertEquals(null, featureBefore.integrationTargetBranch)
 
         releaseLookup.complete(Unit)
         val enrichedRepository = withTimeout(2_000.milliseconds) {
@@ -1857,7 +1928,11 @@ class EngHubLocalRepositoryRemoteLookupViewModelTest {
             }.single()
         }
         assertEquals(true, enrichedRepository.worktrees.single { it.branch == "main" }.canUpdateFromOrigin)
-        assertEquals(false, enrichedRepository.worktrees.single { it.branch == "feature/login" }.canUpdateFromOrigin)
+        val featureAfter = enrichedRepository.worktrees.single { it.branch == "feature/login" }
+        assertEquals(false, featureAfter.canUpdateFromOrigin)
+        assertEquals("main", featureAfter.integrationTargetBranch)
+        assertEquals(featureBefore.copy(integrationTargetBranch = "main"), featureAfter)
+        assertEquals(listOf(true, true), enrichedRepository.worktrees.map { it.isDirty })
     }
 
     @Test
