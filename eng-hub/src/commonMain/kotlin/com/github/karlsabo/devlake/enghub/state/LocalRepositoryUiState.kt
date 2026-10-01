@@ -4,8 +4,19 @@ import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.github.GitHubRepositoryIdentity
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 
-class LocalRepositoryWorktreeRequest internal constructor()
+class LocalRepositoryWorktreeRequest internal constructor() {
+    internal val order = nextOrder.getAndUpdate { it + 1 }
+
+    private companion object {
+        val nextOrder = MutableStateFlow(0L)
+    }
+}
+
+/** Identity of a continuously discovered checkout, retained across metadata and status updates. */
+class LocalWorktreeCheckout internal constructor()
 
 data class LocalRepositoryUiState(
     val name: String,
@@ -31,6 +42,7 @@ data class LocalWorktreeUiState(
     val needsRebase: Boolean = false,
     val canUpdateFromOrigin: Boolean = false,
     val integrationTargetBranch: String? = parentBranch,
+    val checkout: LocalWorktreeCheckout = LocalWorktreeCheckout(),
 )
 
 data class ForceArchiveWorktreeUiState(

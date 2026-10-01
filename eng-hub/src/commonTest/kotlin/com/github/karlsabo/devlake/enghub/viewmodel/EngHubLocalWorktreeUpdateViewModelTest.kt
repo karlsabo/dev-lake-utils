@@ -82,8 +82,9 @@ class EngHubLocalWorktreeUpdateViewModelTest {
         )
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
         val displayedWorktree = withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { it.single().worktrees.singleOrNull() != null }
-                .single().worktrees.single()
+            viewModel.localRepositoriesStateFlow.first {
+                it.single().worktrees.singleOrNull()?.canUpdateFromOrigin == true
+            }.single().worktrees.single()
         }
 
         viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_ROOT, "main")
