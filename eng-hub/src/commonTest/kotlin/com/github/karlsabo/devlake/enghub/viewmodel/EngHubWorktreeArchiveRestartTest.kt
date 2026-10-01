@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
@@ -174,26 +175,27 @@ class EngHubWorktreeArchiveRestartTest {
     fun staleRegistrationWithMissingCheckoutCannotScheduleDeletionOfReplacementFiles() = runBlocking {
         val directory = "/tmp/archive-stale-registration-${Random.nextLong().toULong().toString(16)}"
         val checkout = Path(directory, "checkout")
+        val checkoutPath = checkout.toString().normalizedRepositoryPath()
         val unrelated = Path(checkout, "unrelated.txt")
         SystemFileSystem.createDirectories(checkout)
         writeText(unrelated, "keep me")
         val fixture = ArchiveRestartFixture(
-            worktrees = listOf(Worktree(checkout.toString(), "feature/login", "def")),
+            worktrees = listOf(Worktree(checkoutPath, "feature/login", "def")),
             checkoutPresent = ::worktreeCheckoutPresent,
         )
-        fixture.store.jobs.value = listOf(restartQueuedJob().copy(worktreePath = checkout.toString()))
+        fixture.store.jobs.value = listOf(restartQueuedJob().copy(worktreePath = checkoutPath))
         try {
             val viewModel = fixture.start(100_000)
             val failed = fixture.awaitRestored(viewModel)
             assertEquals(WorktreeArchiveLifecycleState.FAILED, failed.state)
-            assertEquals("Queued worktree checkout is missing: $checkout", failed.errorMessage)
+            assertEquals("Queued worktree checkout is missing: $checkoutPath", failed.errorMessage)
             assertEquals(listOf(failed), fixture.store.listJobs())
             assertFalse(fixture.deadlines.tryReceive().isSuccess)
             viewModel.clearActionError()
-            viewModel.retryFailedWorktreeArchive(checkout.toString())
+            viewModel.retryFailedWorktreeArchive(checkoutPath)
             fixture.awaitError(
                 viewModel,
-                "Failed to retry worktree archive: Cannot retry archive: worktree checkout is missing: $checkout",
+                "Failed to retry worktree archive: Cannot retry archive: worktree checkout is missing: $checkoutPath",
             )
             assertEquals(listOf(failed), fixture.store.listJobs())
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
