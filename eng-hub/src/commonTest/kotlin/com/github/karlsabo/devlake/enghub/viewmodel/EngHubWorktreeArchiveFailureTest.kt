@@ -46,6 +46,41 @@ class EngHubWorktreeArchiveFailureTest {
     }
 
     @Test
+    fun retryAfterGitRemovalAndRefreshFailureCompletesWithoutRemovingTwice() = runBlocking {
+        val fixture = ArchiveFailureFixture()
+        try {
+            val first = fixture.startRemoval()
+            fixture.failNextDiscovery = IllegalStateException("discovery unavailable")
+            first.result.complete(null)
+            val failed = fixture.awaitFailed()
+            fixture.awaitError("Failed to complete worktree archive: discovery unavailable")
+            assertEquals(1, fixture.gitRemovals.value)
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            fixture.assertLeaseHeld()
+
+            fixture.viewModel.retryFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            val retry = fixture.awaitAttempt()
+            assertEquals(WorktreeArchiveLifecycleState.REMOVING, retry.job.state)
+            assertEquals(listOf(retry.job), fixture.store.listJobs())
+            retry.result.complete(null)
+            withTimeout(2_000.milliseconds) {
+                fixture.viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() }
+            }
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(1, fixture.gitRemovals.value)
+            assertEquals(listOf(false, false), fixture.api.archiveWorktreeForceValues)
+            assertEquals(
+                listOf(DEV_LAKE_ROOT),
+                fixture.viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.path },
+            )
+            fixture.viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+            withTimeout(2_000.milliseconds) { fixture.updateStarted.await() }
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun dismissForgetsFailureAndDiscoversPartialRemovalWithoutClaimingUndo() = runBlocking {
         val fixture = ArchiveFailureFixture()
         try {
@@ -232,6 +267,8 @@ private class ArchiveFailureFixture {
     )
     var discovered = worktrees
     var discoveryFailure: RuntimeException? = null
+    var failNextDiscovery: RuntimeException? = null
+    val gitRemovals = MutableStateFlow(0)
     private val attempts = Channel<ArchiveAttempt>(Channel.UNLIMITED)
     private val deadline = CompletableDeferred<Unit>()
     private val releases = MutableStateFlow<List<CompletableDeferred<RuntimeException?>>>(emptyList())
@@ -243,9 +280,18 @@ private class ArchiveFailureFixture {
                 releases.update { it + result }
                 attempts.trySend(ArchiveAttempt(store.listJobs().single(), result))
                 runBlocking { result.await() }?.let { throw it }
-                discovered = worktrees.take(1)
+                if (discovered.any { it.path == DEV_LAKE_SELECTED_WORKTREE }) {
+                    discovered = worktrees.take(1)
+                    gitRemovals.update { it + 1 }
+                }
             },
-            onListWorktreeEntries = { discoveryFailure?.let { throw it } },
+            onListWorktreeEntries = {
+                failNextDiscovery?.let { failure ->
+                    failNextDiscovery = null
+                    throw failure
+                }
+                discoveryFailure?.let { throw it }
+            },
             onUpdateWorktreeFromOrigin = { updateStarted.complete(Unit) },
         ),
     )
