@@ -268,7 +268,11 @@ class EngHubLocalWorktreeArchiveViewModelTest {
         store.transitionFailure = IllegalStateException("store unavailable")
         val waits = Channel<Pair<Duration, CompletableDeferred<Unit>>>(Channel.UNLIMITED)
         val archiveStarted = CompletableDeferred<Unit>()
-        val api = archiveTestApi(onArchiveWorktree = { _, _, _ -> archiveStarted.complete(Unit) })
+        val allowArchive = CompletableDeferred<Unit>()
+        val api = archiveTestApi(onArchiveWorktree = { _, _, _ ->
+            archiveStarted.complete(Unit)
+            runBlocking { allowArchive.await() }
+        })
         val viewModel = archiveViewModel(
             api = api,
             store = store,
@@ -279,36 +283,40 @@ class EngHubLocalWorktreeArchiveViewModelTest {
             },
             now = { Instant.fromEpochMilliseconds(70_000) },
         )
-        expandRepository(viewModel)
-        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
-        withTimeout(2_000.milliseconds) {
-            viewModel.queuedWorktreeArchivesStateFlow.first {
-                it.singleOrNull()?.state == WorktreeArchiveLifecycleState.QUEUED
+        try {
+            expandRepository(viewModel)
+            viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+            withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first {
+                    it.singleOrNull()?.state == WorktreeArchiveLifecycleState.QUEUED
+                }
             }
+            val deadline = withTimeout(2_000.milliseconds) { waits.receive() }
+            deadline.second.complete(Unit)
+            val retry = withTimeout(2_000.milliseconds) { waits.receive() }
+
+            assertEquals(5.seconds, retry.first)
+            assertEquals(
+                "Failed to start worktree archive: store unavailable",
+                viewModel.actionErrorStateFlow.value?.message,
+            )
+            assertEquals(WorktreeArchiveLifecycleState.QUEUED, store.listJobs().single().state)
+            assertEquals(emptyList(), api.archiveWorktreeCalls)
+
+            retry.second.complete(Unit)
+            withTimeout(2_000.milliseconds) { archiveStarted.await() }
+            assertEquals(
+                listOf(DEV_LAKE_SELECTED_WORKTREE, DEV_LAKE_SELECTED_WORKTREE),
+                store.transitionToRemovingCalls.value,
+            )
+            assertEquals(
+                WorktreeArchiveLifecycleState.REMOVING,
+                viewModel.queuedWorktreeArchivesStateFlow.value.single().state,
+            )
+            assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
+        } finally {
+            allowArchive.complete(Unit)
         }
-        val deadline = withTimeout(2_000.milliseconds) { waits.receive() }
-        deadline.second.complete(Unit)
-        val retry = withTimeout(2_000.milliseconds) { waits.receive() }
-
-        assertEquals(5.seconds, retry.first)
-        assertEquals(
-            "Failed to start worktree archive: store unavailable",
-            viewModel.actionErrorStateFlow.value?.message,
-        )
-        assertEquals(WorktreeArchiveLifecycleState.QUEUED, store.listJobs().single().state)
-        assertEquals(emptyList(), api.archiveWorktreeCalls)
-
-        retry.second.complete(Unit)
-        withTimeout(2_000.milliseconds) { archiveStarted.await() }
-        assertEquals(
-            listOf(DEV_LAKE_SELECTED_WORKTREE, DEV_LAKE_SELECTED_WORKTREE),
-            store.transitionToRemovingCalls.value,
-        )
-        assertEquals(
-            WorktreeArchiveLifecycleState.REMOVING,
-            viewModel.queuedWorktreeArchivesStateFlow.value.single().state,
-        )
-        assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
     }
 
     @Test
@@ -318,10 +326,12 @@ class EngHubLocalWorktreeArchiveViewModelTest {
         val archiveStarted = CompletableDeferred<Unit>()
         var currentTime = Instant.fromEpochMilliseconds(10_000)
         var persistedStateAtArchiveCall: WorktreeArchiveLifecycleState? = null
+        val allowArchive = CompletableDeferred<Unit>()
         val api = archiveTestApi(
             onArchiveWorktree = { _, _, _ ->
                 persistedStateAtArchiveCall = store.listJobs().single().state
                 archiveStarted.complete(Unit)
+                runBlocking { allowArchive.await() }
             },
         )
         val viewModel = archiveViewModel(
@@ -330,33 +340,36 @@ class EngHubLocalWorktreeArchiveViewModelTest {
             waitForArchiveDeadline = { deadlineReached.await() },
             now = { currentTime },
         )
-        expandRepository(viewModel)
-        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
-        withTimeout(2_000.milliseconds) {
-            viewModel.queuedWorktreeArchivesStateFlow.first {
-                it.singleOrNull()?.state ==
-                    WorktreeArchiveLifecycleState.QUEUED
+        try {
+            expandRepository(viewModel)
+            viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+            withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first {
+                    it.singleOrNull()?.state == WorktreeArchiveLifecycleState.QUEUED
+                }
             }
+
+            currentTime = Instant.fromEpochMilliseconds(70_000)
+            deadlineReached.complete(Unit)
+            withTimeout(2_000.milliseconds) { archiveStarted.await() }
+
+            val removingJob = viewModel.queuedWorktreeArchivesStateFlow.value.single()
+            assertEquals(WorktreeArchiveLifecycleState.REMOVING, removingJob.state)
+            assertEquals(70_000, removingJob.stateUpdatedAtEpochMs)
+            assertEquals(WorktreeArchiveLifecycleState.REMOVING, persistedStateAtArchiveCall)
+            assertEquals(listOf(DEV_LAKE_SELECTED_WORKTREE), store.transitionToRemovingCalls.value)
+            assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
+            assertEquals(listOf(false), api.archiveWorktreeForceValues)
+
+            viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            withTimeout(2_000.milliseconds) {
+                store.deleteQueuedJobCalls.first { it == listOf(DEV_LAKE_SELECTED_WORKTREE) }
+            }
+            assertEquals(listOf(removingJob), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
+        } finally {
+            allowArchive.complete(Unit)
         }
-
-        currentTime = Instant.fromEpochMilliseconds(70_000)
-        deadlineReached.complete(Unit)
-        withTimeout(2_000.milliseconds) { archiveStarted.await() }
-
-        val removingJob = viewModel.queuedWorktreeArchivesStateFlow.value.single()
-        assertEquals(WorktreeArchiveLifecycleState.REMOVING, removingJob.state)
-        assertEquals(70_000, removingJob.stateUpdatedAtEpochMs)
-        assertEquals(WorktreeArchiveLifecycleState.REMOVING, persistedStateAtArchiveCall)
-        assertEquals(listOf(DEV_LAKE_SELECTED_WORKTREE), store.transitionToRemovingCalls.value)
-        assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
-        assertEquals(listOf(false), api.archiveWorktreeForceValues)
-
-        viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
-        withTimeout(2_000.milliseconds) {
-            store.deleteQueuedJobCalls.first { it == listOf(DEV_LAKE_SELECTED_WORKTREE) }
-        }
-        assertEquals(listOf(removingJob), viewModel.queuedWorktreeArchivesStateFlow.value)
-        assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
     }
 
     @Test

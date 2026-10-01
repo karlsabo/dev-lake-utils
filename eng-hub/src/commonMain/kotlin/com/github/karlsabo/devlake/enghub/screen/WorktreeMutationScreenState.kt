@@ -70,5 +70,7 @@ private fun WorktreeArchiveJob.toArchiveBinEntry(nowEpochMs: Long): WorktreeArch
         remainingSeconds = ((deadlineAtEpochMs - nowEpochMs).coerceAtLeast(0) + 999) / 1_000,
         worktreePath = worktreePath,
         isRemoving = state == WorktreeArchiveLifecycleState.REMOVING,
+        isFailed = state == WorktreeArchiveLifecycleState.FAILED,
+        errorMessage = errorMessage,
     )
 }

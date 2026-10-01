@@ -906,6 +906,8 @@ class RecordingWorktreeArchiveStore(
     var beforeDeleteQueuedJob: (String, String) -> Unit = { _, _ -> }
     var beforeDeleteRemovingJob: (String, String) -> Unit = { _, _ -> }
     val deleteRemovingJobResults = MutableStateFlow<List<Boolean>>(emptyList())
+    var beforeFailedOperation: (String, WorktreeArchiveJob) -> Unit = { _, _ -> }
+    val failedOperationResults = MutableStateFlow<List<Pair<String, Boolean>>>(emptyList())
 
     override fun listJobs(): List<WorktreeArchiveJob> = jobs.value
 
@@ -943,6 +945,60 @@ class RecordingWorktreeArchiveStore(
                 }
             }
             if (jobs.compareAndSet(existing, updated)) return true
+        }
+    }
+
+    override fun transitionRemovingJobToFailed(
+        job: WorktreeArchiveJob,
+        errorMessage: String,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = changeAttempt("fail", job, WorktreeArchiveLifecycleState.REMOVING) {
+        it.copy(
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = errorMessage,
+            stateUpdatedAtEpochMs = stateUpdatedAtEpochMs,
+        )
+    }
+
+    override fun transitionFailedJobToRemoving(
+        job: WorktreeArchiveJob,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = changeAttempt("retry", job, WorktreeArchiveLifecycleState.FAILED) {
+        it.copy(
+            state = WorktreeArchiveLifecycleState.REMOVING,
+            errorMessage = null,
+            stateUpdatedAtEpochMs = stateUpdatedAtEpochMs,
+        )
+    }
+
+    override fun deleteFailedJob(job: WorktreeArchiveJob): Boolean = changeAttempt(
+        "dismiss",
+        job,
+        WorktreeArchiveLifecycleState.FAILED,
+    ) { null }
+
+    private fun changeAttempt(
+        operation: String,
+        expected: WorktreeArchiveJob,
+        expectedState: WorktreeArchiveLifecycleState,
+        transform: (WorktreeArchiveJob) -> WorktreeArchiveJob?,
+    ): Boolean {
+        beforeFailedOperation(operation, expected)
+        while (true) {
+            val existing = jobs.value
+            val matching = existing.firstOrNull {
+                it.worktreePath == expected.worktreePath && it.queueId == expected.queueId &&
+                    it.stateUpdatedAtEpochMs == expected.stateUpdatedAtEpochMs && it.state == expectedState
+            }
+            if (matching == null) {
+                failedOperationResults.update { it + (operation to false) }
+                return false
+            }
+            val updated = existing.mapNotNull { if (it === matching) transform(it) else it }
+            if (jobs.compareAndSet(existing, updated)) {
+                failedOperationResults.update { it + (operation to true) }
+                return true
+            }
         }
     }
 

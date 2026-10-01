@@ -297,6 +297,8 @@ class EngHubViewModel internal constructor(
 
     val archiveLocalWorktree: (String, String) -> Unit = archiveController::archiveLocalWorktree
     val undoQueuedWorktreeArchive: (String) -> Unit = archiveController::undoQueuedWorktreeArchive
+    val retryFailedWorktreeArchive: (String) -> Unit = archiveController.retryFailedWorktreeArchive
+    val dismissFailedWorktreeArchive: (String) -> Unit = archiveController.dismissFailedWorktreeArchive
     val rebaseLocalWorktreeOntoParent: (String, String, String) -> Unit =
         rebaseController::rebaseLocalWorktreeOntoParent
     val mergeLocalWorktreeWithParent: (String, String, String) -> Unit =

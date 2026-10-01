@@ -37,6 +37,13 @@ internal class LocalWorktreeArchiveCompletion(
         }
     }
 
+    suspend fun dismiss(job: WorktreeArchiveJob) {
+        val context = currentCoroutineContext()
+        context.ensureActive()
+        clearEntry(job)
+        localRepositories.refreshLocalRepositoryWorktrees(job.repositoryRootPath) { context.ensureActive() }
+    }
+
     suspend fun complete(job: WorktreeArchiveJob) {
         val completionContext = currentCoroutineContext()
         val checkActive = {

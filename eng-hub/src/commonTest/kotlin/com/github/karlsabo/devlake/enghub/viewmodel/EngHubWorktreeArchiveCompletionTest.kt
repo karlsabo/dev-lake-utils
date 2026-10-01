@@ -53,11 +53,11 @@ class EngHubWorktreeArchiveCompletionTest {
 
     @Test
     fun archiveFailureRetainsNonCancelableJobWithoutRefreshingOrForcing() = runBlocking {
-        val fixture = ArchiveCompletionFixture(archiveFailure = IllegalStateException("local changes"))
+        val fixture = ArchiveCompletionFixture(archiveFailure = IllegalStateException("contains modified files"))
         try {
             fixture.startRemoval()
             fixture.allowArchive.complete(Unit)
-            fixture.awaitError("Failed to complete worktree archive: local changes")
+            fixture.awaitError("Failed to complete worktree archive: contains modified files")
             fixture.assertRetained()
             assertEquals(false, fixture.refreshStarted.isCompleted)
             assertEquals(emptyList(), fixture.store.deleteRemovingJobResults.value)
@@ -76,7 +76,7 @@ class EngHubWorktreeArchiveCompletionTest {
             fixture.awaitRefresh()
             fixture.allowRefresh.complete(Unit)
             fixture.awaitError("Failed to complete worktree archive: discovery unavailable")
-            fixture.assertRetained()
+            fixture.assertRetained(WorktreeArchiveLifecycleState.FAILED)
             assertEquals(emptyList(), fixture.store.deleteRemovingJobResults.value)
         } finally {
             fixture.close()
@@ -93,7 +93,7 @@ class EngHubWorktreeArchiveCompletionTest {
             fixture.awaitRefresh()
             fixture.allowRefresh.complete(Unit)
             fixture.awaitError("Failed to complete worktree archive: database unavailable")
-            fixture.assertRetained()
+            fixture.assertRetained(WorktreeArchiveLifecycleState.FAILED)
             fixture.assertOnlyRootDiscovered()
         } finally {
             fixture.close()
@@ -109,7 +109,7 @@ class EngHubWorktreeArchiveCompletionTest {
             fixture.awaitRefresh()
             fixture.allowRefresh.complete(Unit)
             fixture.awaitReconciliationError()
-            fixture.assertRetained()
+            fixture.assertRetained(WorktreeArchiveLifecycleState.FAILED)
             assertEquals(emptyList(), fixture.store.deleteRemovingJobResults.value)
         } finally {
             fixture.close()
@@ -329,10 +329,10 @@ private class ArchiveCompletionFixture(
         assertEquals(emptyList(), store.deleteRemovingJobResults.value)
     }
 
-    fun assertRetained() {
-        assertEquals(WorktreeArchiveLifecycleState.REMOVING, store.listJobs().single().state)
+    fun assertRetained(expectedState: WorktreeArchiveLifecycleState = WorktreeArchiveLifecycleState.REMOVING) {
+        assertEquals(expectedState, store.listJobs().single().state)
         assertEquals(
-            WorktreeArchiveLifecycleState.REMOVING,
+            expectedState,
             viewModel.queuedWorktreeArchivesStateFlow.value.single().state,
         )
         viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
