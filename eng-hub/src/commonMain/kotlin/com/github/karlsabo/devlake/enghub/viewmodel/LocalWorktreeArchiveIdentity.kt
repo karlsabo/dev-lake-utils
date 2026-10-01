@@ -20,7 +20,7 @@ internal suspend fun verifyRetryIdentity(
     check(if (registration == null) removalAttempted else registration.branch == job.branch) {
         "Cannot retry archive: worktree registration or branch no longer matches: ${job.worktreePath}"
     }
-    check(removalAttempted || checkoutPresent(job.worktreePath)) {
+    check((removalAttempted && registration == null) || checkoutPresent(job.worktreePath)) {
         "Cannot retry archive: worktree checkout is missing: ${job.worktreePath}"
     }
 }

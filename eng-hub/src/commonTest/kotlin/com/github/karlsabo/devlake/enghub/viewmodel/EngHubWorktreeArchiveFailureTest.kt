@@ -134,6 +134,28 @@ class EngHubWorktreeArchiveFailureTest {
     }
 
     @Test
+    fun retryAfterAttemptRejectsMissingCheckoutWhileOriginalRegistrationRemains() = runBlocking {
+        val checkoutExists = MutableStateFlow(true)
+        val fixture = ArchiveFailureFixture(checkoutPresent = { checkoutExists.value })
+        try {
+            val failed = fixture.failRemoval()
+            checkoutExists.value = false
+            fixture.viewModel.clearActionError()
+            fixture.viewModel.retryFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            fixture.awaitError(
+                "Failed to retry worktree archive: Cannot retry archive: " +
+                    "worktree checkout is missing: $DEV_LAKE_SELECTED_WORKTREE",
+            )
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(listOf(failed), fixture.viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+            fixture.assertLeaseHeld()
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun dismissForgetsFailureAndDiscoversPartialRemovalWithoutClaimingUndo() = runBlocking {
         val fixture = ArchiveFailureFixture()
         try {
@@ -311,7 +333,9 @@ internal data class ArchiveAttempt(
     val result: CompletableDeferred<RuntimeException?>,
 )
 
-internal class ArchiveFailureFixture {
+internal class ArchiveFailureFixture(
+    checkoutPresent: (String) -> Boolean = { true },
+) {
     val store = RecordingWorktreeArchiveStore()
     val updateStarted = CompletableDeferred<Unit>()
     val worktrees = listOf(
@@ -354,6 +378,7 @@ internal class ArchiveFailureFixture {
         localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
         services = LocalRepositoryViewModelServices(
             worktreeArchiveStore = store,
+            checkoutPresent = checkoutPresent,
             archiveNow = { Instant.fromEpochMilliseconds(10_000) },
             waitForArchiveDeadline = { deadline.await() },
         ),

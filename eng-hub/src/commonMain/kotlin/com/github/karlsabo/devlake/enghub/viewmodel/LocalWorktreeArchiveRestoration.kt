@@ -15,17 +15,16 @@ internal class LocalWorktreeArchiveRestoration(
     private val expose: (WorktreeArchiveJob, LocalWorktreeMutationGuard.Lease) -> Unit,
 ) {
     suspend fun restore() {
-        val startupTime = archive.now().toEpochMilliseconds()
         runCatching {
             val jobs = archive.store.listJobs()
             currentCoroutineContext().ensureActive()
             jobs.filter { it.state == WorktreeArchiveLifecycleState.QUEUED }.forEach { job ->
-                runCatching { restoreJob(job, startupTime) }.rethrowCancellation().onFailure { report(it) }
+                runCatching { restoreJob(job) }.rethrowCancellation().onFailure { report(it) }
             }
         }.rethrowCancellation().onFailure { report(it) }
     }
 
-    private suspend fun restoreJob(job: WorktreeArchiveJob, startupTime: Long) {
+    private suspend fun restoreJob(job: WorktreeArchiveJob) {
         val root = job.repositoryRootPath.normalizedRepositoryPath()
         val path = job.worktreePath.normalizedRepositoryPath()
         check(root.isNotEmpty() && path.isNotEmpty() && root != path && path == job.worktreePath) {
@@ -48,14 +47,15 @@ internal class LocalWorktreeArchiveRestoration(
         }
         var exposed = false
         try {
+            val readyAt = archive.now().toEpochMilliseconds()
             val restored = job.copy(
                 state = if (error == null) {
                     WorktreeArchiveLifecycleState.QUEUED
                 } else {
                     WorktreeArchiveLifecycleState.FAILED
                 },
-                stateUpdatedAtEpochMs = maxOf(startupTime, job.stateUpdatedAtEpochMs + 1),
-                deadlineAtEpochMs = startupTime + archive.delay.inWholeMilliseconds,
+                stateUpdatedAtEpochMs = maxOf(readyAt, job.stateUpdatedAtEpochMs + 1),
+                deadlineAtEpochMs = readyAt + archive.delay.inWholeMilliseconds,
                 errorMessage = error,
             )
             if (archive.store.startup.restoreQueuedJob(

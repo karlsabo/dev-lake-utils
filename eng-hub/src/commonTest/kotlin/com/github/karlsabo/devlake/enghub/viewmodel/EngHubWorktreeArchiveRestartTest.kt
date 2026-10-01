@@ -8,6 +8,7 @@ import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -50,6 +51,26 @@ class EngHubWorktreeArchiveRestartTest {
             assertEquals(emptyList(), fixture.store.listJobs())
             restarted.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
             withTimeout(2_000.milliseconds) { fixture.updateStarted.await() }
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun slowDiscoveryStartsFreshWindowWhenRestoredJobIsExposed() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        fixture.onDiscovery = { fixture.nowEpochMs.value = 170_000 }
+        try {
+            val viewModel = fixture.start(100_000)
+            val restored = fixture.awaitRestored(viewModel)
+            assertEquals(170_000, restored.stateUpdatedAtEpochMs)
+            assertEquals(230_000, restored.deadlineAtEpochMs)
+            assertEquals(listOf(restored), fixture.store.listJobs())
+            assertEquals(60.seconds, fixture.awaitDeadline().first)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+            viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
         } finally {
             fixture.close()
@@ -368,6 +389,7 @@ private class ArchiveRestartFixture(
     private val checkoutPresent: (String) -> Boolean = { true },
 ) {
     val store = RecordingWorktreeArchiveStore().also { it.jobs.value = listOf(restartQueuedJob()) }
+    val nowEpochMs = MutableStateFlow(100_000L)
     val deadlines = Channel<Pair<Duration, CompletableDeferred<Unit>>>(Channel.UNLIMITED)
     val updateStarted = CompletableDeferred<Unit>()
     var onDiscovery: () -> Unit = {}
@@ -391,21 +413,24 @@ private class ArchiveRestartFixture(
         ),
     )
 
-    fun start(now: Long): EngHubViewModel = createLocalRepositoryViewModel(
-        gitWorktreeApi = api,
-        configWriter = RecordingEngHubConfigWriter(),
-        localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
-        services = LocalRepositoryViewModelServices(
-            worktreeArchiveStore = store,
-            archiveNow = { Instant.fromEpochMilliseconds(now) },
-            checkoutPresent = checkoutPresent,
-            waitForArchiveDeadline = { duration ->
-                val release = CompletableDeferred<Unit>()
-                deadlines.send(duration to release)
-                release.await()
-            },
-        ),
-    ).also { viewModels += it }
+    fun start(now: Long): EngHubViewModel {
+        nowEpochMs.value = now
+        return createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+            services = LocalRepositoryViewModelServices(
+                worktreeArchiveStore = store,
+                archiveNow = { Instant.fromEpochMilliseconds(nowEpochMs.value) },
+                checkoutPresent = checkoutPresent,
+                waitForArchiveDeadline = { duration ->
+                    val release = CompletableDeferred<Unit>()
+                    deadlines.send(duration to release)
+                    release.await()
+                },
+            ),
+        ).also { viewModels += it }
+    }
 
     suspend fun awaitRestored(viewModel: EngHubViewModel): WorktreeArchiveJob = withTimeout(2_000.milliseconds) {
         viewModel.queuedWorktreeArchivesStateFlow.first { it.isNotEmpty() }.single()
