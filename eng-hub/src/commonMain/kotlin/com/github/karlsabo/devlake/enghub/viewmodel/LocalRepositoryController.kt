@@ -8,6 +8,7 @@ import com.github.karlsabo.devlake.enghub.state.LocalRepositoryWorktreeRequest
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.toLocalRepositoryUiStates
 import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStates
+import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStatesWithUnknownDirtyStatus
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.github.GitHubRepositoryIdentity
 import com.github.karlsabo.github.parseGitHubRepositoryIdentity
@@ -85,7 +86,7 @@ internal class LocalRepositoryController(
     }
 
     private suspend fun addLocalRepositoryBlocking(selectedPath: String) {
-        val repositoryWorktrees = gitWorktreeApi.resolveRepositoryRoot(selectedPath)
+        val repositoryWorktrees = gitWorktreeApi.resolveRepositoryRootEntries(selectedPath)
         val rootPath = repositoryWorktrees.rootPath
         var repositoryAdded = false
         state.updateConfig { currentConfig ->
@@ -107,9 +108,9 @@ internal class LocalRepositoryController(
         }
 
         val normalizedRootPath = repositoryIdentity(rootPath)
-        val githubIdentity = githubIdentityResolver.read(rootPath).getOrNull()
         val enrichmentRequest = LocalRepositoryWorktreeRequest()
-        val basicWorktrees = repositoryWorktrees.worktrees.toLocalWorktreeUiStates(rootPath)
+        val basicWorktrees = repositoryWorktrees.worktrees
+            .toLocalWorktreeUiStatesWithUnknownDirtyStatus(rootPath)
         state.localRepositories.update { repositories ->
             state.currentConfig.localRepositories
                 .toLocalRepositoryUiStates(initiallyExpanded = false)
@@ -120,15 +121,13 @@ internal class LocalRepositoryController(
                     expandUpdatedRepository = true,
                 ).map { repository ->
                     if (repositoryIdentity(repository.path) == normalizedRootPath) {
-                        repository.copy(
-                            refreshRequest = enrichmentRequest,
-                            repositoryIdentity = githubIdentity,
-                        )
+                        repository.copy(refreshRequest = enrichmentRequest)
                     } else {
                         repository
                     }
                 }
         }
+        githubIdentityResolver.resolveAndStore(rootPath, normalizedRootPath)
 
         runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(rootPath, basicWorktrees) }
             .rethrowCancellation()
@@ -147,9 +146,9 @@ internal class LocalRepositoryController(
         request: LocalRepositoryWorktreeRequest,
     ) {
         viewModel.viewModelScope.launch(Dispatchers.IO) {
-            githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
             val basicWorktrees = runCatching {
-                gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
+                gitWorktreeApi.listWorktreeEntries(repoRootPath)
+                    .toLocalWorktreeUiStatesWithUnknownDirtyStatus(repoRootPath)
             }.rethrowCancellation().getOrElse { failure ->
                 logger.error(failure) { "Failed to list worktrees for $repoRootPath" }
                 if (expansionTracker.complete(normalizedRepoRootPath, request)) {
@@ -159,6 +158,7 @@ internal class LocalRepositoryController(
             }
             if (!expansionTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return@launch
 
+            githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
             runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees) }
                 .rethrowCancellation()
                 .onSuccess { worktrees ->
@@ -189,14 +189,15 @@ internal class LocalRepositoryController(
     private fun refreshLocalRepositoryWorktrees(repoRootPath: String) {
         val normalizedRepoRootPath = repositoryIdentity(repoRootPath)
         val request = refreshTracker.start(normalizedRepoRootPath) ?: return
-        githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
         val basicWorktrees = runCatching {
-            gitWorktreeApi.listWorktrees(repoRootPath).toLocalWorktreeUiStates(repoRootPath)
+            gitWorktreeApi.listWorktreeEntries(repoRootPath)
+                .toLocalWorktreeUiStatesWithUnknownDirtyStatus(repoRootPath)
         }.onFailure {
             refreshTracker.fail(normalizedRepoRootPath, request)
         }.getOrThrow()
         if (!refreshTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return
 
+        githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
         runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees) }
             .rethrowCancellation()
             .onSuccess { enrichedWorktrees ->
@@ -273,6 +274,7 @@ internal class LocalRepositoryRefreshTracker(
             val updatedRepositories = repositories.map { currentRepository ->
                 if (currentRepository === repository) {
                     currentRepository.copy(
+                        isLoading = false,
                         operationRequest = null,
                         worktrees = basicWorktrees.withEnrichmentFrom(currentRepository.worktrees),
                     )

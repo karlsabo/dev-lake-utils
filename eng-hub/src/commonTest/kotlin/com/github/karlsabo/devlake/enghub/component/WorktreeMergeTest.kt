@@ -31,9 +31,8 @@ class WorktreeMergeTest {
     @Test
     fun mergeActionIsDisabledWhileSetupIsInProgress() {
         assertFalse(
-            isWorktreeMergeEnabled(
-                setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
-                isArchiving = false,
+            isWorktreeStatusDependentActionEnabled(
+                mergeRowState().copy(setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE),
             ),
         )
     }
@@ -41,10 +40,8 @@ class WorktreeMergeTest {
     @Test
     fun mergeActionIsDisabledWhileRebaseIsInProgress() {
         assertFalse(
-            isWorktreeMergeEnabled(
-                setupStatus = null,
-                isArchiving = false,
-                isRebasing = true,
+            isWorktreeStatusDependentActionEnabled(
+                mergeRowState(isRebasing = true),
             ),
         )
     }
@@ -52,27 +49,34 @@ class WorktreeMergeTest {
     @Test
     fun mergeActionIsDisabledWhileMergeIsInProgress() {
         assertFalse(
-            isWorktreeMergeEnabled(
-                setupStatus = null,
-                isArchiving = false,
-                isMerging = true,
+            isWorktreeStatusDependentActionEnabled(
+                mergeRowState(isMerging = true),
             ),
         )
     }
 
     @Test
-    fun mergeActionIsEnabledWhenWorktreeIsIdle() {
-        assertTrue(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false, isMerging = false))
+    fun mergeActionIsEnabledWhenWorktreeIsIdleAndDirtyStatusIsKnown() {
+        assertTrue(
+            isWorktreeStatusDependentActionEnabled(
+                mergeRowState(),
+            ),
+        )
     }
 
-    private fun mergeRowState(isMerging: Boolean): LocalWorktreeRowState = LocalWorktreeRowState(
+    private fun mergeRowState(
+        isRebasing: Boolean = false,
+        isMerging: Boolean = false,
+    ): LocalWorktreeRowState = LocalWorktreeRowState(
         worktree = LocalWorktreeUiState(
             branch = "feature/stacked-pr",
             path = "/repos/dev-lake-utils-feature-stacked-pr",
+            isDirty = false,
             parentBranch = "feature/base-pr",
         ),
         setupStatus = null,
         isArchiving = false,
+        isRebasing = isRebasing,
         isMerging = isMerging,
     )
 }

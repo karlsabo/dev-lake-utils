@@ -72,52 +72,21 @@ internal fun visibleWorktreeMenuActions(
     if (!worktree.isRoot) add(WorktreeMenuAction.Archive)
 }
 
-internal fun isWorktreeOpenEnabled(
-    setupStatus: WorktreeSetupStatus?,
-    isArchiving: Boolean,
-    isUpdating: Boolean = false,
-    isRebasing: Boolean = false,
-    isMerging: Boolean = false,
-): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isRebasing || isMerging)
+/** Open never inspects the checkout, so it stays available while dirty status is unknown. */
+internal fun isWorktreeOpenEnabled(state: LocalWorktreeRowState): Boolean = areWorktreeActionsEnabled(state)
+
+/** Update, archive, rebase, and merge change checkout contents and require a known dirty status. */
+internal fun isWorktreeStatusDependentActionEnabled(
+    state: LocalWorktreeRowState,
+): Boolean = areWorktreeActionsEnabled(state) && state.worktree.isDirty != null
 
 internal fun isWorktreeCreateEnabled(
-    worktree: LocalWorktreeUiState,
-    setupStatus: WorktreeSetupStatus?,
-    isArchiving: Boolean,
-    isUpdating: Boolean = false,
-    isIntegrating: Boolean = false,
-): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isIntegrating) &&
-    worktree.hasCreatableBase()
+    state: LocalWorktreeRowState,
+): Boolean = areWorktreeActionsEnabled(state) && state.worktree.hasCreatableBase()
 
-internal fun isWorktreeArchiveEnabled(
-    setupStatus: WorktreeSetupStatus?,
-    isArchiving: Boolean,
-    isUpdating: Boolean = false,
-    isRebasing: Boolean = false,
-    isMerging: Boolean = false,
-): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isRebasing || isMerging)
-
-internal fun isWorktreeRebaseEnabled(
-    setupStatus: WorktreeSetupStatus?,
-    isArchiving: Boolean,
-    isUpdating: Boolean = false,
-    isRebasing: Boolean = false,
-    isMerging: Boolean = false,
-): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isRebasing || isMerging)
-
-internal fun isWorktreeMergeEnabled(
-    setupStatus: WorktreeSetupStatus?,
-    isArchiving: Boolean,
-    isUpdating: Boolean = false,
-    isRebasing: Boolean = false,
-    isMerging: Boolean = false,
-): Boolean = areWorktreeActionsEnabled(setupStatus, isArchiving, isUpdating, isRebasing || isMerging)
-
-private fun areWorktreeActionsEnabled(
-    setupStatus: WorktreeSetupStatus?,
-    isArchiving: Boolean,
-    isUpdating: Boolean,
-    isIntegrating: Boolean,
-): Boolean = setupStatus == null && !isArchiving && !isUpdating && !isIntegrating
+private fun areWorktreeActionsEnabled(state: LocalWorktreeRowState): Boolean = state.setupStatus == null &&
+    !state.isArchiving &&
+    !state.isUpdating &&
+    !(state.isRebasing || state.isMerging)
 
 private fun LocalWorktreeUiState.hasCreatableBase(): Boolean = branch != DETACHED || !baseCommitHash.isNullOrBlank()

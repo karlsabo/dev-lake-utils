@@ -137,30 +137,46 @@ class WorktreeRowsTest {
 
     @Test
     fun mergeActionIsExcludedWhileAnotherIntegrationIsInProgress() {
-        assertFalse(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false, isRebasing = true))
-        assertFalse(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false, isMerging = true))
-        assertTrue(isWorktreeMergeEnabled(setupStatus = null, isArchiving = false))
-    }
-
-    @Test
-    fun rebaseActionIsExcludedWhileMergeIsInProgress() {
-        assertFalse(isWorktreeRebaseEnabled(setupStatus = null, isArchiving = false, isMerging = true))
+        assertFalse(isWorktreeStatusDependentActionEnabled(statusDependentActionRowState(isRebasing = true)))
+        assertFalse(isWorktreeStatusDependentActionEnabled(statusDependentActionRowState(isMerging = true)))
+        assertTrue(isWorktreeStatusDependentActionEnabled(statusDependentActionRowState()))
     }
 
     @Test
     fun updateProgressDisablesEveryConflictingWorktreeAction() {
-        val worktree = LocalWorktreeUiState(
-            branch = "main",
-            path = "/repos/dev-lake-utils",
-            canUpdateFromOrigin = true,
-        )
+        val state = statusDependentActionRowState(isUpdating = true)
 
-        assertFalse(isWorktreeOpenEnabled(null, isArchiving = false, isUpdating = true))
-        assertFalse(isWorktreeCreateEnabled(worktree, null, isArchiving = false, isUpdating = true))
-        assertFalse(isWorktreeArchiveEnabled(null, isArchiving = false, isUpdating = true))
-        assertFalse(isWorktreeRebaseEnabled(null, isArchiving = false, isUpdating = true))
-        assertFalse(isWorktreeMergeEnabled(null, isArchiving = false, isUpdating = true))
+        assertFalse(isWorktreeOpenEnabled(state))
+        assertFalse(isWorktreeCreateEnabled(state))
+        assertFalse(isWorktreeStatusDependentActionEnabled(state))
     }
+
+    @Test
+    fun unknownDirtyStatusDisablesStatusDependentActionsButNotOpenOrCreate() {
+        val state = statusDependentActionRowState(isDirty = null)
+
+        assertTrue(isWorktreeOpenEnabled(state))
+        assertTrue(isWorktreeCreateEnabled(state))
+        assertFalse(isWorktreeStatusDependentActionEnabled(state))
+    }
+
+    private fun statusDependentActionRowState(
+        isDirty: Boolean? = false,
+        isUpdating: Boolean = false,
+        isRebasing: Boolean = false,
+        isMerging: Boolean = false,
+    ): LocalWorktreeRowState = LocalWorktreeRowState(
+        worktree = LocalWorktreeUiState(
+            branch = "feature/login",
+            path = "/repos/dev-lake-utils-feature-login",
+            isDirty = isDirty,
+        ),
+        setupStatus = null,
+        isArchiving = false,
+        isUpdating = isUpdating,
+        isRebasing = isRebasing,
+        isMerging = isMerging,
+    )
 
     @Test
     fun visibleWorktreeRowsFallBackToFlatListWhenParentIsMissing() {

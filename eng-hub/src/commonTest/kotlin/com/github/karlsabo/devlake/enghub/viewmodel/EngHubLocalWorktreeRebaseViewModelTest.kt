@@ -24,9 +24,8 @@ class EngHubLocalWorktreeRebaseViewModelTest {
             path = childWorktreePath,
             branch = "feature/stacked-pr",
             commitHash = "def456",
-            isDirty = true,
         )
-        val childAfterRebase = childBeforeRebase.copy(isDirty = false)
+        val childAfterRebase = childBeforeRebase.copy(commitHash = "fed654")
         var currentWorktrees = listOf(baseWorktree, childBeforeRebase)
         val api = RecordingGitWorktreeApi(
             responses = RecordingGitWorktreeApiResponses(
@@ -49,25 +48,26 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         )
 
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
-        withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { repositories ->
-                repositories.single().worktrees.any { it.isDirty }
-            }
+        viewModel.localRepositoriesStateFlow.first { repositories ->
+            repositories.single().worktrees.singleOrNull { it.branch == "feature/stacked-pr" }
+                ?.parentBranch == "feature/base-pr" && repositories.single().operationRequest == null
         }
+        assertEquals(listOf(DEV_LAKE_ROOT), api.listWorktreeEntryRepoPaths)
 
         viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, childWorktreePath, "feature/base-pr")
+        viewModel.rebasingLocalWorktreePathsStateFlow.first { it.isEmpty() }
 
-        val repository = withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { repositories ->
-                repositories.single().worktrees.none { it.isDirty }
-            }.single()
-        }
+        assertEquals(listOf(DEV_LAKE_ROOT, DEV_LAKE_ROOT), api.listWorktreeEntryRepoPaths)
+        assertEquals(emptyList(), api.listWorktreesWithStatusRepoPaths)
 
         assertEquals(
             listOf(RebaseWorktreeOntoParentCall(childWorktreePath, "feature/base-pr")),
             api.rebaseWorktreeOntoParentCalls,
         )
-        assertEquals(listOf("feature/base-pr", "feature/stacked-pr"), repository.worktrees.map { it.branch })
+        assertEquals(
+            listOf("feature/base-pr", "feature/stacked-pr"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
         assertEquals(emptySet(), viewModel.rebasingLocalWorktreePathsStateFlow.value)
         assertEquals(null, viewModel.actionErrorStateFlow.value)
     }

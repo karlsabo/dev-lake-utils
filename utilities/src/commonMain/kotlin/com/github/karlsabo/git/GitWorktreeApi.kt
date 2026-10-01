@@ -13,6 +13,9 @@ interface GitWorktreeApi :
 interface GitRepositoryApi {
     fun ensureRepository(repoPath: String, cloneUrl: String)
     fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees
+    fun resolveRepositoryRootEntries(selectedPath: String): RepositoryWorktrees = throw UnsupportedOperationException(
+        "resolveRepositoryRootEntries is not implemented",
+    )
 }
 
 interface GitWorktreeCreationApi {
@@ -52,6 +55,11 @@ interface GitWorktreeCreationApi {
 
 interface GitWorktreeDiscoveryApi {
     fun listWorktrees(repoPath: String): List<Worktree>
+
+    /** Lists worktree entries without local status; entry [Worktree.isDirty] carries no status information. */
+    fun listWorktreeEntries(repoPath: String): List<Worktree> = throw UnsupportedOperationException(
+        "listWorktreeEntries is not implemented",
+    )
     fun originUrl(repoPath: String): String? = throw UnsupportedOperationException("originUrl is not implemented")
     fun refreshAndListExistingBranches(
         repoPath: String,

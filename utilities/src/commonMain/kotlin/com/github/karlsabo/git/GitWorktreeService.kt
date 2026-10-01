@@ -154,6 +154,11 @@ private class GitRepositoryService(
         val repositoryRoot = resolver.resolveRepositoryRoot(selectedPath)
         return repositoryRoot
     }
+
+    override fun resolveRepositoryRootEntries(selectedPath: String): RepositoryWorktrees {
+        val repositoryRoot = resolver.resolveRepositoryRootEntries(selectedPath)
+        return repositoryRoot
+    }
 }
 
 private class GitWorktreeCreationService(
@@ -218,6 +223,8 @@ private class GitWorktreeDiscoveryService(
     private val ancestryChecker: GitBranchAncestryChecker,
 ) : GitWorktreeDiscoveryApi {
     override fun listWorktrees(repoPath: String): List<Worktree> = lister.listWorktrees(repoPath)
+
+    override fun listWorktreeEntries(repoPath: String): List<Worktree> = lister.listWorktreeEntries(repoPath)
 
     override fun refreshAndListExistingBranches(
         repoPath: String,
@@ -328,9 +335,22 @@ private class GitRepositoryResolver(
     }
 
     fun resolveRepositoryRoot(selectedPath: String): RepositoryWorktrees {
+        val repositoryRoot = resolveRepositoryRoot(selectedPath, listWorktrees = lister::listWorktrees)
+        return repositoryRoot
+    }
+
+    fun resolveRepositoryRootEntries(selectedPath: String): RepositoryWorktrees {
+        val repositoryRoot = resolveRepositoryRoot(selectedPath, listWorktrees = lister::listWorktreeEntries)
+        return repositoryRoot
+    }
+
+    private fun resolveRepositoryRoot(
+        selectedPath: String,
+        listWorktrees: (String) -> List<Worktree>,
+    ): RepositoryWorktrees {
         verifySelectedPathIsRepository(selectedPath)
         val selectedWorktreePath = resolveSelectedWorktreePath(selectedPath)
-        val worktrees = lister.listWorktrees(selectedWorktreePath)
+        val worktrees = listWorktrees(selectedWorktreePath)
         verifySelectedWorktreeIsListed(selectedPath, selectedWorktreePath, worktrees)
 
         return RepositoryWorktrees(

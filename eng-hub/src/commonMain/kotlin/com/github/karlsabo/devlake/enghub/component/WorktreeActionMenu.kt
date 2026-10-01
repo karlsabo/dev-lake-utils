@@ -93,13 +93,7 @@ private fun OpenWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onOpen()
         },
-        enabled = isWorktreeOpenEnabled(
-            setupStatus = state.setupStatus,
-            isArchiving = state.isArchiving,
-            isUpdating = state.isUpdating,
-            isRebasing = state.isRebasing,
-            isMerging = state.isMerging,
-        ),
+        enabled = isWorktreeOpenEnabled(state),
     ) {
         Text(setupActionLabel(defaultLabel = "Open", setupStatus = state.setupStatus))
     }
@@ -133,13 +127,7 @@ private fun CreateWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onOpenCreateWorktreeDialog()
         },
-        enabled = isWorktreeCreateEnabled(
-            worktree = state.worktree,
-            setupStatus = state.setupStatus,
-            isArchiving = state.isArchiving,
-            isUpdating = state.isUpdating,
-            isIntegrating = state.isRebasing || state.isMerging,
-        ),
+        enabled = isWorktreeCreateEnabled(state),
     ) {
         Text("Create worktree")
     }
@@ -156,13 +144,7 @@ private fun RebaseOntoParentMenuItem(
             onMenuDismiss()
             rowActions.onRebaseOntoParent()
         },
-        enabled = isWorktreeRebaseEnabled(
-            setupStatus = state.setupStatus,
-            isArchiving = state.isArchiving,
-            isUpdating = state.isUpdating,
-            isRebasing = state.isRebasing,
-            isMerging = state.isMerging,
-        ),
+        enabled = isWorktreeStatusDependentActionEnabled(state),
     ) {
         Text("Rebase onto ${requireNotNull(state.worktree.integrationTargetBranch)}")
     }
@@ -179,13 +161,7 @@ private fun MergeOntoParentMenuItem(
             onMenuDismiss()
             rowActions.onMergeOntoParent()
         },
-        enabled = isWorktreeMergeEnabled(
-            setupStatus = state.setupStatus,
-            isArchiving = state.isArchiving,
-            isUpdating = state.isUpdating,
-            isRebasing = state.isRebasing,
-            isMerging = state.isMerging,
-        ),
+        enabled = isWorktreeStatusDependentActionEnabled(state),
     ) {
         Text("Merge ${requireNotNull(state.worktree.integrationTargetBranch)} into worktree")
     }
@@ -202,13 +178,7 @@ private fun ArchiveWorktreeMenuItem(
             onMenuDismiss()
             rowActions.onArchive()
         },
-        enabled = isWorktreeArchiveEnabled(
-            setupStatus = state.setupStatus,
-            isArchiving = state.isArchiving,
-            isUpdating = state.isUpdating,
-            isRebasing = state.isRebasing,
-            isMerging = state.isMerging,
-        ),
+        enabled = isWorktreeStatusDependentActionEnabled(state),
     ) {
         Text("Archive")
     }

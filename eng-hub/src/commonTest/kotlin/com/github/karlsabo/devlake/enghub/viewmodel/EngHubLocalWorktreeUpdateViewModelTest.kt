@@ -21,8 +21,8 @@ import kotlin.time.Duration.Companion.milliseconds
 class EngHubLocalWorktreeUpdateViewModelTest {
     @Test
     fun updateFromOriginUpdatesDefaultBranchAndRefreshesRepository() = runBlocking {
-        val before = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123", isDirty = true)
-        val after = before.copy(commitHash = "def456", isDirty = false)
+        val before = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val after = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "def456")
         var currentWorktrees = listOf(before)
         val api = RecordingGitWorktreeApi(
             responses = RecordingGitWorktreeApiResponses(
@@ -43,23 +43,23 @@ class EngHubLocalWorktreeUpdateViewModelTest {
         )
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
         withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { it.single().worktrees.singleOrNull()?.isDirty == true }
+            viewModel.localRepositoriesStateFlow.first {
+                it.single().worktrees.singleOrNull()?.canUpdateFromOrigin == true
+            }
         }
 
         val refreshCountBeforeUpdate = api.listWorktreeRepoPaths.size
         viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_ROOT, "main")
 
-        val updated = withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first {
-                it.single().worktrees.singleOrNull()?.isDirty == false
-            }
-        }
-        assertEquals(listOf(UpdateWorktreeFromOriginCall(DEV_LAKE_ROOT, "main")), api.updateWorktreeFromOriginCalls)
-        assertEquals(refreshCountBeforeUpdate + 1, api.listWorktreeRepoPaths.size)
-        assertEquals(true, updated.single().worktrees.single().canUpdateFromOrigin)
         withTimeout(2_000.milliseconds) {
             viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
         }
+        assertEquals(listOf(UpdateWorktreeFromOriginCall(DEV_LAKE_ROOT, "main")), api.updateWorktreeFromOriginCalls)
+        assertEquals(refreshCountBeforeUpdate + 1, api.listWorktreeRepoPaths.size)
+        assertEquals(
+            listOf("main"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
         assertEquals(null, viewModel.actionErrorStateFlow.value)
     }
 
@@ -139,8 +139,8 @@ class EngHubLocalWorktreeUpdateViewModelTest {
 
     @Test
     fun autostashRestorationFailureRefreshesRepositoryAndUsesActionErrorMechanism() = runBlocking {
-        val before = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123", isDirty = true)
-        val after = before.copy(commitHash = "def456", isDirty = false)
+        val before = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123")
+        val after = Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "def456")
         var currentWorktrees = listOf(before)
         val api = RecordingGitWorktreeApi(
             responses = RecordingGitWorktreeApiResponses(
@@ -161,26 +161,26 @@ class EngHubLocalWorktreeUpdateViewModelTest {
         )
         viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
         withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first { it.single().worktrees.singleOrNull()?.isDirty == true }
+            viewModel.localRepositoriesStateFlow.first {
+                it.single().worktrees.singleOrNull()?.canUpdateFromOrigin == true
+            }
         }
 
         val refreshCountBeforeUpdate = api.listWorktreeRepoPaths.size
         viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_ROOT, "main")
 
-        val updated = withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first {
-                it.single().worktrees.singleOrNull()?.isDirty == false
-            }
+        withTimeout(2_000.milliseconds) {
+            viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
         }
         val error = withTimeout(2_000.milliseconds) {
             viewModel.actionErrorStateFlow.first { it != null }
         }
         assertEquals(listOf(UpdateWorktreeFromOriginCall(DEV_LAKE_ROOT, "main")), api.updateWorktreeFromOriginCalls)
         assertEquals(refreshCountBeforeUpdate + 1, api.listWorktreeRepoPaths.size)
-        assertEquals(false, updated.single().worktrees.single().isDirty)
-        withTimeout(2_000.milliseconds) {
-            viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
-        }
+        assertEquals(
+            listOf("main"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
         assertEquals("autostash restoration failed", error?.message)
     }
 
@@ -426,13 +426,13 @@ class EngHubLocalWorktreeUpdateViewModelTest {
         releaseUpdate.complete(Unit)
 
         withTimeout(2_000.milliseconds) {
-            viewModel.localRepositoriesStateFlow.first {
-                it.single().worktrees.firstOrNull { worktree -> worktree.branch == "feature/login" }
-                    ?.isDirty == false
-            }
             viewModel.updatingLocalWorktreePathsStateFlow.first { it.isEmpty() }
         }
         assertEquals(refreshCountBeforeUpdate + 1, api.listWorktreeRepoPaths.size)
+        assertEquals(
+            listOf("main", "feature/login"),
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.map { it.branch },
+        )
         assertEquals(null, viewModel.actionErrorStateFlow.value)
     }
 

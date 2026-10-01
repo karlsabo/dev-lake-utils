@@ -335,9 +335,7 @@ class WorktreePanelTest {
 
         assertFalse(
             isWorktreeCreateEnabled(
-                worktree = worktree,
-                setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
-                isArchiving = false,
+                createRowState(worktree).copy(setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE),
             ),
         )
     }
@@ -350,11 +348,7 @@ class WorktreePanelTest {
         )
 
         assertFalse(
-            isWorktreeCreateEnabled(
-                worktree = worktree,
-                setupStatus = null,
-                isArchiving = true,
-            ),
+            isWorktreeCreateEnabled(createRowState(worktree).copy(isArchiving = true)),
         )
     }
 
@@ -366,13 +360,7 @@ class WorktreePanelTest {
             baseCommitHash = "abc123",
         )
 
-        assertTrue(
-            isWorktreeCreateEnabled(
-                worktree = worktree,
-                setupStatus = null,
-                isArchiving = false,
-            ),
-        )
+        assertTrue(isWorktreeCreateEnabled(createRowState(worktree)))
     }
 
     @Test
@@ -382,13 +370,7 @@ class WorktreePanelTest {
             path = "/repos/dev-lake-utils-detached",
         )
 
-        assertFalse(
-            isWorktreeCreateEnabled(
-                worktree = worktree,
-                setupStatus = null,
-                isArchiving = false,
-            ),
-        )
+        assertFalse(isWorktreeCreateEnabled(createRowState(worktree)))
     }
 
     @Test
@@ -398,13 +380,7 @@ class WorktreePanelTest {
             path = "/repos/dev-lake-utils-feature-base-pr",
         )
 
-        assertTrue(
-            isWorktreeCreateEnabled(
-                worktree = worktree,
-                setupStatus = null,
-                isArchiving = false,
-            ),
-        )
+        assertTrue(isWorktreeCreateEnabled(createRowState(worktree)))
     }
 
     @Test
@@ -590,9 +566,9 @@ class WorktreePanelTest {
     @Test
     fun rebaseActionIsDisabledWhileSetupIsInProgress() {
         assertFalse(
-            isWorktreeRebaseEnabled(
-                setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
-                isArchiving = false,
+            isWorktreeStatusDependentActionEnabled(
+                createRowState(rebaseActionWorktree())
+                    .copy(setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE),
             ),
         )
     }
@@ -600,38 +576,51 @@ class WorktreePanelTest {
     @Test
     fun rebaseActionIsDisabledWhileRebaseIsInProgress() {
         assertFalse(
-            isWorktreeRebaseEnabled(
-                setupStatus = null,
-                isArchiving = false,
-                isRebasing = true,
-            ),
+            isWorktreeStatusDependentActionEnabled(createRowState(rebaseActionWorktree()).copy(isRebasing = true)),
         )
     }
 
     @Test
     fun rebaseActionIsEnabledWhenWorktreeIsIdle() {
-        assertTrue(isWorktreeRebaseEnabled(setupStatus = null, isArchiving = false, isRebasing = false))
+        assertTrue(isWorktreeStatusDependentActionEnabled(createRowState(rebaseActionWorktree())))
     }
 
     @Test
     fun archiveActionIsDisabledWhileSetupIsInProgress() {
         assertFalse(
-            isWorktreeArchiveEnabled(
-                setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE,
-                isArchiving = false,
+            isWorktreeStatusDependentActionEnabled(
+                createRowState(archiveActionWorktree())
+                    .copy(setupStatus = WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE),
             ),
         )
     }
 
     @Test
     fun archiveActionIsDisabledWhileArchiveIsInProgress() {
-        assertFalse(isWorktreeArchiveEnabled(setupStatus = null, isArchiving = true))
+        assertFalse(
+            isWorktreeStatusDependentActionEnabled(
+                createRowState(archiveActionWorktree()).copy(isArchiving = true),
+            ),
+        )
     }
 
     @Test
     fun archiveActionIsEnabledWhenWorktreeIsIdle() {
-        assertTrue(isWorktreeArchiveEnabled(setupStatus = null, isArchiving = false))
+        assertTrue(isWorktreeStatusDependentActionEnabled(createRowState(archiveActionWorktree())))
     }
+
+    private fun rebaseActionWorktree(): LocalWorktreeUiState = LocalWorktreeUiState(
+        branch = "feature/stacked-pr",
+        path = "/repos/dev-lake-utils-feature-stacked-pr",
+        isDirty = false,
+        parentBranch = "feature/base-pr",
+    )
+
+    private fun archiveActionWorktree(): LocalWorktreeUiState = LocalWorktreeUiState(
+        branch = "feature/login",
+        path = "/repos/dev-lake-utils-feature-login",
+        isDirty = false,
+    )
 
     private fun rebaseNeededRow(): LocalWorktreeRowState = worktreeRow(needsRebase = true)
 
@@ -643,6 +632,11 @@ class WorktreePanelTest {
             path = "/repos/dev-lake-utils-feature-stacked-pr",
             needsRebase = needsRebase,
         ),
+        setupStatus = null,
+        isArchiving = false,
+    )
+    private fun createRowState(worktree: LocalWorktreeUiState): LocalWorktreeRowState = LocalWorktreeRowState(
+        worktree = worktree,
         setupStatus = null,
         isArchiving = false,
     )

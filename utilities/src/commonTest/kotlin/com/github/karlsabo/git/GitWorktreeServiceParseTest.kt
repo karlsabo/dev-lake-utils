@@ -117,6 +117,47 @@ class GitWorktreeServiceParseTest {
     }
 
     @Test
+    fun listWorktreeEntries_parsesEntriesWithoutRunningGitStatus() {
+        val fake = FakeGitCommandApi()
+        fake.worktreeListResult = """
+            worktree /tmp/repo
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree /tmp/repo-feature
+            HEAD def456
+            branch refs/heads/feature/x
+        """.trimIndent()
+        fake.statusAction = { error("git status must not run for entries-only listing") }
+        val service = GitWorktreeService(fake)
+
+        val worktrees = service.listWorktreeEntries("/tmp/repo")
+
+        assertEquals(2, worktrees.size)
+        assertEquals("main", worktrees[0].branch)
+        assertEquals("feature/x", worktrees[1].branch)
+        assertTrue(fake.calls.none { it.method == "status" })
+    }
+
+    @Test
+    fun listWorktreeEntries_failure_throwsWorktreeException() {
+        val fake = FakeGitCommandApi()
+        fake.worktreeListAction = {
+            throw GitCommandException(
+                command = listOf("git", "worktree", "list"),
+                exitCode = 128,
+                gitOutput = "fatal: not a git repository",
+            )
+        }
+        val service = GitWorktreeService(fake)
+
+        val ex = assertFailsWith<GitWorktreeException> {
+            service.listWorktreeEntries("/tmp/not-a-repo")
+        }
+        assertTrue(ex.message!!.contains("Failed to list worktrees"))
+    }
+
+    @Test
     fun resolveRepositoryRoot_returnsMainRootForLinkedWorktree() {
         val fake = FakeGitCommandApi()
         fake.revParseAction = { _, args ->
@@ -144,5 +185,37 @@ class GitWorktreeServiceParseTest {
             repositoryWorktrees.selectedWorktreePath,
         )
         assertEquals(listOf("main", "feature/worktree-panel"), repositoryWorktrees.worktrees.map { it.branch })
+    }
+
+    @Test
+    fun resolveRepositoryRootEntries_returnsMainRootForLinkedWorktreeWithoutRunningGitStatus() {
+        val fake = FakeGitCommandApi()
+        fake.revParseAction = { _, args ->
+            assertEquals(listOf("--show-toplevel"), args.toList())
+            "/repos/dev-lake-utils-feature-worktree-panel"
+        }
+        fake.worktreeListResult = """
+            worktree /repos/dev-lake-utils
+            HEAD abc123
+            branch refs/heads/main
+
+            worktree /repos/dev-lake-utils-feature-worktree-panel
+            HEAD def456
+            branch refs/heads/feature/worktree-panel
+        """.trimIndent()
+        fake.statusAction = { error("git status must not run for entries-only root resolution") }
+        val service = GitWorktreeService(fake)
+
+        val repositoryWorktrees = service.resolveRepositoryRootEntries(
+            "/repos/dev-lake-utils-feature-worktree-panel",
+        )
+
+        assertEquals("/repos/dev-lake-utils", repositoryWorktrees.rootPath)
+        assertEquals(
+            "/repos/dev-lake-utils-feature-worktree-panel",
+            repositoryWorktrees.selectedWorktreePath,
+        )
+        assertEquals(listOf("main", "feature/worktree-panel"), repositoryWorktrees.worktrees.map { it.branch })
+        assertTrue(fake.calls.none { it.method == "status" })
     }
 }
