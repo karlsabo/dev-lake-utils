@@ -7,11 +7,14 @@ import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.git.WorktreeSetupCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -20,28 +23,41 @@ class LocalRepositoryDiscoveryContractTest {
     @Test
     fun expansionUsesEntriesDiscoveryWithoutStatusDiscovery() = runBlocking {
         val fixture = discoveryFixture()
-        fixture.controller.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
-        fixture.viewModel.viewModelScope.coroutineContext[Job]!!.children.toList().forEach { it.join() }
+        try {
+            fixture.controller.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+            withTimeout(5_000) {
+                fixture.state.localRepositories.first { repositories ->
+                    repositories.single().let { it.isExpanded && !it.isLoading }
+                }
+            }
 
-        assertEquals(listOf(DEV_LAKE_ROOT), fixture.api.listWorktreeEntryRepoPaths)
-        assertEquals(emptyList(), fixture.api.listWorktreesWithStatusRepoPaths)
-        assertEquals(listOf("main"), fixture.state.localRepositories.value.single().worktrees.map { it.branch })
-        assertEquals(null, fixture.state.actionErrors.value.current)
+            assertEquals(listOf(DEV_LAKE_ROOT), fixture.api.listWorktreeEntryRepoPaths)
+            assertEquals(emptyList(), fixture.api.listWorktreesWithStatusRepoPaths)
+            assertEquals(listOf("main"), fixture.state.localRepositories.value.single().worktrees.map { it.branch })
+            assertEquals(null, fixture.state.actionErrors.value.current)
+        } finally {
+            fixture.viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+        }
     }
 
     @Test
     fun initialAndRepeatedPollingUseEntriesDiscoveryWithoutStatusDiscovery() = runTest {
         val fixture = discoveryFixture()
-        backgroundScope.launch { fixture.controller.pollConfiguredLocalRepositoryWorktrees() }
-        runCurrent()
-        assertEquals(listOf(DEV_LAKE_ROOT), fixture.api.listWorktreeEntryRepoPaths)
+        val pollingJob = backgroundScope.launch { fixture.controller.pollConfiguredLocalRepositoryWorktrees() }
+        try {
+            runCurrent()
+            assertEquals(listOf(DEV_LAKE_ROOT), fixture.api.listWorktreeEntryRepoPaths)
 
-        advanceTimeBy(1_000)
-        runCurrent()
+            advanceTimeBy(1_000)
+            runCurrent()
 
-        assertEquals(listOf(DEV_LAKE_ROOT, DEV_LAKE_ROOT), fixture.api.listWorktreeEntryRepoPaths)
-        assertEquals(emptyList(), fixture.api.listWorktreesWithStatusRepoPaths)
-        assertEquals(listOf("main"), fixture.state.localRepositories.value.single().worktrees.map { it.branch })
+            assertEquals(listOf(DEV_LAKE_ROOT, DEV_LAKE_ROOT), fixture.api.listWorktreeEntryRepoPaths)
+            assertEquals(emptyList(), fixture.api.listWorktreesWithStatusRepoPaths)
+            assertEquals(listOf("main"), fixture.state.localRepositories.value.single().worktrees.map { it.branch })
+        } finally {
+            pollingJob.cancelAndJoin()
+            fixture.viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+        }
     }
 
     @Test
