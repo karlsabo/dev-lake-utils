@@ -100,7 +100,7 @@ Follow the format in `references/output-templates.md`. The planned comments docu
 
 Keep the section headings exactly as defined in the template so later steps can review the same artifact shape every time. If there are no inline comments, still include `## Inline Comments` and leave it empty.
 
-Each inline comment should be self-contained and useful. Prefer explaining the observed behavior and impact over prescribing the exact fix unless the fix is trivial.
+Each inline comment should be self-contained and useful. Prefer explaining the observed behavior and impact over prescribing the exact fix unless the fix is trivial. Make the ask easy to picture: name the specific input or situation, what happens now (or what is untested), and what behavior or check would resolve the concern. For a testing gap, spell out one example test in plain English (setup/action/assertion) and say what the existing tests cover instead. Don't just say "cover the path" or "test persistence"; a reader should not have to ask what test you mean. Keep it short and avoid inventing a bug when the concern is only missing coverage.
 
 ### Step 6: Run a subagent pass and wait for it to finish
 
@@ -115,7 +115,8 @@ Review the Pull Request comments document at {comments_path} with an eye of skep
 2. Keep the tone constructive, but be skeptical about whether each comment should really be posted.
 3. Ensure the `Overall PR Comment` is terse, neutral, and does not repeat what is already covered by inline comments. Prefer a short opener like "Couple of things to look at:" when there are comments.
 4. Rewrite inline comments into the user's preferred style: human, specific, non-commanding, no "please fix", no overstatement. Use question-led phrasing only when it reads naturally; avoid robotic/canned sentence shapes.
-5. Preserve the existing document structure and section headings.
+5. Check that each comment makes the ask concrete enough to act on without a follow-up question. For testing gaps, name an example input, the operation, and the assertion; distinguish this from tests already present. Prefer plain English over shorthand such as "write/read path" or "persistence coverage".
+6. Preserve the existing document structure and section headings.
 
 In your final response, state whether you changed the file and briefly summarize the changes.
 ```
@@ -184,7 +185,7 @@ When the user says they're ready (e.g., "looks good," "post it," "create the rev
 - Prioritize bugs over style, a bug matters more than a naming nit
 - Start inline comments with the concern, not the prescription
 - "Did you consider..." or "Should this..." are options, not defaults.
-- Prefer comments that sound like normal engineering feedback: specific, plainspoken, and tied to the code path.
+- Prefer comments that sound like normal engineering feedback: specific, plainspoken, and tied to the code path. Before keeping one, ask: "Would the author know exactly what I want them to check or change?" If not, add a concrete example rather than more abstract explanation.
 - Avoid restating obvious text from nearby code/docstrings unless it is necessary to explain the risk.
 - Good pattern: "If X happens here, do we want Y as the fallback?" Bad pattern: "Should this do Y? The docstring says... there does not appear..."
 - Prefer "I believe..." only when the conclusion depends on surrounding routing/config and the uncertainty matters.

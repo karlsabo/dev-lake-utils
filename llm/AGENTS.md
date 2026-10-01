@@ -22,7 +22,7 @@ Think like a practitioner of The Pragmatic Programmer and Software Architecture:
 
 ## CLI Tools
 
-Prefer installed CLI tools over websites or browser automation when a CLI can perform the task. Use the CLI's help and machine-readable output options where available.
+Use the service CLI first. Check availability and `--help`; prefer machine-readable output. Use other automation only if the CLI is unavailable, authentication fails, or the operation is unsupported.
 
 - GitHub: [`gh`](https://cli.github.com/)
 - GitLab [`glab`](https://docs.gitlab.com/cli/)
@@ -31,4 +31,4 @@ Prefer installed CLI tools over websites or browser automation when a CLI can pe
 - Buildkite: [`bk`](https://buildkite.com/docs/platform/cli/installation)
 - Sentry: [`sentry-cli`](https://docs.sentry.io/cli/installation/)
 - Chronosphere: [`chronoctl`](https://github.com/chronosphereio/chronoctl-core)
-- Trunk.io: [`trunk`]([https://github.com/trunk-io/trunk-cli-releases](https://docs.trunk.io/merge-queue/reference/merge-queue-cli-reference))
+- Trunk.io: [`trunk`](https://docs.trunk.io/merge-queue/reference/merge-queue-cli-reference)
