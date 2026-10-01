@@ -19,10 +19,22 @@ data class WorktreeArchiveJob(
     val errorMessage: String? = null,
 )
 
+interface WorktreeArchiveStartupStore {
+    /** Resets only the matching queued startup snapshot; an unusable worktree is retained as failed. */
+    fun restoreQueuedJob(
+        job: WorktreeArchiveJob,
+        stateUpdatedAtEpochMs: Long,
+        deadlineAtEpochMs: Long,
+        errorMessage: String? = null,
+    ): Boolean
+}
+
 interface WorktreeArchiveStore {
     fun listJobs(): List<WorktreeArchiveJob>
 
     fun saveJob(job: WorktreeArchiveJob)
+
+    val startup: WorktreeArchiveStartupStore
 
     /** Claims the identified queued job for removal. Returns false if it was canceled, replaced, or already claimed. */
     fun transitionQueuedJobToRemoving(

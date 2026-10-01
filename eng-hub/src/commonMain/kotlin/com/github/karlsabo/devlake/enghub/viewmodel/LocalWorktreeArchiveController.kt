@@ -8,7 +8,8 @@ import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -29,9 +30,9 @@ internal class LocalWorktreeArchiveController(
     localRepositories: LocalRepositoryController,
     private val errorReporter: ActionErrorReporter,
 ) {
-    private val queuedArchiveLeases = MutableStateFlow<Map<String, LocalWorktreeMutationGuard.Lease>>(emptyMap())
+    private val entries = LocalWorktreeArchiveEntries(state)
     private val completion = LocalWorktreeArchiveCompletion(viewModel, state, localRepositories, archive.store) { job ->
-        clearArchiveEntry(job.worktreePath, job.queueId)
+        entries.clear(job.worktreePath, job.queueId)
     }
     private val removal = LocalWorktreeArchiveRemoval(
         viewModel,
@@ -41,6 +42,15 @@ internal class LocalWorktreeArchiveController(
         completion,
         errorReporter,
     )
+
+    private val restoration = LocalWorktreeArchiveRestoration(
+        state,
+        gitWorktreeApi,
+        archive,
+        errorReporter,
+        ::exposeArchive,
+    )
+    private val startupRestoration = viewModel.viewModelScope.launch(Dispatchers.IO) { restoration.restore() }
 
     fun archiveLocalWorktree(repoRootPath: String, worktreePath: String) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepositoryPath()
@@ -52,7 +62,17 @@ internal class LocalWorktreeArchiveController(
                 errorReporter.enqueueActionError("Cannot archive root worktree: $worktreePath")
             }
 
-            else -> queueKnownWorktree(normalizedRepoRootPath, normalizedWorktreePath)
+            else -> {
+                if (startupRestoration.isCompleted) {
+                    queueKnownWorktree(normalizedRepoRootPath, normalizedWorktreePath)
+                } else {
+                    // A new queue request must not overwrite a startup snapshot still being restored.
+                    viewModel.viewModelScope.launch(Dispatchers.IO) {
+                        startupRestoration.join()
+                        queueKnownWorktree(normalizedRepoRootPath, normalizedWorktreePath)
+                    }
+                }
+            }
         }
     }
 
@@ -66,7 +86,7 @@ internal class LocalWorktreeArchiveController(
             runCatching { archive.store.deleteQueuedJob(normalizedWorktreePath, queueId) }
                 .rethrowCancellation()
                 .onSuccess { deleted ->
-                    if (deleted) clearArchiveEntry(normalizedWorktreePath, queueId)
+                    if (deleted) entries.clear(normalizedWorktreePath, queueId)
                 }
                 .onFailure { failure ->
                     logger.error(failure) { "Failed to cancel queued archive for worktree $normalizedWorktreePath" }
@@ -137,14 +157,9 @@ internal class LocalWorktreeArchiveController(
             try {
                 runCatching {
                     archive.store.saveJob(archiveJob)
-                    queuedArchiveLeases.update { leases ->
-                        leases + (archiveJob.worktreePath to mutationLease)
-                    }
-                    state.queuedWorktreeArchives.update { jobs ->
-                        jobs.filterNot { it.worktreePath == archiveJob.worktreePath } + archiveJob
-                    }
+                    currentCoroutineContext().ensureActive()
+                    exposeArchive(archiveJob, mutationLease)
                     safelyQueued = true
-                    scheduleArchiveRemoval(archiveJob)
                     logger.info { "Queued worktree ${archiveJob.worktreePath} for archive" }
                 }
                     .rethrowCancellation()
@@ -159,6 +174,11 @@ internal class LocalWorktreeArchiveController(
                 if (!safelyQueued) mutationLease.release()
             }
         }
+    }
+
+    private fun exposeArchive(job: WorktreeArchiveJob, lease: LocalWorktreeMutationGuard.Lease) {
+        entries.expose(job, lease)
+        if (job.state == WorktreeArchiveLifecycleState.QUEUED) scheduleArchiveRemoval(job)
     }
 
     private fun scheduleArchiveRemoval(archiveJob: WorktreeArchiveJob) {
@@ -211,26 +231,5 @@ internal class LocalWorktreeArchiveController(
             removal.remove(removingJob)
         }
         return true
-    }
-
-    private fun clearArchiveEntry(worktreePath: String, queueId: String) {
-        if (state.queuedWorktreeArchives.value.none { it.worktreePath == worktreePath && it.queueId == queueId }) return
-        // Observers of a cleared entry must be able to acquire the worktree for another mutation.
-        releaseQueuedArchiveLease(worktreePath)
-        state.queuedWorktreeArchives.update { jobs ->
-            jobs.filterNot { it.worktreePath.normalizedRepositoryPath() == worktreePath && it.queueId == queueId }
-        }
-        logger.info { "Cleared archive entry for worktree $worktreePath" }
-    }
-
-    private fun releaseQueuedArchiveLease(worktreePath: String) {
-        while (true) {
-            val leases = queuedArchiveLeases.value
-            val lease = leases[worktreePath] ?: return
-            if (queuedArchiveLeases.compareAndSet(leases, leases - worktreePath)) {
-                lease.release()
-                return
-            }
-        }
     }
 }

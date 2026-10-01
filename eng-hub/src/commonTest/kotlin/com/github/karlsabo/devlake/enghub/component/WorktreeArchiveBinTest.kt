@@ -10,10 +10,58 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.v2.runComposeUiTest
+import com.github.karlsabo.devlake.enghub.screen.collectArchiveBinEntries
+import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
+import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class WorktreeArchiveBinTest {
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun restoredQueuedJobShowsFreshWindowAndUndoWhileMissingJobShowsFailure() = runComposeUiTest {
+        val restored = WorktreeArchiveJob(
+            repositoryRootPath = "/repos/widgets",
+            worktreePath = "/repos/widgets-feature-login",
+            branch = "feature/login",
+            queueId = "persisted-queue",
+            state = WorktreeArchiveLifecycleState.QUEUED,
+            queuedAtEpochMs = 1_000,
+            stateUpdatedAtEpochMs = 100_000,
+            deadlineAtEpochMs = 160_000,
+        )
+        val jobs = mutableStateOf(listOf(restored))
+        val undoRequests = mutableListOf<String>()
+        setContent {
+            MaterialTheme {
+                WorktreeArchiveBin(
+                    entries = collectArchiveBinEntries(jobs.value) { 100_000 },
+                    actions = WorktreeArchiveBinActions(onUndo = undoRequests::add),
+                )
+            }
+        }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("widgets").assertIsDisplayed()
+        onNodeWithText("feature/login").assertIsDisplayed()
+        onNodeWithText("60 seconds remaining").assertIsDisplayed()
+        onNodeWithText("Undo").performClick()
+        assertEquals(listOf(restored.worktreePath), undoRequests)
+        runOnIdle {
+            jobs.value = listOf(
+                restored.copy(
+                    state = WorktreeArchiveLifecycleState.FAILED,
+                    errorMessage = "Queued worktree is no longer registered",
+                ),
+            )
+        }
+        onNodeWithText("Removal failed").assertIsDisplayed()
+        onNodeWithText("Queued worktree is no longer registered").assertIsDisplayed()
+        onNodeWithText("Undo").assertDoesNotExist()
+        onNodeWithText("60 seconds remaining").assertDoesNotExist()
+        onNodeWithText("Retry").assertIsDisplayed()
+        onNodeWithText("Dismiss").assertIsDisplayed()
+    }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun emptyBinRemainsVisibleAndOpensEmptyState() = runComposeUiTest {

@@ -11,6 +11,57 @@ import kotlin.test.assertTrue
 
 class SqlDelightWorktreeArchiveStoreTest {
     @Test
+    fun restartResetsOnlyMatchingQueuedSnapshotAndPersistsFreshDeadline() {
+        val directory = createTestDirectory()
+        val databasePath = Path(directory, "archive.db").toString()
+        val queued = queuedJob("/repos/login", "feature/login", 1_000)
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(queued)
+            assertTrue(store.startup.restoreQueuedJob(queued, 90_000, 150_000))
+            val restored = queued.copy(stateUpdatedAtEpochMs = 90_000, deadlineAtEpochMs = 150_000)
+            assertEquals(listOf(restored), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
+            assertFalse(store.startup.restoreQueuedJob(queued, 100_000, 160_000))
+            assertFalse(store.startup.restoreQueuedJob(restored.copy(queueId = "stale"), 100_000, 160_000))
+            assertEquals(listOf(restored), store.listJobs())
+            assertTrue(store.startup.restoreQueuedJob(restored, 100_000, 160_000, "worktree missing"))
+            assertEquals(
+                listOf(
+                    restored.copy(
+                        state = WorktreeArchiveLifecycleState.FAILED,
+                        stateUpdatedAtEpochMs = 100_000,
+                        deadlineAtEpochMs = 160_000,
+                        errorMessage = "worktree missing",
+                    ),
+                ),
+                store.listJobs(),
+            )
+        } finally {
+            deleteRecursively(directory)
+        }
+    }
+
+    @Test
+    fun restartNeverDowngradesNonQueuedRecordsOrRecreatesDeletedRecords() {
+        val directory = createTestDirectory()
+        val databasePath = Path(directory, "archive.db").toString()
+        val queued = queuedJob("/repos/login", "feature/login", 1_000)
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            assertFalse(store.startup.restoreQueuedJob(queued, 90_000, 150_000))
+            WorktreeArchiveLifecycleState.entries.filterNot { it == WorktreeArchiveLifecycleState.QUEUED }
+                .forEach { lifecycle ->
+                    val record = queued.copy(state = lifecycle, errorMessage = "retained")
+                    store.saveJob(record)
+                    assertFalse(store.startup.restoreQueuedJob(queued, 90_000, 150_000))
+                    assertEquals(listOf(record), store.listJobs())
+                }
+        } finally {
+            deleteRecursively(directory)
+        }
+    }
+
+    @Test
     fun savesAndReloadsQueuedJobs() {
         val testDirectory = createTestDirectory()
         val databasePath = Path(testDirectory, "archive.db").toString()
