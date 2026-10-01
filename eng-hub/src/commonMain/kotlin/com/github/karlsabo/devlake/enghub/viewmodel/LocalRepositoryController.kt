@@ -12,7 +12,10 @@ import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStatesWithUnkno
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.github.GitHubRepositoryIdentity
 import com.github.karlsabo.github.parseGitHubRepositoryIdentity
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -32,6 +35,13 @@ internal class LocalRepositoryController(
     )
     private val expansionTracker = LocalRepositoryExpansionTracker(state)
     private val refreshTracker = LocalRepositoryRefreshTracker(state)
+    private val statusTracker = LocalWorktreeStatusTracker(state)
+
+    // Owned by the view model's scope, so disposal cancels in-flight checks, but supervised so one failed
+    // status check neither cancels its siblings nor surfaces in the view model's own job tree.
+    private val statusHydrationScope = CoroutineScope(
+        SupervisorJob(viewModel.viewModelScope.coroutineContext[Job]) + Dispatchers.IO,
+    )
 
     fun pickAndAddLocalRepository() {
         viewModel.viewModelScope.launch {
@@ -121,12 +131,14 @@ internal class LocalRepositoryController(
                     expandUpdatedRepository = true,
                 ).map { repository ->
                     if (repositoryIdentity(repository.path) == normalizedRootPath) {
-                        repository.copy(refreshRequest = enrichmentRequest)
+                        repository.copy(refreshRequest = enrichmentRequest, statusRequest = enrichmentRequest)
                     } else {
                         repository
                     }
                 }
         }
+        hydrateWorktreeStatuses(normalizedRootPath, enrichmentRequest, basicWorktrees)
+
         githubIdentityResolver.resolveAndStore(rootPath, normalizedRootPath)
 
         runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(rootPath, basicWorktrees) }
@@ -158,6 +170,8 @@ internal class LocalRepositoryController(
             }
             if (!expansionTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return@launch
 
+            hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
+
             githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
             runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees) }
                 .rethrowCancellation()
@@ -168,6 +182,34 @@ internal class LocalRepositoryController(
                     logger.error(failure) { "Failed to enrich worktrees for $repoRootPath" }
                     expansionTracker.complete(normalizedRepoRootPath, request)
                 }
+        }
+    }
+
+    /**
+     * Resolves the unknown dirty status of each published worktree on view-model IO jobs; results apply only
+     * while [request] still owns the rows, so a checkout replaced by a newer request never shows stale status.
+     */
+    private fun hydrateWorktreeStatuses(
+        normalizedRepoRootPath: String,
+        request: LocalRepositoryWorktreeRequest,
+        worktrees: List<LocalWorktreeUiState>,
+    ) {
+        worktrees.forEach { worktree ->
+            statusHydrationScope.launch {
+                val isDirty = runCatching { gitWorktreeApi.worktreeIsDirty(worktree.path) }
+                    .rethrowCancellation()
+                    .getOrElse { failure ->
+                        logger.error(failure) { "Failed to check worktree status for ${worktree.path}" }
+                        return@launch
+                    }
+                statusTracker.publish(
+                    normalizedRepoRootPath = normalizedRepoRootPath,
+                    request = request,
+                    worktreePath = worktree.path,
+                    branch = worktree.branch,
+                    isDirty = isDirty,
+                )
+            }
         }
     }
 
@@ -196,6 +238,8 @@ internal class LocalRepositoryController(
             refreshTracker.fail(normalizedRepoRootPath, request)
         }.getOrThrow()
         if (!refreshTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)) return
+
+        hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
 
         githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
         runCatching { gitWorktreeApi.enrichLocalWorktreeUiStates(repoRootPath, basicWorktrees) }
@@ -251,6 +295,7 @@ internal class LocalRepositoryRefreshTracker(
                     currentRepository.copy(
                         operationRequest = null,
                         refreshRequest = request,
+                        statusRequest = null,
                     )
                 } else {
                     currentRepository
@@ -276,6 +321,7 @@ internal class LocalRepositoryRefreshTracker(
                     currentRepository.copy(
                         isLoading = false,
                         operationRequest = null,
+                        statusRequest = request,
                         worktrees = basicWorktrees.withEnrichmentFrom(currentRepository.worktrees),
                     )
                 } else {

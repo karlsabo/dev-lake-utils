@@ -60,6 +60,11 @@ interface GitWorktreeDiscoveryApi {
     fun listWorktreeEntries(repoPath: String): List<Worktree> = throw UnsupportedOperationException(
         "listWorktreeEntries is not implemented",
     )
+
+    /** Reports whether the checkout at [worktreePath] has local changes; a failed status check is reported as dirty. */
+    fun worktreeIsDirty(worktreePath: String): Boolean = throw UnsupportedOperationException(
+        "worktreeIsDirty is not implemented",
+    )
     fun originUrl(repoPath: String): String? = throw UnsupportedOperationException("originUrl is not implemented")
     fun refreshAndListExistingBranches(
         repoPath: String,

@@ -38,6 +38,19 @@ internal fun List<LocalWorktreeUiState>.withEnrichmentFrom(
     }
 }
 
+/** Fills the dirty status of the row identified by normalized path plus branch; other rows are unchanged. */
+internal fun List<LocalWorktreeUiState>.withWorktreeStatus(
+    normalizedWorktreePath: String,
+    branch: String,
+    isDirty: Boolean,
+): List<LocalWorktreeUiState> = map { worktree ->
+    if (worktree.path.normalizedRepositoryPath() == normalizedWorktreePath && worktree.branch == branch) {
+        worktree.copy(isDirty = isDirty)
+    } else {
+        worktree
+    }
+}
+
 internal fun GitWorktreeApi.enrichLocalWorktreeUiStates(
     repoRootPath: String,
     worktrees: List<LocalWorktreeUiState>,

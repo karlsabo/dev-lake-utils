@@ -1495,6 +1495,283 @@ class EngHubLocalRepositoryConcurrencyViewModelTest {
     }
 }
 
+class EngHubLocalWorktreeStatusHydrationViewModelTest {
+    @Test
+    fun expandingRepositoryHydratesDirtyStatusAfterPublishingUnknownRows() = runBlocking {
+        val statusStarted = CompletableDeferred<Unit>()
+        val releaseStatus = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/login",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+                parentBranchesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to mapOf("feature/login" to "main"),
+                ),
+                isDirtyForWorktreePath = { worktreePath ->
+                    when (worktreePath) {
+                        DEV_LAKE_ROOT -> false
+
+                        DEV_LAKE_SELECTED_WORKTREE -> {
+                            statusStarted.complete(Unit)
+                            runBlocking { releaseStatus.await() }
+                            true
+                        }
+
+                        else -> error("Unexpected worktree path $worktreePath")
+                    }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) { statusStarted.await() }
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.singleOrNull()?.worktrees?.size == 2 && !repositories.single().isLoading
+            }.single()
+        }
+        assertEquals(null, repository.worktrees.single { it.branch == "feature/login" }.isDirty)
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+
+        releaseStatus.complete(Unit)
+        val hydratedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.singleOrNull { it.branch == "feature/login" }?.isDirty == true
+            }.single()
+        }
+
+        assertEquals(false, hydratedRepository.isLoading)
+        assertEquals(
+            listOf(false, true),
+            hydratedRepository.worktrees.map { it.isDirty },
+        )
+        assertEquals("main", hydratedRepository.worktrees.single { it.branch == "feature/login" }.parentBranch)
+    }
+
+    @Test
+    fun failingStatusCheckHydratesSiblingRowAndLeavesFailedRowUnknown() = runBlocking {
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(
+                worktreesByRepoPath = mapOf(
+                    DEV_LAKE_ROOT to listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/login",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+                isDirtyForWorktreePath = { worktreePath ->
+                    when (worktreePath) {
+                        DEV_LAKE_ROOT -> error("status check failed for $worktreePath")
+                        DEV_LAKE_SELECTED_WORKTREE -> true
+                        else -> error("Unexpected worktree path $worktreePath")
+                    }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+        )
+
+        viewModel.toggleLocalRepositoryExpansion(DEV_LAKE_ROOT)
+        withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                api.worktreeIsDirtyCalls.containsAll(listOf(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)) &&
+                    repositories.singleOrNull()?.isLoading == false
+            }
+        }
+        val hydratedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.singleOrNull()?.worktrees
+                    ?.singleOrNull { it.branch == "feature/login" }?.isDirty == true
+            }.single()
+        }
+
+        assertEquals(null, hydratedRepository.worktrees.single { it.branch == "main" }.isDirty)
+        assertEquals(
+            listOf(null, true),
+            hydratedRepository.worktrees.map { it.isDirty },
+        )
+        assertEquals(null, viewModel.actionErrorStateFlow.value)
+    }
+
+    @Test
+    fun addingRepositoryHydratesDirtyStatusAfterPublishingUnknownRows() = runBlocking {
+        val statusStarted = CompletableDeferred<Unit>()
+        val releaseStatus = CompletableDeferred<Unit>()
+        val api = RecordingGitWorktreeApi(
+            repositoryWorktreesBySelectedPath = mapOf(
+                DEV_LAKE_SELECTED_WORKTREE to RepositoryWorktrees(
+                    rootPath = DEV_LAKE_ROOT,
+                    selectedWorktreePath = DEV_LAKE_SELECTED_WORKTREE,
+                    worktrees = listOf(
+                        Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+                        Worktree(
+                            path = DEV_LAKE_SELECTED_WORKTREE,
+                            branch = "feature/login",
+                            commitHash = "def456",
+                        ),
+                    ),
+                ),
+            ),
+            responses = RecordingGitWorktreeApiResponses(
+                isDirtyForWorktreePath = { worktreePath ->
+                    when (worktreePath) {
+                        DEV_LAKE_ROOT -> false
+
+                        DEV_LAKE_SELECTED_WORKTREE -> {
+                            statusStarted.complete(Unit)
+                            runBlocking { releaseStatus.await() }
+                            true
+                        }
+
+                        else -> error("Unexpected worktree path $worktreePath")
+                    }
+                },
+            ),
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+        )
+
+        viewModel.addLocalRepository(DEV_LAKE_SELECTED_WORKTREE)
+        withTimeout(2_000.milliseconds) { statusStarted.await() }
+
+        val repository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.singleOrNull()?.worktrees?.size == 2 && !repositories.single().isLoading
+            }.single()
+        }
+        assertEquals(null, repository.worktrees.single { it.branch == "feature/login" }.isDirty)
+
+        releaseStatus.complete(Unit)
+        val hydratedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.singleOrNull { it.branch == "feature/login" }?.isDirty == true
+            }.single()
+        }
+
+        assertEquals(false, hydratedRepository.isLoading)
+        assertEquals(
+            listOf(false, true),
+            hydratedRepository.worktrees.map { it.isDirty },
+        )
+    }
+
+    @Test
+    fun refreshPublishingNewRowsDiscardsStatusFromSupersededRefresh() = runBlocking {
+        val firstStatusStarted = CompletableDeferred<Unit>()
+        val releaseFirstStatus = CompletableDeferred<Unit>()
+        val secondStatusStarted = CompletableDeferred<Unit>()
+        val releaseSecondStatus = CompletableDeferred<Unit>()
+        val api = gatedRefreshStatusApi(
+            firstStatusStarted = firstStatusStarted,
+            releaseFirstStatus = releaseFirstStatus,
+            secondStatusStarted = secondStatusStarted,
+            releaseSecondStatus = releaseSecondStatus,
+        )
+        val viewModel = createLocalRepositoryViewModel(
+            gitWorktreeApi = api,
+            configWriter = RecordingEngHubConfigWriter(),
+            localRepositoryConfigs = localRepositoryConfigs(DEV_LAKE_ROOT),
+            testConfig = startedWorktreePollingConfig(intervalMs = 500),
+        )
+        val pollingJobs = pollingJobs(viewModel)
+
+        withTimeout(2_000.milliseconds) { firstStatusStarted.await() }
+        val firstRefreshRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.singleOrNull()?.worktrees?.size == 1
+            }.single()
+        }
+        assertEquals(null, firstRefreshRepository.worktrees.single().isDirty)
+
+        withTimeout(2_000.milliseconds) { secondStatusStarted.await() }
+        val secondRefreshRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                api.listWorktreeRepoPaths.size >= 2 && repositories.singleOrNull()?.worktrees?.size == 1
+            }.single()
+        }
+        assertEquals(null, secondRefreshRepository.worktrees.single().isDirty)
+
+        releaseFirstStatus.complete(Unit)
+        delay(100.milliseconds)
+        assertEquals(
+            null,
+            viewModel.localRepositoriesStateFlow.value.single().worktrees.single().isDirty,
+            "status from the superseded refresh must not fill the newer refresh's rows",
+        )
+
+        releaseSecondStatus.complete(Unit)
+        val hydratedRepository = withTimeout(2_000.milliseconds) {
+            viewModel.localRepositoriesStateFlow.first { repositories ->
+                repositories.single().worktrees.singleOrNull()?.isDirty == false
+            }.single()
+        }
+        assertEquals(listOf("feature/login"), hydratedRepository.worktrees.map { it.branch })
+
+        cancelJobs(pollingJobs)
+    }
+}
+
+/**
+ * Serves one `feature/login` worktree whose first two status checks block on separate gates and return dirty;
+ * later checks block on the second gate and report clean.
+ */
+private fun gatedRefreshStatusApi(
+    firstStatusStarted: CompletableDeferred<Unit>,
+    releaseFirstStatus: CompletableDeferred<Unit>,
+    secondStatusStarted: CompletableDeferred<Unit>,
+    releaseSecondStatus: CompletableDeferred<Unit>,
+): RecordingGitWorktreeApi {
+    val statusGates = Channel<CompletableDeferred<Unit>>(capacity = 2).apply {
+        trySend(releaseFirstStatus)
+        trySend(releaseSecondStatus)
+    }
+    return RecordingGitWorktreeApi(
+        responses = RecordingGitWorktreeApiResponses(
+            worktreesByRepoPath = mapOf(
+                DEV_LAKE_ROOT to listOf(
+                    Worktree(
+                        path = DEV_LAKE_SELECTED_WORKTREE,
+                        branch = "feature/login",
+                        commitHash = "abc123",
+                    ),
+                ),
+            ),
+            isDirtyForWorktreePath = { _ ->
+                val release = statusGates.tryReceive().getOrNull() ?: releaseSecondStatus
+                if (release === releaseFirstStatus) {
+                    firstStatusStarted.complete(Unit)
+                } else {
+                    secondStatusStarted.complete(Unit)
+                }
+                runBlocking { release.await() }
+                release === releaseFirstStatus
+            },
+        ),
+    )
+}
+
 private data class RefreshControllerFixture(
     val state: EngHubViewModelState,
     val controller: LocalRepositoryController,
