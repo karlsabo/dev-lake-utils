@@ -62,6 +62,22 @@ class SqlDelightWorktreeArchiveStoreTest {
     }
 
     @Test
+    fun newQueueCannotReplacePersistedJob() {
+        val directory = createTestDirectory()
+        val databasePath = Path(directory, "archive.db").toString()
+        val original = queuedJob("/repos/login", "feature/login", 1_000)
+        val replacement = original.copy(queueId = "replacement", deadlineAtEpochMs = 120_000)
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            assertTrue(store.startup.insertQueuedJob(original))
+            assertFalse(store.startup.insertQueuedJob(replacement))
+            assertEquals(listOf(original), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
+        } finally {
+            deleteRecursively(directory)
+        }
+    }
+
+    @Test
     fun savesAndReloadsQueuedJobs() {
         val testDirectory = createTestDirectory()
         val databasePath = Path(testDirectory, "archive.db").toString()

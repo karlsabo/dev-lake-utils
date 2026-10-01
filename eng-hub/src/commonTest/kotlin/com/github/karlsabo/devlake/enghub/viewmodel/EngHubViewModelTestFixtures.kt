@@ -920,6 +920,15 @@ class RecordingWorktreeArchiveStore(
     }
 
     override val startup = object : WorktreeArchiveStartupStore {
+        override fun insertQueuedJob(job: WorktreeArchiveJob): Boolean {
+            saveFailure?.let { throw it }
+            while (true) {
+                val existing = jobs.value
+                if (existing.any { it.worktreePath == job.worktreePath }) return false
+                if (jobs.compareAndSet(existing, existing + job)) return true
+            }
+        }
+
         override fun restoreQueuedJob(
             job: WorktreeArchiveJob,
             stateUpdatedAtEpochMs: Long,

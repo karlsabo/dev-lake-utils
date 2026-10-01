@@ -20,6 +20,9 @@ data class WorktreeArchiveJob(
 )
 
 interface WorktreeArchiveStartupStore {
+    /** Creates a new queue only when the path has no persisted archive job. */
+    fun insertQueuedJob(job: WorktreeArchiveJob): Boolean
+
     /** Resets only the matching queued startup snapshot; an unusable worktree is retained as failed. */
     fun restoreQueuedJob(
         job: WorktreeArchiveJob,

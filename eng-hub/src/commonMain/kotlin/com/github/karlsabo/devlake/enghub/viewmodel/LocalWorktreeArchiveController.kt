@@ -156,7 +156,9 @@ internal class LocalWorktreeArchiveController(
             var safelyQueued = false
             try {
                 runCatching {
-                    archive.store.saveJob(archiveJob)
+                    check(archive.store.startup.insertQueuedJob(archiveJob)) {
+                        "Worktree archive is already queued: ${archiveJob.worktreePath}"
+                    }
                     currentCoroutineContext().ensureActive()
                     exposeArchive(archiveJob, mutationLease)
                     safelyQueued = true
