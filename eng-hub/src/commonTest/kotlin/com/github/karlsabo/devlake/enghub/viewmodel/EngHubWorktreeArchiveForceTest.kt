@@ -107,7 +107,7 @@ class EngHubWorktreeArchiveForceTest {
     }
 
     @Test
-    fun staleDialogCallbacksCannotConfirmOrDismissNewAttempt() = runBlocking {
+    fun forcedDirtyRefusalFailsAndStaleDialogCannotConfirmLaterAttempt() = runBlocking {
         val fixture = ArchiveFailureFixture()
         try {
             fixture.startRemoval().result.complete(IllegalStateException(DIRTY_REFUSAL))
@@ -115,13 +115,24 @@ class EngHubWorktreeArchiveForceTest {
             fixture.viewModel.requestForceArchiveLocalWorktree(DEV_LAKE_SELECTED_WORKTREE)
             fixture.viewModel.confirmForceArchiveLocalWorktree(original)
             fixture.awaitAttempt().result.complete(IllegalStateException(DIRTY_REFUSAL))
+            val failed = fixture.awaitFailed()
+            fixture.awaitError("Failed to complete worktree archive: $DIRTY_REFUSAL")
+            assertEquals(DIRTY_REFUSAL, failed.errorMessage)
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(null, fixture.viewModel.forceArchiveWorktreeRequestStateFlow.value)
+            fixture.assertLeaseHeld()
+            fixture.viewModel.requestForceArchiveLocalWorktree(DEV_LAKE_SELECTED_WORKTREE)
+            assertEquals(null, fixture.viewModel.forceArchiveWorktreeRequestStateFlow.value)
+
+            fixture.viewModel.retryFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            fixture.awaitAttempt().result.complete(IllegalStateException(DIRTY_REFUSAL))
             val current = fixture.awaitConfirmation()
             assertEquals(true, current.stateUpdatedAtEpochMs > original.stateUpdatedAtEpochMs)
             fixture.viewModel.requestForceArchiveLocalWorktree(DEV_LAKE_SELECTED_WORKTREE)
             fixture.viewModel.dismissForceArchiveWorktreeRequest(original)
             fixture.viewModel.confirmForceArchiveLocalWorktree(original)
             assertEquals(current, fixture.viewModel.forceArchiveWorktreeRequestStateFlow.value)
-            assertEquals(listOf(false, true), fixture.api.archiveWorktreeForceValues)
+            assertEquals(listOf(false, true, false), fixture.api.archiveWorktreeForceValues)
             fixture.assertLeaseHeld()
         } finally {
             fixture.close()

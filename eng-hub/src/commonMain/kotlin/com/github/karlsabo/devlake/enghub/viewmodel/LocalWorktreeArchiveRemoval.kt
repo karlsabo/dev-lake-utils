@@ -29,7 +29,7 @@ internal class LocalWorktreeArchiveRemoval(
             completion.complete(job)
         }.rethrowCancellation().onFailure { failure ->
             currentCoroutineContext().ensureActive()
-            retainFailure(job, failure)
+            retainFailure(job, failure, force)
             report("Failed to complete worktree archive", failure)
         }
     }
@@ -93,8 +93,12 @@ internal class LocalWorktreeArchiveRemoval(
         }
     }
 
-    private suspend fun retainFailure(job: WorktreeArchiveJob, failure: Throwable) {
-        val needsConfirmation = failure.isDirtyWorktreeArchiveFailure()
+    private suspend fun retainFailure(
+        job: WorktreeArchiveJob,
+        failure: Throwable,
+        force: Boolean,
+    ) {
+        val needsConfirmation = !force && failure.isDirtyWorktreeArchiveFailure()
         val failed = job.copy(
             state = if (needsConfirmation) {
                 WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
