@@ -12,8 +12,14 @@ import com.github.karlsabo.devlake.enghub.state.toLocalWorktreeUiStatesWithUnkno
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.github.GitHubRepositoryIdentity
 import com.github.karlsabo.github.parseGitHubRepositoryIdentity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
@@ -35,15 +41,26 @@ internal class LocalRepositoryController(
     private val refreshTracker = LocalRepositoryRefreshTracker(state)
     private val statusTracker = LocalWorktreeStatusTracker(state)
 
-    // Lives as long as the view model, but outside viewModelScope's job tree: background status and
-    // enrichment work must outlive the discovery, refresh, and polling jobs that schedule it, so
-    // cancelling those jobs must neither cancel nor wait on in-flight background work. Supervised so
-    // one failed job neither cancels its siblings nor surfaces upstream.
+    // Outside viewModelScope's job tree so cancelling polling never waits on blocking Git calls.
+    // Disposal cancels this scope immediately, independently of discovery's blocking children.
     private val backgroundWorkScope = viewModel.localRepositoryBackgroundScope()
     private val worktreeEnrichmentScheduler = LocalWorktreeEnrichmentScheduler(
         scope = backgroundWorkScope,
         gitWorktreeApi = gitWorktreeApi,
     )
+
+    private val pollRefreshScheduler = PerRepositoryConflatedTaskQueue<PollRefreshTask>(backgroundWorkScope) { task ->
+        runCatching {
+            refreshLocalRepositoryWorktrees(task.repoRootPath) {
+                viewModel.viewModelScope.coroutineContext.ensureActive()
+                task.requestOwner.ensureActive()
+            }
+        }.onFailure { failure ->
+            if (failure !is CancellationException) {
+                logger.error(failure) { "Failed to poll worktrees for ${task.repoRootPath}" }
+            }
+        }
+    }
 
     fun pickAndAddLocalRepository() {
         viewModel.viewModelScope.launch {
@@ -82,11 +99,21 @@ internal class LocalRepositoryController(
     }
 
     suspend fun pollConfiguredLocalRepositoryWorktrees(pollImmediately: Boolean = true) {
-        worktreePollingFlow(
-            configs = state.config,
-            pollImmediately = pollImmediately,
-            poll = ::refreshConfiguredLocalRepositoryWorktrees,
-        ).collect()
+        configDrivenPollingFlow(state.config) { config ->
+            flow {
+                // A config cancels request ownership, not the worker: synchronous Git may ignore
+                // cancellation, and replacing that worker would allow unbounded overlapping calls.
+                val requestOwner = Job(backgroundWorkScope.coroutineContext[Job])
+                try {
+                    worktreePollingFlow(
+                        configs = flowOf(config),
+                        pollImmediately = pollImmediately,
+                    ) { refreshConfiguredLocalRepositoryWorktrees(requestOwner) }.collect { emit(it) }
+                } finally {
+                    requestOwner.cancel()
+                }
+            }
+        }.collect()
     }
 
     fun refreshLocalRepositoryWorktreesBestEffort(repoRootPath: String, logContext: String) {
@@ -221,37 +248,42 @@ internal class LocalRepositoryController(
         }
     }
 
-    private fun refreshConfiguredLocalRepositoryWorktrees() {
+    private fun refreshConfiguredLocalRepositoryWorktrees(requestOwner: Job) {
         state.currentConfig.localRepositories
             .asSequence()
             .map { it.path.trim() }
             .filter { it.isNotEmpty() }
             .distinctBy { repositoryIdentity(it) }
             .forEach { repoRootPath ->
-                runCatching { refreshLocalRepositoryWorktrees(repoRootPath) }
-                    .rethrowCancellation()
-                    .onFailure { failure ->
-                        logger.error(failure) { "Failed to poll worktrees for $repoRootPath" }
-                    }
+                pollRefreshScheduler.schedule(
+                    key = repositoryIdentity(repoRootPath),
+                    task = PollRefreshTask(repoRootPath, requestOwner),
+                )
             }
     }
 
-    private fun refreshLocalRepositoryWorktrees(repoRootPath: String) {
+    private fun refreshLocalRepositoryWorktrees(repoRootPath: String, checkActive: () -> Unit = {}) {
+        checkActive()
         val normalizedRepoRootPath = repositoryIdentity(repoRootPath)
         val request = refreshTracker.start(normalizedRepoRootPath) ?: return
         val basicWorktrees = runCatching {
             gitWorktreeApi.listWorktreeEntries(repoRootPath)
                 .toLocalWorktreeUiStatesWithUnknownDirtyStatus(repoRootPath)
         }.onFailure {
+            checkActive()
             refreshTracker.fail(normalizedRepoRootPath, request)
         }.getOrThrow()
+        checkActive()
         val published = refreshTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)
         val publishedWorktrees = state.localRepositories.value.firstOrNull {
             published && it.path.normalizedRepositoryPath() == normalizedRepoRootPath && it.statusRequest === request
         }?.worktrees ?: return
 
         hydrateWorktreeStatuses(normalizedRepoRootPath, request, basicWorktrees)
+
+        checkActive()
         githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath)
+        checkActive()
         worktreeEnrichmentScheduler.schedule(
             repoRootPath = repoRootPath,
             normalizedRepoRootPath = normalizedRepoRootPath,
@@ -266,6 +298,11 @@ internal class LocalRepositoryController(
         }
     }
 }
+
+private data class PollRefreshTask(
+    val repoRootPath: String,
+    val requestOwner: Job,
+)
 
 private class LocalRepositoryGitHubIdentityResolver(
     private val state: EngHubViewModelState,

@@ -175,10 +175,14 @@ class EngHubLocalWorktreeArchiveViewModelTest {
     fun lateUndoDoesNotDeleteRequeuedWorktree() = runBlocking {
         val store = RecordingWorktreeArchiveStore()
         val deleteCalls = MutableStateFlow(0)
+        val releaseFirstUndo = CompletableDeferred<Unit>()
         val releaseLateUndo = CompletableDeferred<Unit>()
         store.beforeDeleteQueuedJob = { _, _ ->
-            deleteCalls.update { it + 1 }
-            if (deleteCalls.value == 2) runBlocking { releaseLateUndo.await() }
+            val call = deleteCalls.value + 1
+            deleteCalls.value = call
+            runBlocking {
+                if (call == 1) releaseFirstUndo.await() else releaseLateUndo.await()
+            }
         }
         val api = archiveTestApi()
         val viewModel = archiveViewModel(api, store) { Instant.fromEpochMilliseconds(10_000) }
@@ -189,8 +193,10 @@ class EngHubLocalWorktreeArchiveViewModelTest {
         }
 
         viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+        withTimeout(2_000.milliseconds) { deleteCalls.first { it == 1 } }
         viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
         withTimeout(2_000.milliseconds) { deleteCalls.first { it == 2 } }
+        releaseFirstUndo.complete(Unit)
         withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
         viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
         val replacement = withTimeout(2_000.milliseconds) {

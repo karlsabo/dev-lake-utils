@@ -4,6 +4,7 @@ import com.github.karlsabo.git.GitRebaseConflictException
 import com.github.karlsabo.git.OriginFetchFailureException
 import com.github.karlsabo.git.Worktree
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -304,12 +305,9 @@ class EngHubLocalWorktreeRebaseViewModelTest {
     fun multipleRebaseConflictsAreQueuedUntilHandled() = runBlocking {
         val firstChildWorktreePath = "$DEV_LAKE_ROOT-feature-stacked-pr"
         val secondChildWorktreePath = "$DEV_LAKE_ROOT-feature-next-pr"
+        val refreshStarted = Channel<Unit>(Channel.UNLIMITED)
         val parentBranch = "feature/base-pr"
-        val worktrees = listOf(
-            Worktree(path = "$DEV_LAKE_ROOT-feature-base-pr", branch = parentBranch, commitHash = "abc123"),
-            Worktree(path = firstChildWorktreePath, branch = "feature/stacked-pr", commitHash = "def456"),
-            Worktree(path = secondChildWorktreePath, branch = "feature/next-pr", commitHash = "987abc"),
-        )
+        val worktrees = conflictingWorktrees(parentBranch, firstChildWorktreePath, secondChildWorktreePath)
         val api = RecordingGitWorktreeApi(
             responses = RecordingGitWorktreeApiResponses(
                 worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees),
@@ -324,6 +322,9 @@ class EngHubLocalWorktreeRebaseViewModelTest {
                     parentBranch = parentBranch,
                     cause = RuntimeException("conflict"),
                 ),
+            ),
+            callbacks = RecordingGitWorktreeApiCallbacks(
+                onListWorktreeEntries = { refreshStarted.trySend(Unit).getOrThrow() },
             ),
         )
         val viewModel = createLocalRepositoryViewModel(
@@ -342,13 +343,13 @@ class EngHubLocalWorktreeRebaseViewModelTest {
         val firstRequest = withTimeout(2_000.milliseconds) {
             viewModel.worktreeConflictResolutionRequestStateFlow.first { it != null }
         }
-        val refreshCountBeforeSecondConflict = api.listWorktreeRepoPaths.size
-        viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, secondChildWorktreePath, parentBranch)
+        // A first-conflict refresh can start after its prompt is visible; it must not satisfy the second wait.
         withTimeout(2_000.milliseconds) {
-            while (api.listWorktreeRepoPaths.size == refreshCountBeforeSecondConflict) {
-                kotlinx.coroutines.yield()
-            }
+            refreshStarted.receive()
+            refreshStarted.receive()
         }
+        viewModel.rebaseLocalWorktreeOntoParent(DEV_LAKE_ROOT, secondChildWorktreePath, parentBranch)
+        withTimeout(2_000.milliseconds) { refreshStarted.receive() }
 
         val secondRequest = WorktreeConflictResolutionRequest(
             operation = WorktreeIntegrationOperation.Rebase,
@@ -362,6 +363,16 @@ class EngHubLocalWorktreeRebaseViewModelTest {
 
         assertEquals(secondRequest, viewModel.worktreeConflictResolutionRequestStateFlow.value)
     }
+
+    private fun conflictingWorktrees(
+        parentBranch: String,
+        firstChildPath: String,
+        secondChildPath: String,
+    ) = listOf(
+        Worktree(path = "$DEV_LAKE_ROOT-feature-base-pr", branch = parentBranch, commitHash = "abc123"),
+        Worktree(path = firstChildPath, branch = "feature/stacked-pr", commitHash = "def456"),
+        Worktree(path = secondChildPath, branch = "feature/next-pr", commitHash = "987abc"),
+    )
 
     @Test
     fun rebaseLocalWorktreeOntoParentConflictLeaveAsIsClearsPromptWithoutAborting() = runBlocking {
