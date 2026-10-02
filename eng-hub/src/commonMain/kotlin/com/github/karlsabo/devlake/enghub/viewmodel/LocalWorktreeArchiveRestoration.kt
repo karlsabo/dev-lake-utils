@@ -13,13 +13,19 @@ internal class LocalWorktreeArchiveRestoration(
     private val archive: WorktreeArchiveDependencies,
     private val errorReporter: ActionErrorReporter,
     private val expose: (WorktreeArchiveJob, LocalWorktreeMutationGuard.Lease) -> Unit,
+    private val resumeRemoval: suspend (WorktreeArchiveJob) -> Unit,
 ) {
     suspend fun restore() {
         runCatching {
             val jobs = archive.store.listJobs()
             currentCoroutineContext().ensureActive()
-            jobs.filter { it.state == WorktreeArchiveLifecycleState.QUEUED }.forEach { job ->
-                runCatching { restoreJob(job) }.rethrowCancellation().onFailure { report(it) }
+            jobs.filter {
+                it.state == WorktreeArchiveLifecycleState.QUEUED ||
+                    it.state == WorktreeArchiveLifecycleState.REMOVING
+            }.forEach { job ->
+                runCatching {
+                    if (job.state == WorktreeArchiveLifecycleState.QUEUED) restoreJob(job) else resumeJob(job)
+                }.rethrowCancellation().onFailure { report(it) }
             }
         }.rethrowCancellation().onFailure { report(it) }
     }
@@ -70,6 +76,39 @@ internal class LocalWorktreeArchiveRestoration(
                 exposed = true
                 if (error != null) errorReporter.enqueueActionError(error)
             }
+        } finally {
+            if (!exposed) lease.release()
+        }
+    }
+
+    private suspend fun resumeJob(job: WorktreeArchiveJob) {
+        val root = job.repositoryRootPath.normalizedRepositoryPath()
+        val path = job.worktreePath.normalizedRepositoryPath()
+        check(root.isNotEmpty() && path.isNotEmpty() && root != path && path == job.worktreePath) {
+            "Invalid removing worktree identity: ${job.worktreePath}"
+        }
+        check(state.localRepositories.value.any { it.path.normalizedRepositoryPath() == root }) {
+            "Repository is no longer configured: ${job.repositoryRootPath}"
+        }
+        val lease = checkNotNull(state.localWorktreeMutationGuard.tryAcquire(path)) {
+            "Worktree mutation already in progress: $path"
+        }
+        var exposed = false
+        try {
+            // A partial removal may have erased registration; a registered replacement branch is never safe to remove.
+            val registered = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
+                .firstOrNull { it.path.normalizedRepositoryPath() == path }
+            check(registered == null || registered.branch == job.branch) {
+                "Cannot resume archive: worktree branch no longer matches: $path"
+            }
+            currentCoroutineContext().ensureActive()
+            check(archive.store.listJobs().any { it == job }) {
+                "Removing worktree archive changed during startup: $path"
+            }
+            currentCoroutineContext().ensureActive()
+            expose(job, lease)
+            exposed = true
+            resumeRemoval(job)
         } finally {
             if (!exposed) lease.release()
         }

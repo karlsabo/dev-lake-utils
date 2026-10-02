@@ -49,6 +49,7 @@ internal class LocalWorktreeArchiveController(
         archive,
         errorReporter,
         ::exposeArchive,
+        { job -> removal.remove(job) },
     )
     private val startupRestoration = viewModel.viewModelScope.launch(Dispatchers.IO) { restoration.restore() }
 
