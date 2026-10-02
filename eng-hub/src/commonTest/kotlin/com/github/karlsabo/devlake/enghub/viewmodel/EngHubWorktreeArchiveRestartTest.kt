@@ -520,6 +520,67 @@ class EngHubWorktreeArchiveRemovalRestartTest {
     }
 
     @Test
+    fun registeredAbsentCheckoutResumesAndClearsJobWithoutUndo() = runBlocking {
+        val fixture = ArchiveRestartFixture(pathPresent = { false }, checkoutPresent = { false })
+        val removing = restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING)
+        fixture.store.jobs.value = listOf(removing)
+        val resumed = CompletableDeferred<Unit>()
+        fixture.onResume = { root, path, branch ->
+            assertEquals(DEV_LAKE_ROOT, root)
+            assertEquals(DEV_LAKE_SELECTED_WORKTREE, path)
+            assertEquals("feature/login", branch)
+            assertEquals(listOf(removing), fixture.store.listJobs())
+            fixture.discovered = fixture.discovered.filterNot { it.path == path }
+            resumed.complete(Unit)
+        }
+        fixture.releaseArchive()
+        try {
+            val viewModel = fixture.start(100_000)
+            withTimeout(2_000.milliseconds) { resumed.await() }
+            withTimeout(2_000.milliseconds) { fixture.store.deleteRemovingJobResults.first { it == listOf(true) } }
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+            assertFalse(fixture.deadlines.tryReceive().isSuccess)
+            viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            assertEquals(emptyList(), fixture.store.deleteQueuedJobCalls.value)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun registeredAbsentCheckoutRetriesFailedPruneThroughIdentityCheckedResume() = runBlocking {
+        val fixture = ArchiveRestartFixture(pathPresent = { false }, checkoutPresent = { false })
+        fixture.store.jobs.value = listOf(restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING))
+        var resumes = 0
+        fixture.onResume = { _, path, _ ->
+            resumes++
+            if (resumes == 1) error("prune unavailable")
+            fixture.discovered = fixture.discovered.filterNot { it.path == path }
+        }
+        fixture.releaseArchive()
+        try {
+            val viewModel = fixture.start(100_000)
+            val failed = withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first {
+                    it.singleOrNull()?.state == WorktreeArchiveLifecycleState.FAILED
+                }.single()
+            }
+            assertEquals("prune unavailable", failed.errorMessage)
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            viewModel.retryFailedWorktreeArchive(failed.worktreePath)
+            withTimeout(2_000.milliseconds) { fixture.store.deleteRemovingJobResults.first { it == listOf(true) } }
+            assertEquals(2, resumes)
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun interruptedRemovalFailureRetainsFailedOrForceConfirmationWithoutForce() = runBlocking {
         listOf(
             IllegalStateException("permission denied") to WorktreeArchiveLifecycleState.FAILED,
@@ -767,6 +828,7 @@ private class ArchiveRestartFixture(
     val nowEpochMs = MutableStateFlow(100_000L)
     val deadlines = Channel<Pair<Duration, CompletableDeferred<Unit>>>(Channel.UNLIMITED)
     val updateStarted = CompletableDeferred<Unit>()
+    var discovered = worktrees
     var onDiscovery: () -> Unit = {}
     var onUpdate: () -> Unit = {}
     var onResume: (String, String, String) -> Unit = { _, _, _ -> }
@@ -778,7 +840,7 @@ private class ArchiveRestartFixture(
     }
     private val viewModels = mutableListOf<EngHubViewModel>()
     val api = RecordingGitWorktreeApi(
-        responses = RecordingGitWorktreeApiResponses(worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees)),
+        responses = RecordingGitWorktreeApiResponses(worktreesForRepoPath = { discovered }),
         callbacks = RecordingGitWorktreeApiCallbacks(
             onListWorktreeEntries = { onDiscovery() },
             onResumeArchiveWorktree = { root, path, branch -> onResume(root, path, branch) },

@@ -134,9 +134,29 @@ class EngHubWorktreeArchiveFailureTest {
     }
 
     @Test
+    fun retryAfterAttemptRejectsUnregisteredReplacementDirectory() = runBlocking {
+        val fixture = ArchiveFailureFixture(pathPresent = { true })
+        try {
+            val failed = fixture.failRemoval()
+            fixture.discovered = fixture.worktrees.take(1)
+            fixture.viewModel.clearActionError()
+            fixture.viewModel.retryFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            fixture.awaitError(
+                "Failed to retry worktree archive: Cannot retry archive: " +
+                    "worktree registration or branch no longer matches: $DEV_LAKE_SELECTED_WORKTREE",
+            )
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+            fixture.assertLeaseHeld()
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun retryAfterAttemptRejectsMissingCheckoutWhileOriginalRegistrationRemains() = runBlocking {
         val checkoutExists = MutableStateFlow(true)
-        val fixture = ArchiveFailureFixture(checkoutPresent = { checkoutExists.value })
+        val fixture = ArchiveFailureFixture(checkoutPresent = { checkoutExists.value }, pathPresent = { true })
         try {
             val failed = fixture.failRemoval()
             checkoutExists.value = false
@@ -335,6 +355,7 @@ internal data class ArchiveAttempt(
 
 internal class ArchiveFailureFixture(
     checkoutPresent: (String) -> Boolean = { true },
+    pathPresent: (String) -> Boolean = { false },
 ) {
     val store = RecordingWorktreeArchiveStore()
     val updateStarted = CompletableDeferred<Unit>()
@@ -379,6 +400,7 @@ internal class ArchiveFailureFixture(
         services = LocalRepositoryViewModelServices(
             worktreeArchiveStore = store,
             checkoutPresent = checkoutPresent,
+            pathPresent = pathPresent,
             archiveNow = { Instant.fromEpochMilliseconds(10_000) },
             waitForArchiveDeadline = { deadline.await() },
         ),

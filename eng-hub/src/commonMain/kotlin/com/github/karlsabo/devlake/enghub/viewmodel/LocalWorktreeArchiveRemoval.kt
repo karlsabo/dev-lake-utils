@@ -74,11 +74,12 @@ internal class LocalWorktreeArchiveRemoval(
         val job = failedJob(worktreePath) ?: return
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                verifyRetryIdentity(
+                val resumeAbsent = verifyRetryIdentity(
                     gitWorktreeApi,
                     job,
                     job.queueId in attemptedQueueIds.value,
                     archive.checkoutPresent,
+                    archive.pathPresent,
                 )
                 val removing = job.copy(
                     state = WorktreeArchiveLifecycleState.REMOVING,
@@ -88,7 +89,7 @@ internal class LocalWorktreeArchiveRemoval(
                 if (archive.store.transitionFailedJobToRemoving(job, removing.stateUpdatedAtEpochMs)) {
                     currentCoroutineContext().ensureActive()
                     publish(job, removing)
-                    remove(removing)
+                    remove(removing, resumed = resumeAbsent)
                 }
             }.rethrowCancellation().onFailure { report("Failed to retry worktree archive", it) }
         }

@@ -97,19 +97,7 @@ internal class LocalWorktreeArchiveRestoration(
         try {
             val registered = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
                 .firstOrNull { it.path.normalizedRepositoryPath() == path }
-            val identityError = when {
-                registered != null && registered.branch != job.branch ->
-                    "Cannot resume archive: worktree branch no longer matches: $path"
-
-                // Without registration, leftover files cannot be distinguished from a replacement checkout.
-                registered == null && archive.pathPresent(path) ->
-                    "Cannot resume archive: checkout identity cannot be verified: $path"
-
-                registered != null && !archive.checkoutPresent(path) ->
-                    "Cannot resume archive: checkout identity cannot be verified: $path"
-
-                else -> null
-            }
+            val identityError = resumeIdentityError(job, path, registered?.branch)
             currentCoroutineContext().ensureActive()
             if (identityError != null) {
                 val failedAt = maxOf(archive.now().toEpochMilliseconds(), job.stateUpdatedAtEpochMs + 1)
@@ -136,6 +124,24 @@ internal class LocalWorktreeArchiveRestoration(
         } finally {
             if (!exposed) lease.release()
         }
+    }
+
+    private fun resumeIdentityError(
+        job: WorktreeArchiveJob,
+        path: String,
+        registeredBranch: String?,
+    ): String? = when {
+        registeredBranch != null && registeredBranch != job.branch ->
+            "Cannot resume archive: worktree branch no longer matches: $path"
+
+        // Without registration, leftover files cannot be distinguished from a replacement checkout.
+        registeredBranch == null && archive.pathPresent(path) ->
+            "Cannot resume archive: checkout identity cannot be verified: $path"
+
+        registeredBranch != null && archive.pathPresent(path) && !archive.checkoutPresent(path) ->
+            "Cannot resume archive: checkout identity cannot be verified: $path"
+
+        else -> null
     }
 
     private suspend fun report(failure: Throwable) {

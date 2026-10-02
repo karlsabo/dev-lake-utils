@@ -1467,7 +1467,14 @@ private class GitWorktreeArchiver(
             pruneWorktrees(repoPath)
             return
         }
-        check(registration.branch == expectedBranch && SystemFileSystem.exists(Path(worktreePath, ".git"))) {
+        check(registration.branch == expectedBranch) {
+            "Cannot resume archive: checkout identity cannot be verified: $worktreePath"
+        }
+        if (SystemFileSystem.metadataOrNull(Path(worktreePath)) == null) {
+            pruneWorktrees(repoPath)
+            return
+        }
+        check(SystemFileSystem.exists(Path(worktreePath, ".git"))) {
             "Cannot resume archive: checkout identity cannot be verified: $worktreePath"
         }
         archiveWorktree(repoPath, worktreePath, force = false)
