@@ -98,6 +98,11 @@ interface GitWorktreeMetadataApi {
 }
 
 interface GitWorktreeArchiveApi {
+    fun resumeArchiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        expectedBranch: String,
+    ): Unit = throw UnsupportedOperationException("resumeArchiveWorktree is not implemented")
     fun removeWorktree(worktreePath: String, force: Boolean = false)
     fun archiveWorktree(
         repoPath: String,

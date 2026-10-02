@@ -25,11 +25,19 @@ internal class LocalWorktreeArchiveRemoval(
 
     private val attemptedQueueIds = MutableStateFlow<Set<String>>(emptySet())
 
-    suspend fun remove(job: WorktreeArchiveJob, force: Boolean = false) {
+    suspend fun remove(
+        job: WorktreeArchiveJob,
+        force: Boolean = false,
+        resumed: Boolean = false,
+    ) {
         runCatching {
             currentCoroutineContext().ensureActive()
             attemptedQueueIds.update { it + job.queueId }
-            gitWorktreeApi.archiveWorktree(job.repositoryRootPath, job.worktreePath, force = force)
+            if (resumed) {
+                gitWorktreeApi.resumeArchiveWorktree(job.repositoryRootPath, job.worktreePath, job.branch)
+            } else {
+                gitWorktreeApi.archiveWorktree(job.repositoryRootPath, job.worktreePath, force = force)
+            }
             completion.complete(job)
             attemptedQueueIds.update { it - job.queueId }
         }.rethrowCancellation().onFailure { failure ->

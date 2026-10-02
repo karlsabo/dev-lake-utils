@@ -289,6 +289,43 @@ class EngHubWorktreeArchiveRestartTest {
     }
 
     @Test
+    fun replacementAfterStartupIdentityCheckFailsRemovalAndRetainsEvidence() = runBlocking {
+        val directory = "/tmp/archive-late-${Random.nextLong().toULong().toString(16)}"
+        val path = Path(directory, "checkout").toString().normalizedRepositoryPath()
+        val unrelated = Path(path, "new-file.txt")
+        val fixture = ArchiveRestartFixture(
+            worktrees = emptyList(),
+            pathPresent = { SystemFileSystem.metadataOrNull(Path(it)) != null },
+        )
+        fixture.store.jobs.value = listOf(
+            restartQueuedJob().copy(worktreePath = path, state = WorktreeArchiveLifecycleState.REMOVING),
+        )
+        fixture.onResume = { _, resumedPath, branch ->
+            assertEquals(path, resumedPath)
+            assertEquals("feature/login", branch)
+            SystemFileSystem.createDirectories(Path(path))
+            writeText(unrelated, "keep me")
+            error("Cannot resume archive: checkout identity cannot be verified: $path")
+        }
+        try {
+            val viewModel = fixture.start(100_000)
+            val failed = withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first {
+                    it.singleOrNull()?.state == WorktreeArchiveLifecycleState.FAILED
+                }.single()
+            }
+            assertEquals("Cannot resume archive: checkout identity cannot be verified: $path", failed.errorMessage)
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals("keep me", readText(unrelated))
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+            assertFalse(fixture.deadlines.tryReceive().isSuccess)
+        } finally {
+            fixture.close()
+            if (SystemFileSystem.exists(Path(directory))) removeTempDir(directory)
+        }
+    }
+
+    @Test
     fun replacementAppearingDuringDiscoveryCannotBeRemoved() = runBlocking {
         val directory = "/tmp/archive-discovery-${Random.nextLong().toULong().toString(16)}"
         val path = Path(directory, "checkout").toString().normalizedRepositoryPath()
@@ -732,6 +769,7 @@ private class ArchiveRestartFixture(
     val updateStarted = CompletableDeferred<Unit>()
     var onDiscovery: () -> Unit = {}
     var onUpdate: () -> Unit = {}
+    var onResume: (String, String, String) -> Unit = { _, _, _ -> }
     val archiveStarted = CompletableDeferred<Unit>()
     private val allowArchive = CompletableDeferred<Unit>()
     var archiveFailure: RuntimeException? = null
@@ -743,6 +781,7 @@ private class ArchiveRestartFixture(
         responses = RecordingGitWorktreeApiResponses(worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to worktrees)),
         callbacks = RecordingGitWorktreeApiCallbacks(
             onListWorktreeEntries = { onDiscovery() },
+            onResumeArchiveWorktree = { root, path, branch -> onResume(root, path, branch) },
             onUpdateWorktreeFromOrigin = {
                 updateStarted.complete(Unit)
                 onUpdate()

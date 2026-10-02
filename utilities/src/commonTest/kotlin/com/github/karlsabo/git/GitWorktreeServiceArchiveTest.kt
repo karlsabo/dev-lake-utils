@@ -111,6 +111,80 @@ class GitWorktreeServiceArchiveTest {
     }
 
     @Test
+    fun resumedUnregisteredAbsentCheckoutOnlyPrunes() {
+        val fake = FakeGitCommandApi()
+        val worktreePath = createArchiveWorktreeTempDir()
+        removeTempDir(worktreePath)
+
+        GitWorktreeService(fake).resumeArchiveWorktree("/tmp/repo", worktreePath, "feature/login")
+
+        assertFalse(SystemFileSystem.exists(Path(worktreePath)))
+        assertEquals(
+            listOf(FakeGitCommandApi.Call("execute", listOf("/tmp/repo", "worktree", "prune"))),
+            fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" },
+        )
+    }
+
+    @Test
+    fun resumedUnregisteredCheckoutReplacedAfterStartupCheckIsNeverDeleted() {
+        val fake = FakeGitCommandApi()
+        val worktreePath = createArchiveWorktreeTempDir()
+        removeTempDir(worktreePath)
+        val unrelated = Path(worktreePath, "unrelated.txt")
+        fake.worktreeListAction = {
+            // Startup saw an absent path; replacement lands just before the service's cleanup decision.
+            SystemFileSystem.createDirectories(Path(worktreePath))
+            writeFile(worktreePath, "unrelated.txt", "keep me")
+            ""
+        }
+        try {
+            val failure = assertFailsWith<IllegalStateException> {
+                GitWorktreeService(fake).resumeArchiveWorktree("/tmp/repo", worktreePath, "feature/login")
+            }
+            assertTrue(failure.message!!.contains("checkout identity cannot be verified"))
+            assertTrue(SystemFileSystem.exists(unrelated))
+            assertEquals(emptyList(), fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" })
+        } finally {
+            removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
+    fun resumedRegisteredReplacementBranchIsNotRemoved() {
+        val fake = FakeGitCommandApi()
+        val worktreePath = createArchiveWorktreeTempDir()
+        writeFile(worktreePath, ".git", "gitdir: /tmp/repo/.git/worktrees/other")
+        writeFile(worktreePath, "unrelated.txt", "keep me")
+        fake.worktreeListResult = "worktree $worktreePath\nHEAD abc\nbranch refs/heads/other\n"
+        try {
+            assertFailsWith<IllegalStateException> {
+                GitWorktreeService(fake).resumeArchiveWorktree("/tmp/repo", worktreePath, "feature/login")
+            }
+            assertTrue(SystemFileSystem.exists(Path(worktreePath, "unrelated.txt")))
+            assertEquals(emptyList(), fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" })
+        } finally {
+            removeTempDir(worktreePath)
+        }
+    }
+
+    @Test
+    fun resumedRegisteredCheckoutStillUsesOrdinaryRemoval() {
+        val fake = FakeGitCommandApi()
+        val worktreePath = createArchiveWorktreeTempDir()
+        writeFile(worktreePath, ".git", "gitdir: /tmp/repo/.git/worktrees/login")
+        fake.worktreeListResult = "worktree $worktreePath\nHEAD abc\nbranch refs/heads/feature/login\n"
+        GitWorktreeService(fake).resumeArchiveWorktree("/tmp/repo", worktreePath, "feature/login")
+        assertFalse(SystemFileSystem.exists(Path(worktreePath)))
+        assertEquals(
+            listOf(
+                FakeGitCommandApi.Call("worktreeRemove", listOf("/tmp/repo", worktreePath)),
+                FakeGitCommandApi.Call("execute", listOf("/tmp/repo", "worktree", "prune")),
+            ),
+            fake.calls.filter { it.method == "worktreeRemove" || it.method == "execute" },
+        )
+    }
+
+    @Test
     fun archiveWorktree_deleteFailureStillPrunes() {
         val fake = FakeGitCommandApi()
         val service = GitWorktreeService(
