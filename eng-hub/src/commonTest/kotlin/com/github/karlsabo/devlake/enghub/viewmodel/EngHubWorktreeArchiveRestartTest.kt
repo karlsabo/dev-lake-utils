@@ -540,7 +540,7 @@ class EngHubWorktreeArchiveRemovalRestartTest {
             withTimeout(2_000.milliseconds) { resumed.await() }
             withTimeout(2_000.milliseconds) { fixture.store.deleteRemovingJobResults.first { it == listOf(true) } }
             assertEquals(emptyList(), fixture.store.listJobs())
-            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
             assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
             assertFalse(fixture.deadlines.tryReceive().isSuccess)
             viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
@@ -574,7 +574,7 @@ class EngHubWorktreeArchiveRemovalRestartTest {
             withTimeout(2_000.milliseconds) { fixture.store.deleteRemovingJobResults.first { it == listOf(true) } }
             assertEquals(2, resumes)
             assertEquals(emptyList(), fixture.store.listJobs())
-            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
             assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
         } finally {
             fixture.close()
