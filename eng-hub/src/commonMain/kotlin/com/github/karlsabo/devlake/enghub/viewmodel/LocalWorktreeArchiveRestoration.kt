@@ -97,21 +97,42 @@ internal class LocalWorktreeArchiveRestoration(
         try {
             val registered = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
                 .firstOrNull { it.path.normalizedRepositoryPath() == path }
-            check(registered == null || registered.branch == job.branch) {
-                "Cannot resume archive: worktree branch no longer matches: $path"
-            }
-            // Without registration, leftover files cannot be distinguished from a replacement checkout.
-            check(if (registered == null) !archive.pathPresent(path) else archive.checkoutPresent(path)) {
-                "Cannot resume archive: checkout identity cannot be verified: $path"
+            val identityError = when {
+                registered != null && registered.branch != job.branch ->
+                    "Cannot resume archive: worktree branch no longer matches: $path"
+
+                // Without registration, leftover files cannot be distinguished from a replacement checkout.
+                registered == null && archive.pathPresent(path) ->
+                    "Cannot resume archive: checkout identity cannot be verified: $path"
+
+                registered != null && !archive.checkoutPresent(path) ->
+                    "Cannot resume archive: checkout identity cannot be verified: $path"
+
+                else -> null
             }
             currentCoroutineContext().ensureActive()
-            check(archive.store.listJobs().any { it == job }) {
-                "Removing worktree archive changed during startup: $path"
+            if (identityError != null) {
+                val failedAt = maxOf(archive.now().toEpochMilliseconds(), job.stateUpdatedAtEpochMs + 1)
+                val failed = job.copy(
+                    state = WorktreeArchiveLifecycleState.FAILED,
+                    stateUpdatedAtEpochMs = failedAt,
+                    errorMessage = identityError,
+                )
+                if (archive.store.transitionRemovingJobToFailed(job, identityError, failedAt)) {
+                    currentCoroutineContext().ensureActive()
+                    expose(failed, lease)
+                    exposed = true
+                    errorReporter.enqueueActionError(identityError)
+                }
+            } else {
+                check(archive.store.listJobs().any { it == job }) {
+                    "Removing worktree archive changed during startup: $path"
+                }
+                currentCoroutineContext().ensureActive()
+                expose(job, lease)
+                exposed = true
+                resumeRemoval(job)
             }
-            currentCoroutineContext().ensureActive()
-            expose(job, lease)
-            exposed = true
-            resumeRemoval(job)
         } finally {
             if (!exposed) lease.release()
         }

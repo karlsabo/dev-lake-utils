@@ -260,15 +260,28 @@ class EngHubWorktreeArchiveRestartTest {
         )
         try {
             val viewModel = fixture.start(100_000)
-            fixture.awaitError(
-                viewModel,
-                "Failed to restore queued worktree archive: " +
-                    "Cannot resume archive: checkout identity cannot be verified: $path",
-            )
+            val failed = fixture.awaitRestored(viewModel)
+            assertEquals(WorktreeArchiveLifecycleState.FAILED, failed.state)
+            assertEquals("Cannot resume archive: checkout identity cannot be verified: $path", failed.errorMessage)
+            assertEquals(listOf(failed), fixture.store.listJobs())
             assertEquals("keep me", readText(unrelated))
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
-            assertEquals(WorktreeArchiveLifecycleState.REMOVING, fixture.store.listJobs().single().state)
-            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertFalse(fixture.deadlines.tryReceive().isSuccess)
+            viewModel.undoQueuedWorktreeArchive(path)
+            assertEquals(emptyList(), fixture.store.deleteQueuedJobCalls.value)
+            viewModel.clearActionError()
+            viewModel.retryFailedWorktreeArchive(path)
+            fixture.awaitError(
+                viewModel,
+                "Failed to retry worktree archive: Cannot retry archive: " +
+                    "worktree registration or branch no longer matches: $path",
+            )
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals("keep me", readText(unrelated))
+            viewModel.dismissFailedWorktreeArchive(path)
+            withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals("keep me", readText(unrelated))
         } finally {
             fixture.close()
             removeTempDir(directory)
@@ -293,11 +306,10 @@ class EngHubWorktreeArchiveRestartTest {
         }
         try {
             val viewModel = fixture.start(100_000)
-            fixture.awaitError(
-                viewModel,
-                "Failed to restore queued worktree archive: " +
-                    "Cannot resume archive: checkout identity cannot be verified: $path",
-            )
+            val failed = fixture.awaitRestored(viewModel)
+            assertEquals(WorktreeArchiveLifecycleState.FAILED, failed.state)
+            assertEquals("Cannot resume archive: checkout identity cannot be verified: $path", failed.errorMessage)
+            assertEquals(listOf(failed), fixture.store.listJobs())
             assertEquals("new data", readText(unrelated))
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
         } finally {
@@ -305,7 +317,91 @@ class EngHubWorktreeArchiveRestartTest {
             removeTempDir(directory)
         }
     }
+}
 
+class EngHubWorktreeArchiveIdentityRestartTest {
+    @Test
+    fun identityFailureMustPersistBeforePublicationAndReleaseLeaseOnWriteFailure() = runBlocking {
+        val fixture = ArchiveRestartFixture(worktrees = emptyList(), pathPresent = { true })
+        val removing = restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING)
+        fixture.store.jobs.value = listOf(removing)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        fixture.store.beforeFailedOperation = { operation, _ ->
+            if (operation == "fail") {
+                entered.complete(Unit)
+                runBlocking { release.await() }
+                error("disk full")
+            }
+        }
+        try {
+            val viewModel = fixture.start(100_000)
+            withTimeout(2_000.milliseconds) { entered.await() }
+            assertEquals(listOf(removing), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            release.complete(Unit)
+            fixture.awaitError(viewModel, "Failed to restore queued worktree archive: disk full")
+            assertEquals(listOf(removing), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            release.complete(Unit)
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun identityFailureCannotPublishOrChangeAReplacedAttempt() = runBlocking {
+        val fixture = ArchiveRestartFixture(worktrees = emptyList(), pathPresent = { true })
+        val removing = restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING)
+        val replacement = removing.copy(queueId = "replacement")
+        fixture.store.jobs.value = listOf(removing)
+        fixture.store.beforeFailedOperation = { operation, _ ->
+            if (operation == "fail") fixture.store.jobs.value = listOf(replacement)
+        }
+        try {
+            val viewModel = fixture.start(100_000)
+            withTimeout(2_000.milliseconds) {
+                fixture.store.failedOperationResults.first { it.contains("fail" to false) }
+            }
+            assertEquals(listOf(replacement), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun disposalDuringIdentityFailureWriteNeverPublishesOrRunsGit() = runBlocking {
+        val fixture = ArchiveRestartFixture(worktrees = emptyList(), pathPresent = { true })
+        val removing = restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING)
+        fixture.store.jobs.value = listOf(removing)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        fixture.store.beforeFailedOperation = { operation, _ ->
+            if (operation == "fail") {
+                entered.complete(Unit)
+                runBlocking { release.await() }
+            }
+        }
+        try {
+            val viewModel = fixture.start(100_000)
+            withTimeout(2_000.milliseconds) { entered.await() }
+            fixture.stop(viewModel)
+            release.complete(Unit)
+            withTimeout(2_000.milliseconds) { viewModel.viewModelScope.coroutineContext[Job]?.join() }
+            assertEquals(WorktreeArchiveLifecycleState.FAILED, fixture.store.listJobs().single().state)
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            release.complete(Unit)
+            fixture.close()
+        }
+    }
+}
+
+class EngHubWorktreeArchiveRemovalRestartTest {
     @Test
     fun blockedInterruptedRemovalDoesNotDelayQueuedRestorationAndUndo() = runBlocking {
         val fixture = ArchiveRestartFixture(
@@ -467,13 +563,13 @@ class EngHubWorktreeArchiveRestartTest {
         fixture.store.jobs.value = listOf(removing)
         try {
             val viewModel = fixture.start(100_000)
-            fixture.awaitError(
-                viewModel,
-                "Failed to restore queued worktree archive: " +
-                    "Cannot resume archive: worktree branch no longer matches: $DEV_LAKE_SELECTED_WORKTREE",
+            val failed = fixture.awaitRestored(viewModel)
+            assertEquals(WorktreeArchiveLifecycleState.FAILED, failed.state)
+            assertEquals(
+                "Cannot resume archive: worktree branch no longer matches: $DEV_LAKE_SELECTED_WORKTREE",
+                failed.errorMessage,
             )
-            assertEquals(listOf(removing), fixture.store.listJobs())
-            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(listOf(failed), fixture.store.listJobs())
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
         } finally {
             fixture.close()
