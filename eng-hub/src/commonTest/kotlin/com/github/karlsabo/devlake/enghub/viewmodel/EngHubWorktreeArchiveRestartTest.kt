@@ -213,7 +213,7 @@ class EngHubWorktreeArchiveRestartTest {
             listOf(Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/other", "def")),
         )
         identities.forEach { worktrees ->
-            val fixture = ArchiveRestartFixture(worktrees)
+            val fixture = ArchiveRestartFixture(worktrees, pathPresent = { worktrees.isEmpty() })
             try {
                 val viewModel = fixture.start(100_000)
                 val failed = fixture.awaitRestored(viewModel)
@@ -735,6 +735,65 @@ class EngHubWorktreeArchiveRemovalRestartTest {
     }
 
     @Test
+    fun failedRestartWithAbsentRegistrationAndPathRetriesCleanupWithoutDeletingReplacement() = runBlocking {
+        val directory = "/tmp/archive-failed-retry-${Random.nextLong().toULong().toString(16)}"
+        val path = Path(directory, "checkout").toString().normalizedRepositoryPath()
+        val replacement = Path(path, "new-file.txt")
+        val fixture = ArchiveRestartFixture(
+            worktrees = emptyList(),
+            checkoutPresent = { false },
+            pathPresent = { SystemFileSystem.metadataOrNull(Path(it)) != null },
+        )
+        val failed = restartQueuedJob().copy(
+            worktreePath = path,
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "prune unavailable",
+        )
+        fixture.store.jobs.value = listOf(failed)
+        var resumed = 0
+        fixture.onResume = { _, resumedPath, branch ->
+            assertEquals(path, resumedPath)
+            assertEquals("feature/login", branch)
+            assertFalse(SystemFileSystem.exists(Path(path)))
+            resumed++
+            fixture.discovered = emptyList()
+        }
+        fixture.releaseArchive()
+        try {
+            val first = fixture.start(100_000)
+            assertEquals(failed, fixture.awaitRestored(first))
+            fixture.stop(first)
+            val restarted = fixture.start(200_000)
+            assertEquals(failed, fixture.awaitRestored(restarted))
+            restarted.retryFailedWorktreeArchive(path)
+            withTimeout(2_000.milliseconds) { fixture.store.deleteRemovingJobResults.first { it == listOf(true) } }
+            withTimeout(2_000.milliseconds) { restarted.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+            assertEquals(1, resumed)
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(listOf(DEV_LAKE_ROOT to path), fixture.api.archiveWorktreeCalls)
+
+            // A new directory with no registration must still be rejected, not removed.
+            fixture.store.jobs.value = listOf(failed.copy(queueId = "replacement-attempt"))
+            SystemFileSystem.createDirectories(Path(path))
+            writeText(replacement, "keep me")
+            val next = fixture.start(300_000)
+            val retained = fixture.awaitRestored(next)
+            next.retryFailedWorktreeArchive(path)
+            fixture.awaitError(
+                next,
+                "Failed to retry worktree archive: Cannot retry archive: " +
+                    "worktree registration or branch no longer matches: $path",
+            )
+            assertEquals(listOf(retained), fixture.store.listJobs())
+            assertEquals(1, resumed)
+            assertEquals("keep me", readText(replacement))
+        } finally {
+            fixture.close()
+            if (SystemFileSystem.exists(Path(directory))) removeTempDir(directory)
+        }
+    }
+
+    @Test
     fun failedRestartConflictRetainsRecordWithoutPublishingActions() = runBlocking {
         val fixture = ArchiveRestartFixture()
         val failed = restartQueuedJob().copy(
@@ -1039,10 +1098,10 @@ private class ArchiveRestartFixture(
                 updateStarted.complete(Unit)
                 onUpdate()
             },
-            onArchiveWorktree = { _, _, _ ->
+            onArchiveWorktree = { _, path, _ ->
                 assertEquals(
                     WorktreeArchiveLifecycleState.REMOVING,
-                    store.listJobs().first { it.worktreePath == DEV_LAKE_SELECTED_WORKTREE }.state,
+                    store.listJobs().first { it.worktreePath == path }.state,
                 )
                 archiveStarted.complete(Unit)
                 runBlocking { allowArchive.await() }
