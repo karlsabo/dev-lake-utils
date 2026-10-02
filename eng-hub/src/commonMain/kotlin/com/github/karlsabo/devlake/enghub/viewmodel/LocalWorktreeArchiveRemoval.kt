@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
+import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
@@ -21,15 +22,38 @@ internal class LocalWorktreeArchiveRemoval(
     private val errorReporter: ActionErrorReporter,
 ) {
 
-    suspend fun remove(job: WorktreeArchiveJob) {
+    suspend fun remove(job: WorktreeArchiveJob, force: Boolean = false) {
         runCatching {
             currentCoroutineContext().ensureActive()
-            gitWorktreeApi.archiveWorktree(job.repositoryRootPath, job.worktreePath, force = false)
+            gitWorktreeApi.archiveWorktree(job.repositoryRootPath, job.worktreePath, force = force)
             completion.complete(job)
         }.rethrowCancellation().onFailure { failure ->
             currentCoroutineContext().ensureActive()
-            if (!failure.isDirtyWorktreeArchiveFailure()) retainFailure(job, failure)
+            retainFailure(job, failure, force)
             report("Failed to complete worktree archive", failure)
+        }
+    }
+
+    fun confirmForceRemoval(request: ForceArchiveWorktreeUiState) {
+        if (!state.forceArchiveWorktreeRequest.compareAndSet(request, null)) return
+        val job = state.queuedWorktreeArchives.value.firstOrNull {
+            it.repositoryRootPath == request.repoRootPath && it.worktreePath == request.worktreePath &&
+                it.queueId == request.queueId && it.stateUpdatedAtEpochMs == request.stateUpdatedAtEpochMs &&
+                it.state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
+        } ?: return
+        viewModel.viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val removing = job.copy(
+                    state = WorktreeArchiveLifecycleState.REMOVING,
+                    stateUpdatedAtEpochMs = nextStateTime(job),
+                    errorMessage = null,
+                )
+                if (archive.store.transitionNeedsForceConfirmationJobToRemoving(job, removing.stateUpdatedAtEpochMs)) {
+                    currentCoroutineContext().ensureActive()
+                    publish(job, removing)
+                    remove(removing, force = true)
+                }
+            }.rethrowCancellation().onFailure { report("Failed to force worktree archive", it) }
         }
     }
 
@@ -69,18 +93,35 @@ internal class LocalWorktreeArchiveRemoval(
         }
     }
 
-    private suspend fun retainFailure(job: WorktreeArchiveJob, failure: Throwable) {
+    private suspend fun retainFailure(
+        job: WorktreeArchiveJob,
+        failure: Throwable,
+        force: Boolean,
+    ) {
+        val needsConfirmation = !force && failure.isDirtyWorktreeArchiveFailure()
         val failed = job.copy(
-            state = WorktreeArchiveLifecycleState.FAILED,
+            state = if (needsConfirmation) {
+                WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
+            } else {
+                WorktreeArchiveLifecycleState.FAILED
+            },
             stateUpdatedAtEpochMs = nextStateTime(job),
             errorMessage = failure.message?.takeIf { it.isNotBlank() } ?: failure.toString(),
         )
         runCatching {
-            val persisted = archive.store.transitionRemovingJobToFailed(
-                job,
-                requireNotNull(failed.errorMessage),
-                failed.stateUpdatedAtEpochMs,
-            )
+            val persisted = if (needsConfirmation) {
+                archive.store.transitionRemovingJobToNeedsForceConfirmation(
+                    job,
+                    requireNotNull(failed.errorMessage),
+                    failed.stateUpdatedAtEpochMs,
+                )
+            } else {
+                archive.store.transitionRemovingJobToFailed(
+                    job,
+                    requireNotNull(failed.errorMessage),
+                    failed.stateUpdatedAtEpochMs,
+                )
+            }
             if (persisted) {
                 currentCoroutineContext().ensureActive()
                 publish(job, failed)

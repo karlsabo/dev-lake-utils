@@ -58,7 +58,7 @@ class EngHubWorktreeArchiveCompletionTest {
             fixture.startRemoval()
             fixture.allowArchive.complete(Unit)
             fixture.awaitError("Failed to complete worktree archive: contains modified files")
-            fixture.assertRetained()
+            fixture.assertRetained(WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION)
             assertEquals(false, fixture.refreshStarted.isCompleted)
             assertEquals(emptyList(), fixture.store.deleteRemovingJobResults.value)
             assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)

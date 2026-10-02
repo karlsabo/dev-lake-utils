@@ -38,6 +38,16 @@ interface WorktreeArchiveStore {
         stateUpdatedAtEpochMs: Long,
     ): Boolean
 
+    /** Retains dirty refusal only for the matching removal attempt. */
+    fun transitionRemovingJobToNeedsForceConfirmation(
+        job: WorktreeArchiveJob,
+        errorMessage: String,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean
+
+    /** Claims only the explicitly confirmed attempt; repeated or stale requests return false. */
+    fun transitionNeedsForceConfirmationJobToRemoving(job: WorktreeArchiveJob, stateUpdatedAtEpochMs: Long): Boolean
+
     /** Claims the matching failed attempt for retry; repeated or stale requests return false. */
     fun transitionFailedJobToRemoving(job: WorktreeArchiveJob, stateUpdatedAtEpochMs: Long): Boolean
 

@@ -37,9 +37,11 @@ import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.component.EngHubAction
 import com.github.karlsabo.devlake.enghub.component.EngHubActionPopup
 import com.github.karlsabo.devlake.enghub.component.ErrorDialog
+import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeDialog
 import com.github.karlsabo.devlake.enghub.component.GlobalExistingBranchWorktreeDialog
 import com.github.karlsabo.devlake.enghub.component.PendingGlobalCreateWorktree
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBin
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinActions
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
@@ -125,17 +127,15 @@ internal fun EngHubScreenContent(
         )
     }
 
+    GlobalForceArchiveDialogHost(state, actions)
+
     Row(modifier = Modifier.fillMaxSize()) {
         EngHubSidebar(
             selectedPane = state.selectedPane,
             paneAvailability = state.paneAvailability,
             archiveBinEntries = state.archiveBinEntries,
             onPaneSelect = actions.onPaneSelected,
-            archiveActions = ArchiveBinActions(
-                actions.onUndoQueuedWorktreeArchive,
-                actions.onRetryFailedWorktreeArchive,
-                actions.onDismissFailedWorktreeArchive,
-            ),
+            archiveActions = actions.archiveBinActions(),
         )
         Box(
             modifier = Modifier
@@ -156,6 +156,24 @@ internal fun EngHubScreenContent(
                 modifier = Modifier.weight(1f),
             )
         }
+    }
+}
+
+private fun EngHubScreenActions.archiveBinActions() = WorktreeArchiveBinActions(
+    onUndo = onUndoQueuedWorktreeArchive,
+    onRetry = onRetryFailedWorktreeArchive,
+    onDismiss = onDismissFailedWorktreeArchive,
+    onRequestForceConfirmation = onRequestForceArchiveLocalWorktree,
+)
+
+@Composable
+private fun GlobalForceArchiveDialogHost(state: EngHubScreenState, actions: EngHubScreenActions) {
+    state.worktrees.forceArchiveRequest?.let { request ->
+        ForceArchiveWorktreeDialog(
+            worktreePath = request.worktreePath,
+            onConfirm = { actions.worktrees.forceArchive.onConfirm(request) },
+            onDismiss = { actions.worktrees.forceArchive.onDismiss(request) },
+        )
     }
 }
 
@@ -222,7 +240,7 @@ internal fun EngHubSidebar(
     paneAvailability: Map<EngHubPane, EngHubPaneAvailability> =
         EngHubPane.entries.associateWith { EngHubPaneAvailability(isEnabled = true) },
     archiveBinEntries: List<WorktreeArchiveBinEntry> = emptyList(),
-    archiveActions: ArchiveBinActions = ArchiveBinActions(),
+    archiveActions: WorktreeArchiveBinActions = WorktreeArchiveBinActions(),
 ) {
     Column(
         modifier = Modifier.fillMaxHeight().width(56.dp).padding(vertical = 8.dp),
@@ -244,9 +262,7 @@ internal fun EngHubSidebar(
         Spacer(modifier = Modifier.weight(1f))
         WorktreeArchiveBin(
             entries = archiveBinEntries,
-            onUndo = archiveActions.onUndo,
-            onRetry = archiveActions.onRetry,
-            onDismiss = archiveActions.onDismiss,
+            actions = archiveActions,
         )
         Spacer(modifier = Modifier.size(6.dp))
         EngHubSidebarButton(

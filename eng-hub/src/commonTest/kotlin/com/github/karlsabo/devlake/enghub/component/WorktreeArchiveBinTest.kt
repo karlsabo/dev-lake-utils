@@ -122,7 +122,10 @@ class WorktreeArchiveBinTest {
         )
         setContent {
             MaterialTheme {
-                WorktreeArchiveBin(entries.value, onRetry = retries::add, onDismiss = dismissals::add)
+                WorktreeArchiveBin(
+                    entries.value,
+                    actions = WorktreeArchiveBinActions(onRetry = retries::add, onDismiss = dismissals::add),
+                )
             }
         }
         onNodeWithContentDescription("Recycle bin (1)").performClick()
@@ -148,6 +151,36 @@ class WorktreeArchiveBinTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun dirtyEntryOffersReviewButNeverUndoOrOrdinaryRetry() = runComposeUiTest {
+        val requests = mutableListOf<String>()
+        setContent {
+            MaterialTheme {
+                WorktreeArchiveBin(
+                    entries = listOf(
+                        WorktreeArchiveBinEntry(
+                            "widgets",
+                            "feature/wip",
+                            0,
+                            "/repos/wip",
+                            needsForceConfirmation = true,
+                        ),
+                    ),
+                    actions = WorktreeArchiveBinActions(onRequestForceConfirmation = requests::add),
+                )
+            }
+        }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Confirmation required").assertIsDisplayed()
+        onNodeWithText("Undo").assertDoesNotExist()
+        onNodeWithText("Retry").assertDoesNotExist()
+        onNodeWithText("Dismiss").assertDoesNotExist()
+        onNodeWithText("0 seconds remaining").assertDoesNotExist()
+        onNodeWithText("Review force removal").performClick()
+        assertEquals(listOf("/repos/wip"), requests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun queuedBinEntryOffersUndoForItsWorktree() = runComposeUiTest {
         val undoRequests = mutableListOf<String>()
         setContent {
@@ -161,7 +194,7 @@ class WorktreeArchiveBinTest {
                             worktreePath = "/repos/widgets-feature-login",
                         ),
                     ),
-                    onUndo = undoRequests::add,
+                    actions = WorktreeArchiveBinActions(onUndo = undoRequests::add),
                 )
             }
         }

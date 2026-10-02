@@ -42,7 +42,8 @@ internal fun ForceArchiveWorktreeDialog(
     ConfirmationWorktreeDialog(
         state = ConfirmationWorktreeDialogState(
             title = "Force Archive Worktree",
-            message = "This worktree has local changes. Force removal will discard them.",
+            message = "Force removal discards uncommitted files and changes. " +
+                "They cannot be recovered from local or remote branches.",
             worktreePath = worktreePath,
             confirmText = "Force Archive",
         ),

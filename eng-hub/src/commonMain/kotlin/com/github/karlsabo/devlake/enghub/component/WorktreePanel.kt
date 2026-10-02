@@ -58,7 +58,6 @@ internal fun WorktreePanel(
             existingBranchDiscovery = state.existingBranchDiscovery,
             useUnrelatedExistingBranchConfirmationRequest = state.useUnrelatedExistingBranchConfirmationRequest,
             worktreeConflictResolutionRequest = state.worktreeConflictResolutionRequest,
-            forceArchiveRequest = state.forceArchiveRequest,
         ),
         actions = WorktreeDialogActions(
             onPendingCreateWorktreeChange = { pendingCreateWorktree = it },
@@ -70,7 +69,6 @@ internal fun WorktreePanel(
             onDismissUseUnrelatedExistingBranchConfirmation = actions.onDismissUseUnrelatedExistingBranchConfirmation,
             onAbortWorktreeConflict = actions.onAbortWorktreeConflict,
             onLeaveWorktreeConflictAsIs = actions.onLeaveWorktreeConflictAsIs,
-            forceArchive = actions.forceArchive,
         ),
     )
 

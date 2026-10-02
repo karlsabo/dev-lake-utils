@@ -31,9 +31,11 @@ import com.github.karlsabo.devlake.enghub.component.GlobalExistingBranchDiscover
 import com.github.karlsabo.devlake.enghub.component.LocalWorktreeActions
 import com.github.karlsabo.devlake.enghub.component.NotificationActions
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBin
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinActions
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
+import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.createEngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.representativeEngHubConfig
 import com.github.karlsabo.git.WorktreePath
@@ -247,7 +249,7 @@ class EngHubScreenTest {
         setContent {
             WorktreeArchiveBin(
                 entries = collectArchiveBinEntries(listOf(archive)) { 10_000L },
-                onUndo = undoRequests::add,
+                actions = WorktreeArchiveBinActions(onUndo = undoRequests::add),
             )
         }
 
@@ -387,6 +389,74 @@ class EngHubScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun globalScreenReviewsDirtyArchiveAndDismissesOrConfirmsOutsideWorktreesPane() = runComposeUiTest {
+        val request = ForceArchiveWorktreeUiState("/repos/widgets", "/repos/wip", "queue", 70_001)
+        val initial = screenStateWithQueuedArchive()
+        val state = mutableStateOf(
+            initial.copy(
+                archiveBinEntries = listOf(
+                    WorktreeArchiveBinEntry("widgets", "feature/wip", 0, "/repos/wip", needsForceConfirmation = true),
+                ),
+            ),
+        )
+        val confirmations = mutableListOf<ForceArchiveWorktreeUiState>()
+        val dismissals = mutableListOf<ForceArchiveWorktreeUiState>()
+        val baseActions = screenActions(onUndoQueuedWorktreeArchive = {})
+        val actions = baseActions.copy(
+            onRequestForceArchiveLocalWorktree = { path ->
+                assertEquals("/repos/wip", path)
+                state.value = state.value.copy(worktrees = state.value.worktrees.copy(forceArchiveRequest = request))
+            },
+            worktrees = baseActions.worktrees.copy(
+                forceArchive = ForceArchiveWorktreeActions(
+                    onConfirm = { confirmations.add(it) },
+                    onDismiss = {
+                        dismissals.add(it)
+                        val worktrees = state.value.worktrees.copy(forceArchiveRequest = null)
+                        state.value = state.value.copy(worktrees = worktrees)
+                    },
+                ),
+            ),
+        )
+        setContent { MaterialTheme { EngHubScreenContent(state.value, actions) } }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Review force removal").performClick()
+        onNodeWithText(
+            "Force removal discards uncommitted files and changes. " +
+                "They cannot be recovered from local or remote branches.",
+        ).assertIsDisplayed()
+        assertEquals(emptyList(), confirmations)
+        onNodeWithText("Cancel").performClick()
+        assertEquals(listOf(request), dismissals)
+        onNodeWithText("Confirmation required").assertIsDisplayed()
+        onNodeWithText("Undo").assertDoesNotExist()
+        onNodeWithText("Review force removal").performClick()
+        onNodeWithText("Force Archive").performClick()
+        assertEquals(listOf(request), confirmations)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun dirtyArchiveProjectionDoesNotOfferUndoOrRetry() = runComposeUiTest {
+        val dirty = WorktreeArchiveJob(
+            repositoryRootPath = "/repos/widgets",
+            worktreePath = "/repos/wip",
+            branch = "feature/wip",
+            queueId = "dirty",
+            state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+            queuedAtEpochMs = 10_000,
+            stateUpdatedAtEpochMs = 70_001,
+            deadlineAtEpochMs = 70_000,
+        )
+        setContent { MaterialTheme { WorktreeArchiveBin(collectArchiveBinEntries(listOf(dirty)) { 80_000L }) } }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Confirmation required").assertIsDisplayed()
+        onNodeWithText("Undo").assertDoesNotExist()
+        onNodeWithText("Retry").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun bottomGearSelectsSettingsPane() = runComposeUiTest {
         setContent {
             var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }
@@ -480,7 +550,7 @@ private fun screenActions(onUndoQueuedWorktreeArchive: (String) -> Unit) = EngHu
             onRebaseOntoParent = { _, _, _ -> },
             onMergeOntoParent = { _, _, _ -> },
         ),
-        forceArchive = ForceArchiveWorktreeActions(onConfirm = { _, _ -> }, onDismiss = {}),
+        forceArchive = ForceArchiveWorktreeActions(onConfirm = {}, onDismiss = {}),
     ),
     settings = EngHubSettingsActions(),
 )

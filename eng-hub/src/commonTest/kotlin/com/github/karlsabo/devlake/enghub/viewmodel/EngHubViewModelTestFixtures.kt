@@ -960,6 +960,29 @@ class RecordingWorktreeArchiveStore(
         )
     }
 
+    override fun transitionRemovingJobToNeedsForceConfirmation(
+        job: WorktreeArchiveJob,
+        errorMessage: String,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = changeAttempt("dirty", job, WorktreeArchiveLifecycleState.REMOVING) {
+        it.copy(
+            state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+            errorMessage = errorMessage,
+            stateUpdatedAtEpochMs = stateUpdatedAtEpochMs,
+        )
+    }
+
+    override fun transitionNeedsForceConfirmationJobToRemoving(
+        job: WorktreeArchiveJob,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = changeAttempt("force", job, WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION) {
+        it.copy(
+            state = WorktreeArchiveLifecycleState.REMOVING,
+            errorMessage = null,
+            stateUpdatedAtEpochMs = stateUpdatedAtEpochMs,
+        )
+    }
+
     override fun transitionFailedJobToRemoving(
         job: WorktreeArchiveJob,
         stateUpdatedAtEpochMs: Long,

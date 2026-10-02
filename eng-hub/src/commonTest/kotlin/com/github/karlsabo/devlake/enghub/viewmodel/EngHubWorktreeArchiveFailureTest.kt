@@ -253,12 +253,12 @@ class EngHubWorktreeArchiveFailureTest {
     }
 }
 
-private data class ArchiveAttempt(
+internal data class ArchiveAttempt(
     val job: WorktreeArchiveJob,
     val result: CompletableDeferred<RuntimeException?>,
 )
 
-private class ArchiveFailureFixture {
+internal class ArchiveFailureFixture {
     val store = RecordingWorktreeArchiveStore()
     val updateStarted = CompletableDeferred<Unit>()
     val worktrees = listOf(

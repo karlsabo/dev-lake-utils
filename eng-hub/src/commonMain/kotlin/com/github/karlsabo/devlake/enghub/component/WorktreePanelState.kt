@@ -55,8 +55,8 @@ internal data class LocalWorktreeActions(
 )
 
 internal data class ForceArchiveWorktreeActions(
-    val onConfirm: (repoRootPath: String, worktreePath: String) -> Unit,
-    val onDismiss: () -> Unit,
+    val onConfirm: (ForceArchiveWorktreeUiState) -> Unit,
+    val onDismiss: (ForceArchiveWorktreeUiState) -> Unit,
 )
 
 internal enum class CreateWorktreeMode {

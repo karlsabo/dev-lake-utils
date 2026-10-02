@@ -242,6 +242,44 @@ class SqlDelightWorktreeArchiveStoreTest {
     }
 
     @Test
+    fun dirtyRefusalAndExplicitForceClaimGuardStateQueueAndAttempt() {
+        val directory = createTestDirectory()
+        val databasePath = Path(directory, "archive.db").toString()
+        val removing = queuedJob("/repos/wip", "feature/wip", 1_000).copy(
+            state = WorktreeArchiveLifecycleState.REMOVING,
+        )
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(removing)
+            assertTrue(store.transitionRemovingJobToNeedsForceConfirmation(removing, "modified files", 2_000))
+            val confirmation = removing.copy(
+                state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+                stateUpdatedAtEpochMs = 2_000,
+                errorMessage = "modified files",
+            )
+            assertEquals(listOf(confirmation), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
+            assertFalse(store.deleteQueuedJob(confirmation.worktreePath, confirmation.queueId))
+            assertFalse(store.deleteFailedJob(confirmation))
+            assertFalse(store.transitionFailedJobToRemoving(confirmation, 3_000))
+            assertFalse(store.transitionRemovingJobToNeedsForceConfirmation(removing, "stale", 3_000))
+            assertTrue(store.transitionNeedsForceConfirmationJobToRemoving(confirmation, 3_000))
+            assertFalse(store.transitionNeedsForceConfirmationJobToRemoving(confirmation, 4_000))
+            val forced = removing.copy(stateUpdatedAtEpochMs = 3_000)
+            assertEquals(listOf(forced), store.listJobs())
+            assertFalse(store.transitionRemovingJobToNeedsForceConfirmation(removing, "stale", 4_000))
+            assertTrue(store.transitionRemovingJobToNeedsForceConfirmation(forced, "still modified", 4_000))
+            assertFalse(store.transitionNeedsForceConfirmationJobToRemoving(confirmation, 5_000))
+            val latest = store.listJobs().single()
+            store.saveJob(latest.copy(queueId = "replacement"))
+            assertFalse(store.transitionNeedsForceConfirmationJobToRemoving(latest, 5_000))
+            assertFalse(store.transitionRemovingJobToNeedsForceConfirmation(forced, "stale", 5_000))
+            assertEquals(listOf(latest.copy(queueId = "replacement")), store.listJobs())
+        } finally {
+            deleteRecursively(directory)
+        }
+    }
+
+    @Test
     fun savingSamePathReplacesItsPersistedState() {
         val testDirectory = createTestDirectory()
         val databasePath = Path(testDirectory, "archive.db").toString()
