@@ -16,14 +16,14 @@ internal suspend fun verifyRetryIdentity(
     val worktrees = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
     currentCoroutineContext().ensureActive()
     val registration = worktrees.firstOrNull { it.path.normalizedRepositoryPath() == job.worktreePath }
-    // Only an in-process removal attempt authorizes cleanup after registration has disappeared.
-    // Startup identity failures and registered replacement branches still require a matching identity.
+    // An absent unregistered path is safe to finish via identity-checked resume even after restart.
     val absent = !pathPresent(job.worktreePath)
-    check(if (registration == null) removalAttempted && absent else registration.branch == job.branch) {
+    val resumeAbsent = absent && (removalAttempted || registration == null)
+    check(if (registration == null) absent else registration.branch == job.branch) {
         "Cannot retry archive: worktree registration or branch no longer matches: ${job.worktreePath}"
     }
-    check((removalAttempted && absent) || checkoutPresent(job.worktreePath)) {
+    check(resumeAbsent || checkoutPresent(job.worktreePath)) {
         "Cannot retry archive: worktree checkout is missing: ${job.worktreePath}"
     }
-    return removalAttempted && absent
+    return resumeAbsent
 }

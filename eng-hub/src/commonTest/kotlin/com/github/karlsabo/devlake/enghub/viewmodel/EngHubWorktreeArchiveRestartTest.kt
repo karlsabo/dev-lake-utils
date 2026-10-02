@@ -213,7 +213,7 @@ class EngHubWorktreeArchiveRestartTest {
             listOf(Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/other", "def")),
         )
         identities.forEach { worktrees ->
-            val fixture = ArchiveRestartFixture(worktrees)
+            val fixture = ArchiveRestartFixture(worktrees, pathPresent = { worktrees.isEmpty() })
             try {
                 val viewModel = fixture.start(100_000)
                 val failed = fixture.awaitRestored(viewModel)
@@ -676,18 +676,267 @@ class EngHubWorktreeArchiveRemovalRestartTest {
     }
 
     @Test
-    fun nonQueuedRecordsRemainUntouchedWhileQueuedRecordsRestore() = runBlocking {
+    fun failedRestartKeepsErrorAndGuardWithoutAutomaticRetryThenDismisses() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        val failed = restartQueuedJob().copy(
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "permission denied",
+        )
+        fixture.store.jobs.value = listOf(failed)
+        try {
+            val first = fixture.start(100_000)
+            assertEquals(failed, fixture.awaitRestored(first))
+            fixture.stop(first)
+            val restarted = fixture.start(200_000)
+            assertEquals(failed, fixture.awaitRestored(restarted))
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertFalse(fixture.deadlines.tryReceive().isSuccess)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+            assertEquals(emptyList(), fixture.api.listWorktreeEntryRepoPaths)
+            restarted.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+            assertEquals(emptyList(), fixture.api.updateWorktreeFromOriginCalls)
+            restarted.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            restarted.dismissFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            withTimeout(2_000.milliseconds) { restarted.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+            assertEquals(emptyList(), fixture.store.listJobs())
+            restarted.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+            withTimeout(2_000.milliseconds) { fixture.updateStarted.await() }
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun failedRestartRetryClaimsOrdinaryRemovalBeforeGit() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        val failed = restartQueuedJob().copy(
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "permission denied",
+        )
+        fixture.store.jobs.value = listOf(failed)
+        try {
+            val viewModel = fixture.start(100_000)
+            assertEquals(failed, fixture.awaitRestored(viewModel))
+            viewModel.retryFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
+            withTimeout(2_000.milliseconds) { fixture.archiveStarted.await() }
+            assertEquals(WorktreeArchiveLifecycleState.REMOVING, fixture.store.listJobs().single().state)
+            assertEquals(
+                WorktreeArchiveLifecycleState.REMOVING,
+                viewModel.queuedWorktreeArchivesStateFlow.value.single().state,
+            )
+            assertEquals(listOf("retry" to true), fixture.store.failedOperationResults.value)
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+            assertFalse(fixture.deadlines.tryReceive().isSuccess)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun failedRestartWithAbsentRegistrationAndPathRetriesCleanupWithoutDeletingReplacement() = runBlocking {
+        val directory = "/tmp/archive-failed-retry-${Random.nextLong().toULong().toString(16)}"
+        val path = Path(directory, "checkout").toString().normalizedRepositoryPath()
+        val replacement = Path(path, "new-file.txt")
+        val fixture = ArchiveRestartFixture(
+            worktrees = emptyList(),
+            checkoutPresent = { false },
+            pathPresent = { SystemFileSystem.metadataOrNull(Path(it)) != null },
+        )
+        val failed = restartQueuedJob().copy(
+            worktreePath = path,
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "prune unavailable",
+        )
+        fixture.store.jobs.value = listOf(failed)
+        var resumed = 0
+        fixture.onResume = { _, resumedPath, branch ->
+            assertEquals(path, resumedPath)
+            assertEquals("feature/login", branch)
+            assertFalse(SystemFileSystem.exists(Path(path)))
+            resumed++
+            fixture.discovered = emptyList()
+        }
+        fixture.releaseArchive()
+        try {
+            val first = fixture.start(100_000)
+            assertEquals(failed, fixture.awaitRestored(first))
+            fixture.stop(first)
+            val restarted = fixture.start(200_000)
+            assertEquals(failed, fixture.awaitRestored(restarted))
+            restarted.retryFailedWorktreeArchive(path)
+            withTimeout(2_000.milliseconds) { fixture.store.deleteRemovingJobResults.first { it == listOf(true) } }
+            withTimeout(2_000.milliseconds) { restarted.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+            assertEquals(1, resumed)
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(listOf(DEV_LAKE_ROOT to path), fixture.api.archiveWorktreeCalls)
+
+            // A new directory with no registration must still be rejected, not removed.
+            fixture.store.jobs.value = listOf(failed.copy(queueId = "replacement-attempt"))
+            SystemFileSystem.createDirectories(Path(path))
+            writeText(replacement, "keep me")
+            val next = fixture.start(300_000)
+            val retained = fixture.awaitRestored(next)
+            next.retryFailedWorktreeArchive(path)
+            fixture.awaitError(
+                next,
+                "Failed to retry worktree archive: Cannot retry archive: " +
+                    "worktree registration or branch no longer matches: $path",
+            )
+            assertEquals(listOf(retained), fixture.store.listJobs())
+            assertEquals(1, resumed)
+            assertEquals("keep me", readText(replacement))
+        } finally {
+            fixture.close()
+            if (SystemFileSystem.exists(Path(directory))) removeTempDir(directory)
+        }
+    }
+
+    @Test
+    fun failedRestartConflictRetainsRecordWithoutPublishingActions() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        val failed = restartQueuedJob().copy(
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "permission denied",
+        )
+        fixture.store.jobs.value = listOf(failed)
+        val reading = CompletableDeferred<Unit>()
+        val allowRead = CompletableDeferred<Unit>()
+        val allowUpdate = CompletableDeferred<Unit>()
+        fixture.store.beforeListJobs = {
+            fixture.store.beforeListJobs = {}
+            reading.complete(Unit)
+            runBlocking { allowRead.await() }
+        }
+        fixture.onUpdate = { runBlocking { allowUpdate.await() } }
+        try {
+            val viewModel = fixture.start(100_000)
+            withTimeout(2_000.milliseconds) { reading.await() }
+            viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+            withTimeout(2_000.milliseconds) { fixture.updateStarted.await() }
+            allowRead.complete(Unit)
+            fixture.awaitError(
+                viewModel,
+                "Failed to restore queued worktree archive: " +
+                    "Worktree mutation already in progress: $DEV_LAKE_SELECTED_WORKTREE",
+            )
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            allowRead.complete(Unit)
+            allowUpdate.complete(Unit)
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun staleFailedStartupSnapshotDoesNotPublishReplacement() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        val failed = restartQueuedJob().copy(
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "permission denied",
+        )
+        val replacement = failed.copy(queueId = "new-queue", errorMessage = "new failure")
+        fixture.store.jobs.value = listOf(failed)
+        fixture.store.beforeListJobs = {
+            fixture.store.beforeListJobs = { fixture.store.jobs.value = listOf(replacement) }
+        }
+        try {
+            val viewModel = fixture.start(100_000)
+            fixture.awaitError(
+                viewModel,
+                "Failed to restore queued worktree archive: " +
+                    "Failed worktree archive changed during startup: $DEV_LAKE_SELECTED_WORKTREE",
+            )
+            assertEquals(listOf(replacement), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun disposalDuringFailedRestorationDoesNotExposeActions() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        val failed = restartQueuedJob().copy(
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "permission denied",
+        )
+        fixture.store.jobs.value = listOf(failed)
+        val rechecking = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        fixture.store.beforeListJobs = {
+            fixture.store.beforeListJobs = {
+                rechecking.complete(Unit)
+                runBlocking { release.await() }
+            }
+        }
+        try {
+            val viewModel = fixture.start(100_000)
+            withTimeout(2_000.milliseconds) { rechecking.await() }
+            fixture.stop(viewModel)
+            release.complete(Unit)
+            withTimeout(2_000.milliseconds) { viewModel.viewModelScope.coroutineContext[Job]?.join() }
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            release.complete(Unit)
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun invalidFailedIdentityRetainsPersistedErrorWithoutExposingActions() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        val failed = restartQueuedJob().copy(
+            worktreePath = DEV_LAKE_ROOT,
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "permission denied",
+        )
+        fixture.store.jobs.value = listOf(failed)
+        try {
+            val viewModel = fixture.start(100_000)
+            fixture.awaitError(
+                viewModel,
+                "Failed to restore queued worktree archive: Invalid failed worktree identity: $DEV_LAKE_ROOT",
+            )
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun failedRecordsRestoreWhileForceConfirmationRemainsUntouched() = runBlocking {
         val fixture = ArchiveRestartFixture()
         val deferred = WorktreeArchiveLifecycleState.entries.filter {
             it == WorktreeArchiveLifecycleState.FAILED || it == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
         }
-            .map { restartQueuedJob().copy(worktreePath = "/repos/${it.name}", state = it, errorMessage = "retained") }
+            .map {
+                restartQueuedJob().copy(
+                    worktreePath = "/repos/${it.name.lowercase()}",
+                    state = it,
+                    errorMessage = "retained",
+                )
+            }
         fixture.store.jobs.value += deferred
         try {
             val viewModel = fixture.start(100_000)
-            val restored = fixture.awaitRestored(viewModel)
-            assertEquals(deferred, fixture.store.listJobs().filterNot { it == restored })
-            assertEquals(listOf(restored), viewModel.queuedWorktreeArchivesStateFlow.value)
+            val published = withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first { jobs ->
+                    jobs.any { it.queueId == "queue-login" && it.state == WorktreeArchiveLifecycleState.QUEUED } &&
+                        deferred.first() in jobs
+                }
+            }
+            val restored = published.single { it.worktreePath == DEV_LAKE_SELECTED_WORKTREE }
+            assertEquals(160_000, restored.deadlineAtEpochMs)
+            assertEquals(setOf(restored, deferred.first()), published.toSet())
+            assertEquals(setOf(restored, *deferred.toTypedArray()), fixture.store.listJobs().toSet())
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
         } finally {
             fixture.close()
@@ -849,10 +1098,10 @@ private class ArchiveRestartFixture(
                 updateStarted.complete(Unit)
                 onUpdate()
             },
-            onArchiveWorktree = { _, _, _ ->
+            onArchiveWorktree = { _, path, _ ->
                 assertEquals(
                     WorktreeArchiveLifecycleState.REMOVING,
-                    store.listJobs().first { it.worktreePath == DEV_LAKE_SELECTED_WORKTREE }.state,
+                    store.listJobs().first { it.worktreePath == path }.state,
                 )
                 archiveStarted.complete(Unit)
                 runBlocking { allowArchive.await() }

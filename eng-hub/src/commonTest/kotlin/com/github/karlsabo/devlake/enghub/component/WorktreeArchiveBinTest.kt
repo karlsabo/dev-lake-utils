@@ -64,6 +64,41 @@ class WorktreeArchiveBinTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun persistedFailedJobMapsToGlobalBinActionsWithoutUndo() = runComposeUiTest {
+        val failed = WorktreeArchiveJob(
+            "/repos/widgets",
+            "/repos/widgets-feature-login",
+            "feature/login",
+            "persisted-failure",
+            WorktreeArchiveLifecycleState.FAILED,
+            1_000,
+            2_000,
+            61_000,
+            "permission denied",
+        )
+        val retries = mutableListOf<String>()
+        val dismissals = mutableListOf<String>()
+        setContent {
+            MaterialTheme {
+                WorktreeArchiveBin(
+                    entries = collectArchiveBinEntries(listOf(failed)) { 100_000 },
+                    actions = WorktreeArchiveBinActions(onRetry = retries::add, onDismiss = dismissals::add),
+                )
+            }
+        }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("feature/login").assertIsDisplayed()
+        onNodeWithText("Removal failed").assertIsDisplayed()
+        onNodeWithText("permission denied").assertIsDisplayed()
+        onNodeWithText("Undo").assertDoesNotExist()
+        onNodeWithText("Retry").performClick()
+        onNodeWithText("Dismiss").performClick()
+        assertEquals(listOf(failed.worktreePath), retries)
+        assertEquals(listOf(failed.worktreePath), dismissals)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun emptyBinRemainsVisibleAndOpensEmptyState() = runComposeUiTest {
         setContent {
             MaterialTheme {
