@@ -904,6 +904,8 @@ class RecordingWorktreeArchiveStore(
     val deleteQueuedJobCalls = MutableStateFlow<List<String>>(emptyList())
     val deleteQueuedJobResults = MutableStateFlow<List<Boolean>>(emptyList())
     var beforeDeleteQueuedJob: (String, String) -> Unit = { _, _ -> }
+    var beforeDeleteRemovingJob: (String, String) -> Unit = { _, _ -> }
+    val deleteRemovingJobResults = MutableStateFlow<List<Boolean>>(emptyList())
 
     override fun listJobs(): List<WorktreeArchiveJob> = jobs.value
 
@@ -941,6 +943,25 @@ class RecordingWorktreeArchiveStore(
                 }
             }
             if (jobs.compareAndSet(existing, updated)) return true
+        }
+    }
+
+    override fun deleteRemovingJob(worktreePath: String, queueId: String): Boolean {
+        beforeDeleteRemovingJob(worktreePath, queueId)
+        while (true) {
+            val existing = jobs.value
+            val updated = existing.filterNot { job ->
+                job.worktreePath == worktreePath && job.queueId == queueId &&
+                    job.state == WorktreeArchiveLifecycleState.REMOVING
+            }
+            if (updated.size == existing.size) {
+                deleteRemovingJobResults.update { it + false }
+                return false
+            }
+            if (jobs.compareAndSet(existing, updated)) {
+                deleteRemovingJobResults.update { it + true }
+                return true
+            }
         }
     }
 

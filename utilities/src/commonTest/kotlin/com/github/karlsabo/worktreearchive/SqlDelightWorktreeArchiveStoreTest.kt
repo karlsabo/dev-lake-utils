@@ -134,6 +134,47 @@ class SqlDelightWorktreeArchiveStoreTest {
     }
 
     @Test
+    fun completedRemovalDeletesOnlyMatchingRemovingRecord() {
+        val testDirectory = createTestDirectory()
+        val databasePath = Path(testDirectory, "archive.db").toString()
+        val removing = queuedJob("/repos/widgets-feature-login", "feature/login", 1_000).copy(
+            state = WorktreeArchiveLifecycleState.REMOVING,
+        )
+        val other = queuedJob("/repos/widgets-feature-search", "feature/search", 2_000)
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(removing)
+            store.saveJob(other)
+            assertFalse(store.deleteRemovingJob(removing.worktreePath, "stale-queue"))
+            assertFalse(store.deleteRemovingJob(other.worktreePath, other.queueId))
+            assertEquals(listOf(removing, other), store.listJobs())
+            assertTrue(store.deleteRemovingJob(removing.worktreePath, removing.queueId))
+            assertFalse(store.deleteRemovingJob(removing.worktreePath, removing.queueId))
+            assertEquals(listOf(other), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
+        } finally {
+            deleteRecursively(testDirectory)
+        }
+    }
+
+    @Test
+    fun completionDoesNotDeleteFailedOrConfirmationRecords() {
+        val testDirectory = createTestDirectory()
+        val databasePath = Path(testDirectory, "archive.db").toString()
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            listOf(WorktreeArchiveLifecycleState.FAILED, WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION)
+                .forEach { state ->
+                    val job = queuedJob("/repos/widgets-feature-login", "feature/login", 1_000).copy(state = state)
+                    store.saveJob(job)
+                    assertFalse(store.deleteRemovingJob(job.worktreePath, job.queueId))
+                    assertEquals(listOf(job), store.listJobs())
+                }
+        } finally {
+            deleteRecursively(testDirectory)
+        }
+    }
+
+    @Test
     fun savingSamePathReplacesItsPersistedState() {
         val testDirectory = createTestDirectory()
         val databasePath = Path(testDirectory, "archive.db").toString()

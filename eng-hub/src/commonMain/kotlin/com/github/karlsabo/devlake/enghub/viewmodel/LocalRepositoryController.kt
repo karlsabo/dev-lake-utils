@@ -247,10 +247,14 @@ internal class LocalRepositoryController(
             }
     }
 
-    private fun refreshLocalRepositoryWorktrees(repoRootPath: String, checkActive: () -> Unit = {}) {
+    /** Returns discovered rows only when this refresh still owns the published repository state. */
+    internal fun refreshLocalRepositoryWorktrees(
+        repoRootPath: String,
+        checkActive: () -> Unit = {},
+    ): List<LocalWorktreeUiState>? {
         checkActive()
         val normalizedRepoRootPath = repositoryIdentity(repoRootPath)
-        val request = refreshTracker.start(normalizedRepoRootPath) ?: return
+        val request = refreshTracker.start(normalizedRepoRootPath) ?: return null
         val basicWorktrees = runCatching {
             gitWorktreeApi.listWorktreeEntries(repoRootPath)
                 .toLocalWorktreeUiStatesWithUnknownDirtyStatus(repoRootPath)
@@ -262,24 +266,33 @@ internal class LocalRepositoryController(
         val published = refreshTracker.publishDiscovered(normalizedRepoRootPath, request, basicWorktrees)
         val publishedWorktrees = state.localRepositories.value.firstOrNull {
             published && it.path.normalizedRepositoryPath() == normalizedRepoRootPath && it.statusRequest === request
-        }?.worktrees ?: return
+        }?.worktrees
 
-        hydrateWorktreeStatuses(normalizedRepoRootPath, request)
+        if (publishedWorktrees != null) {
+            hydrateWorktreeStatuses(normalizedRepoRootPath, request)
 
-        checkActive()
-        githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath, request)
-        checkActive()
-        worktreeEnrichmentScheduler.schedule(
-            repoRootPath = repoRootPath,
-            normalizedRepoRootPath = normalizedRepoRootPath,
-            request = request,
-            worktrees = publishedWorktrees,
-        ) { enrichment ->
-            refreshTracker.complete(
-                normalizedRepoRootPath,
-                request,
-                enrichment.getOrNull(),
-            )
+            checkActive()
+            githubIdentityResolver.resolveAndStore(repoRootPath, normalizedRepoRootPath, request)
+            checkActive()
+            worktreeEnrichmentScheduler.schedule(
+                repoRootPath = repoRootPath,
+                normalizedRepoRootPath = normalizedRepoRootPath,
+                request = request,
+                worktrees = publishedWorktrees,
+            ) { enrichment ->
+                refreshTracker.complete(
+                    normalizedRepoRootPath,
+                    request,
+                    enrichment.getOrNull(),
+                )
+            }
+        }
+        return basicWorktrees.takeIf {
+            publishedWorktrees != null && state.localRepositories.value.any { repository ->
+                repository.path.normalizedRepositoryPath() == normalizedRepoRootPath &&
+                    repository.statusRequest === request &&
+                    (repository.refreshRequest == null || repository.refreshRequest === request)
+            }
         }
     }
 }

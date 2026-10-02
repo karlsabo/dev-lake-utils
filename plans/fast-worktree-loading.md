@@ -30,6 +30,8 @@
 
 ### 1. Display branch rows before local status completes
 
+**Status:** Done — merged in [PR #7](https://github.com/karlsabo/dev-lake-utils/pull/7).
+
 **Acceptance criteria:** Given `api` has `main` and `feature/login`, when `git status` for `main` blocks, then both worktree branch/path rows are visible after `git worktree list` completes, each shows `Checking status…` with status-dependent actions disabled, and the worktree-list spinner stops.
 
 **Expected edits:** `utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeApi.kt`, `GitWorktreeService.kt`; `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/state/LocalRepositoryUiState.kt`, `viewmodel/LocalRepositoryController.kt`, `LocalRepositoryExpansionTracker.kt`, `component/WorktreeRepositoryRows.kt`; corresponding service, view-model, and component tests under `utilities/src/commonTest/` and `eng-hub/src/commonTest/`.
@@ -39,6 +41,8 @@
 **Notes:** Add a local entries-only API instead of changing `listWorktrees` semantics for other callers; `GitWorktreeLister.listWorktreeEntries` already exists internally. For add-repository, `resolveRepositoryRoot` currently returns status-enriched `RepositoryWorktrees` (`utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeService.kt`), so its first-paint path must also be split. Keep the existing `listWorktrees` contract for non-view clients. Treat unknown as neither clean nor dirty; show `Checking status…` and disable controls that require a definite status (check archive/update/rebase/merge menus in `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/component/WorktreeWorktreeRows.kt`, `WorktreeActionMenu.kt`, and `WorktreeShortcuts.kt`). Do not wait for status or local origin identity before publishing rows.
 
 ### 2. Fill in dirty status after branch discovery
+
+**Status:** Done — merged in [PR #8](https://github.com/karlsabo/dev-lake-utils/pull/8).
 
 **Acceptance criteria:** Given visible `feature/login` has unknown dirty status, when its local status returns dirty, then the row shows dirty status and the existing dirty-worktree action rules apply.
 
@@ -50,6 +54,8 @@
 
 ### 3. Keep remote lookup off the local-row path
 
+**Status:** Done — merged in [PR #10](https://github.com/karlsabo/dev-lake-utils/pull/10).
+
 **Acceptance criteria:** Given configured `api` has local `feature/login`, when server default-branch lookup hangs, then its row appears with local status without waiting for that lookup.
 
 **Expected edits:** `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/LocalRepositoryController.kt`, `LocalRepositoryExpansionTracker.kt`, possibly `EngHubViewModel.kt`; tests in `eng-hub/src/commonTest/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/EngHubLocalRepositoryViewModelTest.kt`.
@@ -59,6 +65,8 @@
 **Notes:** Expansion/refresh already publish before enrichment; decouple their job lifetimes and make add-repository follow the same rule. Use view-model-owned IO coroutines, not unmanaged threads. Polling must not wait for a blocked metadata call. Avoid repeated unbounded lookups while offline.
 
 ### 4. Load independent repositories concurrently
+
+**Status:** Done — merged in [PR #11](https://github.com/karlsabo/dev-lake-utils/pull/11).
 
 **Acceptance criteria:** Given configured `api` and `web`, when `api`'s remote lookup blocks, then `web`'s local `feature/nav` appears before `api`'s lookup completes.
 
@@ -70,6 +78,8 @@
 
 ### 5. Apply late origin metadata to visible rows
 
+**Status:** Done — merged in [PR #12](https://github.com/karlsabo/dev-lake-utils/pull/12).
+
 **Acceptance criteria:** Given visible `feature/login` without origin metadata, when server HEAD resolves to `main`, then `feature/login` gains its applicable origin-dependent action without disappearing.
 
 **Expected edits:** `eng-hub/src/commonMain/kotlin/com/github/karlsabo/devlake/enghub/viewmodel/LocalWorktreeStateMappers.kt`, `LocalRepositoryController.kt`, `LocalRepositoryExpansionTracker.kt`, and tests in `EngHubLocalRepositoryViewModelTest.kt` and `LocalWorktreeStateMappersTest.kt`.
@@ -79,6 +89,8 @@
 **Notes:** Use the existing `withEnrichmentFrom` path/branch check. Integrate with status hydration without overwriting its newer `isDirty` value; preserve server-authoritative HEAD behavior. During an offline refresh retain previously known metadata only for matching path and branch, without a fresh-verification claim; new rows must not inherit unrelated metadata.
 
 ### 6. Discard stale background results
+
+**Status:** Done — merged in [PR #13](https://github.com/karlsabo/dev-lake-utils/pull/13).
 
 **Acceptance criteria:** Given `feature/login` has been replaced by `feature/logout` while metadata is in flight, when the older lookup returns, then `feature/logout` remains visible without `feature/login`'s metadata.
 
