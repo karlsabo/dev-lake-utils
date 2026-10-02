@@ -62,6 +62,39 @@ class SqlDelightWorktreeArchiveStore(
         queries.changedRowCount().executeAsOne() > 0
     }
 
+    override fun transitionRemovingJobToFailed(
+        job: WorktreeArchiveJob,
+        errorMessage: String,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = queries.transactionWithResult {
+        queries.transitionRemovingJobToFailed(
+            stateUpdatedAtEpochMs,
+            errorMessage,
+            job.worktreePath,
+            job.queueId,
+            job.stateUpdatedAtEpochMs,
+        )
+        queries.changedRowCount().executeAsOne() > 0
+    }
+
+    override fun transitionFailedJobToRemoving(
+        job: WorktreeArchiveJob,
+        stateUpdatedAtEpochMs: Long,
+    ): Boolean = queries.transactionWithResult {
+        queries.transitionFailedJobToRemoving(
+            stateUpdatedAtEpochMs,
+            job.worktreePath,
+            job.queueId,
+            job.stateUpdatedAtEpochMs,
+        )
+        queries.changedRowCount().executeAsOne() > 0
+    }
+
+    override fun deleteFailedJob(job: WorktreeArchiveJob): Boolean = queries.transactionWithResult {
+        queries.deleteFailedJob(job.worktreePath, job.queueId, job.stateUpdatedAtEpochMs)
+        queries.changedRowCount().executeAsOne() > 0
+    }
+
     override fun deleteRemovingJob(worktreePath: String, queueId: String): Boolean = queries.transactionWithResult {
         queries.deleteRemovingJob(worktreePath, queueId)
         queries.changedRowCount().executeAsOne() > 0

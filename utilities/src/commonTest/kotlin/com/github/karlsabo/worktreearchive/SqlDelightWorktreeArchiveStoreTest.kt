@@ -175,6 +175,73 @@ class SqlDelightWorktreeArchiveStoreTest {
     }
 
     @Test
+    fun failureAndRetryPersistErrorAndConditionallyClaimEachAttempt() {
+        val directory = createTestDirectory()
+        val databasePath = Path(directory, "archive.db").toString()
+        val removing = queuedJob("/repos/login", "feature/login", 1_000).copy(
+            state = WorktreeArchiveLifecycleState.REMOVING,
+        )
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(removing)
+            assertTrue(store.transitionRemovingJobToFailed(removing, "permission denied", 2_000))
+            val failed = removing.copy(
+                state = WorktreeArchiveLifecycleState.FAILED,
+                errorMessage = "permission denied",
+                stateUpdatedAtEpochMs = 2_000,
+            )
+            assertEquals(listOf(failed), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
+            assertFalse(store.deleteQueuedJob(failed.worktreePath, failed.queueId))
+            assertFalse(store.transitionRemovingJobToFailed(removing, "stale error", 3_000))
+            assertTrue(store.transitionFailedJobToRemoving(failed, 3_000))
+            assertFalse(store.transitionFailedJobToRemoving(failed, 4_000))
+            assertFalse(store.deleteFailedJob(failed))
+            val retry = removing.copy(stateUpdatedAtEpochMs = 3_000)
+            assertEquals(listOf(retry), store.listJobs())
+            assertTrue(store.transitionRemovingJobToFailed(retry, "still denied", 4_000))
+            assertFalse(store.deleteFailedJob(failed))
+            assertFalse(store.transitionFailedJobToRemoving(failed, 5_000))
+            val latest = store.listJobs().single()
+            assertTrue(store.deleteFailedJob(latest))
+            assertFalse(store.deleteFailedJob(latest))
+            assertEquals(emptyList(), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
+        } finally {
+            deleteRecursively(directory)
+        }
+    }
+
+    @Test
+    fun failedOperationsRejectWrongStateAndReplacedQueueIdentity() {
+        val directory = createTestDirectory()
+        val databasePath = Path(directory, "archive.db").toString()
+        val original = queuedJob("/repos/login", "feature/login", 1_000)
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            WorktreeArchiveLifecycleState.entries.forEach { lifecycle ->
+                val replacement = original.copy(queueId = "replacement", state = lifecycle)
+                store.saveJob(replacement)
+                assertFalse(store.transitionRemovingJobToFailed(original, "stale", 2_000))
+                assertFalse(store.transitionFailedJobToRemoving(original, 2_000))
+                assertFalse(store.deleteFailedJob(original))
+                assertEquals(listOf(replacement), store.listJobs())
+            }
+            listOf(
+                WorktreeArchiveLifecycleState.QUEUED,
+                WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+            ).forEach { lifecycle ->
+                val job = original.copy(state = lifecycle)
+                store.saveJob(job)
+                assertFalse(store.transitionRemovingJobToFailed(job, "wrong state", 2_000))
+                assertFalse(store.transitionFailedJobToRemoving(job, 2_000))
+                assertFalse(store.deleteFailedJob(job))
+                assertEquals(listOf(job), store.listJobs())
+            }
+        } finally {
+            deleteRecursively(directory)
+        }
+    }
+
+    @Test
     fun savingSamePathReplacesItsPersistedState() {
         val testDirectory = createTestDirectory()
         val databasePath = Path(testDirectory, "archive.db").toString()

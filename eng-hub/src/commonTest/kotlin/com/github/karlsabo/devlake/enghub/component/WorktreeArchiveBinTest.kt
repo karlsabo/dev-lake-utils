@@ -105,6 +105,49 @@ class WorktreeArchiveBinTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun failedEntryReportsErrorAndOffersRetryAndDismissInsteadOfUndo() = runComposeUiTest {
+        val retries = mutableListOf<String>()
+        val dismissals = mutableListOf<String>()
+        val entries = mutableStateOf(
+            listOf(
+                WorktreeArchiveBinEntry(
+                    "widgets",
+                    "feature/login",
+                    0,
+                    "/repos/login",
+                    isFailed = true,
+                    errorMessage = "permission denied",
+                ),
+            ),
+        )
+        setContent {
+            MaterialTheme {
+                WorktreeArchiveBin(entries.value, onRetry = retries::add, onDismiss = dismissals::add)
+            }
+        }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Removal failed").assertIsDisplayed()
+        onNodeWithText("permission denied").assertIsDisplayed()
+        onNodeWithText("Undo").assertDoesNotExist()
+        onNodeWithText("0 seconds remaining").assertDoesNotExist()
+        onNodeWithText("Retry").performClick()
+        onNodeWithText("Dismiss").performClick()
+        assertEquals(listOf("/repos/login"), retries)
+        assertEquals(listOf("/repos/login"), dismissals)
+        runOnIdle {
+            entries.value = listOf(
+                entries.value.single().copy(isFailed = false, isRemoving = true, errorMessage = null),
+            )
+        }
+        onNodeWithText("Being removed").assertIsDisplayed()
+        onNodeWithText("Undo").assertIsNotEnabled()
+        onNodeWithText("Retry").assertDoesNotExist()
+        onNodeWithText("Dismiss").assertDoesNotExist()
+        onNodeWithText("permission denied").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun queuedBinEntryOffersUndoForItsWorktree() = runComposeUiTest {
         val undoRequests = mutableListOf<String>()
         setContent {

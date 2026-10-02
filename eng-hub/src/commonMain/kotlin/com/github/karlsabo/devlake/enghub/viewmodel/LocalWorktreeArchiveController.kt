@@ -24,7 +24,7 @@ private const val QUEUE_ID_RADIX = 16
 internal class LocalWorktreeArchiveController(
     private val viewModel: ViewModel,
     private val state: EngHubViewModelState,
-    private val gitWorktreeApi: GitWorktreeApi,
+    gitWorktreeApi: GitWorktreeApi,
     private val archive: WorktreeArchiveDependencies,
     localRepositories: LocalRepositoryController,
     private val errorReporter: ActionErrorReporter,
@@ -33,6 +33,14 @@ internal class LocalWorktreeArchiveController(
     private val completion = LocalWorktreeArchiveCompletion(viewModel, state, localRepositories, archive.store) { job ->
         clearArchiveEntry(job.worktreePath, job.queueId)
     }
+    private val removal = LocalWorktreeArchiveRemoval(
+        viewModel,
+        state,
+        gitWorktreeApi,
+        archive,
+        completion,
+        errorReporter,
+    )
 
     fun archiveLocalWorktree(repoRootPath: String, worktreePath: String) {
         val normalizedRepoRootPath = repoRootPath.normalizedRepositoryPath()
@@ -69,6 +77,9 @@ internal class LocalWorktreeArchiveController(
                 }
         }
     }
+
+    val retryFailedWorktreeArchive: (String) -> Unit = removal::retry
+    val dismissFailedWorktreeArchive: (String) -> Unit = removal::dismiss
 
     fun confirmForceArchiveLocalWorktree(repoRootPath: String, worktreePath: String) {
         val request = ForceArchiveWorktreeUiState(repoRootPath, worktreePath)
@@ -189,25 +200,13 @@ internal class LocalWorktreeArchiveController(
                 }
             }
             logger.info { "Removing archived worktree ${queuedJob.worktreePath}" }
-            runCatching {
-                gitWorktreeApi.archiveWorktree(
-                    repoPath = queuedJob.repositoryRootPath,
-                    worktreePath = queuedJob.worktreePath,
-                    force = false,
-                )
-                completion.complete(removingJob)
-            }.rethrowCancellation().onFailure { failure ->
-                logger.error(failure) { "Worktree removal failed for ${queuedJob.worktreePath}" }
-                errorReporter.enqueueActionError(
-                    failure.message?.let { "Failed to complete worktree archive: $it" }
-                        ?: "Failed to complete worktree archive",
-                )
-            }
+            removal.remove(removingJob)
         }
         return true
     }
 
     private fun clearArchiveEntry(worktreePath: String, queueId: String) {
+        if (state.queuedWorktreeArchives.value.none { it.worktreePath == worktreePath && it.queueId == queueId }) return
         // Observers of a cleared entry must be able to acquire the worktree for another mutation.
         releaseQueuedArchiveLease(worktreePath)
         state.queuedWorktreeArchives.update { jobs ->

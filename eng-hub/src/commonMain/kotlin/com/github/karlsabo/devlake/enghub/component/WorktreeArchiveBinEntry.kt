@@ -30,6 +30,8 @@ internal data class WorktreeArchiveBinEntry(
     val remainingSeconds: Long,
     val worktreePath: String,
     val isRemoving: Boolean = false,
+    val isFailed: Boolean = false,
+    val errorMessage: String? = null,
 )
 
 @Composable
@@ -37,6 +39,8 @@ internal fun WorktreeArchiveBin(
     entries: List<WorktreeArchiveBinEntry>,
     modifier: Modifier = Modifier,
     onUndo: (String) -> Unit = {},
+    onRetry: (String) -> Unit = {},
+    onDismiss: (String) -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
@@ -60,7 +64,7 @@ internal fun WorktreeArchiveBin(
                 } else {
                     entries.forEach { entry ->
                         key(entry.worktreePath) {
-                            WorktreeArchiveBinEntryRow(entry, onUndo)
+                            WorktreeArchiveBinEntryRow(entry, onUndo, onRetry, onDismiss)
                         }
                     }
                 }
@@ -74,11 +78,18 @@ internal fun WorktreeArchiveBin(
 private fun WorktreeArchiveBinEntryRow(
     entry: WorktreeArchiveBinEntry,
     onUndo: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onDismiss: (String) -> Unit,
 ) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text(entry.branch, style = MaterialTheme.typography.body1)
         Text(entry.repository, style = MaterialTheme.typography.caption)
-        if (entry.isRemoving) {
+        if (entry.isFailed) {
+            Text("Removal failed", style = MaterialTheme.typography.caption)
+            entry.errorMessage?.let { Text(it, style = MaterialTheme.typography.caption) }
+            TextButton(onClick = { onRetry(entry.worktreePath) }) { Text("Retry") }
+            TextButton(onClick = { onDismiss(entry.worktreePath) }) { Text("Dismiss") }
+        } else if (entry.isRemoving) {
             Text("Being removed", style = MaterialTheme.typography.caption)
             TooltipArea(
                 tooltip = {

@@ -336,6 +336,57 @@ class EngHubScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun globalScreenRoutesFailedArchiveActionsOutsideWorktreesPane() = runComposeUiTest {
+        val retries = mutableListOf<String>()
+        val dismissals = mutableListOf<String>()
+        val queuedState = screenStateWithQueuedArchive()
+        setContent {
+            MaterialTheme {
+                EngHubScreenContent(
+                    state = queuedState.copy(
+                        archiveBinEntries = queuedState.archiveBinEntries.map {
+                            it.copy(isFailed = true, errorMessage = "permission denied")
+                        },
+                    ),
+                    actions = screenActions(onUndoQueuedWorktreeArchive = {}).copy(
+                        onRetryFailedWorktreeArchive = retries::add,
+                        onDismissFailedWorktreeArchive = dismissals::add,
+                    ),
+                )
+            }
+        }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("permission denied").assertIsDisplayed()
+        onNodeWithText("Retry").performClick()
+        onNodeWithText("Dismiss").performClick()
+        onNodeWithText("Undo").assertDoesNotExist()
+        assertEquals(listOf("/repos/widgets-feature-login"), retries)
+        assertEquals(listOf("/repos/widgets-feature-login"), dismissals)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun failedArchiveProjectionPreservesPersistedErrorWithoutOfferingUndo() = runComposeUiTest {
+        val failed = WorktreeArchiveJob(
+            repositoryRootPath = "/repos/widgets",
+            worktreePath = "/repos/login",
+            branch = "feature/login",
+            queueId = "failed",
+            state = WorktreeArchiveLifecycleState.FAILED,
+            queuedAtEpochMs = 10_000,
+            stateUpdatedAtEpochMs = 70_000,
+            deadlineAtEpochMs = 70_000,
+            errorMessage = "permission denied",
+        )
+        setContent { MaterialTheme { WorktreeArchiveBin(collectArchiveBinEntries(listOf(failed)) { 80_000L }) } }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Removal failed").assertIsDisplayed()
+        onNodeWithText("permission denied").assertIsDisplayed()
+        onNodeWithText("Undo").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun bottomGearSelectsSettingsPane() = runComposeUiTest {
         setContent {
             var selectedPane by remember { mutableStateOf(EngHubPane.PullRequests) }

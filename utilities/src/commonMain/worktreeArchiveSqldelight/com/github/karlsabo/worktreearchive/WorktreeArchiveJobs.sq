@@ -51,5 +51,19 @@ deleteRemovingJob:
 DELETE FROM worktree_archive_jobs
 WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'REMOVING';
 
+transitionRemovingJobToFailed:
+UPDATE worktree_archive_jobs
+SET lifecycle_state = 'FAILED', state_updated_at_epoch_ms = ?, error_message = ?
+WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'REMOVING' AND state_updated_at_epoch_ms = ?;
+
+transitionFailedJobToRemoving:
+UPDATE worktree_archive_jobs
+SET lifecycle_state = 'REMOVING', state_updated_at_epoch_ms = ?, error_message = NULL
+WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'FAILED' AND state_updated_at_epoch_ms = ?;
+
+deleteFailedJob:
+DELETE FROM worktree_archive_jobs
+WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'FAILED' AND state_updated_at_epoch_ms = ?;
+
 changedRowCount:
 SELECT changes();
