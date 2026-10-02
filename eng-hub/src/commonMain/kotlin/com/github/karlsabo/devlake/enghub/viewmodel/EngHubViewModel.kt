@@ -36,6 +36,7 @@ internal data class WorktreeArchiveDependencies(
     val waitForDeadline: suspend (kotlin.time.Duration) -> Unit = { delay(it) },
     val now: () -> kotlin.time.Instant = kotlin.time.Clock.System::now,
     val checkoutPresent: (String) -> Boolean = ::worktreeCheckoutPresent,
+    val pathPresent: (String) -> Boolean = { SystemFileSystem.metadataOrNull(Path(it)) != null },
 )
 
 internal fun worktreeCheckoutPresent(path: String): Boolean {

@@ -13,7 +13,7 @@ internal class LocalWorktreeArchiveRestoration(
     private val archive: WorktreeArchiveDependencies,
     private val errorReporter: ActionErrorReporter,
     private val expose: (WorktreeArchiveJob, LocalWorktreeMutationGuard.Lease) -> Unit,
-    private val resumeRemoval: suspend (WorktreeArchiveJob) -> Unit,
+    private val resumeRemoval: (WorktreeArchiveJob) -> Unit,
 ) {
     suspend fun restore() {
         runCatching {
@@ -95,11 +95,14 @@ internal class LocalWorktreeArchiveRestoration(
         }
         var exposed = false
         try {
-            // A partial removal may have erased registration; a registered replacement branch is never safe to remove.
             val registered = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
                 .firstOrNull { it.path.normalizedRepositoryPath() == path }
             check(registered == null || registered.branch == job.branch) {
                 "Cannot resume archive: worktree branch no longer matches: $path"
+            }
+            // Without registration, leftover files cannot be distinguished from a replacement checkout.
+            check(if (registered == null) !archive.pathPresent(path) else archive.checkoutPresent(path)) {
+                "Cannot resume archive: checkout identity cannot be verified: $path"
             }
             currentCoroutineContext().ensureActive()
             check(archive.store.listJobs().any { it == job }) {

@@ -244,6 +244,110 @@ class EngHubWorktreeArchiveRestartTest {
     }
 
     @Test
+    fun unregisteredReplacementDirectoryIsNeverDeletedOnResume() = runBlocking {
+        val directory = "/tmp/archive-unregistered-${Random.nextLong().toULong().toString(16)}"
+        val checkout = Path(directory, "checkout")
+        val unrelated = Path(checkout, "new-file.txt")
+        SystemFileSystem.createDirectories(checkout)
+        writeText(unrelated, "keep me")
+        val path = checkout.toString().normalizedRepositoryPath()
+        val fixture = ArchiveRestartFixture(
+            worktrees = emptyList(),
+            pathPresent = { SystemFileSystem.metadataOrNull(Path(it)) != null },
+        )
+        fixture.store.jobs.value = listOf(
+            restartQueuedJob().copy(worktreePath = path, state = WorktreeArchiveLifecycleState.REMOVING),
+        )
+        try {
+            val viewModel = fixture.start(100_000)
+            fixture.awaitError(
+                viewModel,
+                "Failed to restore queued worktree archive: " +
+                    "Cannot resume archive: checkout identity cannot be verified: $path",
+            )
+            assertEquals("keep me", readText(unrelated))
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+            assertEquals(WorktreeArchiveLifecycleState.REMOVING, fixture.store.listJobs().single().state)
+            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+        } finally {
+            fixture.close()
+            removeTempDir(directory)
+        }
+    }
+
+    @Test
+    fun replacementAppearingDuringDiscoveryCannotBeRemoved() = runBlocking {
+        val directory = "/tmp/archive-discovery-${Random.nextLong().toULong().toString(16)}"
+        val path = Path(directory, "checkout").toString().normalizedRepositoryPath()
+        val unrelated = Path(path, "new-file.txt")
+        val fixture = ArchiveRestartFixture(
+            worktrees = emptyList(),
+            pathPresent = { SystemFileSystem.metadataOrNull(Path(it)) != null },
+        )
+        fixture.store.jobs.value = listOf(
+            restartQueuedJob().copy(worktreePath = path, state = WorktreeArchiveLifecycleState.REMOVING),
+        )
+        fixture.onDiscovery = {
+            SystemFileSystem.createDirectories(Path(path))
+            writeText(unrelated, "new data")
+        }
+        try {
+            val viewModel = fixture.start(100_000)
+            fixture.awaitError(
+                viewModel,
+                "Failed to restore queued worktree archive: " +
+                    "Cannot resume archive: checkout identity cannot be verified: $path",
+            )
+            assertEquals("new data", readText(unrelated))
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            fixture.close()
+            removeTempDir(directory)
+        }
+    }
+
+    @Test
+    fun blockedInterruptedRemovalDoesNotDelayQueuedRestorationAndUndo() = runBlocking {
+        val fixture = ArchiveRestartFixture(
+            worktrees = listOf(
+                Worktree(DEV_LAKE_ROOT, "main", "abc"),
+                Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/login", "def"),
+                Worktree("/repos/queued", "feature/queued", "ghi"),
+            ),
+        )
+        val removing = restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING)
+        val queued = restartQueuedJob().copy(
+            worktreePath = "/repos/queued",
+            branch = "feature/queued",
+            queueId = "queued",
+        )
+        fixture.store.jobs.value = listOf(removing, queued)
+        try {
+            val viewModel = fixture.start(100_000)
+            withTimeout(2_000.milliseconds) { fixture.archiveStarted.await() }
+            val restored = withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first { jobs -> jobs.any { it.queueId == queued.queueId } }
+            }
+            assertEquals(
+                WorktreeArchiveLifecycleState.REMOVING,
+                restored.first { it.queueId == removing.queueId }.state,
+            )
+            val restoredQueued = restored.first { it.queueId == queued.queueId }
+            assertEquals(WorktreeArchiveLifecycleState.QUEUED, restoredQueued.state)
+            assertEquals(160_000, restoredQueued.deadlineAtEpochMs)
+            viewModel.undoQueuedWorktreeArchive(queued.worktreePath)
+            withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first { jobs -> jobs.none { it.queueId == queued.queueId } }
+            }
+            assertEquals(listOf(removing), fixture.store.listJobs())
+            assertEquals(emptyList(), fixture.api.updateWorktreeFromOriginCalls)
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun interruptedRemovalIsExposedWithoutUndoAndRetriesOrdinarilyBeforeAnyDeadline() = runBlocking {
         val fixture = ArchiveRestartFixture()
         val removing = restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING)
@@ -524,6 +628,7 @@ private class ArchiveRestartFixture(
         Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/login", "def"),
     ),
     private val checkoutPresent: (String) -> Boolean = { true },
+    private val pathPresent: (String) -> Boolean = { false },
 ) {
     val store = RecordingWorktreeArchiveStore().also { it.jobs.value = listOf(restartQueuedJob()) }
     val nowEpochMs = MutableStateFlow(100_000L)
@@ -547,7 +652,10 @@ private class ArchiveRestartFixture(
                 onUpdate()
             },
             onArchiveWorktree = { _, _, _ ->
-                assertEquals(WorktreeArchiveLifecycleState.REMOVING, store.listJobs().single().state)
+                assertEquals(
+                    WorktreeArchiveLifecycleState.REMOVING,
+                    store.listJobs().first { it.worktreePath == DEV_LAKE_SELECTED_WORKTREE }.state,
+                )
                 archiveStarted.complete(Unit)
                 runBlocking { allowArchive.await() }
                 archiveFailure?.let { throw it }
@@ -565,6 +673,7 @@ private class ArchiveRestartFixture(
                 worktreeArchiveStore = store,
                 archiveNow = { Instant.fromEpochMilliseconds(nowEpochMs.value) },
                 checkoutPresent = checkoutPresent,
+                pathPresent = pathPresent,
                 waitForArchiveDeadline = { duration ->
                     val release = CompletableDeferred<Unit>()
                     deadlines.send(duration to release)
