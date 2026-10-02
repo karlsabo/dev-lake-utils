@@ -34,7 +34,7 @@ class EngHubWorktreeArchiveFailureTest {
             assertEquals(true, retry.job.stateUpdatedAtEpochMs > failed.stateUpdatedAtEpochMs)
             fixture.viewModel.retryFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
             fixture.viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
-            withTimeout(2_000.milliseconds) { fixture.store.deleteQueuedJobResults.first { it.isNotEmpty() } }
+            assertEquals(emptyList(), fixture.store.deleteQueuedJobCalls.value)
             assertEquals(listOf(false, false), fixture.api.archiveWorktreeForceValues)
             assertEquals(listOf(retry.job), fixture.store.listJobs())
             retry.result.complete(null)

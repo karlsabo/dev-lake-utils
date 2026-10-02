@@ -161,10 +161,10 @@ class EngHubWorktreeArchiveRestartTest {
             assertFalse(fixture.deadlines.tryReceive().isSuccess)
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
             viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
-            withTimeout(2_000.milliseconds) { fixture.store.deleteQueuedJobResults.first { it.isNotEmpty() } }
             assertEquals(listOf(job), fixture.store.listJobs())
             viewModel.dismissFailedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
             withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+            assertEquals(emptyList(), fixture.store.deleteQueuedJobCalls.value)
             assertEquals(emptyList(), fixture.store.listJobs())
         } finally {
             fixture.close()
@@ -268,7 +268,6 @@ class EngHubWorktreeArchiveRestartTest {
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
             assertFalse(fixture.deadlines.tryReceive().isSuccess)
             viewModel.undoQueuedWorktreeArchive(path)
-            assertEquals(emptyList(), fixture.store.deleteQueuedJobCalls.value)
             viewModel.clearActionError()
             viewModel.retryFailedWorktreeArchive(path)
             fixture.awaitError(
@@ -277,6 +276,8 @@ class EngHubWorktreeArchiveRestartTest {
                     "worktree registration or branch no longer matches: $path",
             )
             assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(emptyList(), fixture.store.deleteQueuedJobCalls.value)
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
             assertEquals("keep me", readText(unrelated))
             viewModel.dismissFailedWorktreeArchive(path)
             withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
