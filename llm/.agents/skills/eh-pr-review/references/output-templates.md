@@ -10,20 +10,20 @@ Concise summary of what the PR does, its scope, and risk level.}
 
 ## Planned Comments Document
 
-**Filename:** `pr-{number}-planned-comments.md`
+**Filename:** `{platform}-{host}-{project_slug}-{number}-planned-comments.md` for hosted reviews; see `SKILL.md` for local reviews.
 
-This is the lean deliverable — exactly what will be posted to GitHub. No analysis, just the comments.
+This is the lean deliverable — exactly the text to be staged on the hosting platform. No analysis, just the comments.
 
 ### Template
 
 ```markdown
-# PR #{number} — Planned Comments
+# {PR #{number} | MR !{number}} — Planned Comments
 
 ---
 
 ## Overall PR Comment
 
-The review body text. This appears at the top of the GitHub review. Keep it concise, terse, and neutral. When there are inline comments, prefer a simple opener like:
+The overall review text. On GitHub it is the review body; on GitLab it is a separate draft note. Keep it concise, terse, and neutral. When there are inline comments, prefer a simple opener like:
 
 Couple of things to look at:
 
@@ -36,7 +36,7 @@ Couple of things to look at:
 **File:** `{full_file_path}`
 **Line:** {line_number} {optional: brief description of what's on that line}
 
-{The exact comment body that will be posted to GitHub. Supports GitHub-flavored markdown.
+{The exact comment body to be staged on GitHub or GitLab. Supports markdown.
 
 The body should be copy/paste-ready for GitHub. Do not prefix lines with `>`.
 
@@ -57,8 +57,8 @@ suggested_code()
 ### Guidelines
 
 - The overall PR comment should be neutral and short; avoid summarizing or judging the PR
-- Each inline comment must be **self-contained**. A reader on GitHub should understand it without seeing the review analysis document
-- Comment bodies should be plain GitHub-flavored markdown with no leading `>` prefixes
+- Each inline comment must be **self-contained**. A reader on either host should understand it without seeing the review analysis document
+- Comment bodies should be plain markdown with no leading `>` prefixes
 - The `{short label}` in the heading should indicate the category: "Bug:", "Nit:", "Question:", "Testing gap:", etc.
 - Keep comment bodies focused; one short paragraph is usually enough
 

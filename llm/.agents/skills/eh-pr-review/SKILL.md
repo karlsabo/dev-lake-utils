@@ -1,13 +1,13 @@
 ---
 name: eh-pr-review
-description: Reviews a GitHub PR. Use when asked to review a PR, code review, or given a PR number/URL.
+description: Reviews a pull or merge request. Use when asked for code review or given a PR/MR number or URL.
 user-invocable: true
-allowed-tools: Bash(gh *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *)
+allowed-tools: Bash(gh *), Bash(glab *), Bash(git *), Read, Glob, Grep, Write, Edit, Task(subagent_type=Explore *)
 ---
 
 # eh-pr-review Skill
 
-You are conducting a review of a git merge request. Never give ad hoc review findings: always write the planned comments document, run the subagent pass, re-read the document, then summarize. You produce a planned comments document, iterate with the user, then create a pending GitHub review via `gh api`.
+You are conducting a review of a pull/merge request (PR/MR). Never give ad hoc review findings: always write the planned comments document, run the subagent pass, re-read the document, then summarize. You produce a planned comments document, iterate with the user, then stage feedback as a pending review or draft notes. Do not publish without explicit authorization.
 
 Keep comments terse, concise, and scoped. Make them sound like a thoughtful teammate, not a lint rule or generated template. Prefer natural, conversational wording and only use question-led phrasing when it fits the concern. Avoid commands and heavy phrasing ("must", "please fix", "before exposing"), and avoid canned openers repeated across comments ("Did you consider...", "Should this..."). Use "we" for shared ownership when needed, but do not force it into unnatural question openers.
 
@@ -15,57 +15,30 @@ Before keeping any comment, run a human-voice check: would this sound normal if 
 
 ## Workflow
 
-### Step 1: Identify the PR
+### Step 1: Identify the PR/MR
 
-Parse the argument to determine the PR number:
+Resolve the hosting platform and repository from the URL if supplied; otherwise inspect `git remote -v` (prefer the upstream/push remote of the current branch, then `origin`). Both HTTPS and SSH remote URLs are valid. If the remote host is ambiguous or unsupported, ask rather than guessing.
 
-- If a number is given (e.g., `12345`), use it directly
-- If a URL is given (e.g., `https://github.com/org/repo/pull/12345`), extract the number
-- If reviewing uncommitted/local changes, use `uncommitted` and gather context with `git diff`, `git diff --name-only`, and full changed-file reads
-- If no argument is given, auto-detect via `gh pr view --json number -q .number` on the current branch
-- If no pr is found, look at uncommitted changes
+- A URL identifies both the project and request: GitHub `/owner/repo/pull/{number}` or GitLab `/group/project/-/merge_requests/{iid}`. Run CLI commands against that project (`gh -R owner/repo` where supported, or `glab -R host/group/project`); don't silently use the current checkout if it differs.
+- A bare number is scoped to the repository resolved above; use that PR number or MR **IID** (not GitLab's global MR ID).
+- With no argument, detect the request on the current branch: `gh pr view --json number -q .number` for GitHub, `glab mr view "$(git branch --show-current)" --output json` for GitLab. Confirm its source branch/repository matches this checkout; never substitute a similarly numbered request from a different project.
+- If no request is found, check `git status --short` and `git diff` (including staged changes). For uncommitted changes, use `uncommitted` and gather `git diff HEAD`, `git diff HEAD --name-only`, and full changed-file reads. If clean but the branch is ahead of its base branch, offer to review the branch diff as a local review instead. Otherwise ask for a request URL; don't claim there is nothing to review solely because `gh` failed on a GitLab remote.
 
-Store the PR number as `{number}` for all later steps.
+Store `{platform}`, `{project}` (namespace/repo), `{host}`, and `{number}` (PR number or MR IID) for later steps. Derive `{comments_path}` once:
 
-Derive a unique planned-comments path and store it as `{comments_path}`:
+- Hosted review: `${PLANNING_MARKDOWN_DIR}/{platform}-{host}-{project_slug}-{number}-planned-comments.md`, where the project slug includes the entire namespace and repository (replace `/` with `-`).
+- Local review: `${PLANNING_MARKDOWN_DIR}/uncommitted-{repo_slug}-{branch_slug}-{timestamp}-planned-comments.md`, using `basename "$(git rev-parse --show-toplevel)"`, `git branch --show-current` (or `detached`), and `date +%Y%m%d-%H%M%S`.
+- Sanitize all filename slugs by replacing characters outside `[A-Za-z0-9._-]` with `-`.
 
-- For a GitHub PR, use `${PLANNING_MARKDOWN_DIR}/pr-{number}-planned-comments.md`
-- For uncommitted/local changes, do **not** use a shared `pr-uncommitted-planned-comments.md` name. Build a unique artifact id from the repo, branch, and current timestamp:
-  - repo slug: `basename "$(git rev-parse --show-toplevel)"`
-  - branch slug: `git branch --show-current`, or `detached` if empty
-  - timestamp: `date +%Y%m%d-%H%M%S`
-  - path: `${PLANNING_MARKDOWN_DIR}/uncommitted-{repo_slug}-{branch_slug}-{timestamp}-planned-comments.md`
-- Sanitize repo and branch slugs for filenames by replacing any character outside `[A-Za-z0-9._-]` with `-`.
-
-Use `{comments_path}` for every later read, write, subagent prompt, user summary, and posting step. Do not reconstruct the path from `{number}` later.
+Use `{comments_path}` for every later read, write, subagent prompt, user summary, and posting step. Do not reconstruct it later.
 
 ### Step 2: Gather metadata
 
-Run these commands to collect PR context:
+For GitHub, use `gh repo view --json nameWithOwner -q .nameWithOwner`, `gh pr view {number} --json title,author,baseRefName,headRefName,additions,deletions,changedFiles,state,statusCheckRollup,url,commits`, `gh pr diff {number}`, and `gh pr diff {number} --name-only`. Scope commands to the resolved repository with `-R` when necessary.
 
-```bash
-# Owner/repo
-gh repo view --json nameWithOwner -q .nameWithOwner
+For GitLab, use `glab mr view {number} --output json`, `glab mr diff {number} --color=never`, and `glab api "projects/{url_encoded_project}/merge_requests/{number}/commits" --paginate` (use `--hostname {host}` for self-hosted instances when not in that checkout). Obtain file names from the diff or `glab api "projects/{url_encoded_project}/merge_requests/{number}/diffs" --paginate` (the `.old_path`/`.new_path` fields); don't treat rename/delete paths as local files. For local changes use the local diff and git log against the base branch.
 
-# PR metadata
-gh pr view {number} --json title,author,baseRefName,headRefName,additions,deletions,changedFiles,state,statusCheckRollup,url
-
-# Full diff
-gh pr diff {number}
-
-# File list
-gh pr diff {number} --name-only
-
-# Commit history
-gh pr view {number} --json commits --jq '.commits[] | "\(.oid[:7]) \(.messageHeadline)"'
-```
-
-From these, derive:
-
-- `{owner}/{repo}`, for API calls
-- PR title, author, branch info, stats
-- The full diff and list of changed files
-- Commit messages for understanding intent
+Collect title, author, branch info, stats if available, URL, the full diff, changed-file list, and commit messages. Verify local HEAD matches the review head before reading files or posting inline comments; if not, check out the request or read its files from the request head rather than reviewing unrelated local contents.
 
 ### Step 3: Read changed files in full
 
@@ -96,7 +69,7 @@ Load `references/review-lenses.md` and systematically analyze the PR through eac
 
 Write the planned comments to `{comments_path}`.
 
-Follow the format in `references/output-templates.md`. The planned comments document must include both of these sections:
+Follow the format in `references/output-templates.md` (use PR or MR and the appropriate number in the title). The planned comments document must include both of these sections:
 
 Keep the section headings exactly as defined in the template so later steps can review the same artifact shape every time. If there are no inline comments, still include `## Inline Comments` and leave it empty.
 
@@ -109,7 +82,7 @@ Spawn an agent pass using whatever the current harness actually supports. If a n
 Set the subagent model to the same model you are when the harness allows it, and give it this prompt:
 
 ```text
-Review the Pull Request comments document at {comments_path} with an eye of skepticism and cynicism.
+Review the PR/MR comments document at {comments_path} with an eye of skepticism and cynicism.
 
 1. Remove or rewrite comments that are weak, speculative, redundant, not actionable, or not well-supported by the PR.
 2. Keep the tone constructive, but be skeptical about whether each comment should really be posted.
@@ -149,34 +122,23 @@ Apply all requested changes to the planned comments document. Show the user what
 
 Repeat until the user is satisfied.
 
-### Step 9: Create a pending GitHub review
+### Step 9: Stage the review as pending/draft
 
-When the user says they're ready (e.g., "looks good," "post it," "create the review"), create the review using `gh api`.
+When the user says they're ready (e.g., "looks good," "post it," "create the review"), read `{comments_path}` from disk again before proceeding.
 
-1. Read `{comments_path}` from disk again before you proceed
-2. Refer to `references/github-review-api.md` for the exact API calls.
+- GitHub: create a pending review via `gh api`, omitting `event` entirely; `"event": "PENDING"` is rejected. If the atomic creation fails, follow the GitHub reference's fallback. If one inline comment has an invalid position, warn and skip it.
+- GitLab: create **draft notes** via `glab api`, one per inline comment and one for the overall comment if nonempty. GitLab has no equivalent atomic pending review; track the created draft note IDs and failures, and never use `glab mr note` or the normal notes/discussions endpoints here (those publish immediately). If a line cannot be positioned, warn and skip it; don't post it as a public comment.
+- A local/uncommitted review cannot be posted without a hosted request; stop after the document and user iteration.
+- Do not publish or approve merely because the user said "post it" or "create the review"; those mean **stage draft feedback** in this workflow. If the user explicitly asks to submit in the same turn, stage first, then follow Step 10.
+- Tell the user what was staged, any skipped comments, and that they need to publish/submit it in the host UI unless they explicitly asked you to do so.
 
-**Critical rules:**
+### Step 10: Optional publish/submit
 
-- **ALWAYS** read `{comments_path}` from disk again before you post a comment
-- **ALWAYS** create a pending/draft review first. For the REST create-review endpoint, omit `event` entirely; do **not** send `"event": "PENDING"` because GitHub rejects it with `422`.
-- **NEVER** submit the review (`APPROVE`, `REQUEST_CHANGES`, or `COMMENT` event) unless explicitly told to. If the user explicitly asks to submit/approve/comment in the same turn as posting, create the pending review first, then submit it via Step 10.
-- Tell the user the review is pending and they need to submit it from the GitHub UI, unless they explicitly asked you to submit it.
+Only if the user explicitly asks to **submit/publish** the review or specifies an approval/change-request action:
 
-**Error handling:**
-
-- If a comment gets a 422 (invalid position), warn the user and skip that comment. Suggest they add it manually.
-- If the entire review creation fails, fall back to creating an empty pending review first, then adding comments individually. See `references/github-review-api.md` for the fallback approach.
-
-### Step 10: Optional submit
-
-**Only** if the user explicitly says "submit" or "submit the review", or explicitly asks to mark the review as `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`:
-
-- If the user already specified an event type (for example, "mark as APPROVE"), use that event without asking again
-- Otherwise ask what event type they want: `COMMENT` (safest), `APPROVE`, or `REQUEST_CHANGES`
-- Default to `COMMENT` if they don't specify
-- Use `gh api` to submit the pending review with the chosen event
-- Confirm submission and provide the PR URL
+- GitHub: if an event type is specified (`COMMENT`, `APPROVE`, `REQUEST_CHANGES`), use it. Otherwise ask which event they want; default to `COMMENT` if unspecified. Submit the pending review using `gh api` as described in the GitHub reference.
+- GitLab: publish the draft notes via the GitLab draft-notes API after confirming which drafts are being published (bulk publish publishes **all** drafts on this MR, including pre-existing drafts). An approval is a separate action and requires an explicit request; don't assume GitHub event types map onto GitLab review actions. If the user asks to request changes, check the instance's support and clarify before acting.
+- Confirm what was published/submitted and provide the PR/MR URL.
 
 ## Important Notes
 
