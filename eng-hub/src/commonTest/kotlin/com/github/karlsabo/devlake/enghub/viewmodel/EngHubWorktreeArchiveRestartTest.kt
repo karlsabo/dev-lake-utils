@@ -513,7 +513,7 @@ class EngHubWorktreeArchiveRemovalRestartTest {
             val viewModel = fixture.start(100_000)
             withTimeout(2_000.milliseconds) { fixture.store.deleteRemovingJobResults.first { it == listOf(true) } }
             assertEquals(emptyList(), fixture.store.listJobs())
-            assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+            withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
             assertEquals(1, fixture.api.archiveWorktreeCalls.size)
         } finally {
             fixture.close()
