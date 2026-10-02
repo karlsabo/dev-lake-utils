@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.devlake.enghub.component.visibleWorktreeRows
 import com.github.karlsabo.git.Worktree
+import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
@@ -18,6 +19,47 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class EngHubLocalWorktreeArchiveViewModelTest {
+    @Test
+    fun failedStartupDiscoveryCannotReplacePersistedQueuedArchive() = runBlocking {
+        val original = WorktreeArchiveJob(
+            DEV_LAKE_ROOT,
+            DEV_LAKE_SELECTED_WORKTREE,
+            "feature/login",
+            "original-queue",
+            WorktreeArchiveLifecycleState.QUEUED,
+            1_000,
+            1_000,
+            61_000,
+        )
+        val store = RecordingWorktreeArchiveStore().apply { jobs.value = listOf(original) }
+        var discoveryCalls = 0
+        val entries = listOf(
+            Worktree(path = DEV_LAKE_ROOT, branch = "main", commitHash = "abc123"),
+            Worktree(path = DEV_LAKE_SELECTED_WORKTREE, branch = "feature/login", commitHash = "def456"),
+        )
+        val api = RecordingGitWorktreeApi(
+            responses = RecordingGitWorktreeApiResponses(worktreesByRepoPath = mapOf(DEV_LAKE_ROOT to entries)),
+            callbacks = RecordingGitWorktreeApiCallbacks(onListWorktreeEntries = {
+                discoveryCalls++
+                check(discoveryCalls != 1) { "startup discovery failed" }
+            }),
+        )
+        val viewModel = archiveViewModel(api, store) { Instant.fromEpochMilliseconds(10_000) }
+        withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it?.message?.contains("startup discovery failed") == true }
+        }
+        expandRepository(viewModel)
+        viewModel.clearActionError()
+
+        viewModel.archiveLocalWorktree(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE)
+        withTimeout(2_000.milliseconds) {
+            viewModel.actionErrorStateFlow.first { it?.message?.contains("already queued") == true }
+        }
+        assertEquals(listOf(original), store.listJobs())
+        assertEquals(emptyList(), viewModel.queuedWorktreeArchivesStateFlow.value)
+        assertEquals(emptyList(), api.archiveWorktreeCalls)
+    }
+
     @Test
     fun archiveQueuesPersistedWorktreeWithoutRunningGitRemoval() = runBlocking {
         val store = RecordingWorktreeArchiveStore()

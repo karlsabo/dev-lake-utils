@@ -35,6 +35,7 @@ import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.osFamily
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
+import com.github.karlsabo.worktreearchive.WorktreeArchiveStartupStore
 import com.github.karlsabo.worktreearchive.WorktreeArchiveStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -282,6 +283,7 @@ data class LocalRepositoryViewModelServices(
     val archiveDelay: Duration = DEFAULT_WORKTREE_ARCHIVE_DELAY,
     val waitForArchiveDeadline: suspend (Duration) -> Unit = { delay(it) },
     val archiveNow: () -> Instant = Clock.System::now,
+    val checkoutPresent: (String) -> Boolean = { true },
 )
 
 fun createLocalRepositoryViewModel(
@@ -317,6 +319,7 @@ fun createLocalRepositoryViewModel(
             delay = services.archiveDelay,
             waitForDeadline = services.waitForArchiveDeadline,
             now = services.archiveNow,
+            checkoutPresent = services.checkoutPresent,
         ),
     ),
     configuredRepositoryStartup = ConfiguredRepositoryStartup(
@@ -901,6 +904,8 @@ class RecordingWorktreeArchiveStore(
     val jobs = MutableStateFlow<List<WorktreeArchiveJob>>(emptyList())
     val transitionToRemovingCalls = MutableStateFlow<List<String>>(emptyList())
     var transitionFailure: RuntimeException? = null
+    var listFailure: RuntimeException? = null
+    var beforeRestoreQueuedJob: (WorktreeArchiveJob) -> Unit = {}
     val deleteQueuedJobCalls = MutableStateFlow<List<String>>(emptyList())
     val deleteQueuedJobResults = MutableStateFlow<List<Boolean>>(emptyList())
     var beforeDeleteQueuedJob: (String, String) -> Unit = { _, _ -> }
@@ -909,7 +914,42 @@ class RecordingWorktreeArchiveStore(
     var beforeFailedOperation: (String, WorktreeArchiveJob) -> Unit = { _, _ -> }
     val failedOperationResults = MutableStateFlow<List<Pair<String, Boolean>>>(emptyList())
 
-    override fun listJobs(): List<WorktreeArchiveJob> = jobs.value
+    override fun listJobs(): List<WorktreeArchiveJob> {
+        listFailure?.let { throw it }
+        return jobs.value
+    }
+
+    override val startup = object : WorktreeArchiveStartupStore {
+        override fun insertQueuedJob(job: WorktreeArchiveJob): Boolean {
+            saveFailure?.let { throw it }
+            while (true) {
+                val existing = jobs.value
+                if (existing.any { it.worktreePath == job.worktreePath }) return false
+                if (jobs.compareAndSet(existing, existing + job)) return true
+            }
+        }
+
+        override fun restoreQueuedJob(
+            job: WorktreeArchiveJob,
+            stateUpdatedAtEpochMs: Long,
+            deadlineAtEpochMs: Long,
+            errorMessage: String?,
+        ): Boolean {
+            beforeRestoreQueuedJob(job)
+            return changeAttempt("restore", job, WorktreeArchiveLifecycleState.QUEUED) {
+                it.copy(
+                    state = if (errorMessage == null) {
+                        WorktreeArchiveLifecycleState.QUEUED
+                    } else {
+                        WorktreeArchiveLifecycleState.FAILED
+                    },
+                    stateUpdatedAtEpochMs = stateUpdatedAtEpochMs,
+                    deadlineAtEpochMs = deadlineAtEpochMs,
+                    errorMessage = errorMessage,
+                )
+            }
+        }
+    }
 
     override fun saveJob(job: WorktreeArchiveJob) {
         saveFailure?.let { throw it }

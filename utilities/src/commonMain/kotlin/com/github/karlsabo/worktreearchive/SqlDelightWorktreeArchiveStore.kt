@@ -53,6 +53,8 @@ class SqlDelightWorktreeArchiveStore(
         )
     }
 
+    override val startup: WorktreeArchiveStartupStore = SqlDelightWorktreeArchiveStartupStore(queries)
+
     override fun transitionQueuedJobToRemoving(
         worktreePath: String,
         queueId: String,

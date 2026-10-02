@@ -38,6 +38,13 @@ INSERT OR REPLACE INTO worktree_archive_jobs(
 )
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
+insertQueuedJob:
+INSERT OR IGNORE INTO worktree_archive_jobs(
+  worktree_path, repository_root_path, branch, queue_id, lifecycle_state,
+  queued_at_epoch_ms, state_updated_at_epoch_ms, deadline_at_epoch_ms, error_message
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
 transitionQueuedJobToRemoving:
 UPDATE worktree_archive_jobs
 SET lifecycle_state = 'REMOVING', state_updated_at_epoch_ms = ?, error_message = NULL
@@ -74,6 +81,11 @@ transitionNeedsForceConfirmationJobToRemoving:
 UPDATE worktree_archive_jobs
 SET lifecycle_state = 'REMOVING', state_updated_at_epoch_ms = ?, error_message = NULL
 WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'NEEDS_FORCE_CONFIRMATION' AND state_updated_at_epoch_ms = ?;
+
+restoreQueuedJob:
+UPDATE worktree_archive_jobs
+SET lifecycle_state = ?, state_updated_at_epoch_ms = ?, deadline_at_epoch_ms = ?, error_message = ?
+WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'QUEUED' AND state_updated_at_epoch_ms = ?;
 
 changedRowCount:
 SELECT changes();
