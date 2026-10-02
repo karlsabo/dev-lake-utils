@@ -28,7 +28,7 @@ class EngHubWorktreeArchiveForceTest {
             assertEquals(null, fixture.viewModel.forceArchiveWorktreeRequestStateFlow.value)
             fixture.assertLeaseHeld()
             fixture.viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
-            withTimeout(2_000.milliseconds) { fixture.store.deleteQueuedJobResults.first { it.isNotEmpty() } }
+            assertEquals(emptyList(), fixture.store.deleteQueuedJobCalls.value)
             assertEquals(listOf(retained), fixture.store.listJobs())
             fixture.viewModel.requestForceArchiveLocalWorktree(DEV_LAKE_SELECTED_WORKTREE)
             assertEquals(request, fixture.viewModel.forceArchiveWorktreeRequestStateFlow.value)

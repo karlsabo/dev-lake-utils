@@ -314,6 +314,14 @@ private class GitWorktreeArchiveService(
         archiver.removeWorktree(worktreePath, force)
     }
 
+    override fun resumeArchiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        expectedBranch: String,
+    ) {
+        archiver.resumeArchiveWorktree(repoPath, worktreePath, expectedBranch)
+    }
+
     override fun archiveWorktree(
         repoPath: String,
         worktreePath: String,
@@ -1442,6 +1450,34 @@ private class GitWorktreeArchiver(
                 gitCommandApi.execute(null, "worktree", "remove", worktreePath)
             }
         }
+    }
+
+    fun resumeArchiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        expectedBranch: String,
+    ) {
+        val registration = GitWorktreeLister(gitCommandApi).listWorktreeEntries(repoPath)
+            .firstOrNull { it.path == worktreePath }
+        if (registration == null) {
+            // An unregistered checkout has no trustworthy identity; only an absent path is safe to finish.
+            check(SystemFileSystem.metadataOrNull(Path(worktreePath)) == null) {
+                "Cannot resume archive: checkout identity cannot be verified: $worktreePath"
+            }
+            pruneWorktrees(repoPath)
+            return
+        }
+        check(registration.branch == expectedBranch) {
+            "Cannot resume archive: checkout identity cannot be verified: $worktreePath"
+        }
+        if (SystemFileSystem.metadataOrNull(Path(worktreePath)) == null) {
+            pruneWorktrees(repoPath)
+            return
+        }
+        check(SystemFileSystem.exists(Path(worktreePath, ".git"))) {
+            "Cannot resume archive: checkout identity cannot be verified: $worktreePath"
+        }
+        archiveWorktree(repoPath, worktreePath, force = false)
     }
 
     fun archiveWorktree(

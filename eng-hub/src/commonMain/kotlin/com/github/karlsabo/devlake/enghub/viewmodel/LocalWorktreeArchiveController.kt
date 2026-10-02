@@ -49,6 +49,9 @@ internal class LocalWorktreeArchiveController(
         archive,
         errorReporter,
         ::exposeArchive,
+        { job ->
+            viewModel.viewModelScope.launch(Dispatchers.IO) { removal.remove(job, resumed = true) }
+        },
     )
     private val startupRestoration = viewModel.viewModelScope.launch(Dispatchers.IO) { restoration.restore() }
 
@@ -79,8 +82,10 @@ internal class LocalWorktreeArchiveController(
     fun undoQueuedWorktreeArchive(worktreePath: String) {
         val normalizedWorktreePath = worktreePath.normalizedRepositoryPath()
         val queueId = state.queuedWorktreeArchives.value
-            .firstOrNull { it.worktreePath.normalizedRepositoryPath() == normalizedWorktreePath }
-            ?.queueId ?: return
+            .firstOrNull {
+                it.worktreePath.normalizedRepositoryPath() == normalizedWorktreePath &&
+                    it.state == WorktreeArchiveLifecycleState.QUEUED
+            }?.queueId ?: return
 
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching { archive.store.deleteQueuedJob(normalizedWorktreePath, queueId) }

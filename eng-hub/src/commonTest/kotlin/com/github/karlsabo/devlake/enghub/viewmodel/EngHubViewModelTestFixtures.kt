@@ -284,6 +284,7 @@ data class LocalRepositoryViewModelServices(
     val waitForArchiveDeadline: suspend (Duration) -> Unit = { delay(it) },
     val archiveNow: () -> Instant = Clock.System::now,
     val checkoutPresent: (String) -> Boolean = { true },
+    val pathPresent: (String) -> Boolean = { false },
 )
 
 fun createLocalRepositoryViewModel(
@@ -320,6 +321,7 @@ fun createLocalRepositoryViewModel(
             waitForDeadline = services.waitForArchiveDeadline,
             now = services.archiveNow,
             checkoutPresent = services.checkoutPresent,
+            pathPresent = services.pathPresent,
         ),
     ),
     configuredRepositoryStartup = ConfiguredRepositoryStartup(
@@ -519,6 +521,7 @@ data class RecordingGitWorktreeApiCallbacks(
     val onInferWorktreeParentBranches: (String) -> Unit = {},
     val onInferOriginDefaultBranch: (String) -> Unit = {},
     val onArchiveWorktree: (String, String, Boolean) -> Unit = { _, _, _ -> },
+    val onResumeArchiveWorktree: (String, String, String) -> Unit = { _, _, _ -> },
     val onCheckoutExistingBranchWorktree: (CheckoutExistingBranchWorktreeCall) -> String = {
         error("Unexpected call")
     },
@@ -808,6 +811,15 @@ class RecordingGitWorktreeApi(
         abortMergeCalls += call
         responses.abortMergeFailure?.let { throw it }
         callbacks.onAbortMerge(call)
+    }
+
+    override fun resumeArchiveWorktree(
+        repoPath: String,
+        worktreePath: String,
+        expectedBranch: String,
+    ) {
+        callbacks.onResumeArchiveWorktree(repoPath, worktreePath, expectedBranch)
+        archiveWorktree(repoPath, worktreePath, force = false)
     }
 
     override fun archiveWorktree(
