@@ -853,7 +853,7 @@ class EngHubWorktreeArchiveRemovalRestartTest {
     }
 
     @Test
-    fun nonQueuedRecordsRemainUntouchedWhileQueuedRecordsRestore() = runBlocking {
+    fun failedRecordsRestoreWhileForceConfirmationRemainsUntouched() = runBlocking {
         val fixture = ArchiveRestartFixture()
         val deferred = WorktreeArchiveLifecycleState.entries.filter {
             it == WorktreeArchiveLifecycleState.FAILED || it == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
@@ -868,10 +868,16 @@ class EngHubWorktreeArchiveRemovalRestartTest {
         fixture.store.jobs.value += deferred
         try {
             val viewModel = fixture.start(100_000)
-            val restored = fixture.awaitRestored(viewModel)
-            assertEquals(deferred, fixture.store.listJobs().filterNot { it == restored })
-            withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.size == 2 } }
-            assertEquals(setOf(restored, deferred.first()), viewModel.queuedWorktreeArchivesStateFlow.value.toSet())
+            val published = withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first { jobs ->
+                    jobs.any { it.queueId == "queue-login" && it.state == WorktreeArchiveLifecycleState.QUEUED } &&
+                        deferred.first() in jobs
+                }
+            }
+            val restored = published.single { it.worktreePath == DEV_LAKE_SELECTED_WORKTREE }
+            assertEquals(160_000, restored.deadlineAtEpochMs)
+            assertEquals(setOf(restored, deferred.first()), published.toSet())
+            assertEquals(setOf(restored, *deferred.toTypedArray()), fixture.store.listJobs().toSet())
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
         } finally {
             fixture.close()
