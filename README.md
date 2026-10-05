@@ -15,6 +15,9 @@
 
 * [ ] When archiving a worktree, don't prompt, move it into some archiving bucket, delayed by 60 seconds or so, with a cancel archive button.
   * Play a nice animation that moves it into a recycle bin in the bottom right of the screen, then you can click that bin and undo (stop the archive) withing 60 seconds. If archiving already began, grey out the button and have a hover text helper that says it's being removed. If there's a remote branch or some other way to recover it we should support that.
+* [ ] Support multiple git repository parent roots
+  * [ ] Missing buttons when the repository isn't configured
+    * ![img.png](img.png)
 * [ ] Show the closed PR on worktrees view
 * [ ] Loading worktrees is too slow. Probably when we don't have an internet connection, or it's slow.
   * We need to load locally, and then add metadata from remote sources in different threads. We want worktrees to show up as fast as possible and then do slow tasks in other threads.
@@ -70,6 +73,7 @@
   * Also show the ticket and allow modifying the ticket, or a quick link to the ticket view, maybe the same with the worktree, link to the view for it.
   * If we link to 'views' of the items, we'd want to add a navigation history (back button, forward button)
 * [ ] We need a UI indicator for when we archive a worktree. Disable all actions and add a spinning loader. The 'Achiving...' text takes too long to appear.
+* [ ] After adding a new repository, display the settings window to configure it. Adding comments, etc.
 
 ## Implementation loop
 * Implement
