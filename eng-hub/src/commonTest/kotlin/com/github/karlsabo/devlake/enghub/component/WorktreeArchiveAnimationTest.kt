@@ -153,6 +153,61 @@ class WorktreeArchiveAnimationTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun queueAcceptedWhileCollapsedDoesNotReplayRowExitOnExpand() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        val path = "/repos/widgets-login"
+        var expanded by mutableStateOf(true)
+        var queuedPaths by mutableStateOf(emptySet<String>())
+        var newlyQueuedPaths by mutableStateOf(emptySet<String>())
+        var finishedExitPaths by mutableStateOf(emptySet<String>())
+        var pendingWrite = false
+        val actions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = animationRepository(path).copy(isExpanded = expanded),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                        queuedArchiveWorktreePaths = queuedPaths,
+                        newlyQueuedArchiveWorktreePaths = newlyQueuedPaths,
+                    ),
+                    panelActions = actions.copy(
+                        onToggleRepository = { expanded = !expanded },
+                        worktrees = actions.worktrees.copy(onArchiveWorktree = { _, _ -> pendingWrite = true }),
+                    ),
+                    onCreateRequest = {},
+                    exitState = WorktreeRowExitState(finishedExitPaths intersect queuedPaths) {
+                        finishedExitPaths = finishedExitPaths + it
+                    },
+                )
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        onNodeWithContentDescription("Archive worktree feature/login").performClick()
+        assertTrue(pendingWrite)
+        onNodeWithContentDescription("Collapse widgets").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+
+        // The store write succeeds only after the row has left composition.
+        newlyQueuedPaths = setOf(path)
+        queuedPaths = setOf(path)
+        mainClock.advanceTimeByFrame()
+        onNodeWithContentDescription("Expand widgets").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+        mainClock.advanceTimeBy(260)
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+
+        queuedPaths = emptySet()
+        newlyQueuedPaths = emptySet()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun childReturnsToRootIndentOnlyAfterQueuedParentExitFinishes() = runComposeUiTest {
         mainClock.autoAdvance = false
         var finishedExitPaths by mutableStateOf(emptySet<String>())

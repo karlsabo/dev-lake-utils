@@ -251,7 +251,7 @@ private fun WorktreeRowEntry(
     val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
     key(normalizedWorktreePath) {
         val isQueued = normalizedWorktreePath in state.queuedArchiveWorktreePaths
-        val visibility = remember { MutableTransitionState(true) }
+        val visibility = remember { MutableTransitionState(!isQueued) }
         val currentOnExitComplete by rememberUpdatedState(onExitComplete)
         visibility.targetState = !isQueued
         LaunchedEffect(visibility.isIdle, visibility.currentState, isQueued) {
