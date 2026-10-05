@@ -26,6 +26,7 @@ internal fun WorktreePanel(
     state: WorktreePanelState,
     actions: WorktreePanelActions,
     modifier: Modifier = Modifier,
+    exitState: WorktreeRowExitState = WorktreeRowExitState(),
 ) {
     var pendingCreateWorktree by remember { mutableStateOf<PendingCreateWorktree?>(null) }
 
@@ -77,6 +78,7 @@ internal fun WorktreePanel(
         actions = actions,
         onCreateRequest = { pendingCreateWorktree = it },
         modifier = modifier,
+        exitState = exitState,
     )
 }
 
@@ -85,6 +87,7 @@ private fun WorktreePanelContent(
     state: WorktreePanelState,
     actions: WorktreePanelActions,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
+    exitState: WorktreeRowExitState,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -94,6 +97,7 @@ private fun WorktreePanelContent(
             actions = actions,
             onCreateRequest = onCreateRequest,
             modifier = Modifier.weight(1f).fillMaxWidth(),
+            exitState = exitState,
         )
     }
 }
@@ -115,6 +119,7 @@ private fun WorktreeRepositoryList(
     state: WorktreePanelState,
     actions: WorktreePanelActions,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
+    exitState: WorktreeRowExitState,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
@@ -137,6 +142,7 @@ private fun WorktreeRepositoryList(
                         ),
                         panelActions = actions,
                         onCreateRequest = onCreateRequest,
+                        exitState = exitState,
                     )
                 }
             }

@@ -36,6 +36,7 @@ class WorktreeArchiveAnimationTest {
         val path = "/repos/widgets-login"
         var queuedPaths by mutableStateOf(emptySet<String>())
         var newlyQueuedPaths by mutableStateOf(emptySet<String>())
+        var finishedExitPaths by mutableStateOf(emptySet<String>())
         var acceptsQueue = false
         var requests = 0
         val actions = emptyPanelActions()
@@ -43,12 +44,7 @@ class WorktreeArchiveAnimationTest {
             MaterialTheme {
                 LocalRepositoryRow(
                     state = WorktreeRowsState(
-                        repository = LocalRepositoryUiState(
-                            name = "widgets",
-                            path = "/repos/widgets",
-                            isExpanded = true,
-                            worktrees = listOf(LocalWorktreeUiState("feature/login", path, isDirty = false)),
-                        ),
+                        repository = animationRepository(path),
                         setupStatuses = emptyMap(),
                         archivingWorktreePaths = emptySet(),
                         queuedArchiveWorktreePaths = queuedPaths,
@@ -64,6 +60,9 @@ class WorktreeArchiveAnimationTest {
                         }),
                     ),
                     onCreateRequest = {},
+                    exitState = WorktreeRowExitState(finishedExitPaths intersect queuedPaths) {
+                        finishedExitPaths = finishedExitPaths + it
+                    },
                 )
             }
         }
@@ -97,6 +96,7 @@ class WorktreeArchiveAnimationTest {
     fun completedExitStaysHiddenAfterCollapseAndExpandUntilUndo() = runComposeUiTest {
         mainClock.autoAdvance = false
         val path = "/repos/widgets-login"
+        var finishedExitPaths by mutableStateOf(emptySet<String>())
         var expanded by mutableStateOf(true)
         var queuedPaths by mutableStateOf(emptySet<String>())
         var newlyQueuedPaths by mutableStateOf(emptySet<String>())
@@ -124,6 +124,9 @@ class WorktreeArchiveAnimationTest {
                         }),
                     ),
                     onCreateRequest = {},
+                    exitState = WorktreeRowExitState(finishedExitPaths intersect queuedPaths) {
+                        finishedExitPaths = finishedExitPaths + it
+                    },
                 )
             }
         }
@@ -152,6 +155,7 @@ class WorktreeArchiveAnimationTest {
     @Test
     fun childReturnsToRootIndentOnlyAfterQueuedParentExitFinishes() = runComposeUiTest {
         mainClock.autoAdvance = false
+        var finishedExitPaths by mutableStateOf(emptySet<String>())
         val parentPath = "/repos/widgets-parent"
         var queuedPaths by mutableStateOf(emptySet<String>())
         var newlyQueuedPaths by mutableStateOf(emptySet<String>())
@@ -180,6 +184,9 @@ class WorktreeArchiveAnimationTest {
                     ),
                     panelActions = actions,
                     onCreateRequest = {},
+                    exitState = WorktreeRowExitState(finishedExitPaths intersect queuedPaths) {
+                        finishedExitPaths = finishedExitPaths + it
+                    },
                 )
             }
         }
@@ -247,6 +254,13 @@ class WorktreeArchiveAnimationTest {
         assertTrue(beforeQueue.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
         onNodeWithContentDescription("Recycle bin (2)").assertIsDisplayed()
     }
+
+    private fun animationRepository(path: String) = LocalRepositoryUiState(
+        name = "widgets",
+        path = "/repos/widgets",
+        isExpanded = true,
+        worktrees = listOf(LocalWorktreeUiState("feature/login", path, isDirty = false)),
+    )
 
     private fun ImageBitmap.pixels(): IntArray = IntArray(width * height).also { readPixels(it) }
 }

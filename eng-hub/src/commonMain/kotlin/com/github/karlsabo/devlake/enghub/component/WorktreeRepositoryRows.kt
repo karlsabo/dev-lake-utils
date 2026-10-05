@@ -54,12 +54,8 @@ internal fun LocalRepositoryRow(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
+    exitState: WorktreeRowExitState = WorktreeRowExitState(),
 ) {
-    var finishedExitPaths by remember { mutableStateOf(emptySet<String>()) }
-    LaunchedEffect(state.queuedArchiveWorktreePaths) {
-        finishedExitPaths = finishedExitPaths intersect state.queuedArchiveWorktreePaths
-    }
-
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         elevation = 2.dp,
@@ -75,8 +71,8 @@ internal fun LocalRepositoryRow(
                 state = state,
                 panelActions = panelActions,
                 onCreateRequest = onCreateRequest,
-                finishedExitPaths = finishedExitPaths,
-                onExitComplete = { path -> finishedExitPaths = finishedExitPaths + path },
+                finishedExitPaths = exitState.finishedPaths,
+                onExitComplete = exitState.onComplete,
             )
         }
     }

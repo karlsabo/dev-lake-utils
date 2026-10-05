@@ -7,6 +7,7 @@ import com.github.karlsabo.devlake.enghub.component.PullRequestPanel
 import com.github.karlsabo.devlake.enghub.component.PullRequestPanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanel
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
+import com.github.karlsabo.devlake.enghub.component.WorktreeRowExitState
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupStatus
 
@@ -15,6 +16,7 @@ internal fun EngHubPaneContent(
     state: EngHubScreenState,
     actions: EngHubScreenActions,
     modifier: Modifier = Modifier,
+    exitState: WorktreeRowExitState = WorktreeRowExitState(),
 ) {
     when (state.selectedPane) {
         EngHubPane.PullRequests -> PullRequestsPane(
@@ -33,6 +35,7 @@ internal fun EngHubPaneContent(
             state = state.worktrees,
             actions = actions,
             modifier = modifier,
+            exitState = exitState,
         )
 
         EngHubPane.Settings -> EngHubSettingsScreen(
@@ -80,12 +83,14 @@ private fun NotificationsPane(
 private fun WorktreesPane(
     state: WorktreePanelState,
     actions: EngHubScreenActions,
+    exitState: WorktreeRowExitState,
     modifier: Modifier = Modifier,
 ) {
     WorktreePanel(
         state = state,
         actions = actions.worktrees,
         modifier = modifier,
+        exitState = exitState,
     )
 }
 
