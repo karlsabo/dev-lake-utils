@@ -276,7 +276,7 @@ data class LocalRepositoryViewModelTestConfig(
 
 fun localRepositoryConfigs(vararg paths: String) = paths.map { LocalRepositoryConfig(path = it) }
 
-data class LocalRepositoryViewModelServices(
+internal data class LocalRepositoryViewModelServices(
     val gitHubApi: RecordingGitHubApi = RecordingGitHubApi(emptyMap()),
     val worktreeSetupCoordinator: WorktreeSetupCoordinator? = null,
     val worktreeArchiveStore: WorktreeArchiveStore = RecordingWorktreeArchiveStore(),
@@ -285,9 +285,13 @@ data class LocalRepositoryViewModelServices(
     val archiveNow: () -> Instant = Clock.System::now,
     val checkoutPresent: (String) -> Boolean = { true },
     val pathPresent: (String) -> Boolean = { false },
+    val forceProvenance: ForceArchiveProvenance = object : ForceArchiveProvenance {
+        override fun record(job: WorktreeArchiveJob) = Unit
+        override fun matches(job: WorktreeArchiveJob) = true
+    },
 )
 
-fun createLocalRepositoryViewModel(
+internal fun createLocalRepositoryViewModel(
     gitWorktreeApi: RecordingGitWorktreeApi,
     configWriter: RecordingEngHubConfigWriter,
     localRepositoryConfigs: List<LocalRepositoryConfig> = emptyList(),
@@ -322,6 +326,7 @@ fun createLocalRepositoryViewModel(
             now = services.archiveNow,
             checkoutPresent = services.checkoutPresent,
             pathPresent = services.pathPresent,
+            forceProvenance = services.forceProvenance,
         ),
     ),
     configuredRepositoryStartup = ConfiguredRepositoryStartup(
@@ -1048,11 +1053,18 @@ class RecordingWorktreeArchiveStore(
         )
     }
 
-    override fun deleteFailedJob(job: WorktreeArchiveJob): Boolean = changeAttempt(
-        "dismiss",
-        job,
-        WorktreeArchiveLifecycleState.FAILED,
-    ) { null }
+    override fun deleteRetainedJob(job: WorktreeArchiveJob): Boolean {
+        if (job.state != WorktreeArchiveLifecycleState.FAILED &&
+            job.state != WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
+        ) {
+            return false
+        }
+        return changeAttempt(
+            if (job.state == WorktreeArchiveLifecycleState.FAILED) "dismiss" else "dismiss-force",
+            job,
+            job.state,
+        ) { null }
+    }
 
     private fun changeAttempt(
         operation: String,

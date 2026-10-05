@@ -51,6 +51,15 @@ internal class LocalWorktreeArchiveRemoval(
         } ?: return
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
+                val registered = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
+                    .firstOrNull { it.path.normalizedRepositoryPath() == job.worktreePath }
+                currentCoroutineContext().ensureActive()
+                check(registered?.branch == job.branch && archive.checkoutPresent(job.worktreePath)) {
+                    "Cannot force archive: worktree registration or checkout no longer matches: ${job.worktreePath}"
+                }
+                check(archive.forceProvenance.matches(job)) {
+                    "Cannot force archive: original checkout provenance cannot be verified: ${job.worktreePath}"
+                }
                 val removing = job.copy(
                     state = WorktreeArchiveLifecycleState.REMOVING,
                     stateUpdatedAtEpochMs = nextStateTime(job),
@@ -90,10 +99,16 @@ internal class LocalWorktreeArchiveRemoval(
     }
 
     fun dismiss(worktreePath: String) {
-        val job = failedJob(worktreePath) ?: return
+        val job = state.queuedWorktreeArchives.value.firstOrNull {
+            it.worktreePath == worktreePath.normalizedRepositoryPath() &&
+                (
+                    it.state == WorktreeArchiveLifecycleState.FAILED ||
+                        it.state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
+                    )
+        } ?: return
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                if (archive.store.deleteFailedJob(job)) {
+                if (archive.store.deleteRetainedJob(job)) {
                     currentCoroutineContext().ensureActive()
                     reconcileAfterDismiss(job)
                 }
@@ -123,22 +138,37 @@ internal class LocalWorktreeArchiveRemoval(
             errorMessage = failure.message?.takeIf { it.isNotBlank() } ?: failure.toString(),
         )
         runCatching {
-            val persisted = if (needsConfirmation) {
+            // A new checkout at the same path and branch must not inherit the old force authorization.
+            val provenanceFailure = if (needsConfirmation) {
+                runCatching { archive.forceProvenance.record(job) }.rethrowCancellation().exceptionOrNull()
+            } else {
+                null
+            }
+            val retained = if (provenanceFailure != null) {
+                failed.copy(
+                    state = WorktreeArchiveLifecycleState.FAILED,
+                    errorMessage = "Cannot save force-removal provenance: " +
+                        (provenanceFailure.message ?: provenanceFailure.toString()),
+                )
+            } else {
+                failed
+            }
+            val persisted = if (retained.state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION) {
                 archive.store.transitionRemovingJobToNeedsForceConfirmation(
                     job,
-                    requireNotNull(failed.errorMessage),
-                    failed.stateUpdatedAtEpochMs,
+                    requireNotNull(retained.errorMessage),
+                    retained.stateUpdatedAtEpochMs,
                 )
             } else {
                 archive.store.transitionRemovingJobToFailed(
                     job,
-                    requireNotNull(failed.errorMessage),
-                    failed.stateUpdatedAtEpochMs,
+                    requireNotNull(retained.errorMessage),
+                    retained.stateUpdatedAtEpochMs,
                 )
             }
             if (persisted) {
                 currentCoroutineContext().ensureActive()
-                publish(job, failed)
+                publish(job, retained)
             }
         }.rethrowCancellation().onFailure { report("Failed to persist worktree archive failure", it) }
     }

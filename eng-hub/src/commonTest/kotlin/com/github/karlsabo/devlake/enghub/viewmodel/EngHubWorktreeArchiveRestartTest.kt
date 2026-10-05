@@ -974,7 +974,7 @@ class EngHubWorktreeArchiveFailedRestartTest {
     }
 
     @Test
-    fun failedRecordsRestoreWhileForceConfirmationRemainsUntouched() = runBlocking {
+    fun failedAndForceConfirmationRecordsRestoreWithoutAutomaticRemoval() = runBlocking {
         val fixture = ArchiveRestartFixture()
         val deferred = WorktreeArchiveLifecycleState.entries.filter {
             it == WorktreeArchiveLifecycleState.FAILED || it == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
@@ -997,7 +997,13 @@ class EngHubWorktreeArchiveFailedRestartTest {
             }
             val restored = published.single { it.worktreePath == DEV_LAKE_SELECTED_WORKTREE }
             assertEquals(160_000, restored.deadlineAtEpochMs)
-            assertEquals(setOf(restored, deferred.first()), published.toSet())
+            withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first { it.size == 3 }
+            }
+            assertEquals(
+                setOf(restored, *deferred.toTypedArray()),
+                viewModel.queuedWorktreeArchivesStateFlow.value.toSet(),
+            )
             assertEquals(setOf(restored, *deferred.toTypedArray()), fixture.store.listJobs().toSet())
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
         } finally {
@@ -1117,7 +1123,7 @@ class EngHubWorktreeArchiveFailedRestartTest {
     }
 }
 
-private fun restartQueuedJob() = WorktreeArchiveJob(
+internal fun restartQueuedJob() = WorktreeArchiveJob(
     repositoryRootPath = DEV_LAKE_ROOT,
     worktreePath = DEV_LAKE_SELECTED_WORKTREE,
     branch = "feature/login",
@@ -1128,7 +1134,7 @@ private fun restartQueuedJob() = WorktreeArchiveJob(
     deadlineAtEpochMs = 61_000,
 )
 
-private class ArchiveRestartFixture(
+internal class ArchiveRestartFixture(
     worktrees: List<Worktree> = listOf(
         Worktree(DEV_LAKE_ROOT, "main", "abc"),
         Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/login", "def"),
@@ -1137,6 +1143,15 @@ private class ArchiveRestartFixture(
     private val pathPresent: (String) -> Boolean = { false },
 ) {
     val store = RecordingWorktreeArchiveStore().also { it.jobs.value = listOf(restartQueuedJob()) }
+    var provenanceQueueId: String? = null
+    var provenanceRecordFailure: RuntimeException? = null
+    private val provenance = object : ForceArchiveProvenance {
+        override fun record(job: WorktreeArchiveJob) {
+            provenanceRecordFailure?.let { throw it }
+            provenanceQueueId = job.queueId
+        }
+        override fun matches(job: WorktreeArchiveJob) = provenanceQueueId == job.queueId
+    }
     val nowEpochMs = MutableStateFlow(100_000L)
     val deadlines = Channel<Pair<Duration, CompletableDeferred<Unit>>>(Channel.UNLIMITED)
     val updateStarted = CompletableDeferred<Unit>()
@@ -1183,6 +1198,7 @@ private class ArchiveRestartFixture(
                 archiveNow = { Instant.fromEpochMilliseconds(nowEpochMs.value) },
                 checkoutPresent = checkoutPresent,
                 pathPresent = pathPresent,
+                forceProvenance = provenance,
                 waitForArchiveDeadline = { duration ->
                     val release = CompletableDeferred<Unit>()
                     deadlines.send(duration to release)

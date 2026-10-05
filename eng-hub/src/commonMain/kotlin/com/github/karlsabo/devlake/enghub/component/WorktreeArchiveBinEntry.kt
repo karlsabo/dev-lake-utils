@@ -93,6 +93,7 @@ private fun WorktreeArchiveBinEntryRow(
             TextButton(onClick = { actions.onRequestForceConfirmation(entry.worktreePath) }) {
                 Text("Review force removal")
             }
+            TextButton(onClick = { actions.onDismiss(entry.worktreePath) }) { Text("Dismiss") }
         } else if (entry.isFailed) {
             Text("Removal failed", style = MaterialTheme.typography.caption)
             entry.errorMessage?.let { Text(it, style = MaterialTheme.typography.caption) }

@@ -392,13 +392,18 @@ class EngHubScreenTest {
     fun globalScreenReviewsDirtyArchiveAndDismissesOrConfirmsOutsideWorktreesPane() = runComposeUiTest {
         val request = ForceArchiveWorktreeUiState("/repos/widgets", "/repos/wip", "queue", 70_001)
         val initial = screenStateWithQueuedArchive()
-        val state = mutableStateOf(
-            initial.copy(
-                archiveBinEntries = listOf(
-                    WorktreeArchiveBinEntry("widgets", "feature/wip", 0, "/repos/wip", needsForceConfirmation = true),
-                ),
-            ),
+        val restored = WorktreeArchiveJob(
+            repositoryRootPath = request.repoRootPath,
+            worktreePath = request.worktreePath,
+            branch = "feature/wip",
+            queueId = request.queueId,
+            state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+            queuedAtEpochMs = 10_000,
+            stateUpdatedAtEpochMs = request.stateUpdatedAtEpochMs,
+            deadlineAtEpochMs = 70_000,
+            errorMessage = "worktree contains modified files",
         )
+        val state = mutableStateOf(initial)
         val confirmations = mutableListOf<ForceArchiveWorktreeUiState>()
         val dismissals = mutableListOf<ForceArchiveWorktreeUiState>()
         val baseActions = screenActions(onUndoQueuedWorktreeArchive = {})
@@ -418,7 +423,15 @@ class EngHubScreenTest {
                 ),
             ),
         )
-        setContent { MaterialTheme { EngHubScreenContent(state.value, actions) } }
+        setContent {
+            MaterialTheme {
+                EngHubScreenContent(
+                    state.value.copy(archiveBinEntries = collectArchiveBinEntries(listOf(restored)) { 200_000L }),
+                    actions,
+                )
+            }
+        }
+        onNodeWithText("Force Archive").assertDoesNotExist()
         onNodeWithContentDescription("Recycle bin (1)").performClick()
         onNodeWithText("Review force removal").performClick()
         onNodeWithText(
@@ -433,6 +446,39 @@ class EngHubScreenTest {
         onNodeWithText("Review force removal").performClick()
         onNodeWithText("Force Archive").performClick()
         assertEquals(listOf(request), confirmations)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun restoredForceConfirmationOffersDismissOutsideWorktreesPane() = runComposeUiTest {
+        val dismissals = mutableListOf<String>()
+        val dirty = WorktreeArchiveJob(
+            repositoryRootPath = "/repos/widgets",
+            worktreePath = "/repos/wip",
+            branch = "feature/wip",
+            queueId = "dirty",
+            state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+            queuedAtEpochMs = 10_000,
+            stateUpdatedAtEpochMs = 70_001,
+            deadlineAtEpochMs = 70_000,
+        )
+        setContent {
+            MaterialTheme {
+                EngHubScreenContent(
+                    state = screenStateWithQueuedArchive().copy(
+                        archiveBinEntries = collectArchiveBinEntries(listOf(dirty)) { 80_000L },
+                    ),
+                    actions = screenActions(onUndoQueuedWorktreeArchive = {}).copy(
+                        onDismissFailedWorktreeArchive = dismissals::add,
+                    ),
+                )
+            }
+        }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Confirmation required").assertIsDisplayed()
+        onNodeWithText("Dismiss").performClick()
+        assertEquals(listOf(dirty.worktreePath), dismissals)
+        onNodeWithText("Undo").assertDoesNotExist()
     }
 
     @OptIn(ExperimentalTestApi::class)

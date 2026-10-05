@@ -262,15 +262,15 @@ class SqlDelightWorktreeArchiveStoreTest {
             assertFalse(store.transitionRemovingJobToFailed(removing, "stale error", 3_000))
             assertTrue(store.transitionFailedJobToRemoving(failed, 3_000))
             assertFalse(store.transitionFailedJobToRemoving(failed, 4_000))
-            assertFalse(store.deleteFailedJob(failed))
+            assertFalse(store.deleteRetainedJob(failed))
             val retry = removing.copy(stateUpdatedAtEpochMs = 3_000)
             assertEquals(listOf(retry), store.listJobs())
             assertTrue(store.transitionRemovingJobToFailed(retry, "still denied", 4_000))
-            assertFalse(store.deleteFailedJob(failed))
+            assertFalse(store.deleteRetainedJob(failed))
             assertFalse(store.transitionFailedJobToRemoving(failed, 5_000))
             val latest = store.listJobs().single()
-            assertTrue(store.deleteFailedJob(latest))
-            assertFalse(store.deleteFailedJob(latest))
+            assertTrue(store.deleteRetainedJob(latest))
+            assertFalse(store.deleteRetainedJob(latest))
             assertEquals(emptyList(), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
         } finally {
             deleteRecursively(directory)
@@ -289,20 +289,15 @@ class SqlDelightWorktreeArchiveStoreTest {
                 store.saveJob(replacement)
                 assertFalse(store.transitionRemovingJobToFailed(original, "stale", 2_000))
                 assertFalse(store.transitionFailedJobToRemoving(original, 2_000))
-                assertFalse(store.deleteFailedJob(original))
+                assertFalse(store.deleteRetainedJob(original))
                 assertEquals(listOf(replacement), store.listJobs())
             }
-            listOf(
-                WorktreeArchiveLifecycleState.QUEUED,
-                WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
-            ).forEach { lifecycle ->
-                val job = original.copy(state = lifecycle)
-                store.saveJob(job)
-                assertFalse(store.transitionRemovingJobToFailed(job, "wrong state", 2_000))
-                assertFalse(store.transitionFailedJobToRemoving(job, 2_000))
-                assertFalse(store.deleteFailedJob(job))
-                assertEquals(listOf(job), store.listJobs())
-            }
+            val queued = original.copy(state = WorktreeArchiveLifecycleState.QUEUED)
+            store.saveJob(queued)
+            assertFalse(store.transitionRemovingJobToFailed(queued, "wrong state", 2_000))
+            assertFalse(store.transitionFailedJobToRemoving(queued, 2_000))
+            assertFalse(store.deleteRetainedJob(queued))
+            assertEquals(listOf(queued), store.listJobs())
         } finally {
             deleteRecursively(directory)
         }
@@ -326,7 +321,6 @@ class SqlDelightWorktreeArchiveStoreTest {
             )
             assertEquals(listOf(confirmation), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
             assertFalse(store.deleteQueuedJob(confirmation.worktreePath, confirmation.queueId))
-            assertFalse(store.deleteFailedJob(confirmation))
             assertFalse(store.transitionFailedJobToRemoving(confirmation, 3_000))
             assertFalse(store.transitionRemovingJobToNeedsForceConfirmation(removing, "stale", 3_000))
             assertTrue(store.transitionNeedsForceConfirmationJobToRemoving(confirmation, 3_000))
@@ -341,6 +335,29 @@ class SqlDelightWorktreeArchiveStoreTest {
             assertFalse(store.transitionNeedsForceConfirmationJobToRemoving(latest, 5_000))
             assertFalse(store.transitionRemovingJobToNeedsForceConfirmation(forced, "stale", 5_000))
             assertEquals(listOf(latest.copy(queueId = "replacement")), store.listJobs())
+        } finally {
+            deleteRecursively(directory)
+        }
+    }
+
+    @Test
+    fun dismissForceConfirmationRequiresMatchingStateQueueAndAttempt() {
+        val directory = createTestDirectory()
+        val databasePath = Path(directory, "archive.db").toString()
+        val confirmation = queuedJob("/repos/wip", "feature/wip", 1_000).copy(
+            state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+        )
+        try {
+            val store = SqlDelightWorktreeArchiveStore(databasePath = databasePath)
+            store.saveJob(confirmation)
+            assertFalse(store.deleteRetainedJob(confirmation.copy(queueId = "other")))
+            assertFalse(store.deleteRetainedJob(confirmation.copy(stateUpdatedAtEpochMs = 999)))
+            store.saveJob(confirmation.copy(state = WorktreeArchiveLifecycleState.REMOVING))
+            assertFalse(store.deleteRetainedJob(confirmation))
+            store.saveJob(confirmation)
+            assertTrue(store.deleteRetainedJob(confirmation))
+            assertEquals(emptyList(), SqlDelightWorktreeArchiveStore(databasePath = databasePath).listJobs())
+            assertFalse(store.deleteRetainedJob(confirmation))
         } finally {
             deleteRecursively(directory)
         }
