@@ -369,6 +369,38 @@ class WorktreeArchiveAnimationTest {
         assertTrue(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
     }
 
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun undoWaitingSecondPulseSkipsItWhileFirstReturnsToBaseline() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        val first = WorktreeArchiveBinEntry("widgets", "feature/login", 60, "/repos/login", "first", true)
+        val second = WorktreeArchiveBinEntry("widgets", "feature/search", 60, "/repos/search", "second", true)
+        var entries by mutableStateOf(emptyList<WorktreeArchiveBinEntry>())
+        setContent {
+            MaterialTheme {
+                Box(Modifier.size(80.dp).testTag("bin-snapshot")) {
+                    WorktreeArchiveBin(entries = entries)
+                }
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        val baseline = onNodeWithTag("bin-snapshot").captureToImage().pixels()
+
+        entries = listOf(first)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(80)
+        assertFalse(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
+        entries = listOf(first, second)
+        mainClock.advanceTimeByFrame()
+        entries = listOf(first)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(240)
+        assertTrue(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
+        mainClock.advanceTimeBy(160)
+        assertTrue(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
+        onNodeWithContentDescription("Recycle bin (1)").assertIsDisplayed()
+    }
+
     private fun animationRepository(path: String) = LocalRepositoryUiState(
         name = "widgets",
         path = "/repos/widgets",

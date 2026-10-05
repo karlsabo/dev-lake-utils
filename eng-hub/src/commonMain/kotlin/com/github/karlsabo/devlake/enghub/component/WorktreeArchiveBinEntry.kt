@@ -16,7 +16,7 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -67,13 +67,18 @@ internal fun WorktreeArchiveBin(
     val binScope = rememberCoroutineScope()
     entries.filter { it.isNewlyQueued }.forEach { entry ->
         key(entry.queueId) {
-            LaunchedEffect(entry.queueId) {
-                // The bin owns the shared scale; removing one entry must not cancel its return to rest.
-                binScope.launch {
+            DisposableEffect(entry.queueId) {
+                var started = false
+                val pulse = binScope.launch {
                     pulseMutex.withLock {
+                        started = true
                         pulseScale.animateTo(BIN_PULSE_SCALE, tween(BIN_PULSE_DURATION_MS))
                         pulseScale.animateTo(1f, tween(BIN_PULSE_DURATION_MS))
                     }
+                }
+                onDispose {
+                    // Once started, the bin owns the return to rest even if this entry is undone.
+                    if (!started) pulse.cancel()
                 }
             }
         }
