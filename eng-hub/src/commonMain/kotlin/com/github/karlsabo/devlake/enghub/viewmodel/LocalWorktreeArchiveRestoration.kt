@@ -21,10 +21,16 @@ internal class LocalWorktreeArchiveRestoration(
             currentCoroutineContext().ensureActive()
             jobs.filter {
                 it.state == WorktreeArchiveLifecycleState.QUEUED ||
-                    it.state == WorktreeArchiveLifecycleState.REMOVING
+                    it.state == WorktreeArchiveLifecycleState.REMOVING ||
+                    it.state == WorktreeArchiveLifecycleState.FAILED
             }.forEach { job ->
                 runCatching {
-                    if (job.state == WorktreeArchiveLifecycleState.QUEUED) restoreJob(job) else resumeJob(job)
+                    when (job.state) {
+                        WorktreeArchiveLifecycleState.QUEUED -> restoreJob(job)
+                        WorktreeArchiveLifecycleState.REMOVING -> resumeJob(job)
+                        WorktreeArchiveLifecycleState.FAILED -> restoreFailedJob(job)
+                        else -> Unit
+                    }
                 }.rethrowCancellation().onFailure { report(it) }
             }
         }.rethrowCancellation().onFailure { report(it) }
@@ -76,6 +82,31 @@ internal class LocalWorktreeArchiveRestoration(
                 exposed = true
                 if (error != null) errorReporter.enqueueActionError(error)
             }
+        } finally {
+            if (!exposed) lease.release()
+        }
+    }
+
+    private suspend fun restoreFailedJob(job: WorktreeArchiveJob) {
+        val root = job.repositoryRootPath.normalizedRepositoryPath()
+        val path = job.worktreePath.normalizedRepositoryPath()
+        check(root.isNotEmpty() && path.isNotEmpty() && root != path && path == job.worktreePath) {
+            "Invalid failed worktree identity: ${job.worktreePath}"
+        }
+        check(state.localRepositories.value.any { it.path.normalizedRepositoryPath() == root }) {
+            "Repository is no longer configured: ${job.repositoryRootPath}"
+        }
+        val lease = checkNotNull(state.localWorktreeMutationGuard.tryAcquire(path)) {
+            "Worktree mutation already in progress: $path"
+        }
+        var exposed = false
+        try {
+            check(archive.store.listJobs().any { it == job }) {
+                "Failed worktree archive changed during startup: $path"
+            }
+            currentCoroutineContext().ensureActive()
+            expose(job, lease)
+            exposed = true
         } finally {
             if (!exposed) lease.release()
         }
@@ -146,7 +177,7 @@ internal class LocalWorktreeArchiveRestoration(
 
     private suspend fun report(failure: Throwable) {
         currentCoroutineContext().ensureActive()
-        logger.error(failure) { "Failed to restore queued worktree archive" }
+        logger.error(failure) { "Failed to restore worktree archive" }
         errorReporter.enqueueActionError("Failed to restore queued worktree archive: ${failure.message ?: failure}")
     }
 }

@@ -917,6 +917,7 @@ class RecordingWorktreeArchiveStore(
     val transitionToRemovingCalls = MutableStateFlow<List<String>>(emptyList())
     var transitionFailure: RuntimeException? = null
     var listFailure: RuntimeException? = null
+    var beforeListJobs: () -> Unit = {}
     var beforeRestoreQueuedJob: (WorktreeArchiveJob) -> Unit = {}
     val deleteQueuedJobCalls = MutableStateFlow<List<String>>(emptyList())
     val deleteQueuedJobResults = MutableStateFlow<List<Boolean>>(emptyList())
@@ -927,6 +928,7 @@ class RecordingWorktreeArchiveStore(
     val failedOperationResults = MutableStateFlow<List<Pair<String, Boolean>>>(emptyList())
 
     override fun listJobs(): List<WorktreeArchiveJob> {
+        beforeListJobs()
         listFailure?.let { throw it }
         return jobs.value
     }
