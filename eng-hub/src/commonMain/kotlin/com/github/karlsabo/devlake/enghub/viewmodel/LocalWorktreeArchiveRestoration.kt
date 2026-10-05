@@ -22,14 +22,15 @@ internal class LocalWorktreeArchiveRestoration(
             jobs.filter {
                 it.state == WorktreeArchiveLifecycleState.QUEUED ||
                     it.state == WorktreeArchiveLifecycleState.REMOVING ||
-                    it.state == WorktreeArchiveLifecycleState.FAILED
+                    it.state == WorktreeArchiveLifecycleState.FAILED ||
+                    it.state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
             }.forEach { job ->
                 runCatching {
                     when (job.state) {
                         WorktreeArchiveLifecycleState.QUEUED -> restoreJob(job)
                         WorktreeArchiveLifecycleState.REMOVING -> resumeJob(job)
-                        WorktreeArchiveLifecycleState.FAILED -> restoreFailedJob(job)
-                        else -> Unit
+                        WorktreeArchiveLifecycleState.FAILED -> restoreRetainedJob(job)
+                        WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION -> restoreRetainedJob(job)
                     }
                 }.rethrowCancellation().onFailure { report(it) }
             }
@@ -87,11 +88,12 @@ internal class LocalWorktreeArchiveRestoration(
         }
     }
 
-    private suspend fun restoreFailedJob(job: WorktreeArchiveJob) {
+    private suspend fun restoreRetainedJob(job: WorktreeArchiveJob) {
         val root = job.repositoryRootPath.normalizedRepositoryPath()
         val path = job.worktreePath.normalizedRepositoryPath()
+        val label = if (job.state == WorktreeArchiveLifecycleState.FAILED) "Failed" else "Force-confirmation"
         check(root.isNotEmpty() && path.isNotEmpty() && root != path && path == job.worktreePath) {
-            "Invalid failed worktree identity: ${job.worktreePath}"
+            "Invalid ${label.lowercase()} worktree identity: ${job.worktreePath}"
         }
         check(state.localRepositories.value.any { it.path.normalizedRepositoryPath() == root }) {
             "Repository is no longer configured: ${job.repositoryRootPath}"
@@ -102,7 +104,7 @@ internal class LocalWorktreeArchiveRestoration(
         var exposed = false
         try {
             check(archive.store.listJobs().any { it == job }) {
-                "Failed worktree archive changed during startup: $path"
+                "$label worktree archive changed during startup: $path"
             }
             currentCoroutineContext().ensureActive()
             expose(job, lease)

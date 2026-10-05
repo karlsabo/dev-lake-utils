@@ -974,7 +974,7 @@ class EngHubWorktreeArchiveFailedRestartTest {
     }
 
     @Test
-    fun failedRecordsRestoreWhileForceConfirmationRemainsUntouched() = runBlocking {
+    fun failedAndForceConfirmationRecordsRestoreWithoutAutomaticRemoval() = runBlocking {
         val fixture = ArchiveRestartFixture()
         val deferred = WorktreeArchiveLifecycleState.entries.filter {
             it == WorktreeArchiveLifecycleState.FAILED || it == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
@@ -997,7 +997,13 @@ class EngHubWorktreeArchiveFailedRestartTest {
             }
             val restored = published.single { it.worktreePath == DEV_LAKE_SELECTED_WORKTREE }
             assertEquals(160_000, restored.deadlineAtEpochMs)
-            assertEquals(setOf(restored, deferred.first()), published.toSet())
+            withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first { it.size == 3 }
+            }
+            assertEquals(
+                setOf(restored, *deferred.toTypedArray()),
+                viewModel.queuedWorktreeArchivesStateFlow.value.toSet(),
+            )
             assertEquals(setOf(restored, *deferred.toTypedArray()), fixture.store.listJobs().toSet())
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
         } finally {
@@ -1117,7 +1123,7 @@ class EngHubWorktreeArchiveFailedRestartTest {
     }
 }
 
-private fun restartQueuedJob() = WorktreeArchiveJob(
+internal fun restartQueuedJob() = WorktreeArchiveJob(
     repositoryRootPath = DEV_LAKE_ROOT,
     worktreePath = DEV_LAKE_SELECTED_WORKTREE,
     branch = "feature/login",
@@ -1128,7 +1134,7 @@ private fun restartQueuedJob() = WorktreeArchiveJob(
     deadlineAtEpochMs = 61_000,
 )
 
-private class ArchiveRestartFixture(
+internal class ArchiveRestartFixture(
     worktrees: List<Worktree> = listOf(
         Worktree(DEV_LAKE_ROOT, "main", "abc"),
         Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/login", "def"),

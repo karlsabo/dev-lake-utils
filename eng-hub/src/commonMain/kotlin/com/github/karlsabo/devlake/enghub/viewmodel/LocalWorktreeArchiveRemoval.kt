@@ -51,6 +51,12 @@ internal class LocalWorktreeArchiveRemoval(
         } ?: return
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
+                val registered = gitWorktreeApi.listWorktreeEntries(job.repositoryRootPath)
+                    .firstOrNull { it.path.normalizedRepositoryPath() == job.worktreePath }
+                currentCoroutineContext().ensureActive()
+                check(registered?.branch == job.branch && archive.checkoutPresent(job.worktreePath)) {
+                    "Cannot force archive: worktree registration or checkout no longer matches: ${job.worktreePath}"
+                }
                 val removing = job.copy(
                     state = WorktreeArchiveLifecycleState.REMOVING,
                     stateUpdatedAtEpochMs = nextStateTime(job),
