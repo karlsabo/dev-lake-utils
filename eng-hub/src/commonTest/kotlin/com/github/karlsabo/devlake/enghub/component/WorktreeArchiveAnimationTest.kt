@@ -310,6 +310,65 @@ class WorktreeArchiveAnimationTest {
         onNodeWithContentDescription("Recycle bin (2)").assertIsDisplayed()
     }
 
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun undoDuringPulseReturnsToExistingEntryBaselineAndPreservesNextPulse() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        val existing = WorktreeArchiveBinEntry(
+            "widgets",
+            "feature/existing",
+            60,
+            "/repos/existing",
+            queueId = "existing",
+        )
+        val first = WorktreeArchiveBinEntry(
+            "widgets",
+            "feature/login",
+            60,
+            "/repos/login",
+            queueId = "first",
+            isNewlyQueued = true,
+        )
+        val second = WorktreeArchiveBinEntry(
+            "widgets",
+            "feature/search",
+            60,
+            "/repos/search",
+            queueId = "second",
+            isNewlyQueued = true,
+        )
+        var entries by mutableStateOf(listOf(existing))
+        setContent {
+            MaterialTheme {
+                Box(Modifier.size(80.dp).testTag("bin-snapshot")) {
+                    WorktreeArchiveBin(entries = entries)
+                }
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        val baseline = onNodeWithTag("bin-snapshot").captureToImage().pixels()
+
+        entries = listOf(existing, first)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(80)
+        assertFalse(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
+        entries = listOf(existing)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(400)
+        onNodeWithContentDescription("Recycle bin (1)").assertIsDisplayed()
+        assertTrue(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
+
+        entries = listOf(existing, first, second)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(80)
+        entries = listOf(existing, second)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(280)
+        assertFalse(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
+        mainClock.advanceTimeBy(400)
+        assertTrue(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
+    }
+
     private fun animationRepository(path: String) = LocalRepositoryUiState(
         name = "widgets",
         path = "/repos/widgets",

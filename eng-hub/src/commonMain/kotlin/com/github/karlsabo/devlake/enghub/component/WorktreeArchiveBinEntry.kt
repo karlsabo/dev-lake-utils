@@ -21,12 +21,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -62,12 +64,16 @@ internal fun WorktreeArchiveBin(
     var expanded by remember { mutableStateOf(false) }
     val pulseScale = remember { Animatable(1f) }
     val pulseMutex = remember { Mutex() }
+    val binScope = rememberCoroutineScope()
     entries.filter { it.isNewlyQueued }.forEach { entry ->
         key(entry.queueId) {
             LaunchedEffect(entry.queueId) {
-                pulseMutex.withLock {
-                    pulseScale.animateTo(BIN_PULSE_SCALE, tween(BIN_PULSE_DURATION_MS))
-                    pulseScale.animateTo(1f, tween(BIN_PULSE_DURATION_MS))
+                // The bin owns the shared scale; removing one entry must not cancel its return to rest.
+                binScope.launch {
+                    pulseMutex.withLock {
+                        pulseScale.animateTo(BIN_PULSE_SCALE, tween(BIN_PULSE_DURATION_MS))
+                        pulseScale.animateTo(1f, tween(BIN_PULSE_DURATION_MS))
+                    }
                 }
             }
         }
