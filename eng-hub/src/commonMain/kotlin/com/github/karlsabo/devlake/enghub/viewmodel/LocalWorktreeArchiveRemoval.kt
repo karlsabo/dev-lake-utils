@@ -139,23 +139,36 @@ internal class LocalWorktreeArchiveRemoval(
         )
         runCatching {
             // A new checkout at the same path and branch must not inherit the old force authorization.
-            if (needsConfirmation) archive.forceProvenance.record(job)
-            val persisted = if (needsConfirmation) {
+            val provenanceFailure = if (needsConfirmation) {
+                runCatching { archive.forceProvenance.record(job) }.rethrowCancellation().exceptionOrNull()
+            } else {
+                null
+            }
+            val retained = if (provenanceFailure != null) {
+                failed.copy(
+                    state = WorktreeArchiveLifecycleState.FAILED,
+                    errorMessage = "Cannot save force-removal provenance: " +
+                        (provenanceFailure.message ?: provenanceFailure.toString()),
+                )
+            } else {
+                failed
+            }
+            val persisted = if (retained.state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION) {
                 archive.store.transitionRemovingJobToNeedsForceConfirmation(
                     job,
-                    requireNotNull(failed.errorMessage),
-                    failed.stateUpdatedAtEpochMs,
+                    requireNotNull(retained.errorMessage),
+                    retained.stateUpdatedAtEpochMs,
                 )
             } else {
                 archive.store.transitionRemovingJobToFailed(
                     job,
-                    requireNotNull(failed.errorMessage),
-                    failed.stateUpdatedAtEpochMs,
+                    requireNotNull(retained.errorMessage),
+                    retained.stateUpdatedAtEpochMs,
                 )
             }
             if (persisted) {
                 currentCoroutineContext().ensureActive()
-                publish(job, failed)
+                publish(job, retained)
             }
         }.rethrowCancellation().onFailure { report("Failed to persist worktree archive failure", it) }
     }

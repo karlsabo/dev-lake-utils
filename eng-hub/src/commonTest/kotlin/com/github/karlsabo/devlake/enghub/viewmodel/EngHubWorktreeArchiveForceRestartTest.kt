@@ -59,6 +59,35 @@ class EngHubWorktreeArchiveForceRestartTest {
     }
 
     @Test
+    fun provenanceWriteFailureAfterDirtyRefusalPersistsDismissibleFailureWithoutForce() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        fixture.store.jobs.value = listOf(restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING))
+        fixture.archiveFailure = IllegalStateException("worktree contains modified files")
+        fixture.provenanceRecordFailure = IllegalStateException("admin directory is read-only")
+        fixture.releaseArchive()
+        try {
+            val viewModel = fixture.start(100_000)
+            val failed = withTimeout(2_000.milliseconds) {
+                viewModel.queuedWorktreeArchivesStateFlow.first {
+                    it.singleOrNull()?.state == WorktreeArchiveLifecycleState.FAILED
+                }.single()
+            }
+            assertEquals("Cannot save force-removal provenance: admin directory is read-only", failed.errorMessage)
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(null, fixture.provenanceQueueId)
+            viewModel.requestForceArchiveLocalWorktree(failed.worktreePath)
+            assertEquals(null, viewModel.forceArchiveWorktreeRequestStateFlow.value)
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+            viewModel.dismissFailedWorktreeArchive(failed.worktreePath)
+            withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun samePathSameBranchReplacementCannotInheritForceConfirmation() = runBlocking {
         val fixture = ArchiveRestartFixture()
         val dirty = restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION)

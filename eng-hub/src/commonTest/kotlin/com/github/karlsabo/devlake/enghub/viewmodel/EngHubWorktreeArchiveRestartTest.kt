@@ -1144,8 +1144,10 @@ internal class ArchiveRestartFixture(
 ) {
     val store = RecordingWorktreeArchiveStore().also { it.jobs.value = listOf(restartQueuedJob()) }
     var provenanceQueueId: String? = null
+    var provenanceRecordFailure: RuntimeException? = null
     private val provenance = object : ForceArchiveProvenance {
         override fun record(job: WorktreeArchiveJob) {
+            provenanceRecordFailure?.let { throw it }
             provenanceQueueId = job.queueId
         }
         override fun matches(job: WorktreeArchiveJob) = provenanceQueueId == job.queueId
