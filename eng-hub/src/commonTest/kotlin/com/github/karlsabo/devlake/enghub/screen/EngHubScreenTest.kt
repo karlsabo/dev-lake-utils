@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
@@ -36,6 +37,8 @@ import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
+import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
+import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.createEngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.representativeEngHubConfig
 import com.github.karlsabo.git.WorktreePath
@@ -338,6 +341,65 @@ class EngHubScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun completedArchiveExitDoesNotReplayAfterSwitchingPanesBeforeUndo() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        val path = "/repos/widgets-feature-login"
+        val initial = screenStateWithVisibleWorktree(path)
+        var state by mutableStateOf(initial)
+        val baseActions = screenActions(onUndoQueuedWorktreeArchive = {
+            state = state.copy(
+                archiveBinEntries = emptyList(),
+                worktrees = state.worktrees.copy(
+                    queuedArchiveWorktreePaths = emptySet(),
+                    newlyQueuedArchiveWorktreePaths = emptySet(),
+                ),
+            )
+        })
+        setContent {
+            MaterialTheme {
+                EngHubScreenContent(
+                    state = state,
+                    actions = baseActions.copy(
+                        onPaneSelected = { state = state.copy(selectedPane = it) },
+                        worktrees = baseActions.worktrees.copy(
+                            worktrees = baseActions.worktrees.worktrees.copy(onArchiveWorktree = { _, _ ->
+                                state = state.copy(
+                                    archiveBinEntries = screenStateWithQueuedArchive().archiveBinEntries,
+                                    worktrees = state.worktrees.copy(
+                                        queuedArchiveWorktreePaths = setOf(path),
+                                        newlyQueuedArchiveWorktreePaths = setOf(path),
+                                    ),
+                                )
+                            }),
+                        ),
+                    ),
+                )
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        onNodeWithContentDescription("Archive worktree feature/login").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertExists()
+        mainClock.advanceTimeBy(260)
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+
+        onNodeWithContentDescription("Settings").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithContentDescription("Worktrees").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+        mainClock.advanceTimeBy(260)
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("Undo").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun globalScreenRoutesFailedArchiveActionsOutsideWorktreesPane() = runComposeUiTest {
         val retries = mutableListOf<String>()
         val dismissals = mutableListOf<String>()
@@ -528,6 +590,24 @@ class EngHubScreenTest {
         onNodeWithContentDescription("Settings").performClick()
         onNodeWithText("Selected: Settings").assertIsDisplayed()
     }
+}
+
+private fun screenStateWithVisibleWorktree(path: String): EngHubScreenState {
+    val base = screenStateWithQueuedArchive()
+    return base.copy(
+        selectedPane = EngHubPane.Worktrees,
+        archiveBinEntries = emptyList(),
+        worktrees = base.worktrees.copy(
+            localRepositories = listOf(
+                LocalRepositoryUiState(
+                    name = "widgets",
+                    path = "/repos/widgets",
+                    isExpanded = true,
+                    worktrees = listOf(LocalWorktreeUiState("feature/login", path, isDirty = false)),
+                ),
+            ),
+        ),
+    )
 }
 
 private fun screenStateWithQueuedArchive() = EngHubScreenState(

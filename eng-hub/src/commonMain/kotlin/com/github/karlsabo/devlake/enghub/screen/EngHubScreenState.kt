@@ -147,6 +147,7 @@ internal fun collectEngHubScreenState(
             setupStatuses = setupStatuses,
             archivingWorktreePaths = worktreeMutations.archivingPaths,
             queuedArchiveWorktreePaths = worktreeMutations.queuedArchivePaths,
+            newlyQueuedArchiveWorktreePaths = worktreeMutations.newlyQueuedArchivePaths,
             updatingWorktreePaths = worktreeMutations.updatingPaths,
             rebasingWorktreePaths = worktreeMutations.rebasingPaths,
             mergingWorktreePaths = worktreeMutations.mergingPaths,

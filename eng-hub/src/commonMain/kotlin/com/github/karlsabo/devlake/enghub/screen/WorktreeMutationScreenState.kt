@@ -17,6 +17,7 @@ internal data class WorktreeMutationScreenState(
     val archivingPaths: Set<String>,
     val archiveBinEntries: List<WorktreeArchiveBinEntry>,
     val queuedArchivePaths: Set<String>,
+    val newlyQueuedArchivePaths: Set<String>,
     val updatingPaths: Set<String>,
     val rebasingPaths: Set<String>,
     val mergingPaths: Set<String>,
@@ -26,6 +27,7 @@ internal data class WorktreeMutationScreenState(
 internal fun collectWorktreeMutationScreenState(viewModel: EngHubViewModel): WorktreeMutationScreenState {
     val archivingPaths by viewModel.archivingLocalWorktreePathsStateFlow.collectAsState()
     val queuedArchives by viewModel.queuedWorktreeArchivesStateFlow.collectAsState()
+    val newlyQueuedArchiveIds by viewModel.newlyQueuedArchiveIdsStateFlow.collectAsState()
     val updatingPaths by viewModel.updatingLocalWorktreePathsStateFlow.collectAsState()
     val rebasingPaths by viewModel.rebasingLocalWorktreePathsStateFlow.collectAsState()
     val mergingPaths by viewModel.mergingLocalWorktreePathsStateFlow.collectAsState()
@@ -35,8 +37,12 @@ internal fun collectWorktreeMutationScreenState(viewModel: EngHubViewModel): Wor
     )
     return WorktreeMutationScreenState(
         archivingPaths = archivingPaths,
-        archiveBinEntries = archiveBinEntries,
+        archiveBinEntries = archiveBinEntries.map { entry ->
+            entry.copy(isNewlyQueued = entry.queueId in newlyQueuedArchiveIds)
+        },
         queuedArchivePaths = queuedArchives.mapTo(mutableSetOf(), WorktreeArchiveJob::worktreePath),
+        newlyQueuedArchivePaths = queuedArchives.filter { it.queueId in newlyQueuedArchiveIds }
+            .mapTo(mutableSetOf(), WorktreeArchiveJob::worktreePath),
         updatingPaths = updatingPaths,
         rebasingPaths = rebasingPaths,
         mergingPaths = mergingPaths,
@@ -69,6 +75,7 @@ private fun WorktreeArchiveJob.toArchiveBinEntry(nowEpochMs: Long): WorktreeArch
         branch = branch,
         remainingSeconds = ((deadlineAtEpochMs - nowEpochMs).coerceAtLeast(0) + 999) / 1_000,
         worktreePath = worktreePath,
+        queueId = queueId,
         isRemoving = state == WorktreeArchiveLifecycleState.REMOVING,
         isFailed = state == WorktreeArchiveLifecycleState.FAILED,
         needsForceConfirmation = state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,

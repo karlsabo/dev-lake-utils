@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.layout.Box
@@ -14,21 +16,32 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+private const val BIN_PULSE_DURATION_MS = 160
+private const val BIN_PULSE_SCALE = 1.25f
 
 internal data class WorktreeArchiveBinEntry(
     val repository: String,
     val branch: String,
     val remainingSeconds: Long,
     val worktreePath: String,
+    val queueId: String = "",
+    val isNewlyQueued: Boolean = false,
     val isRemoving: Boolean = false,
     val isFailed: Boolean = false,
     val errorMessage: String? = null,
@@ -49,11 +62,36 @@ internal fun WorktreeArchiveBin(
     actions: WorktreeArchiveBinActions = WorktreeArchiveBinActions(),
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val pulseScale = remember { Animatable(1f) }
+    val pulseMutex = remember { Mutex() }
+    val binScope = rememberCoroutineScope()
+    entries.filter { it.isNewlyQueued }.forEach { entry ->
+        key(entry.queueId) {
+            DisposableEffect(entry.queueId) {
+                var started = false
+                val pulse = binScope.launch {
+                    pulseMutex.withLock {
+                        started = true
+                        pulseScale.animateTo(BIN_PULSE_SCALE, tween(BIN_PULSE_DURATION_MS))
+                        pulseScale.animateTo(1f, tween(BIN_PULSE_DURATION_MS))
+                    }
+                }
+                onDispose {
+                    // Once started, the bin owns the return to rest even if this entry is undone.
+                    if (!started) pulse.cancel()
+                }
+            }
+        }
+    }
     Box(modifier = modifier) {
         IconButton(
             onClick = { expanded = true },
             modifier = Modifier
                 .size(40.dp)
+                .graphicsLayer {
+                    scaleX = pulseScale.value
+                    scaleY = pulseScale.value
+                }
                 .semantics { contentDescription = "Recycle bin (${entries.size})" },
         ) {
             Text(text = "♻", style = MaterialTheme.typography.button)

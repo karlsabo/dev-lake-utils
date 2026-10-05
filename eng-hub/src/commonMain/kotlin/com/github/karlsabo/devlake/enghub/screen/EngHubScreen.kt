@@ -43,6 +43,7 @@ import com.github.karlsabo.devlake.enghub.component.PendingGlobalCreateWorktree
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBin
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinActions
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
+import com.github.karlsabo.devlake.enghub.component.WorktreeRowExitState
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
@@ -99,6 +100,7 @@ internal fun EngHubScreenContent(
     actions: EngHubScreenActions,
 ) {
     var pendingGlobalCreateWorktree by remember { mutableStateOf<PendingGlobalCreateWorktree?>(null) }
+    val exitState = rememberWorktreeRowExitState(state.worktrees.queuedArchiveWorktreePaths)
 
     LaunchedEffect(pendingGlobalCreateWorktree != null) {
         if (pendingGlobalCreateWorktree != null) actions.onDiscoverGlobalExistingBranches()
@@ -154,9 +156,19 @@ internal fun EngHubScreenContent(
                 state = state,
                 actions = actions,
                 modifier = Modifier.weight(1f),
+                exitState = exitState,
             )
         }
     }
+}
+
+@Composable
+private fun rememberWorktreeRowExitState(queuedPaths: Set<String>): WorktreeRowExitState {
+    var finishedPaths by remember { mutableStateOf(emptySet<String>()) }
+    LaunchedEffect(queuedPaths) {
+        finishedPaths = finishedPaths intersect queuedPaths
+    }
+    return WorktreeRowExitState(finishedPaths) { path -> finishedPaths = finishedPaths + path }
 }
 
 private fun EngHubScreenActions.archiveBinActions() = WorktreeArchiveBinActions(

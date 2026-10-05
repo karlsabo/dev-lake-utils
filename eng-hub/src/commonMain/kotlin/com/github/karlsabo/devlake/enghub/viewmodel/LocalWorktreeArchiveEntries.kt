@@ -10,8 +10,13 @@ internal class LocalWorktreeArchiveEntries(
 ) {
     private val leases = MutableStateFlow<Map<String, LocalWorktreeMutationGuard.Lease>>(emptyMap())
 
-    fun expose(job: WorktreeArchiveJob, lease: LocalWorktreeMutationGuard.Lease) {
+    fun expose(
+        job: WorktreeArchiveJob,
+        lease: LocalWorktreeMutationGuard.Lease,
+        newlyQueued: Boolean = false,
+    ) {
         leases.update { it + (job.worktreePath to lease) }
+        if (newlyQueued) state.newlyQueuedArchiveIds.update { it + job.queueId }
         state.queuedWorktreeArchives.update { jobs ->
             jobs.filterNot { it.worktreePath == job.worktreePath } + job
         }
@@ -24,6 +29,7 @@ internal class LocalWorktreeArchiveEntries(
         state.queuedWorktreeArchives.update { jobs ->
             jobs.filterNot { it.worktreePath.normalizedRepositoryPath() == worktreePath && it.queueId == queueId }
         }
+        state.newlyQueuedArchiveIds.update { it - queueId }
         logger.info { "Cleared archive entry for worktree $worktreePath" }
     }
 

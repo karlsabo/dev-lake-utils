@@ -1,5 +1,11 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
@@ -21,10 +27,12 @@ import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +54,7 @@ internal fun LocalRepositoryRow(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
+    exitState: WorktreeRowExitState = WorktreeRowExitState(),
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -62,6 +71,8 @@ internal fun LocalRepositoryRow(
                 state = state,
                 panelActions = panelActions,
                 onCreateRequest = onCreateRequest,
+                finishedExitPaths = exitState.finishedPaths,
+                onExitComplete = exitState.onComplete,
             )
         }
     }
@@ -190,6 +201,8 @@ private fun LocalWorktreeRows(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
+    finishedExitPaths: Set<String>,
+    onExitComplete: (String) -> Unit,
 ) {
     if (!state.repository.isExpanded) return
 
@@ -209,18 +222,22 @@ private fun LocalWorktreeRows(
             Spacer(modifier = Modifier.size(8.dp))
             visibleWorktreeRows(
                 worktrees = state.repository.worktrees,
-                hiddenPaths = state.queuedArchiveWorktreePaths,
+                hiddenPaths = state.queuedArchiveWorktreePaths - state.newlyQueuedArchiveWorktreePaths +
+                    (finishedExitPaths intersect state.queuedArchiveWorktreePaths),
             ).forEach { row ->
                 WorktreeRowEntry(
                     row = row,
                     state = state,
                     panelActions = panelActions,
                     onCreateRequest = onCreateRequest,
+                    onExitComplete = onExitComplete,
                 )
             }
         }
     }
 }
+
+private const val WORKTREE_EXIT_DURATION_MS = 220
 
 @Composable
 private fun WorktreeRowEntry(
@@ -228,28 +245,46 @@ private fun WorktreeRowEntry(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
+    onExitComplete: (String) -> Unit,
 ) {
     val worktree = row.worktree
     val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
     key(normalizedWorktreePath) {
-        LocalWorktreeRow(
-            state = LocalWorktreeRowState(
-                worktree = worktree,
-                setupStatus = state.setupStatuses[WorktreePath(worktree.path)],
-                isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
-                isUpdating = normalizedWorktreePath in state.updatingWorktreePaths,
-                isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
-                isMerging = normalizedWorktreePath in state.mergingWorktreePaths,
-                nestingDepth = row.nestingDepth,
-                connectedPullRequest = state.connectedPullRequestFor(worktree.branch),
-            ),
-            actions = worktreeRowActions(
-                worktree = worktree,
-                repositoryPath = state.repository.path,
-                panelActions = panelActions,
-                onCreateRequest = onCreateRequest,
-            ),
-        )
+        val isQueued = normalizedWorktreePath in state.queuedArchiveWorktreePaths
+        val visibility = remember { MutableTransitionState(!isQueued) }
+        val currentOnExitComplete by rememberUpdatedState(onExitComplete)
+        visibility.targetState = !isQueued
+        LaunchedEffect(visibility.isIdle, visibility.currentState, isQueued) {
+            if (isQueued && visibility.isIdle && !visibility.currentState) {
+                currentOnExitComplete(normalizedWorktreePath)
+            }
+        }
+        AnimatedVisibility(
+            visibleState = visibility,
+            enter = EnterTransition.None,
+            exit = shrinkVertically(animationSpec = tween(WORKTREE_EXIT_DURATION_MS)) +
+                fadeOut(animationSpec = tween(WORKTREE_EXIT_DURATION_MS)),
+        ) {
+            LocalWorktreeRow(
+                state = LocalWorktreeRowState(
+                    worktree = worktree,
+                    setupStatus = state.setupStatuses[WorktreePath(worktree.path)],
+                    isArchiving = normalizedWorktreePath in state.archivingWorktreePaths ||
+                        normalizedWorktreePath in state.queuedArchiveWorktreePaths,
+                    isUpdating = normalizedWorktreePath in state.updatingWorktreePaths,
+                    isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
+                    isMerging = normalizedWorktreePath in state.mergingWorktreePaths,
+                    nestingDepth = row.nestingDepth,
+                    connectedPullRequest = state.connectedPullRequestFor(worktree.branch),
+                ),
+                actions = worktreeRowActions(
+                    worktree = worktree,
+                    repositoryPath = state.repository.path,
+                    panelActions = panelActions,
+                    onCreateRequest = onCreateRequest,
+                ),
+            )
+        }
     }
 }
 
