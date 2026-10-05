@@ -57,6 +57,9 @@ internal class LocalWorktreeArchiveRemoval(
                 check(registered?.branch == job.branch && archive.checkoutPresent(job.worktreePath)) {
                     "Cannot force archive: worktree registration or checkout no longer matches: ${job.worktreePath}"
                 }
+                check(archive.forceProvenance.matches(job)) {
+                    "Cannot force archive: original checkout provenance cannot be verified: ${job.worktreePath}"
+                }
                 val removing = job.copy(
                     state = WorktreeArchiveLifecycleState.REMOVING,
                     stateUpdatedAtEpochMs = nextStateTime(job),
@@ -135,6 +138,8 @@ internal class LocalWorktreeArchiveRemoval(
             errorMessage = failure.message?.takeIf { it.isNotBlank() } ?: failure.toString(),
         )
         runCatching {
+            // A new checkout at the same path and branch must not inherit the old force authorization.
+            if (needsConfirmation) archive.forceProvenance.record(job)
             val persisted = if (needsConfirmation) {
                 archive.store.transitionRemovingJobToNeedsForceConfirmation(
                     job,

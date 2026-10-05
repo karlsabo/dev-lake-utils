@@ -1143,6 +1143,13 @@ internal class ArchiveRestartFixture(
     private val pathPresent: (String) -> Boolean = { false },
 ) {
     val store = RecordingWorktreeArchiveStore().also { it.jobs.value = listOf(restartQueuedJob()) }
+    var provenanceQueueId: String? = null
+    private val provenance = object : ForceArchiveProvenance {
+        override fun record(job: WorktreeArchiveJob) {
+            provenanceQueueId = job.queueId
+        }
+        override fun matches(job: WorktreeArchiveJob) = provenanceQueueId == job.queueId
+    }
     val nowEpochMs = MutableStateFlow(100_000L)
     val deadlines = Channel<Pair<Duration, CompletableDeferred<Unit>>>(Channel.UNLIMITED)
     val updateStarted = CompletableDeferred<Unit>()
@@ -1189,6 +1196,7 @@ internal class ArchiveRestartFixture(
                 archiveNow = { Instant.fromEpochMilliseconds(nowEpochMs.value) },
                 checkoutPresent = checkoutPresent,
                 pathPresent = pathPresent,
+                forceProvenance = provenance,
                 waitForArchiveDeadline = { duration ->
                     val release = CompletableDeferred<Unit>()
                     deadlines.send(duration to release)

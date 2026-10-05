@@ -37,6 +37,7 @@ internal data class WorktreeArchiveDependencies(
     val now: () -> kotlin.time.Instant = kotlin.time.Clock.System::now,
     val checkoutPresent: (String) -> Boolean = ::worktreeCheckoutPresent,
     val pathPresent: (String) -> Boolean = { SystemFileSystem.metadataOrNull(Path(it)) != null },
+    val forceProvenance: ForceArchiveProvenance = GitDirectoryForceArchiveProvenance,
 )
 
 internal fun worktreeCheckoutPresent(path: String): Boolean {

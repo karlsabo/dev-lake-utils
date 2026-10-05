@@ -23,6 +23,7 @@ class EngHubWorktreeArchiveForceRestartTest {
             errorMessage = "worktree contains modified files",
         )
         fixture.store.jobs.value = listOf(dirty)
+        fixture.provenanceQueueId = dirty.queueId
         fixture.discovered = listOf(Worktree(DEV_LAKE_SELECTED_WORKTREE, "feature/wip", "def"))
         try {
             val first = fixture.start(100_000)
@@ -55,6 +56,39 @@ class EngHubWorktreeArchiveForceRestartTest {
         } finally {
             fixture.close()
         }
+    }
+
+    @Test
+    fun samePathSameBranchReplacementCannotInheritForceConfirmation() = runBlocking {
+        val fixture = ArchiveRestartFixture()
+        val dirty = restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION)
+        fixture.store.jobs.value = listOf(dirty)
+        fixture.provenanceQueueId = dirty.queueId
+        try {
+            val first = fixture.start(100_000)
+            assertEquals(dirty, fixture.awaitRestored(first))
+            fixture.stop(first)
+            // Git removes the original admin directory when the checkout is replaced.
+            fixture.provenanceQueueId = null
+            fixture.discovered = listOf(Worktree(dirty.worktreePath, dirty.branch, "new"))
+            val restarted = fixture.start(200_000)
+            assertEquals(dirty, fixture.awaitRestored(restarted))
+            restarted.requestForceArchiveLocalWorktree(dirty.worktreePath)
+            val request = requireNotNull(restarted.forceArchiveWorktreeRequestStateFlow.value)
+            restarted.confirmForceArchiveLocalWorktree(request)
+            fixture.awaitError(
+                restarted,
+                "Failed to force worktree archive: Cannot force archive: " +
+                    "original checkout provenance cannot be verified: ${dirty.worktreePath}",
+            )
+            assertEquals(listOf(dirty), fixture.store.listJobs())
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+            restarted.dismissFailedWorktreeArchive(dirty.worktreePath)
+            withTimeout(2_000.milliseconds) { restarted.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+        } finally {
+            fixture.close()
+        }
+        Unit
     }
 
     @Test
