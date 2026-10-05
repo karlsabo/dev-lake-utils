@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
+import com.github.karlsabo.devlake.enghub.normalizedRepositoryPath
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -33,8 +34,7 @@ internal object GitDirectoryForceArchiveProvenance : ForceArchiveProvenance {
         if (SystemFileSystem.metadataOrNull(gitFile)?.isRegularFile != true) return null
         val pointer = SystemFileSystem.source(gitFile).buffered().use { it.readString() }
             .trim().removePrefix("gitdir: ")
-        val absolute = pointer.startsWith("/") || pointer.getOrNull(1) == ':'
-        val admin = if (absolute) Path(pointer) else Path(worktreePath, pointer)
+        val admin = resolveGitPath(Path(worktreePath), pointer)
         // Only Git's linked-worktree admin directory is used; a new worktree add recreates it.
         val backlink = Path(admin, "gitdir")
         val registeredGitFile = if (SystemFileSystem.exists(backlink)) {
@@ -42,6 +42,19 @@ internal object GitDirectoryForceArchiveProvenance : ForceArchiveProvenance {
         } else {
             null
         }
-        return if (registeredGitFile != null && Path(registeredGitFile) == gitFile) Path(admin, MARKER) else null
+        return if (
+            registeredGitFile != null &&
+            resolveGitPath(admin, registeredGitFile).toString().normalizedRepositoryPath() ==
+            gitFile.toString().normalizedRepositoryPath()
+        ) {
+            Path(admin, MARKER)
+        } else {
+            null
+        }
+    }
+
+    private fun resolveGitPath(base: Path, value: String): Path {
+        val absolute = value.startsWith("/") || value.getOrNull(1) == ':'
+        return if (absolute) Path(value) else Path(base, value)
     }
 }
