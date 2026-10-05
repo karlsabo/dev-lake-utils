@@ -179,6 +179,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 
 ### 8. Retry an interrupted removal immediately after restart
 
+**Status:** Done — [merged PR #19](https://github.com/karlsabo/dev-lake-utils/pull/19)
+
 **Acceptance criteria:** Given `feature/login` is persisted as `Removing` when Eng Hub stops, when Eng Hub starts again, then the bin restores it as non-cancelable and retries cleanup immediately without displaying Undo.
 
 **Expected edits:** restoration routing in `viewmodel/LocalWorktreeArchiveController.kt`, `EngHubViewModelState.kt`, and `EngHubViewModel.kt`; `component/WorktreeArchiveBin.kt`; archive-store loading tests; and interrupted-removal tests in `viewmodel/EngHubLocalWorktreeArchiveViewModelTest.kt`.
@@ -188,6 +190,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 **Notes:** The underlying `GitWorktreeService.archiveWorktree` already handles a missing `.git` marker by deleting a leftover checkout directory and pruning (`utilities/src/commonMain/kotlin/com/github/karlsabo/git/GitWorktreeService.kt`), which supports retry after partial progress. Never downgrade `Removing` to `Queued` because partial deletion makes Undo misleading.
 
 ### 9. Restore a failed removal after restart
+
+**Status:** Done — [merged PR #20](https://github.com/karlsabo/dev-lake-utils/pull/20)
 
 **Acceptance criteria:** Given `feature/login` is persisted as `Failed` with error `permission denied` when Eng Hub exits, when Eng Hub starts again, then the global bin displays `Removal failed` and `permission denied`, reacquires the path mutation guard, offers Retry and Dismiss, and does not offer Undo.
 
@@ -199,6 +203,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 
 ### 10. Restore dirty-worktree force confirmation after restart
 
+**Status:** Done — [merged PR #22](https://github.com/karlsabo/dev-lake-utils/pull/22)
+
 **Acceptance criteria:** Given dirty `feature/wip` is persisted as `NeedsForceConfirmation` when Eng Hub exits, when Eng Hub starts again, then the global bin restores the confirmation-required state, reacquires the path mutation guard, and does not force removal until the user explicitly confirms.
 
 **Expected edits:** startup restoration routing in `viewmodel/LocalWorktreeArchiveController.kt`, `EngHubViewModelState.kt`, and `EngHubViewModel.kt`; global force-dialog state in `screen/EngHubScreenState.kt`; `component/WorktreeArchiveBin.kt`; and restart tests in `viewmodel/EngHubLocalWorktreeArchiveViewModelTest.kt` and component tests.
@@ -208,6 +214,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 **Notes:** Startup must not automatically reopen a modal over an unrelated pane. Restore the bin status and let the user reopen confirmation deliberately from the bin.
 
 ### 11. Animate a queued row into the global recycle bin
+
+**Status:** Done — [merged PR #23](https://github.com/karlsabo/dev-lake-utils/pull/23)
 
 **Acceptance criteria:** Given visible worktree `feature/login`, when its queue request succeeds, then the row animates out and the global sidebar recycle-bin control pulses once to acknowledge the newly queued item.
 
