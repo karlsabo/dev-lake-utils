@@ -1458,7 +1458,7 @@ private class GitWorktreeArchiver(
         expectedBranch: String,
     ) {
         val registration = GitWorktreeLister(gitCommandApi).listWorktreeEntries(repoPath)
-            .firstOrNull { it.path == worktreePath }
+            .firstOrNull { it.path.matchesArchivePath(worktreePath) }
         if (registration == null) {
             // An unregistered checkout has no trustworthy identity; only an absent path is safe to finish.
             check(SystemFileSystem.metadataOrNull(Path(worktreePath)) == null) {
@@ -1473,6 +1473,10 @@ private class GitWorktreeArchiver(
         if (SystemFileSystem.metadataOrNull(Path(worktreePath)) == null) {
             pruneWorktrees(repoPath)
             return
+        }
+        // A case-sensitive macOS volume may contain two distinct paths differing only by case.
+        check(SystemFileSystem.resolve(Path(registration.path)) == SystemFileSystem.resolve(Path(worktreePath))) {
+            "Cannot resume archive: checkout identity cannot be verified: $worktreePath"
         }
         check(SystemFileSystem.exists(Path(worktreePath, ".git"))) {
             "Cannot resume archive: checkout identity cannot be verified: $worktreePath"
