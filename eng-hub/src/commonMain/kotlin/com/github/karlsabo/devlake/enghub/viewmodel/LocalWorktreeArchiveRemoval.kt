@@ -96,10 +96,16 @@ internal class LocalWorktreeArchiveRemoval(
     }
 
     fun dismiss(worktreePath: String) {
-        val job = failedJob(worktreePath) ?: return
+        val job = state.queuedWorktreeArchives.value.firstOrNull {
+            it.worktreePath == worktreePath.normalizedRepositoryPath() &&
+                (
+                    it.state == WorktreeArchiveLifecycleState.FAILED ||
+                        it.state == WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
+                    )
+        } ?: return
         viewModel.viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                if (archive.store.deleteFailedJob(job)) {
+                if (archive.store.deleteRetainedJob(job)) {
                     currentCoroutineContext().ensureActive()
                     reconcileAfterDismiss(job)
                 }

@@ -68,9 +68,10 @@ UPDATE worktree_archive_jobs
 SET lifecycle_state = 'REMOVING', state_updated_at_epoch_ms = ?, error_message = NULL
 WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'FAILED' AND state_updated_at_epoch_ms = ?;
 
-deleteFailedJob:
+deleteRetainedJob:
 DELETE FROM worktree_archive_jobs
-WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = 'FAILED' AND state_updated_at_epoch_ms = ?;
+WHERE worktree_path = ? AND queue_id = ? AND lifecycle_state = ? AND state_updated_at_epoch_ms = ?
+  AND lifecycle_state IN ('FAILED', 'NEEDS_FORCE_CONFIRMATION');
 
 transitionRemovingJobToNeedsForceConfirmation:
 UPDATE worktree_archive_jobs

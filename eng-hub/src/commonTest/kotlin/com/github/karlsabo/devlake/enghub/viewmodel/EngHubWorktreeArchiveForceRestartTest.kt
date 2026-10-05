@@ -3,6 +3,7 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import com.github.karlsabo.git.Worktree
 import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
@@ -79,6 +80,37 @@ class EngHubWorktreeArchiveForceRestartTest {
             assertEquals(listOf(dirty), fixture.store.listJobs())
             assertEquals(listOf(dirty), viewModel.queuedWorktreeArchivesStateFlow.value)
             assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun missingCheckoutAfterRestartCanBeDismissedWithoutForcedRemoval() = runBlocking {
+        val fixture = ArchiveRestartFixture(worktrees = emptyList(), checkoutPresent = { false })
+        val dirty = restartQueuedJob().copy(
+            state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+            errorMessage = "worktree contains modified files",
+        )
+        fixture.store.jobs.value = listOf(dirty)
+        try {
+            val viewModel = fixture.start(100_000)
+            assertEquals(dirty, fixture.awaitRestored(viewModel))
+            viewModel.requestForceArchiveLocalWorktree(dirty.worktreePath)
+            val request = requireNotNull(viewModel.forceArchiveWorktreeRequestStateFlow.value)
+            viewModel.confirmForceArchiveLocalWorktree(request)
+            fixture.awaitError(
+                viewModel,
+                "Failed to force worktree archive: Cannot force archive: " +
+                    "worktree registration or checkout no longer matches: ${dirty.worktreePath}",
+            )
+            assertEquals(listOf(dirty), fixture.store.listJobs())
+            viewModel.dismissFailedWorktreeArchive(dirty.worktreePath)
+            withTimeout(2_000.milliseconds) { viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+            assertEquals(emptyList(), fixture.store.deleteQueuedJobCalls.value)
+            assertEquals("dismiss-force" to true, fixture.store.failedOperationResults.value.last())
         } finally {
             fixture.close()
         }

@@ -1048,11 +1048,18 @@ class RecordingWorktreeArchiveStore(
         )
     }
 
-    override fun deleteFailedJob(job: WorktreeArchiveJob): Boolean = changeAttempt(
-        "dismiss",
-        job,
-        WorktreeArchiveLifecycleState.FAILED,
-    ) { null }
+    override fun deleteRetainedJob(job: WorktreeArchiveJob): Boolean {
+        if (job.state != WorktreeArchiveLifecycleState.FAILED &&
+            job.state != WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION
+        ) {
+            return false
+        }
+        return changeAttempt(
+            if (job.state == WorktreeArchiveLifecycleState.FAILED) "dismiss" else "dismiss-force",
+            job,
+            job.state,
+        ) { null }
+    }
 
     private fun changeAttempt(
         operation: String,

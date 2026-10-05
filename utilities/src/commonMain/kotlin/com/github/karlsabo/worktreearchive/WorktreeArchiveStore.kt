@@ -66,8 +66,8 @@ interface WorktreeArchiveStore {
     /** Claims the matching failed attempt for retry; repeated or stale requests return false. */
     fun transitionFailedJobToRemoving(job: WorktreeArchiveJob, stateUpdatedAtEpochMs: Long): Boolean
 
-    /** Forgets only the matching failed attempt. This is not cancellation or restoration. */
-    fun deleteFailedJob(job: WorktreeArchiveJob): Boolean
+    /** Forgets only the matching failed or force-confirmation attempt; does not remove a checkout. */
+    fun deleteRetainedJob(job: WorktreeArchiveJob): Boolean
 
     /** Deletes only the identified removing job after successful cleanup and reconciliation. */
     fun deleteRemovingJob(worktreePath: String, queueId: String): Boolean

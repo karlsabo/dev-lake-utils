@@ -234,8 +234,9 @@ class WorktreeArchiveBinTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun dirtyEntryOffersReviewButNeverUndoOrOrdinaryRetry() = runComposeUiTest {
+    fun dirtyEntryOffersReviewAndDismissButNeverUndoOrOrdinaryRetry() = runComposeUiTest {
         val requests = mutableListOf<String>()
+        val dismissals = mutableListOf<String>()
         setContent {
             MaterialTheme {
                 WorktreeArchiveBin(
@@ -248,7 +249,10 @@ class WorktreeArchiveBinTest {
                             needsForceConfirmation = true,
                         ),
                     ),
-                    actions = WorktreeArchiveBinActions(onRequestForceConfirmation = requests::add),
+                    actions = WorktreeArchiveBinActions(
+                        onRequestForceConfirmation = requests::add,
+                        onDismiss = dismissals::add,
+                    ),
                 )
             }
         }
@@ -256,7 +260,8 @@ class WorktreeArchiveBinTest {
         onNodeWithText("Confirmation required").assertIsDisplayed()
         onNodeWithText("Undo").assertDoesNotExist()
         onNodeWithText("Retry").assertDoesNotExist()
-        onNodeWithText("Dismiss").assertDoesNotExist()
+        onNodeWithText("Dismiss").performClick()
+        assertEquals(listOf("/repos/wip"), dismissals)
         onNodeWithText("0 seconds remaining").assertDoesNotExist()
         onNodeWithText("Review force removal").performClick()
         assertEquals(listOf("/repos/wip"), requests)

@@ -450,6 +450,39 @@ class EngHubScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun restoredForceConfirmationOffersDismissOutsideWorktreesPane() = runComposeUiTest {
+        val dismissals = mutableListOf<String>()
+        val dirty = WorktreeArchiveJob(
+            repositoryRootPath = "/repos/widgets",
+            worktreePath = "/repos/wip",
+            branch = "feature/wip",
+            queueId = "dirty",
+            state = WorktreeArchiveLifecycleState.NEEDS_FORCE_CONFIRMATION,
+            queuedAtEpochMs = 10_000,
+            stateUpdatedAtEpochMs = 70_001,
+            deadlineAtEpochMs = 70_000,
+        )
+        setContent {
+            MaterialTheme {
+                EngHubScreenContent(
+                    state = screenStateWithQueuedArchive().copy(
+                        archiveBinEntries = collectArchiveBinEntries(listOf(dirty)) { 80_000L },
+                    ),
+                    actions = screenActions(onUndoQueuedWorktreeArchive = {}).copy(
+                        onDismissFailedWorktreeArchive = dismissals::add,
+                    ),
+                )
+            }
+        }
+        onNodeWithContentDescription("Recycle bin (1)").performClick()
+        onNodeWithText("Confirmation required").assertIsDisplayed()
+        onNodeWithText("Dismiss").performClick()
+        assertEquals(listOf(dirty.worktreePath), dismissals)
+        onNodeWithText("Undo").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun dirtyArchiveProjectionDoesNotOfferUndoOrRetry() = runComposeUiTest {
         val dirty = WorktreeArchiveJob(
             repositoryRootPath = "/repos/widgets",
