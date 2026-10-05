@@ -94,6 +94,62 @@ class WorktreeArchiveAnimationTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun completedExitStaysHiddenAfterCollapseAndExpandUntilUndo() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        val path = "/repos/widgets-login"
+        var expanded by mutableStateOf(true)
+        var queuedPaths by mutableStateOf(emptySet<String>())
+        var newlyQueuedPaths by mutableStateOf(emptySet<String>())
+        val actions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "widgets",
+                            path = "/repos/widgets",
+                            isExpanded = expanded,
+                            worktrees = listOf(LocalWorktreeUiState("feature/login", path, isDirty = false)),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                        queuedArchiveWorktreePaths = queuedPaths,
+                        newlyQueuedArchiveWorktreePaths = newlyQueuedPaths,
+                    ),
+                    panelActions = actions.copy(
+                        onToggleRepository = { expanded = !expanded },
+                        worktrees = actions.worktrees.copy(onArchiveWorktree = { _, _ ->
+                            newlyQueuedPaths = setOf(path)
+                            queuedPaths = setOf(path)
+                        }),
+                    ),
+                    onCreateRequest = {},
+                )
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        onNodeWithContentDescription("Archive worktree feature/login").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertExists()
+        mainClock.advanceTimeBy(260)
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+
+        onNodeWithContentDescription("Collapse widgets").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithContentDescription("Expand widgets").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+        mainClock.advanceTimeBy(260)
+        onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+
+        queuedPaths = emptySet()
+        newlyQueuedPaths = emptySet()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/login").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun childReturnsToRootIndentOnlyAfterQueuedParentExitFinishes() = runComposeUiTest {
         mainClock.autoAdvance = false
         val parentPath = "/repos/widgets-parent"
