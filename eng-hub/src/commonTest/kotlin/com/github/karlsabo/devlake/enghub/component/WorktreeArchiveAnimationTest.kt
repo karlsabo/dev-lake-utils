@@ -13,8 +13,10 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -23,6 +25,7 @@ import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class WorktreeArchiveAnimationTest {
@@ -87,6 +90,64 @@ class WorktreeArchiveAnimationTest {
         queuedPaths = setOf(path)
         mainClock.advanceTimeByFrame()
         onNodeWithTag("worktree-row-feature/login").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun childReturnsToRootIndentOnlyAfterQueuedParentExitFinishes() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        val parentPath = "/repos/widgets-parent"
+        var queuedPaths by mutableStateOf(emptySet<String>())
+        var newlyQueuedPaths by mutableStateOf(emptySet<String>())
+        val actions = emptyPanelActions()
+        setContent {
+            MaterialTheme {
+                LocalRepositoryRow(
+                    state = WorktreeRowsState(
+                        repository = LocalRepositoryUiState(
+                            name = "widgets",
+                            path = "/repos/widgets",
+                            isExpanded = true,
+                            worktrees = listOf(
+                                LocalWorktreeUiState(
+                                    "feature/child",
+                                    "/repos/widgets-child",
+                                    parentBranch = "feature/parent",
+                                ),
+                                LocalWorktreeUiState("feature/parent", parentPath),
+                            ),
+                        ),
+                        setupStatuses = emptyMap(),
+                        archivingWorktreePaths = emptySet(),
+                        queuedArchiveWorktreePaths = queuedPaths,
+                        newlyQueuedArchiveWorktreePaths = newlyQueuedPaths,
+                    ),
+                    panelActions = actions,
+                    onCreateRequest = {},
+                )
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        val parentIndent = onNodeWithText("feature/parent").getUnclippedBoundsInRoot().left
+        val childIndent = onNodeWithText("feature/child").getUnclippedBoundsInRoot().left
+        assertTrue(childIndent > parentIndent)
+
+        newlyQueuedPaths = setOf(parentPath)
+        queuedPaths = setOf(parentPath)
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/parent").assertExists()
+        assertEquals(childIndent, onNodeWithText("feature/child").getUnclippedBoundsInRoot().left)
+
+        mainClock.advanceTimeBy(260)
+        onNodeWithTag("worktree-row-feature/parent").assertDoesNotExist()
+        assertEquals(parentIndent, onNodeWithText("feature/child").getUnclippedBoundsInRoot().left)
+        assertNotEquals(childIndent, onNodeWithText("feature/child").getUnclippedBoundsInRoot().left)
+
+        queuedPaths = emptySet()
+        newlyQueuedPaths = emptySet()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag("worktree-row-feature/parent").assertIsDisplayed()
+        assertEquals(childIndent, onNodeWithText("feature/child").getUnclippedBoundsInRoot().left)
     }
 
     @OptIn(ExperimentalTestApi::class)

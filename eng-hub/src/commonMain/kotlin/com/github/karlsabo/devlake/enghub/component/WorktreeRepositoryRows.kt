@@ -2,6 +2,7 @@ package com.github.karlsabo.devlake.enghub.component
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
@@ -26,10 +27,12 @@ import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -198,6 +201,11 @@ private fun LocalWorktreeRows(
 ) {
     if (!state.repository.isExpanded) return
 
+    var finishedExitPaths by remember { mutableStateOf(emptySet<String>()) }
+    LaunchedEffect(state.queuedArchiveWorktreePaths) {
+        finishedExitPaths = finishedExitPaths intersect state.queuedArchiveWorktreePaths
+    }
+
     Column {
         if (state.repository.isLoading) {
             CircularProgressIndicator(
@@ -213,14 +221,16 @@ private fun LocalWorktreeRows(
         if (state.repository.worktrees.isNotEmpty()) {
             Spacer(modifier = Modifier.size(8.dp))
             visibleWorktreeRows(
-                state.repository.worktrees,
-                hiddenPaths = state.queuedArchiveWorktreePaths - state.newlyQueuedArchiveWorktreePaths,
+                worktrees = state.repository.worktrees,
+                hiddenPaths = state.queuedArchiveWorktreePaths - state.newlyQueuedArchiveWorktreePaths +
+                    (finishedExitPaths intersect state.queuedArchiveWorktreePaths),
             ).forEach { row ->
                 WorktreeRowEntry(
                     row = row,
                     state = state,
                     panelActions = panelActions,
                     onCreateRequest = onCreateRequest,
+                    onExitComplete = { path -> finishedExitPaths = finishedExitPaths + path },
                 )
             }
         }
@@ -235,12 +245,22 @@ private fun WorktreeRowEntry(
     state: WorktreeRowsState,
     panelActions: WorktreePanelActions,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
+    onExitComplete: (String) -> Unit,
 ) {
     val worktree = row.worktree
     val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
     key(normalizedWorktreePath) {
+        val isQueued = normalizedWorktreePath in state.queuedArchiveWorktreePaths
+        val visibility = remember { MutableTransitionState(true) }
+        val currentOnExitComplete by rememberUpdatedState(onExitComplete)
+        visibility.targetState = !isQueued
+        LaunchedEffect(visibility.isIdle, visibility.currentState, isQueued) {
+            if (isQueued && visibility.isIdle && !visibility.currentState) {
+                currentOnExitComplete(normalizedWorktreePath)
+            }
+        }
         AnimatedVisibility(
-            visible = normalizedWorktreePath !in state.queuedArchiveWorktreePaths,
+            visibleState = visibility,
             enter = EnterTransition.None,
             exit = shrinkVertically(animationSpec = tween(WORKTREE_EXIT_DURATION_MS)) +
                 fadeOut(animationSpec = tween(WORKTREE_EXIT_DURATION_MS)),
