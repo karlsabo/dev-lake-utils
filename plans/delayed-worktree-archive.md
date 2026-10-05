@@ -2,7 +2,7 @@
 
 **Goal:** Let users archive a worktree without an initial confirmation, provide a 60-second undo window in a recycle-bin UI, and make archive progress and recoverability explicit.
 
-**Merged progress:** Stories 1–3 are Done on `main`. Stories 4–11 remain to be merged; implementation or review alone does not mark them Done.
+**Merged progress:** Stories 1–7 are Done on `main` (Stories 4–7: [#14](https://github.com/karlsabo/dev-lake-utils/pull/14), [#15](https://github.com/karlsabo/dev-lake-utils/pull/15), [#17](https://github.com/karlsabo/dev-lake-utils/pull/17), [#18](https://github.com/karlsabo/dev-lake-utils/pull/18)). Stories 8–11 remain to be merged; implementation or review alone does not mark them Done.
 
 ## Context
 
@@ -131,6 +131,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 
 ### 4. Clear a successfully removed worktree from the bin
 
+**Status:** Done — [merged PR #14](https://github.com/karlsabo/dev-lake-utils/pull/14)
+
 **Acceptance criteria:** Given `feature/login` is `Removing`, when archive and repository refresh complete successfully, then its persisted archive record is deleted, its bin entry disappears, and its mutation lease is released.
 
 **Expected edits:** `viewmodel/LocalWorktreeArchiveController.kt`, archive-store delete operations under `utilities/src/commonMain/kotlin/com/github/karlsabo/worktreearchive/`, `component/WorktreeArchiveBin.kt`, and `viewmodel/EngHubLocalWorktreeArchiveViewModelTest.kt`.
@@ -140,6 +142,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 **Notes:** Delete the record only after the current archive service and repository-state reconciliation have established successful cleanup. Keep no completed history. Existing local/origin branches remain available through the separate existing-branch creation flow.
 
 ### 5. Retain and act on a failed worktree removal
+
+**Status:** Done — [merged PR #15](https://github.com/karlsabo/dev-lake-utils/pull/15)
 
 **Acceptance criteria:** Given `feature/login` is `Removing`, when removal fails for a reason other than dirty files, then its persisted state becomes `Failed`, the bin displays `Removal failed` and the error, Retry starts another non-cancelable removal attempt, and Dismiss removes the failed record without claiming the worktree was restored.
 
@@ -151,6 +155,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 
 ### 6. Require confirmation before force-removing a dirty worktree
 
+**Status:** Done — [merged PR #17](https://github.com/karlsabo/dev-lake-utils/pull/17)
+
 **Acceptance criteria:** Given dirty `feature/wip` reaches its deadline, when ordinary removal refuses to discard local changes, then its persisted state becomes `NeedsForceConfirmation`, the bin identifies that confirmation is required, and no forced Git archive call occurs until the user confirms.
 
 **Expected edits:** `viewmodel/LocalWorktreeArchiveController.kt`, `EngHubViewModelState.kt`, `EngHubViewModel.kt`, `screen/EngHubScreenState.kt`, `component/WorktreeArchiveBin.kt`, `component/WorktreeDialogs.kt`, `component/WorktreeArchiveDialogs.kt`, archive-store lifecycle values/queries, and dirty archive tests in `viewmodel/EngHubLocalWorktreeArchiveViewModelTest.kt` and component tests.
@@ -160,6 +166,8 @@ A dedicated archive database duplicates a small driver-factory seam, but avoids 
 **Notes:** Reuse `Throwable.isDirtyWorktreeArchiveFailure()` from `EngHubViewModelCommon.kt`. Move force-dialog hosting to the global screen boundary because the recycle bin is available outside the Worktrees pane. Clearly state that forced deletion discards uncommitted files and cannot be recovered from local or remote branches.
 
 ### 7. Restore queued archives with a fresh delay after restart
+
+**Status:** Done — [merged PR #18](https://github.com/karlsabo/dev-lake-utils/pull/18)
 
 **Acceptance criteria:** Given `feature/login` is persisted as `Queued` when Eng Hub exits, when Eng Hub starts again, then the global bin restores it, reacquires its mutation guard, and gives it a new 60-second cancellation window before any Git removal call.
 

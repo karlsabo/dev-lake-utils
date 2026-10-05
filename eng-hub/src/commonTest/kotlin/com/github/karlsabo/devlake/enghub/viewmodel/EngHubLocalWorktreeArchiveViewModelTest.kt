@@ -404,9 +404,7 @@ class EngHubLocalWorktreeArchiveViewModelTest {
             assertEquals(listOf(false), api.archiveWorktreeForceValues)
 
             viewModel.undoQueuedWorktreeArchive(DEV_LAKE_SELECTED_WORKTREE)
-            withTimeout(2_000.milliseconds) {
-                store.deleteQueuedJobCalls.first { it == listOf(DEV_LAKE_SELECTED_WORKTREE) }
-            }
+            assertEquals(emptyList(), store.deleteQueuedJobCalls.value)
             assertEquals(listOf(removingJob), viewModel.queuedWorktreeArchivesStateFlow.value)
             assertEquals(listOf(DEV_LAKE_ROOT to DEV_LAKE_SELECTED_WORKTREE), api.archiveWorktreeCalls)
         } finally {
