@@ -182,6 +182,7 @@ class EngHubWorktreeArchiveRestartTest {
         val fixture = ArchiveRestartFixture(
             worktrees = listOf(Worktree(checkoutPath, "feature/login", "def")),
             checkoutPresent = ::worktreeCheckoutPresent,
+            pathPresent = { SystemFileSystem.metadataOrNull(Path(it)) != null },
         )
         fixture.store.jobs.value = listOf(restartQueuedJob().copy(worktreePath = checkoutPath))
         try {
@@ -582,6 +583,41 @@ class EngHubWorktreeArchiveRemovalRestartTest {
     }
 
     @Test
+    fun failedRegisteredAbsentCheckoutRetriesAfterRestartWithoutDeletingReplacement() = runBlocking {
+        val fixture = ArchiveRestartFixture(pathPresent = { false }, checkoutPresent = { false })
+        fixture.store.jobs.value = listOf(restartQueuedJob().copy(state = WorktreeArchiveLifecycleState.REMOVING))
+        var resumes = 0
+        fixture.onResume = { _, path, branch ->
+            assertEquals(DEV_LAKE_SELECTED_WORKTREE, path)
+            assertEquals("feature/login", branch)
+            resumes++
+            if (resumes == 1) error("prune unavailable")
+            fixture.discovered = fixture.discovered.filterNot { it.path == path }
+        }
+        fixture.releaseArchive()
+        try {
+            val first = fixture.start(100_000)
+            val failed = withTimeout(2_000.milliseconds) {
+                first.queuedWorktreeArchivesStateFlow.first {
+                    it.singleOrNull()?.state == WorktreeArchiveLifecycleState.FAILED
+                }.single()
+            }
+            assertEquals("prune unavailable", failed.errorMessage)
+            fixture.stop(first)
+            val restarted = fixture.start(200_000)
+            assertEquals(failed, fixture.awaitRestored(restarted))
+            restarted.retryFailedWorktreeArchive(failed.worktreePath)
+            withTimeout(2_000.milliseconds) { fixture.store.deleteRemovingJobResults.first { it == listOf(true) } }
+            withTimeout(2_000.milliseconds) { restarted.queuedWorktreeArchivesStateFlow.first { it.isEmpty() } }
+            assertEquals(2, resumes)
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(listOf(false), fixture.api.archiveWorktreeForceValues)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun interruptedRemovalFailureRetainsFailedOrForceConfirmationWithoutForce() = runBlocking {
         listOf(
             IllegalStateException("permission denied") to WorktreeArchiveLifecycleState.FAILED,
@@ -674,7 +710,9 @@ class EngHubWorktreeArchiveRemovalRestartTest {
             fixture.close()
         }
     }
+}
 
+class EngHubWorktreeArchiveFailedRestartTest {
     @Test
     fun failedRestartKeepsErrorAndGuardWithoutAutomaticRetryThenDismisses() = runBlocking {
         val fixture = ArchiveRestartFixture()
@@ -790,6 +828,30 @@ class EngHubWorktreeArchiveRemovalRestartTest {
         } finally {
             fixture.close()
             if (SystemFileSystem.exists(Path(directory))) removeTempDir(directory)
+        }
+    }
+
+    @Test
+    fun failedRegisteredCheckoutReplacedWithoutGitMarkerIsNotRemovedOnRetry() = runBlocking {
+        val fixture = ArchiveRestartFixture(pathPresent = { true }, checkoutPresent = { false })
+        val failed = restartQueuedJob().copy(
+            state = WorktreeArchiveLifecycleState.FAILED,
+            errorMessage = "prune unavailable",
+        )
+        fixture.store.jobs.value = listOf(failed)
+        try {
+            val viewModel = fixture.start(100_000)
+            assertEquals(failed, fixture.awaitRestored(viewModel))
+            viewModel.retryFailedWorktreeArchive(failed.worktreePath)
+            fixture.awaitError(
+                viewModel,
+                "Failed to retry worktree archive: Cannot retry archive: " +
+                    "worktree checkout is missing: $DEV_LAKE_SELECTED_WORKTREE",
+            )
+            assertEquals(listOf(failed), fixture.store.listJobs())
+            assertEquals(emptyList(), fixture.api.archiveWorktreeCalls)
+        } finally {
+            fixture.close()
         }
     }
 
