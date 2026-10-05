@@ -129,6 +129,7 @@ private fun WorktreeRepositoryList(
                             setupStatuses = state.setupStatuses,
                             archivingWorktreePaths = state.archivingWorktreePaths,
                             queuedArchiveWorktreePaths = state.queuedArchiveWorktreePaths,
+                            newlyQueuedArchiveWorktreePaths = state.newlyQueuedArchiveWorktreePaths,
                             updatingWorktreePaths = state.updatingWorktreePaths,
                             rebasingWorktreePaths = state.rebasingWorktreePaths,
                             mergingWorktreePaths = state.mergingWorktreePaths,

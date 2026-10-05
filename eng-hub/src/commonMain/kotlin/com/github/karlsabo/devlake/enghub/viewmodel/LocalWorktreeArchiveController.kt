@@ -165,7 +165,7 @@ internal class LocalWorktreeArchiveController(
                         "Worktree archive is already queued: ${archiveJob.worktreePath}"
                     }
                     currentCoroutineContext().ensureActive()
-                    exposeArchive(archiveJob, mutationLease)
+                    exposeArchive(archiveJob, mutationLease, newlyQueued = true)
                     safelyQueued = true
                     logger.info { "Queued worktree ${archiveJob.worktreePath} for archive" }
                 }
@@ -183,8 +183,12 @@ internal class LocalWorktreeArchiveController(
         }
     }
 
-    private fun exposeArchive(job: WorktreeArchiveJob, lease: LocalWorktreeMutationGuard.Lease) {
-        entries.expose(job, lease)
+    private fun exposeArchive(
+        job: WorktreeArchiveJob,
+        lease: LocalWorktreeMutationGuard.Lease,
+        newlyQueued: Boolean = false,
+    ) {
+        entries.expose(job, lease, newlyQueued)
         if (job.state == WorktreeArchiveLifecycleState.QUEUED) scheduleArchiveRemoval(job)
     }
 

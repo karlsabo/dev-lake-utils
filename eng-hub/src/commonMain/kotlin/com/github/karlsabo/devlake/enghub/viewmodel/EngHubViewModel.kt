@@ -204,6 +204,7 @@ class EngHubViewModel internal constructor(
         state.archivingLocalWorktreePaths.asStateFlow()
     val queuedWorktreeArchivesStateFlow: StateFlow<List<WorktreeArchiveJob>> =
         state.queuedWorktreeArchives.asStateFlow()
+    val newlyQueuedArchiveIdsStateFlow: StateFlow<Set<String>> = state.newlyQueuedArchiveIds.asStateFlow()
     internal val currentArchiveTimeEpochMs: () -> Long = { archiveNow().toEpochMilliseconds() }
     val updatingLocalWorktreePathsStateFlow: StateFlow<Set<String>> =
         state.updatingLocalWorktreePaths.asStateFlow()

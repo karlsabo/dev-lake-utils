@@ -135,6 +135,7 @@ internal class EngHubViewModelState(
     val localWorktreeMutationGuard = LocalWorktreeMutationGuard()
     val archivingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val queuedWorktreeArchives = MutableStateFlow<List<WorktreeArchiveJob>>(emptyList())
+    val newlyQueuedArchiveIds = MutableStateFlow<Set<String>>(emptySet())
     val integratingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val updatingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())
     val rebasingLocalWorktreePaths = MutableStateFlow<Set<String>>(emptySet())

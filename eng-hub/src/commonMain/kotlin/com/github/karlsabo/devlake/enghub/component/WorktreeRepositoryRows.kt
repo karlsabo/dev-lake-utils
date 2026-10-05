@@ -1,5 +1,10 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
@@ -208,8 +213,8 @@ private fun LocalWorktreeRows(
         if (state.repository.worktrees.isNotEmpty()) {
             Spacer(modifier = Modifier.size(8.dp))
             visibleWorktreeRows(
-                worktrees = state.repository.worktrees,
-                hiddenPaths = state.queuedArchiveWorktreePaths,
+                state.repository.worktrees,
+                hiddenPaths = state.queuedArchiveWorktreePaths - state.newlyQueuedArchiveWorktreePaths,
             ).forEach { row ->
                 WorktreeRowEntry(
                     row = row,
@@ -222,6 +227,8 @@ private fun LocalWorktreeRows(
     }
 }
 
+private const val WORKTREE_EXIT_DURATION_MS = 220
+
 @Composable
 private fun WorktreeRowEntry(
     row: VisibleWorktreeRow,
@@ -232,24 +239,32 @@ private fun WorktreeRowEntry(
     val worktree = row.worktree
     val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
     key(normalizedWorktreePath) {
-        LocalWorktreeRow(
-            state = LocalWorktreeRowState(
-                worktree = worktree,
-                setupStatus = state.setupStatuses[WorktreePath(worktree.path)],
-                isArchiving = normalizedWorktreePath in state.archivingWorktreePaths,
-                isUpdating = normalizedWorktreePath in state.updatingWorktreePaths,
-                isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
-                isMerging = normalizedWorktreePath in state.mergingWorktreePaths,
-                nestingDepth = row.nestingDepth,
-                connectedPullRequest = state.connectedPullRequestFor(worktree.branch),
-            ),
-            actions = worktreeRowActions(
-                worktree = worktree,
-                repositoryPath = state.repository.path,
-                panelActions = panelActions,
-                onCreateRequest = onCreateRequest,
-            ),
-        )
+        AnimatedVisibility(
+            visible = normalizedWorktreePath !in state.queuedArchiveWorktreePaths,
+            enter = EnterTransition.None,
+            exit = shrinkVertically(animationSpec = tween(WORKTREE_EXIT_DURATION_MS)) +
+                fadeOut(animationSpec = tween(WORKTREE_EXIT_DURATION_MS)),
+        ) {
+            LocalWorktreeRow(
+                state = LocalWorktreeRowState(
+                    worktree = worktree,
+                    setupStatus = state.setupStatuses[WorktreePath(worktree.path)],
+                    isArchiving = normalizedWorktreePath in state.archivingWorktreePaths ||
+                        normalizedWorktreePath in state.queuedArchiveWorktreePaths,
+                    isUpdating = normalizedWorktreePath in state.updatingWorktreePaths,
+                    isRebasing = normalizedWorktreePath in state.rebasingWorktreePaths,
+                    isMerging = normalizedWorktreePath in state.mergingWorktreePaths,
+                    nestingDepth = row.nestingDepth,
+                    connectedPullRequest = state.connectedPullRequestFor(worktree.branch),
+                ),
+                actions = worktreeRowActions(
+                    worktree = worktree,
+                    repositoryPath = state.repository.path,
+                    panelActions = panelActions,
+                    onCreateRequest = onCreateRequest,
+                ),
+            )
+        }
     }
 }
 

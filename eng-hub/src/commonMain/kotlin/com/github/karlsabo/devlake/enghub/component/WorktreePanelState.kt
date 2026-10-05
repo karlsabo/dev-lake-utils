@@ -17,6 +17,7 @@ internal data class WorktreePanelState(
     val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
     val archivingWorktreePaths: Set<String>,
     val queuedArchiveWorktreePaths: Set<String> = emptySet(),
+    val newlyQueuedArchiveWorktreePaths: Set<String> = emptySet(),
     val updatingWorktreePaths: Set<String> = emptySet(),
     val rebasingWorktreePaths: Set<String> = emptySet(),
     val mergingWorktreePaths: Set<String> = emptySet(),
