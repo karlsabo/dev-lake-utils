@@ -14,9 +14,9 @@ Break features into stories where each story = 1 acceptance test = 1 ticket = 1 
 Argument is either:
 
 - Freeform text describing a feature or story
-- A Linear ticket ID (e.g., `ABC-123`) or URL
+- A ticket ID (e.g., `ABC-123`) or URL
 
-If a Linear ticket ID/URL is given, fetch the ticket details for context.
+If a ticket ID/URL is given, fetch the ticket details for context.
 
 ## Workflow
 
@@ -24,7 +24,7 @@ If a Linear ticket ID/URL is given, fetch the ticket details for context.
 
 If freeform text: ask clarifying questions until you understand the feature well enough to enumerate acceptance tests.
 
-If Linear ticket: read the ticket, summarize what you understand, and ask what's unclear or missing.
+If ticket: read the ticket, summarize what you understand, and ask what's unclear or missing.
 
 Don't rush to decompose. Understand first.
 
