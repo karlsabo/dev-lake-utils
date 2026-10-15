@@ -23,16 +23,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.stateIn
 import kotlin.time.Duration.Companion.milliseconds
 
-private const val POLLING_RETRY_COUNT = 5L
 internal const val POLLING_RETRY_DELAY_MS = 5_000L
 internal const val STATE_FLOW_STOP_TIMEOUT_MS = 5_000L
 private const val ZERO_CHECK_RUNS = 0
@@ -63,24 +61,22 @@ internal fun pullRequestsForConfig(
 ): Flow<Result<List<PullRequestUiState>>> = if (config.organizationIds.isEmpty()) {
     flowOf(Result.success(emptyList()))
 } else {
-    fixedIntervalPollingFlow(config) {
-        val issues = searchApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
-        Result.success(buildPullRequestUiStates(issues, reviewApi, summaryApi))
-    }
-}
-    .flowOn(Dispatchers.IO)
-    .retry(POLLING_RETRY_COUNT) { cause ->
-        if (cause.isRetriablePollingFailure()) {
-            delay(POLLING_RETRY_DELAY_MS.milliseconds)
-            true
-        } else {
-            false
+    flow {
+        var hasEmittedResult = false
+        while (true) {
+            val result = runCatching {
+                val issues = searchApi.getOpenPullRequestsByAuthor(config.organizationIds, config.gitHubAuthor)
+                buildPullRequestUiStates(issues, reviewApi, summaryApi)
+            }.rethrowCancellation()
+            result.onFailure { logger.error(it) { "Error polling pull requests" } }
+            if (result.isSuccess || !hasEmittedResult) {
+                emit(result)
+                hasEmittedResult = true
+            }
+            delay((if (result.isSuccess) config.pollIntervalMs else POLLING_RETRY_DELAY_MS).milliseconds)
         }
     }
-    .catch { e ->
-        logger.error(e) { "Error polling pull requests" }
-        emit(Result.failure(e))
-    }
+}.flowOn(Dispatchers.IO)
 
 internal suspend fun GitHubApi.buildPullRequestUiStates(
     issues: List<Issue>,

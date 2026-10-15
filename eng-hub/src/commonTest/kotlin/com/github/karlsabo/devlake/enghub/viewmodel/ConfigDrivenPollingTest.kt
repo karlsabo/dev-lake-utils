@@ -1,12 +1,17 @@
 package com.github.karlsabo.devlake.enghub.viewmodel
 
 import com.github.karlsabo.devlake.enghub.EngHubConfig
+import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.github.GitHubNotificationService
+import com.github.karlsabo.github.GitHubPullRequestSearchApi
+import com.github.karlsabo.github.Issue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
@@ -33,6 +38,81 @@ class ConfigDrivenPollingTest {
 
         assertEquals(emptyList(), result.getOrThrow())
         assertEquals(0, api.openPullRequestCalls)
+    }
+
+    @Test
+    fun initialPullRequestFailureIsEmittedAndRetryRecovers() = runBlocking {
+        val api = RecordingGitHubApi(emptyMap(), openPullRequests = emptyList())
+        var calls = 0
+        val searchApi = object : GitHubPullRequestSearchApi by api {
+            override suspend fun getOpenPullRequestsByAuthor(
+                organizationIds: List<String>,
+                author: String,
+            ): List<Issue> {
+                if (++calls == 1) error("Invalid credentials")
+                return api.getOpenPullRequestsByAuthor(organizationIds, author)
+            }
+        }
+        val results = mutableListOf<Result<List<PullRequestUiState>>>()
+
+        withTimeout(10_000.milliseconds) {
+            pullRequestsForConfig(
+                searchApi = searchApi,
+                reviewApi = api,
+                summaryApi = api,
+                config = EngHubConfig(organizationIds = listOf("test-org"), gitHubAuthor = "octocat"),
+            ).take(2).collect { results += it }
+        }
+
+        assertEquals("Invalid credentials", results[0].exceptionOrNull()?.message)
+        assertEquals(emptyList(), results[1].getOrThrow())
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun failedPullRequestPollKeepsLastResultAndRetriesUntilSuccess() = runBlocking {
+        val api = RecordingGitHubApi(emptyMap(), openPullRequests = emptyList())
+        val failedPoll = CompletableDeferred<Unit>()
+        var calls = 0
+        val searchApi = object : GitHubPullRequestSearchApi by api {
+            override suspend fun getOpenPullRequestsByAuthor(
+                organizationIds: List<String>,
+                author: String,
+            ): List<Issue> {
+                calls++
+                if (calls == 2) {
+                    failedPoll.complete(Unit)
+                    error("Temporary failure")
+                }
+                return api.getOpenPullRequestsByAuthor(organizationIds, author)
+            }
+        }
+        val results = mutableListOf<Result<List<PullRequestUiState>>>()
+        val collector = launch {
+            pullRequestsForConfig(
+                searchApi = searchApi,
+                reviewApi = api,
+                summaryApi = api,
+                config = EngHubConfig(
+                    organizationIds = listOf("test-org"),
+                    gitHubAuthor = "octocat",
+                    pollIntervalMs = 1_000,
+                ),
+            ).take(2).collect { results += it }
+        }
+        try {
+            withTimeout(10_000.milliseconds) {
+                failedPoll.await()
+                assertEquals(1, results.size)
+                assertEquals(emptyList(), results.single().getOrThrow())
+                collector.join()
+            }
+            assertEquals(3, calls)
+            assertEquals(2, results.size)
+            results.forEach { assertEquals(emptyList(), it.getOrThrow()) }
+        } finally {
+            collector.cancelAndJoin()
+        }
     }
 
     @Test
