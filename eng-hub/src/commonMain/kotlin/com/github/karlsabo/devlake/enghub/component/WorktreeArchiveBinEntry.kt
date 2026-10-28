@@ -1,6 +1,7 @@
 package com.github.karlsabo.devlake.enghub.component
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
@@ -31,6 +32,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -44,7 +46,6 @@ internal data class WorktreeArchiveBinEntry(
     val remainingSeconds: Long,
     val worktreePath: String,
     val queueId: String = "",
-    val isNewlyQueued: Boolean = false,
     val isRemoving: Boolean = false,
     val isFailed: Boolean = false,
     val errorMessage: String? = null,
@@ -63,6 +64,8 @@ internal data class WorktreeArchiveBinSection(
     val entries: List<WorktreeArchiveBinEntry> = emptyList(),
     val actions: WorktreeArchiveBinActions = WorktreeArchiveBinActions(),
     val onBoundsUpdate: (Rect) -> Unit = {},
+    /** Worktree paths whose archive just reached the bin, or queued without a flight. */
+    val pulseWorktreePaths: Set<String> = emptySet(),
 )
 
 @Composable
@@ -71,28 +74,19 @@ internal fun WorktreeArchiveBin(
     modifier: Modifier = Modifier,
     actions: WorktreeArchiveBinActions = WorktreeArchiveBinActions(),
     onBoundsUpdate: (Rect) -> Unit = {},
+    pulseWorktreePaths: Set<String> = emptySet(),
 ) {
     var expanded by remember { mutableStateOf(false) }
     val pulseScale = remember { Animatable(1f) }
     val pulseMutex = remember { Mutex() }
     val binScope = rememberCoroutineScope()
-    entries.filter { it.isNewlyQueued }.forEach { entry ->
-        key(entry.queueId) {
-            DisposableEffect(entry.queueId) {
-                var started = false
-                val pulse = binScope.launch {
-                    pulseMutex.withLock {
-                        started = true
-                        pulseScale.animateTo(BIN_PULSE_SCALE, tween(BIN_PULSE_DURATION_MS))
-                        pulseScale.animateTo(1f, tween(BIN_PULSE_DURATION_MS))
-                    }
-                }
-                onDispose {
-                    // Once started, the bin owns the return to rest even if this entry is undone.
-                    if (!started) pulse.cancel()
-                }
-            }
-        }
+    entries.filter { it.worktreePath in pulseWorktreePaths }.forEach { entry ->
+        ArchiveBinPulse(
+            queueId = entry.queueId,
+            pulseScale = pulseScale,
+            pulseMutex = pulseMutex,
+            scope = binScope,
+        )
     }
     Box(modifier = modifier) {
         IconButton(
@@ -124,6 +118,35 @@ internal fun WorktreeArchiveBin(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Plays one 160ms-out-and-back scale pulse for an archive that has landed in the bin.
+ * Pulses queue on [pulseMutex] so back-to-back arrivals stay visible instead of overlapping.
+ */
+@Composable
+private fun ArchiveBinPulse(
+    queueId: String,
+    pulseScale: Animatable<Float, AnimationVector1D>,
+    pulseMutex: Mutex,
+    scope: CoroutineScope,
+) {
+    key(queueId) {
+        DisposableEffect(queueId) {
+            var started = false
+            val pulse = scope.launch {
+                pulseMutex.withLock {
+                    started = true
+                    pulseScale.animateTo(BIN_PULSE_SCALE, tween(BIN_PULSE_DURATION_MS))
+                    pulseScale.animateTo(1f, tween(BIN_PULSE_DURATION_MS))
+                }
+            }
+            onDispose {
+                // Once started, the bin owns the return to rest even if this entry is undone.
+                if (!started) pulse.cancel()
             }
         }
     }

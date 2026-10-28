@@ -52,14 +52,17 @@ internal data class WorktreeArchiveFlight(
 )
 
 /**
- * The single archive flight the screen is animating, plus the location reporters that feed it.
+ * The archive feedback the screen is animating, plus the location reporters that feed it.
  * Concurrent flights are intentionally unsupported; a queued archive waits without a chip instead.
+ * [binPulsePaths] is the outcome of that decision: an archive either flies and pulses on arrival, or
+ * cannot fly and pulses on queue.
  */
 internal data class WorktreeArchiveFlightState(
     val flight: WorktreeArchiveFlight? = null,
     val onRowBoundsUpdate: (worktreePath: String, anchor: WorktreeArchiveFlightAnchor) -> Unit = { _, _ -> },
     val onBinBoundsUpdate: (Rect) -> Unit = {},
-    val onFlightComplete: () -> Unit = {},
+    val onFlightComplete: (worktreePath: String) -> Unit = {},
+    val binPulsePaths: Set<String> = emptySet(),
 )
 
 /** Cosine ease-in-out: slow departure, fast middle, slow arrival on the bin. */
@@ -87,6 +90,7 @@ internal fun worktreeArchiveFlightScale(progress: Float): Float {
 /**
  * Tracks row and bin geometry and starts a flight when an archive is newly queued.
  * Coordinates are reported in root bounds, which is the space the overlay draws in.
+ * The recycle bin pulses when a chip arrives; archives that cannot fly pulse on queue instead.
  */
 @Composable
 internal fun rememberWorktreeArchiveFlightState(
@@ -98,21 +102,32 @@ internal fun rememberWorktreeArchiveFlightState(
     var binBounds by remember { mutableStateOf<Rect?>(null) }
     var flight by remember { mutableStateOf<WorktreeArchiveFlight?>(null) }
     var handledPaths by remember { mutableStateOf(emptySet<String>()) }
+    var binPulsePaths by remember { mutableStateOf(emptySet<String>()) }
 
     LaunchedEffect(queuedWorktreePaths) {
         handledPaths = handledPaths intersect queuedWorktreePaths
+        binPulsePaths = binPulsePaths intersect queuedWorktreePaths
     }
 
     LaunchedEffect(newlyQueuedWorktreePaths, binBounds, flight) {
+        val unhandledPaths = newlyQueuedWorktreePaths - handledPaths
         if (flight != null) {
-            handledPaths = consumePathsSkippedByActiveFlight(newlyQueuedWorktreePaths, handledPaths, rowAnchors)
+            // One chip at a time: archives queued mid-flight never get a chip, so they pulse now.
+            unhandledPaths.forEach(rowAnchors::remove)
+            handledPaths = handledPaths + unhandledPaths
+            binPulsePaths = binPulsePaths + unhandledPaths
             return@LaunchedEffect
         }
+        val unanchoredPaths = unhandledPaths.filterNot { rowAnchors.containsKey(it) }.toSet()
+        if (unanchoredPaths.isNotEmpty()) {
+            // Decision 6: without captured row bounds there is no flight, so pulse on queue.
+            handledPaths = handledPaths + unanchoredPaths
+            binPulsePaths = binPulsePaths + unanchoredPaths
+        }
         val destination = binBounds ?: return@LaunchedEffect
-        val source = newlyQueuedWorktreePaths
-            .filterNot { it in handledPaths }
-            .firstNotNullOfOrNull { path -> rowAnchors[path]?.let { path to it } }
-            ?: return@LaunchedEffect
+        val source = (unhandledPaths - unanchoredPaths).firstNotNullOfOrNull { path ->
+            rowAnchors[path]?.let { path to it }
+        } ?: return@LaunchedEffect
         val (worktreePath, anchor) = source
         handledPaths = handledPaths + worktreePath
         flight = WorktreeArchiveFlight(
@@ -127,26 +142,13 @@ internal fun rememberWorktreeArchiveFlightState(
         flight = flight,
         onRowBoundsUpdate = { worktreePath, anchor -> rowAnchors[worktreePath] = anchor },
         onBinBoundsUpdate = { bounds -> binBounds = bounds },
-        onFlightComplete = {
-            flight?.let { completed -> rowAnchors.remove(completed.worktreePath) }
+        onFlightComplete = { worktreePath ->
+            rowAnchors.remove(worktreePath)
             flight = null
+            binPulsePaths = binPulsePaths + worktreePath
         },
+        binPulsePaths = binPulsePaths,
     )
-}
-
-/**
- * Consumes archives queued while a chip is already flying. Story 1 flies one chip at a time, so
- * these paths are marked handled without a flight; otherwise the flight's completion would replay
- * them late, from a row that has already collapsed.
- */
-private fun consumePathsSkippedByActiveFlight(
-    newlyQueuedPaths: Set<String>,
-    handledPaths: Set<String>,
-    rowAnchors: MutableMap<String, WorktreeArchiveFlightAnchor>,
-): Set<String> {
-    val skippedPaths = newlyQueuedPaths - handledPaths
-    skippedPaths.forEach(rowAnchors::remove)
-    return handledPaths + skippedPaths
 }
 
 /** Draws the archive chip on top of the screen content; it is inert once no flight is running. */
@@ -158,7 +160,10 @@ internal fun WorktreeArchiveFlightOverlay(
     val flight = state.flight ?: return
     Box(modifier = modifier) {
         key(flight.worktreePath) {
-            WorktreeArchiveFlightChip(flight = flight, onFlightComplete = state.onFlightComplete)
+            WorktreeArchiveFlightChip(
+                flight = flight,
+                onFlightComplete = { state.onFlightComplete(flight.worktreePath) },
+            )
         }
     }
 }

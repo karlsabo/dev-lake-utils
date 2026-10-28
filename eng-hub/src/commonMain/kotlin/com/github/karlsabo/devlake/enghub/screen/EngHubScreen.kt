@@ -250,6 +250,7 @@ internal fun EngHubSidebar(
             entries = archiveBin.entries,
             actions = archiveBin.actions,
             onBoundsUpdate = archiveBin.onBoundsUpdate,
+            pulseWorktreePaths = archiveBin.pulseWorktreePaths,
         )
         Spacer(modifier = Modifier.size(6.dp))
         EngHubSidebarButton(

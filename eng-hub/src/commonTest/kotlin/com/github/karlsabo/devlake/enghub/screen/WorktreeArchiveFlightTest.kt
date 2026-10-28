@@ -1,12 +1,16 @@
 package com.github.karlsabo.devlake.enghub.screen
 
 import androidx.compose.material.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -34,6 +38,7 @@ import kotlin.math.PI
 import kotlin.math.acos
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private const val TEST_FRAME_MS = 16f
@@ -46,6 +51,15 @@ private const val LOGIN_BRANCH = "feature/login"
 private const val LOGIN_PATH = "/repos/widgets-feature-login"
 private const val SIGNUP_BRANCH = "feature/signup"
 private const val SIGNUP_PATH = "/repos/widgets-feature-signup"
+private const val GHOST_BRANCH = "feature/ghost"
+private const val GHOST_PATH = "/repos/widgets-feature-ghost"
+private const val GHOST_CHIP_TAG = "archive-flight-chip-feature/ghost"
+
+/**
+ * The chip's shadow reaches the bin icon well before the chip itself does, so bin pixels are only
+ * trusted while the chip's center is still this far away. The capture cannot separate the two.
+ */
+private const val CHIP_CLEAR_OF_BIN_PX = 150f
 private const val MAX_CHIP_START_FRAMES = 5
 
 class WorktreeArchiveFlightTest {
@@ -55,20 +69,8 @@ class WorktreeArchiveFlightTest {
     fun archiveMenuClickFliesChipFromRowToBinAlongSinusoidWhileRowCollapses() = runComposeUiTest {
         mainClock.autoAdvance = false
         var screenState by mutableStateOf(screenStateWithWorktrees(TestWorktree(LOGIN_BRANCH, LOGIN_PATH)))
-        val baseActions = worktreeScreenActions()
         setContent {
-            MaterialTheme {
-                EngHubScreenContent(
-                    state = screenState,
-                    actions = baseActions.copy(
-                        worktrees = baseActions.worktrees.copy(
-                            worktrees = baseActions.worktrees.worktrees.copy(onArchiveWorktree = { branch, path ->
-                                screenState = screenState.queuingArchive(branch, path)
-                            }),
-                        ),
-                    ),
-                )
-            }
+            EngHubScreenWithArchiveQueueing(screenState) { screenState = it }
         }
         mainClock.advanceTimeByFrame()
         val rowCenter = onNodeWithTag(ROW_TAG).fetchSemanticsNode().boundsInRoot.center
@@ -112,20 +114,8 @@ class WorktreeArchiveFlightTest {
                 TestWorktree(SIGNUP_BRANCH, SIGNUP_PATH),
             ),
         )
-        val baseActions = worktreeScreenActions()
         setContent {
-            MaterialTheme {
-                EngHubScreenContent(
-                    state = screenState,
-                    actions = baseActions.copy(
-                        worktrees = baseActions.worktrees.copy(
-                            worktrees = baseActions.worktrees.worktrees.copy(onArchiveWorktree = { branch, path ->
-                                screenState = screenState.queuingArchive(branch, path)
-                            }),
-                        ),
-                    ),
-                )
-            }
+            EngHubScreenWithArchiveQueueing(screenState) { screenState = it }
         }
         mainClock.advanceTimeByFrame()
         val binCenter = onNodeWithContentDescription("Recycle bin (0)").fetchSemanticsNode().boundsInRoot.center
@@ -167,6 +157,104 @@ class WorktreeArchiveFlightTest {
         // Both rows still collapse; only the chip was skipped.
         onNodeWithTag(ROW_TAG).assertDoesNotExist()
         onNodeWithTag(SKIPPED_ROW_TAG).assertDoesNotExist()
+    }
+
+    /**
+     * Acceptance: the bin keeps its resting scale while the chip flies and pulses once the chip has
+     * covered the 220ms flight, not when the archive is queued.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun binDoesNotPulseDuringFlightButPulsesOnceTheChipArrives() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var screenState by mutableStateOf(screenStateWithWorktrees(TestWorktree(LOGIN_BRANCH, LOGIN_PATH)))
+        setContent {
+            EngHubScreenWithArchiveQueueing(screenState) { screenState = it }
+        }
+        mainClock.advanceTimeByFrame()
+        val binAtRest = onNodeWithContentDescription("Recycle bin (0)").captureToImage().pixels()
+
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("Archive").performClick()
+        advanceFramesUntilTagExists(CHIP_TAG)
+        onNodeWithTag(CHIP_TAG).assertExists()
+
+        // The archive is already queued, yet the bin holds its rest scale for the whole flight.
+        // Samples stop once the chip is close enough to cast its shadow on the icon; from there on the
+        // chip and its shadow draw over the bin, and the pulse legitimately starts on arrival.
+        var flightFrames = 0
+        var restingSamples = 0
+        while (true) {
+            val chip = onAllNodesWithTag(CHIP_TAG).fetchSemanticsNodes().firstOrNull() ?: break
+            val binNode = onNodeWithContentDescription("Recycle bin (1)")
+            val chipCenter = chip.boundsInRoot.center
+            val binCenter = binNode.fetchSemanticsNode().boundsInRoot.center
+            if ((chipCenter - binCenter).getDistance() >= CHIP_CLEAR_OF_BIN_PX) {
+                assertTrue(
+                    binAtRest.contentEquals(binNode.captureToImage().pixels()),
+                    "bin pulses while the chip is still in flight after $flightFrames frames",
+                )
+                restingSamples++
+            }
+            mainClock.advanceTimeByFrame()
+            flightFrames++
+            assertTrue(flightFrames < 30, "the chip should finish within its 220ms window")
+        }
+        assertTrue(flightFrames in 10..20, "sampled the bin while the chip flew for $flightFrames frames")
+        assertTrue(restingSamples >= 8, "sampled the bin at rest while the chip was away: $restingSamples")
+
+        // The chip has landed, so the pulse is mid-leg 160ms later. A pulse that had started when
+        // the archive was queued (the whole 220ms flight earlier) would already be back at rest.
+        mainClock.advanceTimeBy(160)
+        val pulsingBin = onNodeWithContentDescription("Recycle bin (1)")
+        assertFalse(
+            binAtRest.contentEquals(pulsingBin.captureToImage().pixels()),
+            "bin pulses once the chip arrives, not while it flies",
+        )
+        mainClock.advanceTimeBy(240)
+        assertTrue(
+            binAtRest.contentEquals(pulsingBin.captureToImage().pixels()),
+            "bin returns to rest after the 160ms out and back pulse",
+        )
+    }
+
+    /**
+     * Decision 6 fallback: with no row bounds captured there is no flight, so the bin pulses on
+     * queue instead. Feedback is never lost just because the chip could not start.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun binPulsesOnQueueWhenNoSourceBoundsWereCapturedForTheFlight() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var screenState by mutableStateOf(screenStateWithWorktrees(TestWorktree(LOGIN_BRANCH, LOGIN_PATH)))
+        setContent {
+            EngHubScreenWithArchiveQueueing(screenState) { screenState = it }
+        }
+        mainClock.advanceTimeByFrame()
+        val binAtRest = onNodeWithContentDescription("Recycle bin (0)").captureToImage().pixels()
+
+        // feature/ghost has no rendered row, so the flight overlay can never anchor it.
+        screenState = screenState.queuingArchive(GHOST_BRANCH, GHOST_PATH)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        onAllNodesWithTag(GHOST_CHIP_TAG).assertCountEquals(0)
+
+        assertTrue(
+            (1..12).any {
+                mainClock.advanceTimeBy(20)
+                !binAtRest.contentEquals(
+                    onNodeWithContentDescription("Recycle bin (1)").captureToImage().pixels(),
+                )
+            },
+            "bin pulses on queue when no flight can start",
+        )
+        mainClock.advanceTimeBy(400)
+        assertTrue(
+            binAtRest.contentEquals(onNodeWithContentDescription("Recycle bin (1)").captureToImage().pixels()),
+            "bin returns to rest after the fallback pulse",
+        )
+        onAllNodesWithTag(GHOST_CHIP_TAG).assertCountEquals(0)
     }
 
     /**
@@ -215,9 +303,7 @@ class WorktreeArchiveFlightTest {
     }
 }
 
-/**
- * A queued archive starts its chip only after the flight effect runs on a following frame.
- */
+/** A queued archive starts its chip only after the flight effect runs on a following frame. */
 @OptIn(ExperimentalTestApi::class)
 private fun ComposeUiTest.advanceFramesUntilTagExists(tag: String) {
     repeat(MAX_CHIP_START_FRAMES) {
@@ -226,12 +312,35 @@ private fun ComposeUiTest.advanceFramesUntilTagExists(tag: String) {
     }
 }
 
+/** Screen content whose archive click queues the archive into the mutable test screen state. */
+@Composable
+private fun EngHubScreenWithArchiveQueueing(
+    screenState: EngHubScreenState,
+    onScreenStateChange: (EngHubScreenState) -> Unit,
+) {
+    val baseActions = worktreeScreenActions()
+    MaterialTheme {
+        EngHubScreenContent(
+            state = screenState,
+            actions = baseActions.copy(
+                worktrees = baseActions.worktrees.copy(
+                    worktrees = baseActions.worktrees.worktrees.copy(onArchiveWorktree = { branch, path ->
+                        onScreenStateChange(screenState.queuingArchive(branch, path))
+                    }),
+                ),
+            ),
+        )
+    }
+}
+
 private data class TestWorktree(
     val branch: String,
     val path: String,
 )
 
-/** Mirrors the view model: every queued archive keeps its newly-queued flag until it is cleared. */
+private fun ImageBitmap.pixels(): IntArray = IntArray(width * height).also { readPixels(it) }
+
+/** Mirrors the view model: a queued archive stays newly queued until it is cleared. */
 private fun EngHubScreenState.queuingArchive(branch: String, worktreePath: String): EngHubScreenState {
     val entries = archiveBinEntries.filterNot { it.worktreePath == worktreePath } + WorktreeArchiveBinEntry(
         repository = "widgets",
@@ -239,7 +348,6 @@ private fun EngHubScreenState.queuingArchive(branch: String, worktreePath: Strin
         remainingSeconds = 60,
         worktreePath = worktreePath,
         queueId = "queued-${branch.replace('/', '-')}",
-        isNewlyQueued = true,
     )
     val queuedPaths = entries.mapTo(mutableSetOf(), WorktreeArchiveBinEntry::worktreePath)
     return copy(
