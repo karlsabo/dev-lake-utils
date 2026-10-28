@@ -13,11 +13,9 @@
 
 # TODO
 
-* [ ] When archiving a worktree, don't prompt, move it into some archiving bucket, delayed by 60 seconds or so, with a cancel archive button.
-  * Play a nice animation that moves it into a recycle bin in the bottom right of the screen, then you can click that bin and undo (stop the archive) withing 60 seconds. If archiving already began, grey out the button and have a hover text helper that says it's being removed. If there's a remote branch or some other way to recover it we should support that.
 * [ ] The worktree status updates are annoying and distracting since they keep moving the text around with 'updating status...'
 * [ ] The recycle bin needs to auto empty when a worktree has finished being removed
-* [ ] We need an animation where an archived worktree is 'moved' into the recycle bin so users know what's happening.
+  * When there is a worktree that needs to be force removed, the recycle icon needs a badge on it so i know to check it.
 * [ ] Support multiple git repository parent roots
   * [ ] Missing buttons when the repository isn't configured
     * ![img.png](img.png)
@@ -77,6 +75,8 @@
   * If we link to 'views' of the items, we'd want to add a navigation history (back button, forward button)
 * [ ] We need a UI indicator for when we archive a worktree. Disable all actions and add a spinning loader. The 'Achiving...' text takes too long to appear.
 * [ ] After adding a new repository, display the settings window to configure it. Adding comments, etc.
+* [ ] We need a workflow kickoff
+  * I should be able to paste a ticket, and it will create a worktree and spawn agents to implement the ticket.
 
 ## Implementation loop
 * Implement
