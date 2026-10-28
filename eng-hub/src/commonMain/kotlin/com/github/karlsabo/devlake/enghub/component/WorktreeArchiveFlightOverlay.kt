@@ -104,7 +104,10 @@ internal fun rememberWorktreeArchiveFlightState(
     }
 
     LaunchedEffect(newlyQueuedWorktreePaths, binBounds, flight) {
-        if (flight != null) return@LaunchedEffect
+        if (flight != null) {
+            handledPaths = consumePathsSkippedByActiveFlight(newlyQueuedWorktreePaths, handledPaths, rowAnchors)
+            return@LaunchedEffect
+        }
         val destination = binBounds ?: return@LaunchedEffect
         val source = newlyQueuedWorktreePaths
             .filterNot { it in handledPaths }
@@ -129,6 +132,21 @@ internal fun rememberWorktreeArchiveFlightState(
             flight = null
         },
     )
+}
+
+/**
+ * Consumes archives queued while a chip is already flying. Story 1 flies one chip at a time, so
+ * these paths are marked handled without a flight; otherwise the flight's completion would replay
+ * them late, from a row that has already collapsed.
+ */
+private fun consumePathsSkippedByActiveFlight(
+    newlyQueuedPaths: Set<String>,
+    handledPaths: Set<String>,
+    rowAnchors: MutableMap<String, WorktreeArchiveFlightAnchor>,
+): Set<String> {
+    val skippedPaths = newlyQueuedPaths - handledPaths
+    skippedPaths.forEach(rowAnchors::remove)
+    return handledPaths + skippedPaths
 }
 
 /** Draws the archive chip on top of the screen content; it is inert once no flight is running. */

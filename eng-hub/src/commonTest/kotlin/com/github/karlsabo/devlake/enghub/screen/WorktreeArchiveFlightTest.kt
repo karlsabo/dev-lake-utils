@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -39,6 +40,13 @@ private const val TEST_FRAME_MS = 16f
 private const val FRAME_PROGRESS = TEST_FRAME_MS / WORKTREE_ARCHIVE_FLIGHT_DURATION_MS
 private const val ROW_TAG = "worktree-row-feature/login"
 private const val CHIP_TAG = "archive-flight-chip-feature/login"
+private const val SKIPPED_ROW_TAG = "worktree-row-feature/signup"
+private const val SKIPPED_CHIP_TAG = "archive-flight-chip-feature/signup"
+private const val LOGIN_BRANCH = "feature/login"
+private const val LOGIN_PATH = "/repos/widgets-feature-login"
+private const val SIGNUP_BRANCH = "feature/signup"
+private const val SIGNUP_PATH = "/repos/widgets-feature-signup"
+private const val MAX_CHIP_START_FRAMES = 5
 
 class WorktreeArchiveFlightTest {
 
@@ -46,8 +54,7 @@ class WorktreeArchiveFlightTest {
     @Test
     fun archiveMenuClickFliesChipFromRowToBinAlongSinusoidWhileRowCollapses() = runComposeUiTest {
         mainClock.autoAdvance = false
-        val worktreePath = "/repos/widgets-feature-login"
-        var screenState by mutableStateOf(screenStateWithWorktree(worktreePath))
+        var screenState by mutableStateOf(screenStateWithWorktrees(TestWorktree(LOGIN_BRANCH, LOGIN_PATH)))
         val baseActions = worktreeScreenActions()
         setContent {
             MaterialTheme {
@@ -55,8 +62,8 @@ class WorktreeArchiveFlightTest {
                     state = screenState,
                     actions = baseActions.copy(
                         worktrees = baseActions.worktrees.copy(
-                            worktrees = baseActions.worktrees.worktrees.copy(onArchiveWorktree = { _, path ->
-                                screenState = screenState.archiving(path)
+                            worktrees = baseActions.worktrees.worktrees.copy(onArchiveWorktree = { branch, path ->
+                                screenState = screenState.queuingArchive(branch, path)
                             }),
                         ),
                     ),
@@ -89,6 +96,77 @@ class WorktreeArchiveFlightTest {
         onNodeWithTag(ROW_TAG).assertDoesNotExist()
 
         assertSinusoidalFlight(chipCenters, origin = rowCenter, destination = binCenter)
+    }
+
+    /**
+     * Regression: an archive queued while a chip is already flying must skip its chip outright.
+     * Marking it late replayed a delayed chip from a row that had already collapsed.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun archiveQueuedDuringFlightSkipsItsChipInsteadOfReplayingItLate() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var screenState by mutableStateOf(
+            screenStateWithWorktrees(
+                TestWorktree(LOGIN_BRANCH, LOGIN_PATH),
+                TestWorktree(SIGNUP_BRANCH, SIGNUP_PATH),
+            ),
+        )
+        val baseActions = worktreeScreenActions()
+        setContent {
+            MaterialTheme {
+                EngHubScreenContent(
+                    state = screenState,
+                    actions = baseActions.copy(
+                        worktrees = baseActions.worktrees.copy(
+                            worktrees = baseActions.worktrees.worktrees.copy(onArchiveWorktree = { branch, path ->
+                                screenState = screenState.queuingArchive(branch, path)
+                            }),
+                        ),
+                    ),
+                )
+            }
+        }
+        mainClock.advanceTimeByFrame()
+        val binCenter = onNodeWithContentDescription("Recycle bin (0)").fetchSemanticsNode().boundsInRoot.center
+        onNodeWithTag(SKIPPED_ROW_TAG).assertExists()
+
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("Archive").performClick()
+        advanceFramesUntilTagExists(CHIP_TAG)
+        onNodeWithTag(CHIP_TAG).assertExists()
+
+        // A second archive is queued while the first chip is still in the air.
+        screenState = screenState.queuingArchive(SIGNUP_BRANCH, SIGNUP_PATH)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        // The first chip keeps flying, and the second archive never gets one of its own.
+        onNodeWithTag(CHIP_TAG).assertExists()
+        onNodeWithTag(SKIPPED_CHIP_TAG).assertDoesNotExist()
+
+        val chipCenters = mutableListOf<Offset>()
+        while (true) {
+            mainClock.advanceTimeByFrame()
+            onNodeWithTag(SKIPPED_CHIP_TAG).assertDoesNotExist()
+            val chip = onAllNodesWithTag(CHIP_TAG).fetchSemanticsNodes().firstOrNull() ?: break
+            chipCenters += chip.boundsInRoot.center
+            assertTrue(chipCenters.size < 20, "the first chip should finish within its 220ms window")
+        }
+        assertTrue(
+            chipCenters.size in 6..17,
+            "the first chip keeps flying after the skipped archive is queued: ${chipCenters.size} frames",
+        )
+        assertTrue((chipCenters.last() - binCenter).getDistance() < 4f, "the first chip still lands on the bin")
+
+        // Watch well past the flight's 220ms: the skipped archive must not replay a delayed chip.
+        repeat(30) {
+            mainClock.advanceTimeByFrame()
+            onNodeWithTag(SKIPPED_CHIP_TAG).assertDoesNotExist()
+        }
+        // Both rows still collapse; only the chip was skipped.
+        onNodeWithTag(ROW_TAG).assertDoesNotExist()
+        onNodeWithTag(SKIPPED_ROW_TAG).assertDoesNotExist()
     }
 
     /**
@@ -137,24 +215,43 @@ class WorktreeArchiveFlightTest {
     }
 }
 
-private fun EngHubScreenState.archiving(worktreePath: String): EngHubScreenState = copy(
-    archiveBinEntries = listOf(
-        WorktreeArchiveBinEntry(
-            repository = "widgets",
-            branch = "feature/login",
-            remainingSeconds = 60,
-            worktreePath = worktreePath,
-            queueId = "queued-feature-login",
-            isNewlyQueued = true,
-        ),
-    ),
-    worktrees = worktrees.copy(
-        queuedArchiveWorktreePaths = setOf(worktreePath),
-        newlyQueuedArchiveWorktreePaths = setOf(worktreePath),
-    ),
+/**
+ * A queued archive starts its chip only after the flight effect runs on a following frame.
+ */
+@OptIn(ExperimentalTestApi::class)
+private fun ComposeUiTest.advanceFramesUntilTagExists(tag: String) {
+    repeat(MAX_CHIP_START_FRAMES) {
+        if (onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()) return
+        mainClock.advanceTimeByFrame()
+    }
+}
+
+private data class TestWorktree(
+    val branch: String,
+    val path: String,
 )
 
-private fun screenStateWithWorktree(worktreePath: String) = EngHubScreenState(
+/** Mirrors the view model: every queued archive keeps its newly-queued flag until it is cleared. */
+private fun EngHubScreenState.queuingArchive(branch: String, worktreePath: String): EngHubScreenState {
+    val entries = archiveBinEntries.filterNot { it.worktreePath == worktreePath } + WorktreeArchiveBinEntry(
+        repository = "widgets",
+        branch = branch,
+        remainingSeconds = 60,
+        worktreePath = worktreePath,
+        queueId = "queued-${branch.replace('/', '-')}",
+        isNewlyQueued = true,
+    )
+    val queuedPaths = entries.mapTo(mutableSetOf(), WorktreeArchiveBinEntry::worktreePath)
+    return copy(
+        archiveBinEntries = entries,
+        worktrees = worktrees.copy(
+            queuedArchiveWorktreePaths = queuedPaths,
+            newlyQueuedArchiveWorktreePaths = queuedPaths,
+        ),
+    )
+}
+
+private fun screenStateWithWorktrees(vararg worktrees: TestWorktree) = EngHubScreenState(
     selectedPane = EngHubPane.Worktrees,
     paneAvailability = EngHubPane.entries.associateWith { EngHubPaneAvailability(isEnabled = true) },
     actionError = null,
@@ -168,7 +265,7 @@ private fun screenStateWithWorktree(worktreePath: String) = EngHubScreenState(
                 name = "widgets",
                 path = "/repos/widgets",
                 isExpanded = true,
-                worktrees = listOf(LocalWorktreeUiState("feature/login", worktreePath, isDirty = false)),
+                worktrees = worktrees.map { LocalWorktreeUiState(it.branch, it.path, isDirty = false) },
             ),
         ),
         forceArchiveRequest = null,
