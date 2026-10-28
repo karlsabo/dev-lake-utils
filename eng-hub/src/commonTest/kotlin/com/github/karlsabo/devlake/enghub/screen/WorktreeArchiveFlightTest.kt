@@ -102,7 +102,8 @@ class WorktreeArchiveFlightTest {
 
     /**
      * Regression: an archive queued while a chip is already flying must skip its chip outright.
-     * Marking it late replayed a delayed chip from a row that had already collapsed.
+     * Marking it late replayed a delayed chip from a row that had already collapsed. Skipping the
+     * chip must not also skip the feedback: that archive pulses the bin on queue instead.
      */
     @OptIn(ExperimentalTestApi::class)
     @Test
@@ -127,6 +128,10 @@ class WorktreeArchiveFlightTest {
         advanceFramesUntilTagExists(CHIP_TAG)
         onNodeWithTag(CHIP_TAG).assertExists()
 
+        // The bin waits for the first chip to land, so this is the appearance the skipped archive's
+        // own pulse has to change.
+        val binAtRest = onNodeWithContentDescription("Recycle bin (1)").captureToImage().pixels()
+
         // A second archive is queued while the first chip is still in the air.
         screenState = screenState.queuingArchive(SIGNUP_BRANCH, SIGNUP_PATH)
         mainClock.advanceTimeByFrame()
@@ -136,13 +141,21 @@ class WorktreeArchiveFlightTest {
         onNodeWithTag(SKIPPED_CHIP_TAG).assertDoesNotExist()
 
         val chipCenters = mutableListOf<Offset>()
+        var skippedArchivePulseFrames = 0
         while (true) {
-            mainClock.advanceTimeByFrame()
             onNodeWithTag(SKIPPED_CHIP_TAG).assertDoesNotExist()
             val chip = onAllNodesWithTag(CHIP_TAG).fetchSemanticsNodes().firstOrNull() ?: break
-            chipCenters += chip.boundsInRoot.center
+            val chipCenter = chip.boundsInRoot.center
+            chipCenters += chipCenter
             assertTrue(chipCenters.size < 20, "the first chip should finish within its 220ms window")
+            if (binPulsedWhileChipIsAway(binAtRest, chipCenter, binCenter)) skippedArchivePulseFrames++
+            mainClock.advanceTimeByFrame()
         }
+        assertTrue(
+            skippedArchivePulseFrames >= 4,
+            "the skipped archive pulses the bin on queue instead of losing its feedback: " +
+                "$skippedArchivePulseFrames frames before the first chip arrived",
+        )
         assertTrue(
             chipCenters.size in 6..17,
             "the first chip keeps flying after the skipped archive is queued: ${chipCenters.size} frames",
@@ -310,6 +323,21 @@ private fun ComposeUiTest.advanceFramesUntilTagExists(tag: String) {
         if (onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()) return
         mainClock.advanceTimeByFrame()
     }
+}
+
+/**
+ * The chip and its shadow draw over the bin icon as it closes in, so only frames with the chip still
+ * this far away show the bin's own scale.
+ */
+@OptIn(ExperimentalTestApi::class)
+private fun ComposeUiTest.binPulsedWhileChipIsAway(
+    binAtRest: IntArray,
+    chipCenter: Offset,
+    binCenter: Offset,
+): Boolean {
+    if ((chipCenter - binCenter).getDistance() < CHIP_CLEAR_OF_BIN_PX) return false
+    val bin = onNodeWithContentDescription("Recycle bin (2)")
+    return !binAtRest.contentEquals(bin.captureToImage().pixels())
 }
 
 /** Screen content whose archive click queues the archive into the mutable test screen state. */
