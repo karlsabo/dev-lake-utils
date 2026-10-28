@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import com.github.karlsabo.devlake.enghub.component.NotificationPanel
 import com.github.karlsabo.devlake.enghub.component.PullRequestPanel
 import com.github.karlsabo.devlake.enghub.component.PullRequestPanelActions
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveFlightState
 import com.github.karlsabo.devlake.enghub.component.WorktreePanel
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.component.WorktreeRowExitState
@@ -17,6 +18,7 @@ internal fun EngHubPaneContent(
     actions: EngHubScreenActions,
     modifier: Modifier = Modifier,
     exitState: WorktreeRowExitState = WorktreeRowExitState(),
+    archiveFlight: WorktreeArchiveFlightState = WorktreeArchiveFlightState(),
 ) {
     when (state.selectedPane) {
         EngHubPane.PullRequests -> PullRequestsPane(
@@ -36,6 +38,7 @@ internal fun EngHubPaneContent(
             actions = actions,
             modifier = modifier,
             exitState = exitState,
+            archiveFlight = archiveFlight,
         )
 
         EngHubPane.Settings -> EngHubSettingsScreen(
@@ -84,6 +87,7 @@ private fun WorktreesPane(
     state: WorktreePanelState,
     actions: EngHubScreenActions,
     exitState: WorktreeRowExitState,
+    archiveFlight: WorktreeArchiveFlightState,
     modifier: Modifier = Modifier,
 ) {
     WorktreePanel(
@@ -91,6 +95,7 @@ private fun WorktreesPane(
         actions = actions.worktrees,
         modifier = modifier,
         exitState = exitState,
+        archiveFlight = archiveFlight,
     )
 }
 

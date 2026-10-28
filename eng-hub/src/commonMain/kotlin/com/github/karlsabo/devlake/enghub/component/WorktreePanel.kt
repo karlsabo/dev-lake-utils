@@ -27,6 +27,7 @@ internal fun WorktreePanel(
     actions: WorktreePanelActions,
     modifier: Modifier = Modifier,
     exitState: WorktreeRowExitState = WorktreeRowExitState(),
+    archiveFlight: WorktreeArchiveFlightState = WorktreeArchiveFlightState(),
 ) {
     var pendingCreateWorktree by remember { mutableStateOf<PendingCreateWorktree?>(null) }
 
@@ -75,29 +76,35 @@ internal fun WorktreePanel(
 
     WorktreePanelContent(
         state = state,
-        actions = actions,
-        onCreateRequest = { pendingCreateWorktree = it },
+        context = WorktreePanelContext(
+            actions = actions,
+            onCreateRequest = { pendingCreateWorktree = it },
+            exitState = exitState,
+            archiveFlight = archiveFlight,
+        ),
         modifier = modifier,
-        exitState = exitState,
     )
 }
+
+private data class WorktreePanelContext(
+    val actions: WorktreePanelActions,
+    val onCreateRequest: (PendingCreateWorktree) -> Unit,
+    val exitState: WorktreeRowExitState,
+    val archiveFlight: WorktreeArchiveFlightState,
+)
 
 @Composable
 private fun WorktreePanelContent(
     state: WorktreePanelState,
-    actions: WorktreePanelActions,
-    onCreateRequest: (PendingCreateWorktree) -> Unit,
-    exitState: WorktreeRowExitState,
+    context: WorktreePanelContext,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        WorktreePanelToolbar(onAddRepository = actions.onAddRepository)
+        WorktreePanelToolbar(onAddRepository = context.actions.onAddRepository)
         WorktreeRepositoryList(
             state = state,
-            actions = actions,
-            onCreateRequest = onCreateRequest,
+            context = context,
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            exitState = exitState,
         )
     }
 }
@@ -117,9 +124,7 @@ private fun WorktreePanelToolbar(onAddRepository: () -> Unit) {
 @Composable
 private fun WorktreeRepositoryList(
     state: WorktreePanelState,
-    actions: WorktreePanelActions,
-    onCreateRequest: (PendingCreateWorktree) -> Unit,
-    exitState: WorktreeRowExitState,
+    context: WorktreePanelContext,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
@@ -140,9 +145,10 @@ private fun WorktreeRepositoryList(
                             mergingWorktreePaths = state.mergingWorktreePaths,
                             authoredOpenPullRequests = state.authoredOpenPullRequests,
                         ),
-                        panelActions = actions,
-                        onCreateRequest = onCreateRequest,
-                        exitState = exitState,
+                        panelActions = context.actions,
+                        onCreateRequest = context.onCreateRequest,
+                        exitState = context.exitState,
+                        archiveFlight = context.archiveFlight,
                     )
                 }
             }

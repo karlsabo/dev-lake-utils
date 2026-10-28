@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
@@ -72,6 +73,7 @@ private data class WorktreeRowContentActions(
 internal fun LocalWorktreeRow(
     state: LocalWorktreeRowState,
     actions: LocalWorktreeRowActions,
+    onBoundsUpdate: (Rect) -> Unit = {},
 ) {
     val hoverInteractionSource = remember { MutableInteractionSource() }
     val isHovered by hoverInteractionSource.collectIsHoveredAsState()
@@ -87,7 +89,10 @@ internal fun LocalWorktreeRow(
         modifier = Modifier
             .fillMaxWidth()
             .contextMenuOpenDetector(menuState)
-            .onGloballyPositioned { menuAnchorBoundsInWindow = it.boundsInWindow() },
+            .onGloballyPositioned { coordinates ->
+                menuAnchorBoundsInWindow = coordinates.boundsInWindow()
+                onBoundsUpdate(coordinates.boundsInRoot())
+            },
     ) {
         WorktreeRowContent(
             state = state,

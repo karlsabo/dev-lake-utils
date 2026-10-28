@@ -24,7 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -55,11 +58,19 @@ internal data class WorktreeArchiveBinActions(
     val onRequestForceConfirmation: (String) -> Unit = {},
 )
 
+/** Everything the sidebar needs to render and locate the recycle bin. */
+internal data class WorktreeArchiveBinSection(
+    val entries: List<WorktreeArchiveBinEntry> = emptyList(),
+    val actions: WorktreeArchiveBinActions = WorktreeArchiveBinActions(),
+    val onBoundsUpdate: (Rect) -> Unit = {},
+)
+
 @Composable
 internal fun WorktreeArchiveBin(
     entries: List<WorktreeArchiveBinEntry>,
     modifier: Modifier = Modifier,
     actions: WorktreeArchiveBinActions = WorktreeArchiveBinActions(),
+    onBoundsUpdate: (Rect) -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     val pulseScale = remember { Animatable(1f) }
@@ -88,6 +99,7 @@ internal fun WorktreeArchiveBin(
             onClick = { expanded = true },
             modifier = Modifier
                 .size(40.dp)
+                .onGloballyPositioned { coordinates -> onBoundsUpdate(coordinates.boundsInRoot()) }
                 .graphicsLayer {
                     scaleX = pulseScale.value
                     scaleY = pulseScale.value
