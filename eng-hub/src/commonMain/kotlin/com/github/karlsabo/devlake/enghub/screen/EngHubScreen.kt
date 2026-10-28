@@ -41,9 +41,9 @@ import com.github.karlsabo.devlake.enghub.component.ForceArchiveWorktreeDialog
 import com.github.karlsabo.devlake.enghub.component.GlobalExistingBranchWorktreeDialog
 import com.github.karlsabo.devlake.enghub.component.PendingGlobalCreateWorktree
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBin
-import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinActions
-import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinSection
 import com.github.karlsabo.devlake.enghub.component.WorktreeRowExitState
+import com.github.karlsabo.devlake.enghub.component.rememberWorktreeArchiveFlightState
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
@@ -101,6 +101,10 @@ internal fun EngHubScreenContent(
 ) {
     var pendingGlobalCreateWorktree by remember { mutableStateOf<PendingGlobalCreateWorktree?>(null) }
     val exitState = rememberWorktreeRowExitState(state.worktrees.queuedArchiveWorktreePaths)
+    val archiveFlight = rememberWorktreeArchiveFlightState(
+        queuedWorktreePaths = state.worktrees.queuedArchiveWorktreePaths,
+        newlyQueuedWorktreePaths = state.worktrees.newlyQueuedArchiveWorktreePaths,
+    )
 
     LaunchedEffect(pendingGlobalCreateWorktree != null) {
         if (pendingGlobalCreateWorktree != null) actions.onDiscoverGlobalExistingBranches()
@@ -131,35 +135,13 @@ internal fun EngHubScreenContent(
 
     GlobalForceArchiveDialogHost(state, actions)
 
-    Row(modifier = Modifier.fillMaxSize()) {
-        EngHubSidebar(
-            selectedPane = state.selectedPane,
-            paneAvailability = state.paneAvailability,
-            archiveBinEntries = state.archiveBinEntries,
-            onPaneSelect = actions.onPaneSelected,
-            archiveActions = actions.archiveBinActions(),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(1.dp)
-                .background(MaterialTheme.colors.onSurface.copy(alpha = 0.12f)),
-        )
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            EngHubScreenHeader(
-                selectedPane = state.selectedPane,
-                onPaneSelect = actions.onPaneSelected,
-                onCreateWorktree = { pendingGlobalCreateWorktree = PendingGlobalCreateWorktree() },
-            )
-            Spacer(modifier = Modifier.size(8.dp))
-            EngHubPaneContent(
-                state = state,
-                actions = actions,
-                modifier = Modifier.weight(1f),
-                exitState = exitState,
-            )
-        }
-    }
+    EngHubScreenBody(
+        state = state,
+        actions = actions,
+        exitState = exitState,
+        archiveFlight = archiveFlight,
+        onCreateWorktree = { pendingGlobalCreateWorktree = PendingGlobalCreateWorktree() },
+    )
 }
 
 @Composable
@@ -170,13 +152,6 @@ private fun rememberWorktreeRowExitState(queuedPaths: Set<String>): WorktreeRowE
     }
     return WorktreeRowExitState(finishedPaths) { path -> finishedPaths = finishedPaths + path }
 }
-
-private fun EngHubScreenActions.archiveBinActions() = WorktreeArchiveBinActions(
-    onUndo = onUndoQueuedWorktreeArchive,
-    onRetry = onRetryFailedWorktreeArchive,
-    onDismiss = onDismissFailedWorktreeArchive,
-    onRequestForceConfirmation = onRequestForceArchiveLocalWorktree,
-)
 
 @Composable
 private fun GlobalForceArchiveDialogHost(state: EngHubScreenState, actions: EngHubScreenActions) {
@@ -251,8 +226,7 @@ internal fun EngHubSidebar(
     onPaneSelect: (EngHubPane) -> Unit,
     paneAvailability: Map<EngHubPane, EngHubPaneAvailability> =
         EngHubPane.entries.associateWith { EngHubPaneAvailability(isEnabled = true) },
-    archiveBinEntries: List<WorktreeArchiveBinEntry> = emptyList(),
-    archiveActions: WorktreeArchiveBinActions = WorktreeArchiveBinActions(),
+    archiveBin: WorktreeArchiveBinSection = WorktreeArchiveBinSection(),
 ) {
     Column(
         modifier = Modifier.fillMaxHeight().width(56.dp).padding(vertical = 8.dp),
@@ -273,8 +247,9 @@ internal fun EngHubSidebar(
         }
         Spacer(modifier = Modifier.weight(1f))
         WorktreeArchiveBin(
-            entries = archiveBinEntries,
-            actions = archiveActions,
+            entries = archiveBin.entries,
+            actions = archiveBin.actions,
+            onBoundsUpdate = archiveBin.onBoundsUpdate,
         )
         Spacer(modifier = Modifier.size(6.dp))
         EngHubSidebarButton(

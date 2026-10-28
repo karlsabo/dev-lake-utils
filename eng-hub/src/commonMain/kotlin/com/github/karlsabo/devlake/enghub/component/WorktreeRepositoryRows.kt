@@ -55,6 +55,7 @@ internal fun LocalRepositoryRow(
     panelActions: WorktreePanelActions,
     onCreateRequest: (PendingCreateWorktree) -> Unit,
     exitState: WorktreeRowExitState = WorktreeRowExitState(),
+    archiveFlight: WorktreeArchiveFlightState = WorktreeArchiveFlightState(),
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -69,10 +70,12 @@ internal fun LocalRepositoryRow(
             Text(text = state.repository.path, style = MaterialTheme.typography.caption)
             LocalWorktreeRows(
                 state = state,
-                panelActions = panelActions,
-                onCreateRequest = onCreateRequest,
-                finishedExitPaths = exitState.finishedPaths,
-                onExitComplete = exitState.onComplete,
+                interactions = WorktreeRowInteractions(
+                    panelActions = panelActions,
+                    onCreateRequest = onCreateRequest,
+                    exitState = exitState,
+                    archiveFlight = archiveFlight,
+                ),
             )
         }
     }
@@ -196,13 +199,17 @@ private fun LocalRepositoryMenuItem(
     }
 }
 
+private data class WorktreeRowInteractions(
+    val panelActions: WorktreePanelActions,
+    val onCreateRequest: (PendingCreateWorktree) -> Unit,
+    val exitState: WorktreeRowExitState,
+    val archiveFlight: WorktreeArchiveFlightState,
+)
+
 @Composable
 private fun LocalWorktreeRows(
     state: WorktreeRowsState,
-    panelActions: WorktreePanelActions,
-    onCreateRequest: (PendingCreateWorktree) -> Unit,
-    finishedExitPaths: Set<String>,
-    onExitComplete: (String) -> Unit,
+    interactions: WorktreeRowInteractions,
 ) {
     if (!state.repository.isExpanded) return
 
@@ -223,14 +230,12 @@ private fun LocalWorktreeRows(
             visibleWorktreeRows(
                 worktrees = state.repository.worktrees,
                 hiddenPaths = state.queuedArchiveWorktreePaths - state.newlyQueuedArchiveWorktreePaths +
-                    (finishedExitPaths intersect state.queuedArchiveWorktreePaths),
+                    (interactions.exitState.finishedPaths intersect state.queuedArchiveWorktreePaths),
             ).forEach { row ->
                 WorktreeRowEntry(
                     row = row,
                     state = state,
-                    panelActions = panelActions,
-                    onCreateRequest = onCreateRequest,
-                    onExitComplete = onExitComplete,
+                    interactions = interactions,
                 )
             }
         }
@@ -243,16 +248,14 @@ private const val WORKTREE_EXIT_DURATION_MS = 220
 private fun WorktreeRowEntry(
     row: VisibleWorktreeRow,
     state: WorktreeRowsState,
-    panelActions: WorktreePanelActions,
-    onCreateRequest: (PendingCreateWorktree) -> Unit,
-    onExitComplete: (String) -> Unit,
+    interactions: WorktreeRowInteractions,
 ) {
     val worktree = row.worktree
     val normalizedWorktreePath = worktree.path.normalizedRepositoryPath()
     key(normalizedWorktreePath) {
         val isQueued = normalizedWorktreePath in state.queuedArchiveWorktreePaths
         val visibility = remember { MutableTransitionState(!isQueued) }
-        val currentOnExitComplete by rememberUpdatedState(onExitComplete)
+        val currentOnExitComplete by rememberUpdatedState(interactions.exitState.onComplete)
         visibility.targetState = !isQueued
         LaunchedEffect(visibility.isIdle, visibility.currentState, isQueued) {
             if (isQueued && visibility.isIdle && !visibility.currentState) {
@@ -280,9 +283,18 @@ private fun WorktreeRowEntry(
                 actions = worktreeRowActions(
                     worktree = worktree,
                     repositoryPath = state.repository.path,
-                    panelActions = panelActions,
-                    onCreateRequest = onCreateRequest,
+                    panelActions = interactions.panelActions,
+                    onCreateRequest = interactions.onCreateRequest,
                 ),
+                onBoundsUpdate = { bounds ->
+                    // Bounds are recorded while the row is at rest so the collapse never wins.
+                    if (!isQueued) {
+                        interactions.archiveFlight.onRowBoundsUpdate(
+                            normalizedWorktreePath,
+                            WorktreeArchiveFlightAnchor(branch = worktree.branch, bounds = bounds),
+                        )
+                    }
+                },
             )
         }
     }

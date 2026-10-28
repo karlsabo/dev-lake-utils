@@ -34,6 +34,7 @@ import com.github.karlsabo.devlake.enghub.component.NotificationActions
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBin
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinActions
 import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinEntry
+import com.github.karlsabo.devlake.enghub.component.WorktreeArchiveBinSection
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelActions
 import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
@@ -302,12 +303,14 @@ class EngHubScreenTest {
                     EngHubSidebar(
                         selectedPane = EngHubPane.Worktrees,
                         onPaneSelect = {},
-                        archiveBinEntries = listOf(
-                            WorktreeArchiveBinEntry(
-                                repository = "widgets",
-                                branch = "feature/login",
-                                remainingSeconds = 60,
-                                worktreePath = "/repos/widgets-feature-login",
+                        archiveBin = WorktreeArchiveBinSection(
+                            entries = listOf(
+                                WorktreeArchiveBinEntry(
+                                    repository = "widgets",
+                                    branch = "feature/login",
+                                    remainingSeconds = 60,
+                                    worktreePath = "/repos/widgets-feature-login",
+                                ),
                             ),
                         ),
                     )
