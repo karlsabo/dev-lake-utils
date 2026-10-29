@@ -268,9 +268,13 @@ class WorktreeArchiveAnimationTest {
         assertEquals(childIndent, onNodeWithText("feature/child").getUnclippedBoundsInRoot().left)
     }
 
+    /**
+     * The screen owns pulse timing now: the bin only pulses for paths it reports as arrived, so an
+     * entry restored from the persisted bin stays quiet.
+     */
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun binPulsesOnceOnlyForNewPersistedQueueNotRestoredOrRejectedEntry() = runComposeUiTest {
+    fun binPulsesOnceOnlyForPathsReportedByTheScreen() = runComposeUiTest {
         mainClock.autoAdvance = false
         val entry = WorktreeArchiveBinEntry(
             "widgets",
@@ -280,10 +284,11 @@ class WorktreeArchiveAnimationTest {
             queueId = "queued-1",
         )
         var entries by mutableStateOf(listOf(entry))
+        var pulseWorktreePaths by mutableStateOf(emptySet<String>())
         setContent {
             MaterialTheme {
                 Box(Modifier.size(80.dp).testTag("bin-snapshot")) {
-                    WorktreeArchiveBin(entries = entries)
+                    WorktreeArchiveBin(entries = entries, pulseWorktreePaths = pulseWorktreePaths)
                 }
             }
         }
@@ -292,14 +297,14 @@ class WorktreeArchiveAnimationTest {
         mainClock.advanceTimeBy(400)
         assertTrue(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
 
-        // A rejected write leaves the event absent even if the persisted bin already has entries.
+        // A restored entry appears without an arrival report, so the bin stays quiet.
         entries = entries + entry.copy(worktreePath = "/repos/widgets-search", queueId = "restored-2")
         mainClock.advanceTimeByFrame()
         val beforeQueue = onNodeWithTag("bin-snapshot").captureToImage().pixels()
         mainClock.advanceTimeBy(400)
         assertTrue(beforeQueue.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
 
-        entries = entries.map { it.copy(isNewlyQueued = it.queueId == "queued-1") }
+        pulseWorktreePaths = setOf("/repos/widgets-login")
         mainClock.advanceTimeByFrame()
         mainClock.advanceTimeBy(160)
         assertFalse(beforeQueue.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
@@ -327,7 +332,6 @@ class WorktreeArchiveAnimationTest {
             60,
             "/repos/login",
             queueId = "first",
-            isNewlyQueued = true,
         )
         val second = WorktreeArchiveBinEntry(
             "widgets",
@@ -335,13 +339,13 @@ class WorktreeArchiveAnimationTest {
             60,
             "/repos/search",
             queueId = "second",
-            isNewlyQueued = true,
         )
         var entries by mutableStateOf(listOf(existing))
+        var pulseWorktreePaths by mutableStateOf(emptySet<String>())
         setContent {
             MaterialTheme {
                 Box(Modifier.size(80.dp).testTag("bin-snapshot")) {
-                    WorktreeArchiveBin(entries = entries)
+                    WorktreeArchiveBin(entries = entries, pulseWorktreePaths = pulseWorktreePaths)
                 }
             }
         }
@@ -349,6 +353,7 @@ class WorktreeArchiveAnimationTest {
         val baseline = onNodeWithTag("bin-snapshot").captureToImage().pixels()
 
         entries = listOf(existing, first)
+        pulseWorktreePaths = setOf("/repos/login")
         mainClock.advanceTimeByFrame()
         mainClock.advanceTimeBy(80)
         assertFalse(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
@@ -359,6 +364,7 @@ class WorktreeArchiveAnimationTest {
         assertTrue(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
 
         entries = listOf(existing, first, second)
+        pulseWorktreePaths = setOf("/repos/login", "/repos/search")
         mainClock.advanceTimeByFrame()
         mainClock.advanceTimeBy(80)
         entries = listOf(existing, second)
@@ -373,13 +379,14 @@ class WorktreeArchiveAnimationTest {
     @Test
     fun undoWaitingSecondPulseSkipsItWhileFirstReturnsToBaseline() = runComposeUiTest {
         mainClock.autoAdvance = false
-        val first = WorktreeArchiveBinEntry("widgets", "feature/login", 60, "/repos/login", "first", true)
-        val second = WorktreeArchiveBinEntry("widgets", "feature/search", 60, "/repos/search", "second", true)
+        val first = WorktreeArchiveBinEntry("widgets", "feature/login", 60, "/repos/login", "first")
+        val second = WorktreeArchiveBinEntry("widgets", "feature/search", 60, "/repos/search", "second")
         var entries by mutableStateOf(emptyList<WorktreeArchiveBinEntry>())
+        var pulseWorktreePaths by mutableStateOf(emptySet<String>())
         setContent {
             MaterialTheme {
                 Box(Modifier.size(80.dp).testTag("bin-snapshot")) {
-                    WorktreeArchiveBin(entries = entries)
+                    WorktreeArchiveBin(entries = entries, pulseWorktreePaths = pulseWorktreePaths)
                 }
             }
         }
@@ -387,10 +394,12 @@ class WorktreeArchiveAnimationTest {
         val baseline = onNodeWithTag("bin-snapshot").captureToImage().pixels()
 
         entries = listOf(first)
+        pulseWorktreePaths = setOf("/repos/login")
         mainClock.advanceTimeByFrame()
         mainClock.advanceTimeBy(80)
         assertFalse(baseline.contentEquals(onNodeWithTag("bin-snapshot").captureToImage().pixels()))
         entries = listOf(first, second)
+        pulseWorktreePaths = setOf("/repos/login", "/repos/search")
         mainClock.advanceTimeByFrame()
         entries = listOf(first)
         mainClock.advanceTimeByFrame()

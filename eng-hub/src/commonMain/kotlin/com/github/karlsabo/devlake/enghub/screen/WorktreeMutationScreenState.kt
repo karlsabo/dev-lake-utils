@@ -37,9 +37,7 @@ internal fun collectWorktreeMutationScreenState(viewModel: EngHubViewModel): Wor
     )
     return WorktreeMutationScreenState(
         archivingPaths = archivingPaths,
-        archiveBinEntries = archiveBinEntries.map { entry ->
-            entry.copy(isNewlyQueued = entry.queueId in newlyQueuedArchiveIds)
-        },
+        archiveBinEntries = archiveBinEntries,
         queuedArchivePaths = queuedArchives.mapTo(mutableSetOf(), WorktreeArchiveJob::worktreePath),
         newlyQueuedArchivePaths = queuedArchives.filter { it.queueId in newlyQueuedArchiveIds }
             .mapTo(mutableSetOf(), WorktreeArchiveJob::worktreePath),

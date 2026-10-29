@@ -38,6 +38,7 @@ internal fun EngHubScreenBody(
                     entries = state.archiveBinEntries,
                     actions = actions.archiveBinActions(),
                     onBoundsUpdate = archiveFlight.onBinBoundsUpdate,
+                    pulseWorktreePaths = archiveFlight.binPulsePaths,
                 ),
                 onPaneSelect = actions.onPaneSelected,
             )
