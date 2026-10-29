@@ -61,6 +61,8 @@ private const val GHOST_CHIP_TAG = "archive-flight-chip-feature/ghost"
  */
 private const val CHIP_CLEAR_OF_BIN_PX = 150f
 private const val MAX_CHIP_START_FRAMES = 5
+private const val MAX_CHIP_FLIGHT_FRAMES = 30
+private const val ARCHIVE_SHORTCUT_DESCRIPTION = "Archive worktree feature/login"
 
 class WorktreeArchiveFlightTest {
 
@@ -83,21 +85,48 @@ class WorktreeArchiveFlightTest {
         // The real row collapses on its own 220ms schedule, concurrently with the chip.
         onNodeWithTag(ROW_TAG).assertExists()
 
-        val chipCenters = mutableListOf<Offset>()
-        val chipWidths = mutableListOf<Float>()
-        while (chipCenters.size < 30) {
-            mainClock.advanceTimeByFrame()
-            val chip = onAllNodesWithTag(CHIP_TAG).fetchSemanticsNodes().firstOrNull() ?: break
-            chipCenters += chip.boundsInRoot.center
-            chipWidths += chip.boundsInRoot.width
-        }
-        assertTrue(chipWidths.last() < chipWidths.first() / 2f, "chip shrinks: $chipWidths")
+        val samples = recordArchiveFlightChip(CHIP_TAG)
+        assertTrue(samples.widths.last() < samples.widths.first() / 2f, "chip shrinks: ${samples.widths}")
         onNodeWithTag(CHIP_TAG).assertDoesNotExist()
         mainClock.advanceTimeByFrame()
         mainClock.advanceTimeByFrame()
         onNodeWithTag(ROW_TAG).assertDoesNotExist()
 
-        assertSinusoidalFlight(chipCenters, origin = rowCenter, destination = binCenter)
+        assertSinusoidalFlight(samples.centers, origin = rowCenter, destination = binCenter)
+    }
+
+    /**
+     * Acceptance (story 3): the row's archive shortcut and the row menu are two handles on the same
+     * `LocalWorktreeRowActions.onArchive`, so the shortcut must fly the same chip rather than quietly
+     * collapsing the row. This test pins the shortcut trigger, not just the menu trigger.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun archiveShortcutFliesTheSameChipFromRowToBinWhileRowCollapses() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var screenState by mutableStateOf(screenStateWithWorktrees(TestWorktree(LOGIN_BRANCH, LOGIN_PATH)))
+        setContent {
+            EngHubScreenWithArchiveQueueing(screenState) { screenState = it }
+        }
+        mainClock.advanceTimeByFrame()
+        val rowCenter = onNodeWithTag(ROW_TAG).fetchSemanticsNode().boundsInRoot.center
+        val binCenter = onNodeWithContentDescription("Recycle bin (0)").fetchSemanticsNode().boundsInRoot.center
+
+        // The shortcut sits on the row itself, so acting on a focused row is this click.
+        onNodeWithContentDescription(ARCHIVE_SHORTCUT_DESCRIPTION).performClick()
+        mainClock.advanceTimeByFrame()
+        // The archive is queued, and the row still collapses on its own 220ms schedule.
+        onNodeWithContentDescription("Recycle bin (1)").assertExists()
+        onNodeWithTag(ROW_TAG).assertExists()
+
+        val samples = recordArchiveFlightChip(CHIP_TAG)
+        assertTrue(samples.widths.last() < samples.widths.first() / 2f, "chip shrinks: ${samples.widths}")
+        onNodeWithTag(CHIP_TAG).assertDoesNotExist()
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        onNodeWithTag(ROW_TAG).assertDoesNotExist()
+
+        assertSinusoidalFlight(samples.centers, origin = rowCenter, destination = binCenter)
     }
 
     /**
@@ -314,6 +343,26 @@ class WorktreeArchiveFlightTest {
         assertEquals(1f, worktreeArchiveFlightScale(0f), 0.0001f)
         assertTrue(worktreeArchiveFlightScale(1f) < 0.5f, "chip is small enough to vanish into the bin")
     }
+}
+
+/** One chip's rendered bounds per animation frame, from the frame it appears to the frame it lands. */
+private data class ArchiveFlightSamples(
+    val centers: List<Offset>,
+    val widths: List<Float>,
+)
+
+/** Follows a chip frame by frame until it vanishes into the bin, or the flight window is exceeded. */
+@OptIn(ExperimentalTestApi::class)
+private fun ComposeUiTest.recordArchiveFlightChip(tag: String): ArchiveFlightSamples {
+    val centers = mutableListOf<Offset>()
+    val widths = mutableListOf<Float>()
+    while (centers.size < MAX_CHIP_FLIGHT_FRAMES) {
+        mainClock.advanceTimeByFrame()
+        val chip = onAllNodesWithTag(tag).fetchSemanticsNodes().firstOrNull() ?: break
+        centers += chip.boundsInRoot.center
+        widths += chip.boundsInRoot.width
+    }
+    return ArchiveFlightSamples(centers = centers, widths = widths)
 }
 
 /** A queued archive starts its chip only after the flight effect runs on a following frame. */
