@@ -53,12 +53,12 @@ internal data class WorktreeArchiveFlight(
 
 /**
  * The archive feedback the screen is animating, plus the location reporters that feed it.
- * Concurrent flights are intentionally unsupported; a queued archive waits without a chip instead.
- * [binPulsePaths] is the outcome of that decision: an archive either flies and pulses on arrival, or
- * cannot fly and pulses on queue.
+ * [flights] holds every chip currently in the air: archives queued while another chip flies get
+ * their own chip immediately, so each keeps its own 220ms window. [binPulsePaths] carries the
+ * outcome: an archive either flies and pulses on arrival, or cannot fly and pulses on queue.
  */
 internal data class WorktreeArchiveFlightState(
-    val flight: WorktreeArchiveFlight? = null,
+    val flights: List<WorktreeArchiveFlight> = emptyList(),
     val onRowBoundsUpdate: (worktreePath: String, anchor: WorktreeArchiveFlightAnchor) -> Unit = { _, _ -> },
     val onBinBoundsUpdate: (Rect) -> Unit = {},
     val onFlightComplete: (worktreePath: String) -> Unit = {},
@@ -88,7 +88,8 @@ internal fun worktreeArchiveFlightScale(progress: Float): Float {
 }
 
 /**
- * Tracks row and bin geometry and starts a flight when an archive is newly queued.
+ * Tracks row and bin geometry and starts a flight for every archive as it is newly queued, so
+ * archives queued while another chip flies each get their own chip.
  * Coordinates are reported in root bounds, which is the space the overlay draws in.
  * The recycle bin pulses when a chip arrives; archives that cannot fly pulse on queue instead.
  */
@@ -100,7 +101,7 @@ internal fun rememberWorktreeArchiveFlightState(
     // Deliberately not snapshot state: anchors are only read when a flight starts.
     val rowAnchors = remember { mutableMapOf<String, WorktreeArchiveFlightAnchor>() }
     var binBounds by remember { mutableStateOf<Rect?>(null) }
-    var flight by remember { mutableStateOf<WorktreeArchiveFlight?>(null) }
+    var flights by remember { mutableStateOf(emptyList<WorktreeArchiveFlight>()) }
     var handledPaths by remember { mutableStateOf(emptySet<String>()) }
     var binPulsePaths by remember { mutableStateOf(emptySet<String>()) }
 
@@ -109,15 +110,9 @@ internal fun rememberWorktreeArchiveFlightState(
         binPulsePaths = binPulsePaths intersect queuedWorktreePaths
     }
 
-    LaunchedEffect(newlyQueuedWorktreePaths, binBounds, flight) {
+    LaunchedEffect(newlyQueuedWorktreePaths, binBounds) {
         val unhandledPaths = newlyQueuedWorktreePaths - handledPaths
-        if (flight != null) {
-            // One chip at a time: archives queued mid-flight never get a chip, so they pulse now.
-            unhandledPaths.forEach(rowAnchors::remove)
-            handledPaths = handledPaths + unhandledPaths
-            binPulsePaths = binPulsePaths + unhandledPaths
-            return@LaunchedEffect
-        }
+        if (unhandledPaths.isEmpty()) return@LaunchedEffect
         val unanchoredPaths = unhandledPaths.filterNot { rowAnchors.containsKey(it) }.toSet()
         if (unanchoredPaths.isNotEmpty()) {
             // Decision 6: without captured row bounds there is no flight, so pulse on queue.
@@ -125,45 +120,51 @@ internal fun rememberWorktreeArchiveFlightState(
             binPulsePaths = binPulsePaths + unanchoredPaths
         }
         val destination = binBounds ?: return@LaunchedEffect
-        val source = (unhandledPaths - unanchoredPaths).firstNotNullOfOrNull { path ->
-            rowAnchors[path]?.let { path to it }
-        } ?: return@LaunchedEffect
-        val (worktreePath, anchor) = source
-        handledPaths = handledPaths + worktreePath
-        flight = WorktreeArchiveFlight(
-            worktreePath = worktreePath,
-            branch = anchor.branch,
-            origin = anchor.bounds,
-            destination = destination,
-        )
+        // Every anchored path starts its own chip, so a mid-flight archive never replays later from
+        // a row that has already collapsed.
+        val startedFlights = (unhandledPaths - unanchoredPaths).mapNotNull { path ->
+            rowAnchors[path]?.let { anchor ->
+                WorktreeArchiveFlight(
+                    worktreePath = path,
+                    branch = anchor.branch,
+                    origin = anchor.bounds,
+                    destination = destination,
+                )
+            }
+        }
+        if (startedFlights.isEmpty()) return@LaunchedEffect
+        handledPaths = handledPaths + startedFlights.map(WorktreeArchiveFlight::worktreePath)
+        flights = flights + startedFlights
     }
 
     return WorktreeArchiveFlightState(
-        flight = flight,
+        flights = flights,
         onRowBoundsUpdate = { worktreePath, anchor -> rowAnchors[worktreePath] = anchor },
         onBinBoundsUpdate = { bounds -> binBounds = bounds },
         onFlightComplete = { worktreePath ->
             rowAnchors.remove(worktreePath)
-            flight = null
+            flights = flights.filterNot { it.worktreePath == worktreePath }
             binPulsePaths = binPulsePaths + worktreePath
         },
         binPulsePaths = binPulsePaths,
     )
 }
 
-/** Draws the archive chip on top of the screen content; it is inert once no flight is running. */
+/** Draws every in-flight archive chip on top of the screen content; inert once no flight is running. */
 @Composable
 internal fun WorktreeArchiveFlightOverlay(
     state: WorktreeArchiveFlightState,
     modifier: Modifier = Modifier,
 ) {
-    val flight = state.flight ?: return
+    if (state.flights.isEmpty()) return
     Box(modifier = modifier) {
-        key(flight.worktreePath) {
-            WorktreeArchiveFlightChip(
-                flight = flight,
-                onFlightComplete = { state.onFlightComplete(flight.worktreePath) },
-            )
+        state.flights.forEach { flight ->
+            key(flight.worktreePath) {
+                WorktreeArchiveFlightChip(
+                    flight = flight,
+                    onFlightComplete = { state.onFlightComplete(flight.worktreePath) },
+                )
+            }
         }
     }
 }
