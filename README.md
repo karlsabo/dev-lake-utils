@@ -77,6 +77,8 @@
 * [ ] After adding a new repository, display the settings window to configure it. Adding comments, etc.
 * [ ] We need a workflow kickoff
   * I should be able to paste a ticket, and it will create a worktree and spawn agents to implement the ticket.
+* [ ] Save window position and size and restore it
+* [ ] Open in terminal or finder - allow adding arbitrary command sequences and bind to a new emoji button or menu item. that gives the user the ability to do whatever they want in the worktree.
 
 ## Implementation loop
 * Implement
