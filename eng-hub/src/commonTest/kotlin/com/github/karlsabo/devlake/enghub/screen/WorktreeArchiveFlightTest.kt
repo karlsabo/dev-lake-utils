@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
@@ -35,6 +36,7 @@ import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,15 +47,24 @@ private const val TEST_FRAME_MS = 16f
 private const val FRAME_PROGRESS = TEST_FRAME_MS / WORKTREE_ARCHIVE_FLIGHT_DURATION_MS
 private const val ROW_TAG = "worktree-row-feature/login"
 private const val CHIP_TAG = "archive-flight-chip-feature/login"
-private const val SKIPPED_ROW_TAG = "worktree-row-feature/signup"
-private const val SKIPPED_CHIP_TAG = "archive-flight-chip-feature/signup"
+private const val SECOND_ROW_TAG = "worktree-row-feature/signup"
+private const val SECOND_CHIP_TAG = "archive-flight-chip-feature/signup"
 private const val LOGIN_BRANCH = "feature/login"
 private const val LOGIN_PATH = "/repos/widgets-feature-login"
-private const val SIGNUP_BRANCH = "feature/signup"
-private const val SIGNUP_PATH = "/repos/widgets-feature-signup"
+private const val SECOND_BRANCH = "feature/signup"
+private const val SECOND_PATH = "/repos/widgets-feature-signup"
 private const val GHOST_BRANCH = "feature/ghost"
 private const val GHOST_PATH = "/repos/widgets-feature-ghost"
 private const val GHOST_CHIP_TAG = "archive-flight-chip-feature/ghost"
+
+/** Frames the second archive waits before it is queued: about 100ms into the first chip's flight. */
+private const val SECOND_ARCHIVE_DELAY_FRAMES = 6
+
+/** Frames the bin is sampled for: long enough to cover two serialized 320ms out-and-back pulses. */
+private const val BIN_PULSE_SAMPLE_FRAMES = 50
+
+/** Ignores capture noise that is too short to be a pulse hump. */
+private const val MIN_BIN_PULSE_HUMP_FRAMES = 3
 
 /**
  * The chip's shadow reaches the bin icon well before the chip itself does, so bin pixels are only
@@ -130,18 +141,18 @@ class WorktreeArchiveFlightTest {
     }
 
     /**
-     * Regression: an archive queued while a chip is already flying must skip its chip outright.
-     * Marking it late replayed a delayed chip from a row that had already collapsed. Skipping the
-     * chip must not also skip the feedback: that archive pulses the bin on queue instead.
+     * Acceptance (story 4): a second archive queued while the first chip is still in the air gets a
+     * chip of its own. Both fly concurrently and vanish on their own 220ms schedules, so the second
+     * neither waits for the first to land nor replays later from a row that has already collapsed.
      */
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun archiveQueuedDuringFlightSkipsItsChipInsteadOfReplayingItLate() = runComposeUiTest {
+    fun archivesQueuedWhileAChipIsFlyingAnimateIndependentlyOnTheirOwnSchedules() = runComposeUiTest {
         mainClock.autoAdvance = false
         var screenState by mutableStateOf(
             screenStateWithWorktrees(
                 TestWorktree(LOGIN_BRANCH, LOGIN_PATH),
-                TestWorktree(SIGNUP_BRANCH, SIGNUP_PATH),
+                TestWorktree(SECOND_BRANCH, SECOND_PATH),
             ),
         )
         setContent {
@@ -149,56 +160,152 @@ class WorktreeArchiveFlightTest {
         }
         mainClock.advanceTimeByFrame()
         val binCenter = onNodeWithContentDescription("Recycle bin (0)").fetchSemanticsNode().boundsInRoot.center
-        onNodeWithTag(SKIPPED_ROW_TAG).assertExists()
+        onNodeWithTag(SECOND_ROW_TAG).assertExists()
 
         onNodeWithContentDescription("Worktree actions for feature/login").performClick()
         mainClock.advanceTimeByFrame()
         onNodeWithText("Archive").performClick()
         advanceFramesUntilTagExists(CHIP_TAG)
-        onNodeWithTag(CHIP_TAG).assertExists()
 
-        // The bin waits for the first chip to land, so this is the appearance the skipped archive's
-        // own pulse has to change.
-        val binAtRest = onNodeWithContentDescription("Recycle bin (1)").captureToImage().pixels()
-
-        // A second archive is queued while the first chip is still in the air.
-        screenState = screenState.queuingArchive(SIGNUP_BRANCH, SIGNUP_PATH)
-        mainClock.advanceTimeByFrame()
-        mainClock.advanceTimeByFrame()
-        // The first chip keeps flying, and the second archive never gets one of its own.
-        onNodeWithTag(CHIP_TAG).assertExists()
-        onNodeWithTag(SKIPPED_CHIP_TAG).assertDoesNotExist()
-
-        val chipCenters = mutableListOf<Offset>()
-        var skippedArchivePulseFrames = 0
-        while (true) {
-            onNodeWithTag(SKIPPED_CHIP_TAG).assertDoesNotExist()
-            val chip = onAllNodesWithTag(CHIP_TAG).fetchSemanticsNodes().firstOrNull() ?: break
-            val chipCenter = chip.boundsInRoot.center
-            chipCenters += chipCenter
-            assertTrue(chipCenters.size < 20, "the first chip should finish within its 220ms window")
-            if (binPulsedWhileChipIsAway(binAtRest, chipCenter, binCenter)) skippedArchivePulseFrames++
-            mainClock.advanceTimeByFrame()
-        }
-        assertTrue(
-            skippedArchivePulseFrames >= 4,
-            "the skipped archive pulses the bin on queue instead of losing its feedback: " +
-                "$skippedArchivePulseFrames frames before the first chip arrived",
+        // Follow both chips frame by frame; the second archive is queued ~100ms into the first flight.
+        val frames = recordConcurrentArchiveFlight(
+            firstTag = CHIP_TAG,
+            secondTag = SECOND_CHIP_TAG,
+            queueSecondArchive = { screenState = screenState.queuingArchive(SECOND_BRANCH, SECOND_PATH) },
         )
-        assertTrue(
-            chipCenters.size in 6..17,
-            "the first chip keeps flying after the skipped archive is queued: ${chipCenters.size} frames",
-        )
-        assertTrue((chipCenters.last() - binCenter).getDistance() < 4f, "the first chip still lands on the bin")
+        assertIndependentChipSchedules(frames, binCenter)
 
-        // Watch well past the flight's 220ms: the skipped archive must not replay a delayed chip.
-        repeat(30) {
+        // Watch well past both flights: neither archive may replay a delayed chip.
+        repeat(MAX_CHIP_FLIGHT_FRAMES) {
             mainClock.advanceTimeByFrame()
-            onNodeWithTag(SKIPPED_CHIP_TAG).assertDoesNotExist()
+            onAllNodesWithTag(CHIP_TAG).assertCountEquals(0)
+            onAllNodesWithTag(SECOND_CHIP_TAG).assertCountEquals(0)
         }
-        // Both rows still collapse; only the chip was skipped.
+        // Both rows collapse on their own schedule, regardless of the chips.
         onNodeWithTag(ROW_TAG).assertDoesNotExist()
-        onNodeWithTag(SKIPPED_ROW_TAG).assertDoesNotExist()
+        onNodeWithTag(SECOND_ROW_TAG).assertDoesNotExist()
+    }
+
+    private fun assertIndependentChipSchedules(frames: ConcurrentFlightFrames, binCenter: Offset) {
+        val firstFrames = frames.firstFrames
+        val secondFrames = frames.secondFrames
+        assertTrue(
+            firstFrames.size in 13..18,
+            "the first chip flies for one 220ms window: ${firstFrames.size} frames",
+        )
+        assertTrue(
+            secondFrames.size in 13..18,
+            "the second chip flies for its own 220ms window: ${secondFrames.size} frames",
+        )
+        val overlapFrames = firstFrames.count { it in secondFrames }
+        assertTrue(overlapFrames >= 5, "both chips are in the air together for $overlapFrames frames")
+
+        // The second chip started and finished ~100ms after the first, so the two schedules are
+        // independent rather than shared or staggered by the first flight's completion.
+        val startGap = secondFrames.first() - firstFrames.first()
+        val endGap = secondFrames.last() - firstFrames.last()
+        assertTrue(
+            startGap in SECOND_ARCHIVE_DELAY_FRAMES..(SECOND_ARCHIVE_DELAY_FRAMES + 3),
+            "the second chip starts ~100ms after the first: $startGap frames",
+        )
+        assertTrue(
+            abs(endGap - startGap) <= 2,
+            "each chip keeps its own 220ms window: start gap $startGap, end gap $endGap",
+        )
+        assertTrue(
+            abs(secondFrames.size - firstFrames.size) <= 2,
+            "neither chip waits on the other: ${firstFrames.size} vs ${secondFrames.size} frames",
+        )
+        assertTrue(
+            (frames.firstCenters.last() - binCenter).getDistance() < 4f,
+            "the first chip vanishes into the bin",
+        )
+        assertTrue(
+            (frames.secondCenters.last() - binCenter).getDistance() < 4f,
+            "the second chip vanishes into the bin",
+        )
+    }
+
+    /**
+     * Acceptance (story 4) bin side: two arrivals pulse the bin twice. The bin shares one scale
+     * animator behind a mutex, so the second pulse waits for the first to return to rest. The test
+     * counts humps in the scale signal rather than pinning either pulse to exact frames.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun bothConcurrentArrivalsPulseTheBinIndependentlyAndInSequence() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var screenState by mutableStateOf(
+            screenStateWithWorktrees(
+                TestWorktree(LOGIN_BRANCH, LOGIN_PATH),
+                TestWorktree(SECOND_BRANCH, SECOND_PATH),
+            ),
+        )
+        setContent {
+            EngHubScreenWithArchiveQueueing(screenState) { screenState = it }
+        }
+        mainClock.advanceTimeByFrame()
+        val binAtRestWidth = onNodeWithContentDescription("Recycle bin (0)").captureToImage().width
+
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("Archive").performClick()
+        advanceFramesUntilTagExists(CHIP_TAG)
+
+        // Queue the second archive ~100ms into the first flight, then let both chips land.
+        recordConcurrentArchiveFlight(
+            firstTag = CHIP_TAG,
+            secondTag = SECOND_CHIP_TAG,
+            queueSecondArchive = { screenState = screenState.queuingArchive(SECOND_BRANCH, SECOND_PATH) },
+        )
+        onAllNodesWithTag(CHIP_TAG).assertCountEquals(0)
+        onAllNodesWithTag(SECOND_CHIP_TAG).assertCountEquals(0)
+
+        // Both arrivals are now in the bin; the first pulse may already be mid-leg. Because the
+        // pulses serialize on the bin's mutex, the scale signal must show two humps separated by a
+        // return to rest. The captured size grows with the icon's pulse scale.
+        val pulseWidths = (1..BIN_PULSE_SAMPLE_FRAMES).map {
+            mainClock.advanceTimeByFrame()
+            onNodeWithContentDescription("Recycle bin (2)").captureToImage().width
+        }
+        assertTwoSerializedBinPulses(pulseWidths, binAtRestWidth)
+    }
+
+    /**
+     * Regression: undo a queued archive while its chip is in the air, then re-archive the same path
+     * before it lands. Undo drops the path from the queued set but not from the in-flight chip, so
+     * the re-archive must reuse that chip rather than adding a second overlay keyed by the same path.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun rearchivingAPathWhoseChipIsStillFlyingKeepsOneChip() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var screenState by mutableStateOf(screenStateWithWorktrees(TestWorktree(LOGIN_BRANCH, LOGIN_PATH)))
+        setContent {
+            EngHubScreenWithArchiveQueueing(screenState) { screenState = it }
+        }
+        mainClock.advanceTimeByFrame()
+
+        onNodeWithContentDescription("Worktree actions for feature/login").performClick()
+        mainClock.advanceTimeByFrame()
+        onNodeWithText("Archive").performClick()
+        advanceFramesUntilTagExists(CHIP_TAG)
+        repeat(SECOND_ARCHIVE_DELAY_FRAMES) { mainClock.advanceTimeByFrame() }
+        onAllNodesWithTag(CHIP_TAG).assertCountEquals(1)
+
+        screenState = screenState.undoingArchive(LOGIN_PATH)
+        mainClock.advanceTimeByFrame()
+        screenState = screenState.queuingArchive(LOGIN_BRANCH, LOGIN_PATH)
+        // The re-archive reaches the flight effect a frame or two after the state change.
+        repeat(3) { mainClock.advanceTimeByFrame() }
+
+        // The original chip is still the only chip; without the guard the re-archive adds a second
+        // chip for the same path.
+        onAllNodesWithTag(CHIP_TAG).assertCountEquals(1)
+        onNodeWithTag(CHIP_TAG).assertExists()
+
+        repeat(MAX_CHIP_FLIGHT_FRAMES) { mainClock.advanceTimeByFrame() }
+        onAllNodesWithTag(CHIP_TAG).assertCountEquals(0)
     }
 
     /**
@@ -351,6 +458,67 @@ private data class ArchiveFlightSamples(
     val widths: List<Float>,
 )
 
+/** The frames, and last positions, of two chips whose flights overlap. */
+private data class ConcurrentFlightFrames(
+    val firstFrames: List<Int>,
+    val secondFrames: List<Int>,
+    val firstCenters: List<Offset>,
+    val secondCenters: List<Offset>,
+)
+
+/**
+ * Follows two chips frame by frame until both have landed, queueing the second archive partway
+ * through the first flight. Recording stops once both are gone, so a late replay is never sampled.
+ */
+@OptIn(ExperimentalTestApi::class)
+private fun ComposeUiTest.recordConcurrentArchiveFlight(
+    firstTag: String,
+    secondTag: String,
+    queueSecondArchive: () -> Unit,
+): ConcurrentFlightFrames {
+    val firstFrames = mutableListOf<Int>()
+    val secondFrames = mutableListOf<Int>()
+    val firstCenters = mutableListOf<Offset>()
+    val secondCenters = mutableListOf<Offset>()
+    var frame = 0
+    while (frame < 2 * MAX_CHIP_FLIGHT_FRAMES) {
+        mainClock.advanceTimeByFrame()
+        if (frame == SECOND_ARCHIVE_DELAY_FRAMES) queueSecondArchive()
+        frame++
+        val firstChip = onAllNodesWithTag(firstTag).fetchSemanticsNodes().firstOrNull()
+        val secondChip = onAllNodesWithTag(secondTag).fetchSemanticsNodes().firstOrNull()
+        firstChip?.let {
+            firstFrames += frame
+            firstCenters += it.boundsInRoot.center
+            assertDistinctChips(it.boundsInRoot.center, secondChip?.boundsInRoot?.center, frame)
+        }
+        secondChip?.let {
+            secondFrames += frame
+            secondCenters += it.boundsInRoot.center
+        }
+        if (chipsHaveLanded(firstChip, secondChip, firstFrames, secondFrames)) break
+    }
+    return ConcurrentFlightFrames(firstFrames, secondFrames, firstCenters, secondCenters)
+}
+
+/** Two chips in the air at once are separate chips on separate rows, not one chip drawn twice. */
+private fun assertDistinctChips(
+    firstCenter: Offset,
+    secondCenter: Offset?,
+    frame: Int,
+) {
+    if (secondCenter == null) return
+    assertTrue((firstCenter - secondCenter).getDistance() > 20f, "each archive flies its own chip at frame $frame")
+}
+
+/** Both chips have appeared and are now gone, so the concurrent window is fully sampled. */
+private fun chipsHaveLanded(
+    firstChip: SemanticsNode?,
+    secondChip: SemanticsNode?,
+    firstFrames: List<Int>,
+    secondFrames: List<Int>,
+): Boolean = firstChip == null && secondChip == null && firstFrames.isNotEmpty() && secondFrames.isNotEmpty()
+
 /** Follows a chip frame by frame until it vanishes into the bin, or the flight window is exceeded. */
 @OptIn(ExperimentalTestApi::class)
 private fun ComposeUiTest.recordArchiveFlightChip(tag: String): ArchiveFlightSamples {
@@ -372,21 +540,6 @@ private fun ComposeUiTest.advanceFramesUntilTagExists(tag: String) {
         if (onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()) return
         mainClock.advanceTimeByFrame()
     }
-}
-
-/**
- * The chip and its shadow draw over the bin icon as it closes in, so only frames with the chip still
- * this far away show the bin's own scale.
- */
-@OptIn(ExperimentalTestApi::class)
-private fun ComposeUiTest.binPulsedWhileChipIsAway(
-    binAtRest: IntArray,
-    chipCenter: Offset,
-    binCenter: Offset,
-): Boolean {
-    if ((chipCenter - binCenter).getDistance() < CHIP_CLEAR_OF_BIN_PX) return false
-    val bin = onNodeWithContentDescription("Recycle bin (2)")
-    return !binAtRest.contentEquals(bin.captureToImage().pixels())
 }
 
 /** Screen content whose archive click queues the archive into the mutable test screen state. */
@@ -417,6 +570,44 @@ private data class TestWorktree(
 
 private fun ImageBitmap.pixels(): IntArray = IntArray(width * height).also { readPixels(it) }
 
+/**
+ * Counts the humps in the bin's scale signal. Two serialized pulses rise, settle all the way back
+ * to rest, then rise again; overlapping or missing pulses merge into one hump or leave no hump at
+ * all. The hump count alone cannot show that the bin settled, because a pulse that dips below the
+ * threshold without returning to rest would still read as two humps, so the gap must contain a
+ * sample at [restWidth].
+ */
+private fun assertTwoSerializedBinPulses(pulseWidths: List<Int>, restWidth: Int) {
+    val strongest = pulseWidths.max()
+    assertTrue(strongest > restWidth, "the bin never scaled up from rest width $restWidth: $pulseWidths")
+    val threshold = restWidth + (strongest - restWidth) / 4
+    val humps = pulseWidths.humpsAbove(threshold).filter { it.last - it.first >= MIN_BIN_PULSE_HUMP_FRAMES }
+    assertEquals(2, humps.size, "expected one bin pulse per arrival, saw ${humps.size}: $pulseWidths")
+    val betweenHumps = pulseWidths.filterIndexed { index, _ -> index in (humps[0].last + 1) until humps[1].first }
+    assertTrue(
+        betweenHumps.contains(restWidth),
+        "the bin must settle back to rest width $restWidth between pulses, not just drop below " +
+            "threshold $threshold: ${humps[0]} then $betweenHumps then ${humps[1]} in $pulseWidths",
+    )
+}
+
+/** Contiguous runs of samples above [threshold], in sample order. */
+private fun List<Int>.humpsAbove(threshold: Int): List<IntRange> {
+    val humps = mutableListOf<IntRange>()
+    var index = 0
+    while (index < size) {
+        if (this[index] <= threshold) {
+            index++
+            continue
+        }
+        val start = index
+        while (index + 1 < size && this[index + 1] > threshold) index++
+        humps += start..index
+        index++
+    }
+    return humps
+}
+
 /** Mirrors the view model: a queued archive stays newly queued until it is cleared. */
 private fun EngHubScreenState.queuingArchive(branch: String, worktreePath: String): EngHubScreenState {
     val entries = archiveBinEntries.filterNot { it.worktreePath == worktreePath } + WorktreeArchiveBinEntry(
@@ -426,6 +617,17 @@ private fun EngHubScreenState.queuingArchive(branch: String, worktreePath: Strin
         worktreePath = worktreePath,
         queueId = "queued-${branch.replace('/', '-')}",
     )
+    return withArchiveEntries(entries)
+}
+
+/** Undo drops the entry and its queued path, leaving any chip already in the air untouched. */
+private fun EngHubScreenState.undoingArchive(worktreePath: String): EngHubScreenState {
+    val entries = archiveBinEntries.filterNot { it.worktreePath == worktreePath }
+    return withArchiveEntries(entries)
+}
+
+/** Keeps the queued and newly-queued path sets in step with the bin entries. */
+private fun EngHubScreenState.withArchiveEntries(entries: List<WorktreeArchiveBinEntry>): EngHubScreenState {
     val queuedPaths = entries.mapTo(mutableSetOf(), WorktreeArchiveBinEntry::worktreePath)
     return copy(
         archiveBinEntries = entries,
