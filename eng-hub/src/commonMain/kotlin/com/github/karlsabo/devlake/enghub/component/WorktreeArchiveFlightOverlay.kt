@@ -134,7 +134,14 @@ internal fun rememberWorktreeArchiveFlightState(
         }
         if (startedFlights.isEmpty()) return@LaunchedEffect
         handledPaths = handledPaths + startedFlights.map(WorktreeArchiveFlight::worktreePath)
-        flights = flights + startedFlights
+        // Undo can drop a path from queuedWorktreePaths while its chip is still in the air, and a
+        // re-archive then queues the same path again. The chip already flying owns that path's
+        // feedback; starting another would give the overlay two chips with the same key.
+        val newFlights = startedFlights.filterNot { candidate ->
+            flights.any { it.worktreePath == candidate.worktreePath }
+        }
+        if (newFlights.isEmpty()) return@LaunchedEffect
+        flights = flights + newFlights
     }
 
     return WorktreeArchiveFlightState(
