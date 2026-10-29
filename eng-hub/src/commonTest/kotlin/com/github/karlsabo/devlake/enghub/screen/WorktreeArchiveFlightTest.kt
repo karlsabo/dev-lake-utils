@@ -571,8 +571,11 @@ private data class TestWorktree(
 private fun ImageBitmap.pixels(): IntArray = IntArray(width * height).also { readPixels(it) }
 
 /**
- * Counts the humps in the bin's scale signal. Two serialized pulses rise, return to rest, then rise
- * again; overlapping or missing pulses merge into one hump or leave no hump at all.
+ * Counts the humps in the bin's scale signal. Two serialized pulses rise, settle all the way back
+ * to rest, then rise again; overlapping or missing pulses merge into one hump or leave no hump at
+ * all. The hump count alone cannot show that the bin settled, because a pulse that dips below the
+ * threshold without returning to rest would still read as two humps, so the gap must contain a
+ * sample at [restWidth].
  */
 private fun assertTwoSerializedBinPulses(pulseWidths: List<Int>, restWidth: Int) {
     val strongest = pulseWidths.max()
@@ -580,7 +583,12 @@ private fun assertTwoSerializedBinPulses(pulseWidths: List<Int>, restWidth: Int)
     val threshold = restWidth + (strongest - restWidth) / 4
     val humps = pulseWidths.humpsAbove(threshold).filter { it.last - it.first >= MIN_BIN_PULSE_HUMP_FRAMES }
     assertEquals(2, humps.size, "expected one bin pulse per arrival, saw ${humps.size}: $pulseWidths")
-    assertTrue(humps[0].last < humps[1].first, "the pulses must not overlap: ${humps[0]} then ${humps[1]}")
+    val betweenHumps = pulseWidths.filterIndexed { index, _ -> index in (humps[0].last + 1) until humps[1].first }
+    assertTrue(
+        betweenHumps.contains(restWidth),
+        "the bin must settle back to rest width $restWidth between pulses, not just drop below " +
+            "threshold $threshold: ${humps[0]} then $betweenHumps then ${humps[1]} in $pulseWidths",
+    )
 }
 
 /** Contiguous runs of samples above [threshold], in sample order. */
