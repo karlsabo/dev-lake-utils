@@ -14,6 +14,7 @@
 # TODO
 
 * [ ] The worktree status updates are annoying and distracting since they keep moving the text around with 'updating status...'
+* [ ] When notifications list is refresh, some things jump to the top. We need a stable sorting order for the list. I'd like 'oldest' at the top of the list. So sorted ascending oldest to newest.
 * [ ] The recycle bin needs to auto empty when a worktree has finished being removed
   * When there is a worktree that needs to be force removed, the recycle icon needs a badge on it so i know to check it.
 * [ ] Support multiple git repository parent roots
