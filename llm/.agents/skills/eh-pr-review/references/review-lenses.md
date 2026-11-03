@@ -105,6 +105,25 @@ Low-priority cleanup that can be addressed in follow-up work.
 
 ---
 
+## Comment quality
+
+- Do not add comments that narrate what the next line or block does.
+- Inline comments are for `why`: constraints, invariants, trade-offs, or non-obvious behavior.
+- `What` comments belong only in doc comments on functions, classes, modules, or similar units, and those doc comments should be terse.
+- If the code is self-explanatory, prefer no comment.
+- Delete stale or noisy comments in code you touch.
+- Document public APIs and non-obvious behavior; skip obvious boilerplate.
+- Start with a one-line purpose or behavior summary.
+- Describe contracts, not implementation details.
+- For functions: clarify inputs, returns, exceptions, and side effects.
+- For classes: explain responsibilities, invariants, and lifecycle.
+- Specify meaningful constraints, units, edge cases, and concurrency requirements.
+- Explain why when intent is surprising.
+- Use short examples for tricky usage.
+- Follow language conventions; don’t duplicate names or type annotations.
+
+---
+
 ## Calibration Guide
 
 **Before writing any comments, ask yourself:**
