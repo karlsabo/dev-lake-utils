@@ -13,7 +13,7 @@ The user authorizes publishing review comments without another approval prompt. 
 - Check `git worktree list --porcelain`, the current branch, and `git status --short` before choosing a worktree. Reuse the current checkout if it is already a worktree on a suitable feature branch for this request (not the base/default branch) and any uncommitted changes can be safely preserved. If suitability or ownership of existing changes is unclear, ask rather than overwrite or discard them. Otherwise create a dedicated worktree as below. Record whether the worktree is reused or newly created for cleanup.
 - Identify the host with `git remote -v`. Check `gh` or `glab` availability, help, and authentication. Stop if the host is unsupported or authentication fails.
 - Spawn agents with a native tool only if it can set each agent's model and thinking level and wait for completion. Otherwise, use fresh `pi -p` processes. Check `pi --help` and model availability first. Pass each agent the needed paths and URL; agents do not share context. Load skills with absolute `--skill` paths derived from this skill's directory.
-- Implementation and fixes: `--model deepseek-v4.1-flash-1017 --thinking high`. Reviews: `--model openai-codex/gpt-6-sol --thinking medium`. Do not substitute models silently.
+- Implementation and fixes: `--model deepseek-v4.1-flash-1017 --thinking high`. Reviews: `--model openai-codex/gpt-6-sol --thinking medium`.
 - Confirm the target repo's required checks, CI host, and any merge queue or branch-protection requirements before calling the draft otherwise mergeable. Never use a successful local build as a substitute for required remote checks.
 
 ## Implement

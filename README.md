@@ -16,6 +16,7 @@
 * [ ] When notifications list is refresh, some things jump to the top. We need a stable sorting order for the list. I'd like 'oldest' at the top of the list. So sorted ascending oldest to newest.
 * [ ] The recycle bin needs to auto empty when a worktree has finished being removed
   * When there is a worktree that needs to be force removed, the recycle icon needs a badge on it so i know to check it.
+* [ ] We need a visible scroll bar on worktree pane
 * [ ] Support multiple git repository parent roots
   * [ ] Missing buttons when the repository isn't configured
     * ![img.png](img.png)
