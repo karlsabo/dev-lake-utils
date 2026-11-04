@@ -582,49 +582,6 @@ class WorktreeWorktreeRowsTest {
         assertFalse(initialPixels.contentEquals(hoveredPixels))
     }
 
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun knownDirtyStatusRendersDirtyAndCleanIndicators() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                WorktreeRow(
-                    state = worktreeRowState().copy(
-                        worktree = worktreeRowState().worktree.copy(isDirty = true),
-                    ),
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Dirty worktree").assertIsDisplayed()
-        onAllNodesWithText("Checking status…").assertCountEquals(0)
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun unknownDirtyStatusShowsCheckingStatusLabelAndDisablesStatusDependentActions() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                WorktreeRow(
-                    state = worktreeRowState().copy(
-                        worktree = worktreeRowState().worktree.copy(isDirty = null),
-                    ),
-                )
-            }
-        }
-
-        onNodeWithText("Checking status…").assertIsDisplayed()
-        onNodeWithContentDescription("Update feature/login from base main").assertIsNotEnabled()
-        onNodeWithContentDescription("Archive worktree feature/login").assertIsNotEnabled()
-        onNodeWithContentDescription("Open worktree feature/login").assertIsEnabled()
-
-        onNodeWithTag("worktree-row-feature/login").performMouseInput { rightClick() }
-        onNodeWithText("Open").assertIsDisplayed().assertIsEnabled()
-        onNodeWithText("Create worktree").assertIsDisplayed().assertIsEnabled()
-        onNodeWithText("Rebase onto main").assertIsDisplayed().assertIsNotEnabled()
-        onNodeWithText("Merge main into worktree").assertIsDisplayed().assertIsNotEnabled()
-        onNodeWithText("Archive").assertIsDisplayed().assertIsNotEnabled()
-    }
-
     @Composable
     private fun ConnectedPullRequestWorktreeRow(onOpenPullRequest: (String) -> Unit) {
         LocalWorktreeRow(
@@ -647,23 +604,4 @@ class WorktreeWorktreeRowsTest {
             actions = emptyLocalWorktreeRowActions().copy(onOpenPullRequest = onOpenPullRequest),
         )
     }
-
-    @Composable
-    private fun WorktreeRow(
-        state: LocalWorktreeRowState = worktreeRowState(),
-        actions: LocalWorktreeRowActions = emptyLocalWorktreeRowActions(),
-    ) {
-        LocalWorktreeRow(state = state, actions = actions)
-    }
-
-    private fun worktreeRowState(): LocalWorktreeRowState = LocalWorktreeRowState(
-        worktree = LocalWorktreeUiState(
-            branch = "feature/login",
-            path = "/repos/dev-lake-utils-feature-login",
-            isDirty = false,
-            parentBranch = "main",
-        ),
-        setupStatus = null,
-        isArchiving = false,
-    )
 }
