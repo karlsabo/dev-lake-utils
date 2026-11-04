@@ -1,5 +1,27 @@
 package com.github.karlsabo.devlake.enghub.component
 
+import androidx.compose.runtime.Composable
+import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
+
+internal fun worktreeRowState(isDirty: Boolean? = false): LocalWorktreeRowState = LocalWorktreeRowState(
+    worktree = LocalWorktreeUiState(
+        branch = "feature/login",
+        path = "/repos/dev-lake-utils-feature-login",
+        isDirty = isDirty,
+        parentBranch = "main",
+    ),
+    setupStatus = null,
+    isArchiving = false,
+)
+
+@Composable
+internal fun WorktreeRow(
+    state: LocalWorktreeRowState = worktreeRowState(),
+    actions: LocalWorktreeRowActions = emptyLocalWorktreeRowActions(),
+) {
+    LocalWorktreeRow(state = state, actions = actions)
+}
+
 internal fun emptyLocalWorktreeRowActions(): LocalWorktreeRowActions = LocalWorktreeRowActions(
     onOpen = {},
     onOpenPullRequest = {},

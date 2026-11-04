@@ -44,6 +44,13 @@ import com.github.karlsabo.git.WorktreeSetupStatus
 private const val WORKTREE_ROW_BASE_INDENT_DP = 16
 private const val WORKTREE_ROW_CHILD_INDENT_DP = 24
 
+/** Wide enough for the widest clean/dirty emoji so the slot never resizes between status states. */
+private const val WORKTREE_STATUS_SLOT_WIDTH_DP = 20
+internal const val WORKTREE_STATUS_SLOT_TAG = "worktree-status-slot"
+
+private const val CHECKING_STATUS_INDICATOR = "⏳"
+private const val CHECKING_STATUS_DESCRIPTION = "Checking status"
+
 internal fun worktreeRowIndentDp(nestingDepth: Int): Int {
     val childIndentDp = WORKTREE_ROW_CHILD_INDENT_DP * nestingDepth.coerceAtLeast(0)
     return WORKTREE_ROW_BASE_INDENT_DP + childIndentDp
@@ -212,23 +219,31 @@ private fun ConnectedPullRequestDetails(
     }
 }
 
+/** Fixed-width status slot so unknown, clean, and dirty states never shift the branch label. */
 @Composable
 private fun WorktreeDirtyIndicator(worktree: LocalWorktreeUiState) {
-    val isDirty = worktree.isDirty
-    if (isDirty == null) {
-        Text(
-            text = "Checking status…",
-            modifier = Modifier.semantics { contentDescription = "Checking status" },
-            style = MaterialTheme.typography.caption,
-        )
-        return
+    Box(
+        modifier = Modifier
+            .width(WORKTREE_STATUS_SLOT_WIDTH_DP.dp)
+            .testTag(WORKTREE_STATUS_SLOT_TAG),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (worktree.isDirty) {
+            null -> WorktreeStatusIndicator(CHECKING_STATUS_INDICATOR, CHECKING_STATUS_DESCRIPTION)
+            true -> WorktreeStatusIndicator("🟡", "Dirty worktree")
+            false -> WorktreeStatusIndicator("🟢", "Clean worktree")
+        }
     }
+}
+
+@Composable
+private fun WorktreeStatusIndicator(indicator: String, description: String) {
     Text(
-        text = if (isDirty) "🟡" else "🟢",
-        modifier = Modifier.semantics {
-            contentDescription = if (isDirty) "Dirty worktree" else "Clean worktree"
-        },
+        text = indicator,
+        modifier = Modifier.semantics { contentDescription = description },
         style = MaterialTheme.typography.body2,
+        maxLines = 1,
+        overflow = TextOverflow.Clip,
     )
 }
 
