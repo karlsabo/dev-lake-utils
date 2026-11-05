@@ -10,7 +10,8 @@ import ai.koog.prompt.message.MessagePart
  * Koog checks its history compression threshold only after a tool call, so text-only conversations
  * would otherwise grow without bound. System messages always survive the cap. The retained tail
  * starts at the oldest user text message inside the budget, so a prompt never begins with a reply or
- * with a tool result whose call was dropped.
+ * with a tool result whose call was dropped. A window without any user text cannot form a complete
+ * turn, so only system messages survive it.
  */
 internal class BoundedChatHistoryPreProcessor(
     private val maxMessages: Int,
@@ -32,16 +33,9 @@ internal class BoundedChatHistoryPreProcessor(
 
     private fun trimIncompleteLeadingTurn(messages: List<Message>): List<Message> {
         val firstUserText = messages.indexOfFirst { message -> message.isUserText }
-        return if (firstUserText >= 0) {
-            messages.drop(firstUserText)
-        } else {
-            messages.dropWhile { message -> message.isToolResult }
-        }
+        return if (firstUserText >= 0) messages.drop(firstUserText) else emptyList()
     }
 }
 
 private val Message.isUserText: Boolean
     get() = this is Message.User && parts.any { part -> part is MessagePart.Text }
-
-private val Message.isToolResult: Boolean
-    get() = this is Message.User && parts.any { part -> part is MessagePart.Tool.Result }

@@ -37,7 +37,7 @@ class BoundedChatHistoryPreProcessorTest {
     }
 
     @Test
-    fun `drops a leading tool result whose call was cut off`() {
+    fun `drops a partial turn left without its question`() {
         val toolCall = Message.Assistant(
             MessagePart.Tool.Call(id = "call-1", tool = "read", args = "{}"),
             ResponseMetaInfo.Empty,
@@ -48,8 +48,31 @@ class BoundedChatHistoryPreProcessorTest {
         )
         val messages = listOf(system, firstQuestion, firstAnswer, toolCall, toolResult, secondAnswer)
         assertEquals(
-            listOf(system, secondAnswer),
+            listOf(system),
             BoundedChatHistoryPreProcessor(3).preprocess(messages),
+        )
+    }
+
+    @Test
+    fun `drops an orphaned reply left without its question`() {
+        val messages = listOf(system, firstQuestion, firstAnswer)
+        assertEquals(listOf(system), BoundedChatHistoryPreProcessor(2).preprocess(messages))
+    }
+
+    @Test
+    fun `keeps a tool call paired with its result inside a retained turn`() {
+        val toolCall = Message.Assistant(
+            MessagePart.Tool.Call(id = "call-1", tool = "read", args = "{}"),
+            ResponseMetaInfo.Empty,
+        )
+        val toolResult = Message.User(
+            MessagePart.Tool.Result(id = "call-1", tool = "read", parts = listOf(MessagePart.Text("contents"))),
+            RequestMetaInfo.Empty,
+        )
+        val messages = listOf(system, firstQuestion, firstAnswer, secondQuestion, toolCall, toolResult, secondAnswer)
+        assertEquals(
+            listOf(system, secondQuestion, toolCall, toolResult, secondAnswer),
+            BoundedChatHistoryPreProcessor(5).preprocess(messages),
         )
     }
 
