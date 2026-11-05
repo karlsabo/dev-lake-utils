@@ -2,6 +2,8 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 val engHubDisplayName = "Eng Hub"
 val engHubPackageName = "eng-hub"
+val frameworkVersion = "3.0.3-SNAPSHOT"
+val frameworkRepository = "https://artifactory.nimblygames.com/artifactory/ng-public/"
 val engHubPackageVersion = rootProject.version.toString()
     .substringBefore('-')
     .substringBefore('+')
@@ -12,6 +14,12 @@ require(Regex("""\d+\.\d+\.\d+""").matches(engHubPackageVersion)) {
 plugins {
     id("devlake.kotlin-multiplatform-compose-conventions")
     id("devlake.kotlin-inject-conventions")
+}
+
+repositories {
+    maven {
+        url = uri(frameworkRepository)
+    }
 }
 
 kotlin {
@@ -27,6 +35,8 @@ kotlin {
                 implementation(libs.lifecycle.viewmodel.compose)
                 implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.json)
+                implementation("com.nimblygames.framework:LLM:$frameworkVersion")
+                implementation("com.nimblygames.framework:Skills:$frameworkVersion")
             }
         }
         getByName("commonTest") {
@@ -96,4 +106,14 @@ createJvmExecTask(
     mainClassName = "com.github.karlsabo.devlake.enghub.LlmSkillSyncMainKt",
 ) {
     args(rootProject.projectDir.resolve("llm").absolutePath)
+}
+
+createJvmExecTask(
+    taskName = "terminalChat",
+    mainClassName = "com.github.karlsabo.devlake.enghub.agent.TerminalChatMainKt",
+) {
+    workingDir = rootProject.projectDir
+    standardInput = System.`in`
+    standardOutput = System.out
+    errorOutput = System.err
 }
