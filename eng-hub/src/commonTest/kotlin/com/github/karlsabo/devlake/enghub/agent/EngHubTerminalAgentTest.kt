@@ -73,12 +73,61 @@ class EngHubTerminalAgentTest {
         }
         assertTrue(client.closed)
     }
+
+    @Test
+    fun `bounds text-only history that never runs a tool`() = runTest {
+        val directory = Path(SystemTemporaryDirectory, "eng-hub-terminal-${Random.nextLong()}")
+        SystemFileSystem.createDirectories(directory)
+        val client = TextOnlyLlmClient()
+        val executor = MultiLLMPromptExecutor(client)
+        val chat = EngHubTerminalAgent.create(executor, directory.toString(), "bounded-session")
+        try {
+            // Thirty text-only turns save 61 messages: the system prompt plus 30 user/assistant pairs.
+            repeat(30) { turn -> chat.ask("turn-$turn") }
+            chat.ask("turn-30")
+
+            val prompt = client.prompts.last().prompt
+            assertTrue(prompt.messages.size <= HISTORY_MESSAGE_LIMIT + 1)
+            assertTrue(prompt.messages.first() is Message.System)
+            assertTrue(prompt.messages.none { message -> message.textContent() == "turn-0" })
+            assertTrue(prompt.messages.any { message -> message.textContent() == "turn-29" })
+        } finally {
+            chat.close()
+            executor.close()
+            SystemFileSystem.delete(directory)
+        }
+        assertTrue(client.closed)
+    }
 }
 
-private class ScriptedLlmClient : LLMClient() {
+private abstract class RecordingLlmClient : LLMClient() {
     val prompts = mutableListOf<CapturedPrompt>()
     var closed = false
 
+    override suspend fun moderate(
+        prompt: Prompt,
+        model: LLModel,
+    ): ModerationResult = error("Moderation is not used")
+
+    override fun llmProvider(): LLMProvider = LLMProvider.OpenAI
+
+    override fun close() {
+        closed = true
+    }
+}
+
+private class TextOnlyLlmClient : RecordingLlmClient() {
+    override suspend fun execute(
+        prompt: Prompt,
+        model: LLModel,
+        tools: List<ToolDescriptor>,
+    ): Message.Assistant {
+        prompts += CapturedPrompt(prompt, tools)
+        return Message.Assistant("acknowledged", ResponseMetaInfo.Empty)
+    }
+}
+
+private class ScriptedLlmClient : RecordingLlmClient() {
     override suspend fun execute(
         prompt: Prompt,
         model: LLModel,
@@ -102,17 +151,6 @@ private class ScriptedLlmClient : LLMClient() {
                 ResponseMetaInfo.Empty,
             )
         }
-    }
-
-    override suspend fun moderate(
-        prompt: Prompt,
-        model: LLModel,
-    ): ModerationResult = error("Moderation is not used")
-
-    override fun llmProvider(): LLMProvider = LLMProvider.OpenAI
-
-    override fun close() {
-        closed = true
     }
 }
 

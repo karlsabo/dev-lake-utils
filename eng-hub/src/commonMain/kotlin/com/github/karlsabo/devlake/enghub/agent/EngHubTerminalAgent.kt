@@ -17,7 +17,11 @@ const val LM_STUDIO_API_KEY = "lm-studio"
 const val LM_STUDIO_HTTP_MAX_RETRIES = 2U
 
 private const val MAX_AGENT_ITERATIONS = 30
-private const val HISTORY_MESSAGE_LIMIT = 60
+
+/**
+ * Message count at which conversation history is bounded, whether or not a tool has run.
+ */
+internal const val HISTORY_MESSAGE_LIMIT = 60
 private const val HISTORY_MESSAGES_TO_KEEP = 20
 
 private const val SYSTEM_PROMPT = """
@@ -30,9 +34,10 @@ Keep responses concise and mention the source path when reporting file contents.
 /**
  * Builds the Eng Hub terminal agent with the framework Skills `read` tool and Koog chat memory.
  *
- * The agent keeps history for [sessionId] in Koog's in-memory chat history provider. It also installs
- * Koog's history compression strategy, which summarizes the retained tail once a conversation grows
- * beyond [HISTORY_MESSAGE_LIMIT] messages.
+ * The agent keeps history for [sessionId] in Koog's in-memory chat history provider. Chat memory is
+ * capped at [HISTORY_MESSAGE_LIMIT] messages so text-only turns stay bounded, and Koog's history
+ * compression strategy summarizes the retained tail once a tool call grows a prompt beyond that
+ * limit.
  */
 object EngHubTerminalAgent {
     fun create(
@@ -53,7 +58,9 @@ object EngHubTerminalAgent {
             systemPrompt = SYSTEM_PROMPT,
             maxIterations = MAX_AGENT_ITERATIONS,
             installFeatures = {
-                install(ChatMemory.Feature)
+                install(ChatMemory.Feature) {
+                    addPreProcessor(BoundedChatHistoryPreProcessor(HISTORY_MESSAGE_LIMIT))
+                }
             },
         )
         return TerminalChatSession(agent, sessionId)
