@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +46,12 @@ import kotlinx.coroutines.sync.withLock
 private const val BIN_PULSE_DURATION_MS = 160
 private const val BIN_PULSE_SCALE = 1.25f
 private const val FORCE_REVIEW_BADGE_DESCRIPTION = "Force removal review required"
+
+/** Largest marker that still clears the centred recycle glyph inside the 40dp button. */
+private val FORCE_REVIEW_BADGE_SIZE = 12.dp
+
+/** Pinned to the font size: the inherited Material line height would push "!" to the circle's bottom edge. */
+private val FORCE_REVIEW_BADGE_GLYPH_SIZE = 10.sp
 
 internal data class WorktreeArchiveBinEntry(
     val repository: String,
@@ -107,9 +114,12 @@ internal fun WorktreeArchiveBin(
                 }
                 .semantics { contentDescription = "Recycle bin (${entries.size})" },
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "♻", style = MaterialTheme.typography.button)
-                if (needsForceReview) ForceReviewBadge(modifier = Modifier.align(Alignment.TopEnd))
+                if (needsForceReview) {
+                    // Anchored to the 40dp button frame, so the marker sits in the corner instead of over the glyph.
+                    ForceReviewBadge(modifier = Modifier.align(Alignment.TopEnd))
+                }
             }
         }
         DropdownMenu(
@@ -134,22 +144,24 @@ internal fun WorktreeArchiveBin(
 }
 
 /**
- * High-contrast marker drawn over the closed recycle bin while a worktree still needs force-removal review.
- * The description merges into the bin button so the requirement is announced with the icon itself.
+ * High-contrast marker pinned to the closed recycle bin's top-right corner while a worktree still needs
+ * force-removal review. It is a separate semantics node so assistive tech reports the requirement next to the bin.
  */
 @Composable
 private fun ForceReviewBadge(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
+            .size(FORCE_REVIEW_BADGE_SIZE)
             .background(MaterialTheme.colors.error, CircleShape)
-            .padding(horizontal = 4.dp),
+            .semantics(mergeDescendants = true) { contentDescription = FORCE_REVIEW_BADGE_DESCRIPTION },
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = "!",
             color = MaterialTheme.colors.onError,
-            fontSize = 10.sp,
+            fontSize = FORCE_REVIEW_BADGE_GLYPH_SIZE,
+            lineHeight = FORCE_REVIEW_BADGE_GLYPH_SIZE,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.semantics { contentDescription = FORCE_REVIEW_BADGE_DESCRIPTION },
         )
     }
 }
