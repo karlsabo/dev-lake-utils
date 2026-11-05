@@ -5,11 +5,13 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
@@ -24,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -31,7 +34,9 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -39,6 +44,7 @@ import kotlinx.coroutines.sync.withLock
 
 private const val BIN_PULSE_DURATION_MS = 160
 private const val BIN_PULSE_SCALE = 1.25f
+private const val FORCE_REVIEW_BADGE_DESCRIPTION = "Force removal review required"
 
 internal data class WorktreeArchiveBinEntry(
     val repository: String,
@@ -88,6 +94,7 @@ internal fun WorktreeArchiveBin(
             scope = binScope,
         )
     }
+    val needsForceReview = entries.any { it.needsForceConfirmation }
     Box(modifier = modifier) {
         IconButton(
             onClick = { expanded = true },
@@ -100,7 +107,10 @@ internal fun WorktreeArchiveBin(
                 }
                 .semantics { contentDescription = "Recycle bin (${entries.size})" },
         ) {
-            Text(text = "♻", style = MaterialTheme.typography.button)
+            Box(contentAlignment = Alignment.Center) {
+                Text(text = "♻", style = MaterialTheme.typography.button)
+                if (needsForceReview) ForceReviewBadge(modifier = Modifier.align(Alignment.TopEnd))
+            }
         }
         DropdownMenu(
             expanded = expanded,
@@ -120,6 +130,27 @@ internal fun WorktreeArchiveBin(
                 }
             }
         }
+    }
+}
+
+/**
+ * High-contrast marker drawn over the closed recycle bin while a worktree still needs force-removal review.
+ * The description merges into the bin button so the requirement is announced with the icon itself.
+ */
+@Composable
+private fun ForceReviewBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(MaterialTheme.colors.error, CircleShape)
+            .padding(horizontal = 4.dp),
+    ) {
+        Text(
+            text = "!",
+            color = MaterialTheme.colors.onError,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { contentDescription = FORCE_REVIEW_BADGE_DESCRIPTION },
+        )
     }
 }
 

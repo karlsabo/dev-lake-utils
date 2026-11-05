@@ -269,6 +269,27 @@ class WorktreeArchiveBinTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun forceReviewNeededBadgesClosedRecycleIconAndClearsWhenResolved() = runComposeUiTest {
+        val entries = mutableStateOf(
+            listOf(
+                WorktreeArchiveBinEntry("widgets", "feature/wip", 0, "/repos/wip", needsForceConfirmation = true),
+                WorktreeArchiveBinEntry("widgets", "feature/login", 42, "/repos/login"),
+            ),
+        )
+        setContent { MaterialTheme { WorktreeArchiveBin(entries = entries.value) } }
+
+        onNodeWithContentDescription("Recycle bin (2)").assertIsDisplayed()
+        onNodeWithContentDescription("Force removal review required").assertIsDisplayed()
+        onNodeWithText("Confirmation required").assertDoesNotExist()
+
+        runOnIdle { entries.value = listOf(entries.value.last()) }
+
+        onNodeWithContentDescription("Recycle bin (1)").assertIsDisplayed()
+        onNodeWithContentDescription("Force removal review required").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun queuedBinEntryOffersUndoForItsWorktree() = runComposeUiTest {
         val undoRequests = mutableListOf<String>()
         setContent {
