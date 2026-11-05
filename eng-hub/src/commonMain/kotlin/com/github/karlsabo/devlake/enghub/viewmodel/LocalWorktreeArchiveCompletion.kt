@@ -19,6 +19,7 @@ internal class LocalWorktreeArchiveCompletion(
     private val localRepositories: LocalRepositoryController,
     private val store: WorktreeArchiveStore,
     private val clearEntry: (WorktreeArchiveJob) -> Unit,
+    private val clearUnpersistedEntry: (WorktreeArchiveJob) -> Boolean,
 ) {
     private suspend fun reconcile(
         repoRootPath: String,
@@ -60,6 +61,10 @@ internal class LocalWorktreeArchiveCompletion(
             checkActive()
             clearEntry(job)
             logger.info { "Completed worktree archive ${job.worktreePath}" }
+        } else if (clearUnpersistedEntry(job)) {
+            // The removal record is already gone, so the removal completed elsewhere and nothing can restore
+            // this entry. Keeping it would leave the bin showing a completed worktree until the app restarts.
+            logger.info { "Cleared already completed worktree archive ${job.worktreePath}" }
         }
     }
 }
