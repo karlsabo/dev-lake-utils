@@ -16,6 +16,9 @@ allowed-tools: Bash(gh glab *), Read, Glob, Grep, Write, Edit
 
 ## PR description best practices
 
+- Keep the PR body short, terse, and concise: use a 1–3 sentence summary, only essential bullets, and a brief manual test plan.
+- Do not narrate the diff or enumerate every changed file and test. Omit generated release-note blocks and transient environment or workflow details unless they materially affect review or deployment.
+- Summarize completed validation and any material gaps in one short line without repeating the test plan.
 - Lead with the ticket link and a brief summary of the change and why it matters.
 - Call out only material scope limits, risks, or reviewer decisions; don't narrate the diff.
 - Keep the test plan short and reproducible; distinguish completed validation from steps still to run.
