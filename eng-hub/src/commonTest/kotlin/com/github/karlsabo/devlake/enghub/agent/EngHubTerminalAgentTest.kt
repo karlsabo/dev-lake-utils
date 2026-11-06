@@ -21,6 +21,7 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.SystemTemporaryDirectory
+import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -56,9 +57,9 @@ class EngHubTerminalAgentTest {
             assertEquals(3, client.prompts.size)
             assertTrue(
                 client.prompts.all { captured ->
-                    captured.tools.map { tool -> tool.name } == listOf("read")
+                    captured.tools.map { tool -> tool.name } == listOf("read", "write")
                 },
-                "omitting MCP config must leave the Skills-only read tool",
+                "omitting MCP config must leave the Skills read and write tools",
             )
             assertEquals(
                 listOf("Release on Friday"),
@@ -79,6 +80,61 @@ class EngHubTerminalAgentTest {
             chat.close()
             executor.close()
             SystemFileSystem.delete(notes, mustExist = false)
+            SystemFileSystem.delete(directory)
+        }
+        assertTrue(client.closed)
+    }
+
+    @Test
+    fun `writes summary file from an empty launch directory through the write tool`() = runTest {
+        val directory = Path(SystemTemporaryDirectory, "eng-hub-terminal-${Random.nextLong()}")
+        SystemFileSystem.createDirectories(directory)
+        val summary = Path(directory, "summary.txt")
+        val client = WriteScriptedLlmClient("Release on Friday", "Created summary.txt.")
+        val executor = MultiLLMPromptExecutor(client)
+        val chat = EngHubTerminalAgent.create(executor, directory.toString(), "write-session")
+        try {
+            assertEquals("Created summary.txt.", chat.ask("Write summary.txt containing Release on Friday"))
+
+            assertEquals(2, client.prompts.size)
+            assertTrue(
+                client.prompts.all { captured ->
+                    captured.tools.map { tool -> tool.name } == listOf("read", "write")
+                },
+            )
+            assertEquals("write", client.calledTool)
+            assertEquals(
+                listOf("Wrote $summary"),
+                client.prompts.last().prompt.toolResults().map { result -> result.output },
+            )
+            assertEquals("Release on Friday", readFile(summary))
+        } finally {
+            chat.close()
+            executor.close()
+            SystemFileSystem.delete(summary, mustExist = false)
+            SystemFileSystem.delete(directory)
+        }
+        assertTrue(client.closed)
+    }
+
+    @Test
+    fun `write tool replaces an existing file's entire contents`() = runTest {
+        val directory = Path(SystemTemporaryDirectory, "eng-hub-terminal-${Random.nextLong()}")
+        SystemFileSystem.createDirectories(directory)
+        val summary = Path(directory, "summary.txt")
+        SystemFileSystem.sink(summary).buffered().use { it.writeString("Old contents") }
+        val client = WriteScriptedLlmClient("Release on Friday", "Updated summary.txt.")
+        val executor = MultiLLMPromptExecutor(client)
+        val chat = EngHubTerminalAgent.create(executor, directory.toString(), "overwrite-session")
+        try {
+            assertEquals("Updated summary.txt.", chat.ask("Replace summary.txt with Release on Friday"))
+
+            assertEquals("write", client.calledTool)
+            assertEquals("Release on Friday", readFile(summary))
+        } finally {
+            chat.close()
+            executor.close()
+            SystemFileSystem.delete(summary, mustExist = false)
             SystemFileSystem.delete(directory)
         }
         assertTrue(client.closed)
@@ -113,7 +169,7 @@ class EngHubTerminalAgentTest {
 
             assertEquals(2, client.prompts.size)
             assertEquals(
-                listOf("read", "browser_navigate"),
+                listOf("read", "write", "browser_navigate"),
                 client.prompts.first().tools.map { tool -> tool.name },
             )
             assertEquals(
@@ -253,6 +309,37 @@ private class ScriptedLlmClient : RecordingLlmClient() {
     }
 }
 
+private class WriteScriptedLlmClient(
+    private val content: String,
+    private val reply: String,
+) : RecordingLlmClient() {
+    var calledTool: String? = null
+
+    override suspend fun execute(
+        prompt: Prompt,
+        model: LLModel,
+        tools: List<ToolDescriptor>,
+    ): Message.Assistant {
+        prompts += CapturedPrompt(prompt, tools)
+        return if (prompt.toolResults().isEmpty()) {
+            calledTool = "write"
+            Message.Assistant(
+                MessagePart.Tool.Call(
+                    id = "write-1",
+                    tool = "write",
+                    args = buildJsonObject {
+                        put("path", "summary.txt")
+                        put("content", content)
+                    },
+                ),
+                ResponseMetaInfo.Empty,
+            )
+        } else {
+            Message.Assistant(reply, ResponseMetaInfo.Empty)
+        }
+    }
+}
+
 private class BrowserScriptedLlmClient : RecordingLlmClient() {
     override suspend fun execute(
         prompt: Prompt,
@@ -319,3 +406,5 @@ private data class CapturedPrompt(
 private fun Prompt.toolResults(): List<MessagePart.Tool.Result> = messages.flatMap { message ->
     message.parts.filterIsInstance<MessagePart.Tool.Result>()
 }
+
+private fun readFile(path: Path): String = SystemFileSystem.source(path).buffered().use { it.readString() }

@@ -240,9 +240,9 @@ Other useful run tasks that exist today:
 
 ## Terminal chat agent
 
-The `terminalChat` task runs a separate JVM terminal program with the framework Skills `read` tool and the local
-`QWEN_3_8_27B` model from LM Studio. It does not start the Compose UI. An explicit `--mcp-config` argument adds
-tools from a configured `browser` MCP server to the same session.
+The `terminalChat` task runs a separate JVM terminal program with the framework Skills `read` and `write` tools and
+the local `QWEN_3_8_27B` model from LM Studio. It does not start the Compose UI. An explicit `--mcp-config` argument
+adds tools from a configured `browser` MCP server to the same session.
 
 Start LM Studio and serve the model id `qwen/qwen3.8-27b` at `http://localhost:1234/v1`, then launch from the
 repository root:
@@ -251,8 +251,9 @@ repository root:
 ./gradlew :eng-hub:terminalChat
 ```
 
-Relative file paths resolve from the repository root because the JavaExec task sets its working directory explicitly.
-Ask about any local text file, then ask a follow-up in the same session. Quit with `/exit` or end-of-input (Ctrl-D).
+Relative file paths resolve from the terminal's launch working directory; the JavaExec task sets that to the
+repository root explicitly. Ask about any local text file, ask it to write one, then ask a follow-up in the same
+session. Quit with `/exit` or end-of-input (Ctrl-D).
 
 Example conversation:
 
@@ -261,6 +262,8 @@ you> Read /tmp/release-notes.txt and tell me the release day.
 agent> The file says the release is on Friday.
 you> What day did I ask about?
 agent> Friday.
+you> Write summary.txt containing Release on Friday
+agent> Created summary.txt.
 you> /exit
 ```
 
@@ -269,7 +272,8 @@ file is bundled or required at startup.
 
 ### Browser MCP tools
 
-Pass `--mcp-config` with a framework `McpConfig` JSON file to add browser tools alongside Skills `read`:
+Pass `--mcp-config` with a framework `McpConfig` JSON file to add browser tools alongside Skills `read` and
+`write`:
 
 ```bash
 ./gradlew :eng-hub:terminalChat --args="--mcp-config /path/to/mcp.json"
@@ -292,9 +296,9 @@ Example config shape with synthetic values:
 ```
 
 The terminal selects the server named `browser` and starts only that server. Other configured servers are ignored.
-The `browser` entry must exist and be enabled. Without `--mcp-config`, the terminal keeps the Skills-only behavior and
-does not read any MCP config, including Pi's config. The MCP manager is closed when the chat returns through `/exit`,
-end-of-input, a prompt failure, or a startup failure after tool discovery began.
+The `browser` entry must exist and be enabled. Without `--mcp-config`, the terminal keeps the Skills-only `read` and
+`write` behavior and does not read any MCP config, including Pi's config. The MCP manager is closed when the chat
+returns through `/exit`, end-of-input, a prompt failure, or a startup failure after tool discovery began.
 
 ### Framework dependency
 
@@ -316,11 +320,13 @@ History is process-local and is lost when the terminal exits.
 
 ### Trust and scope
 
-The framework Skills `read` tool can read any UTF-8 file the JVM process can access, including absolute paths and
-paths outside the launch directory. An explicitly configured `browser` MCP server can start its own local process and
-receive the environment values in the config, and its tools can drive that browser. Both are trusted host
-capabilities, not a sandbox. Write, shell, Markdown skill loading, a GUI chat surface, a custom history store, and a
-native executable are intentionally out of scope for this terminal chat slice.
+The framework Skills `read` and `write` tools can access any UTF-8 file the JVM process can access, including
+absolute paths and paths outside the launch directory. The `write` tool creates or replaces a file's entire contents,
+creates missing parent directories, and has no approval UI or path confinement; it is a trusted local overwrite. An
+explicitly configured `browser` MCP server can start its own local process and receive the environment values in the
+config, and its tools can drive that browser. All of these are trusted host capabilities, not a sandbox. Shell,
+Markdown skill loading, a GUI chat surface, a custom history store, and a native executable are intentionally out of
+scope for this terminal chat slice.
 
 ### Manual LM Studio smoke test
 
@@ -332,6 +338,10 @@ Studio with the model above and, from the repository root:
 3. Ask it to read that file and report the fact.
 4. Ask a follow-up about the same fact.
 5. Confirm the first answer came from the `read` tool and the follow-up remembers it, then quit with `/exit` or Ctrl-D.
+
+For the write path, use a disposable launch directory and ask `Write summary.txt containing Release on Friday`.
+Confirm that `summary.txt` exists with exactly `Release on Friday`. The Gradle task launches in the repository root,
+so use a disposable checkout copy or an absolute path inside a disposable directory rather than a real project file.
 
 For the browser path, pass a synthetic or personal `--mcp-config` file and ask it to open `https://example.com` and
 report the title. Confirm it invokes a browser MCP tool and reports `Example Domain`, then quit with `/exit` or Ctrl-D.
