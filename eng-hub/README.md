@@ -238,6 +238,70 @@ Other useful run tasks that exist today:
 ./gradlew :eng-hub:syncLlmFiles
 ```
 
+## Terminal chat agent
+
+The `terminalChat` task runs a separate JVM terminal program with the framework Skills `read` tool and the local
+`QWEN_3_8_27B` model from LM Studio. It does not start the Compose UI.
+
+Start LM Studio and serve the model id `qwen/qwen3.8-27b` at `http://localhost:1234/v1`, then launch from the
+repository root:
+
+```bash
+./gradlew :eng-hub:terminalChat
+```
+
+Relative file paths resolve from the repository root because the JavaExec task sets its working directory explicitly.
+Ask about any local text file, then ask a follow-up in the same session. Quit with `/exit` or end-of-input (Ctrl-D).
+
+Example conversation:
+
+```text
+you> Read /tmp/release-notes.txt and tell me the release day.
+agent> The file says the release is on Friday.
+you> What day did I ask about?
+agent> Friday.
+you> /exit
+```
+
+The program retries transient LM Studio HTTP failures. It accepts arbitrary prompts and file paths; no fixture
+file is bundled or required at startup.
+
+### Framework dependency
+
+Eng Hub consumes the published `com.nimblygames.framework:LLM` and `:Skills` artifacts from the public Nimbly Games
+repository, with Maven Central for transitive dependencies. The coordinate is `3.0.3-SNAPSHOT`. Story 1 in the
+framework repository added public publishing for `Skills`, but did not publish a fixed `3.0.3` release: public metadata
+currently exposes only the mutable snapshot. Until a fixed release is published, a build re-resolving the snapshot can
+pick up a different framework revision.
+
+### Conversation history and compaction
+
+Koog owns the conversation history. The agent installs Koog's `ChatMemory` feature with its in-memory history provider,
+keyed by the fixed `eng-hub-terminal` session id. Each prompt is a new Koog agent run that reloads that history, so
+follow-ups see earlier prompts, tool calls, and tool results without a separate Eng Hub history store.
+
+The agent also uses Koog's single-run strategy with history compression. Once the prompt exceeds 60 messages, it
+summarizes the retained tail (the last 20 messages) with the same model instead of growing the prompt without bound.
+History is process-local and is lost when the terminal exits.
+
+### Trust and scope
+
+Only the framework Skills `read` tool is installed in this story. It can read any UTF-8 file the JVM process can
+access, including absolute paths and paths outside the launch directory. It is a trusted host capability, not a
+sandbox. Write, shell, browser MCP tools, Markdown skill loading, a GUI chat surface, a custom history store, and a
+native executable are intentionally out of scope for this terminal chat slice.
+
+### Manual LM Studio smoke test
+
+Automated tests use a fake model and a temporary file. To verify the real end-to-end path, run LM Studio with the model
+above and, from the repository root:
+
+1. Create any local text file containing a known fact, for example `/tmp/release-notes.txt` with `Release on Friday`.
+2. Run `./gradlew :eng-hub:terminalChat`.
+3. Ask it to read that file and report the fact.
+4. Ask a follow-up about the same fact.
+5. Confirm the first answer came from the `read` tool and the follow-up remembers it, then quit with `/exit` or Ctrl-D.
+
 ## Building
 
 Build the module and run its tests:
