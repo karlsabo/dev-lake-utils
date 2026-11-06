@@ -10,6 +10,12 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.ResponseMetaInfo
+import com.nimblygames.mcp.api.McpManager
+import com.nimblygames.mcp.api.McpTool
+import com.nimblygames.mcp.client.DefaultMcpManager
+import com.nimblygames.mcp.client.McpServerSession
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -18,9 +24,12 @@ import kotlinx.io.files.SystemTemporaryDirectory
 import kotlinx.io.writeString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class EngHubTerminalAgentTest {
@@ -47,8 +56,9 @@ class EngHubTerminalAgentTest {
             assertEquals(3, client.prompts.size)
             assertTrue(
                 client.prompts.all { captured ->
-                    captured.tools.any { tool -> tool.name == "read" }
+                    captured.tools.map { tool -> tool.name } == listOf("read")
                 },
+                "omitting MCP config must leave the Skills-only read tool",
             )
             assertEquals(
                 listOf("Release on Friday"),
@@ -69,6 +79,95 @@ class EngHubTerminalAgentTest {
             chat.close()
             executor.close()
             SystemFileSystem.delete(notes, mustExist = false)
+            SystemFileSystem.delete(directory)
+        }
+        assertTrue(client.closed)
+    }
+
+    @Test
+    fun `browser mcp tool reports the page title and closes its session`() = runTest {
+        val directory = Path(SystemTemporaryDirectory, "eng-hub-terminal-${Random.nextLong()}")
+        SystemFileSystem.createDirectories(directory)
+        val browserSession = FakeBrowserSession()
+        val mcpTools =
+            BrowserMcpTools(
+                DefaultMcpManager(
+                    parseBrowserMcpConfig(BROWSER_MCP_CONFIG),
+                    sessionFactory = { browserSession },
+                ),
+            )
+        val client = BrowserScriptedLlmClient()
+        val executor = MultiLLMPromptExecutor(client)
+        val chat =
+            EngHubTerminalAgent.create(
+                executor,
+                directory.toString(),
+                "browser-session",
+                mcpTools,
+            )
+        try {
+            assertEquals(
+                "Example Domain",
+                chat.ask("Open https://example.com and report its title."),
+            )
+
+            assertEquals(2, client.prompts.size)
+            assertEquals(
+                listOf("read", "browser_navigate"),
+                client.prompts.first().tools.map { tool -> tool.name },
+            )
+            assertEquals(
+                buildJsonObject { put("url", "https://example.com") },
+                browserSession.calledArguments,
+            )
+            assertEquals("browser_navigate", browserSession.calledName)
+            assertTrue(
+                client.prompts.last().prompt.toolResults().single().output.contains("Example Domain"),
+            )
+        } finally {
+            chat.close()
+            executor.close()
+            SystemFileSystem.delete(directory)
+        }
+        assertTrue(browserSession.closed, "the MCP manager must close its browser session")
+        assertTrue(client.closed)
+    }
+
+    @Test
+    fun `closes mcp tools when agent construction fails after tool discovery`() = runTest {
+        val directory = Path(SystemTemporaryDirectory, "eng-hub-terminal-${Random.nextLong()}")
+        SystemFileSystem.createDirectories(directory)
+        var closed = false
+        val manager =
+            object : McpManager {
+                override suspend fun listTools(): List<McpTool> = error("browser server failed to start")
+
+                override suspend fun callTool(
+                    name: String,
+                    arguments: JsonObject,
+                ): CallToolResult = error("not used")
+
+                override suspend fun close() {
+                    closed = true
+                }
+            }
+        val client = TextOnlyLlmClient()
+        val executor = MultiLLMPromptExecutor(client)
+        try {
+            val failure =
+                assertFailsWith<IllegalStateException> {
+                    EngHubTerminalAgent.create(
+                        executor,
+                        directory.toString(),
+                        "startup-failure",
+                        BrowserMcpTools(manager),
+                    )
+                }
+
+            assertEquals("browser server failed to start", failure.message)
+            assertTrue(closed, "a failed startup must close the MCP manager")
+        } finally {
+            executor.close()
             SystemFileSystem.delete(directory)
         }
         assertTrue(client.closed)
@@ -153,6 +252,64 @@ private class ScriptedLlmClient : RecordingLlmClient() {
         }
     }
 }
+
+private class BrowserScriptedLlmClient : RecordingLlmClient() {
+    override suspend fun execute(
+        prompt: Prompt,
+        model: LLModel,
+        tools: List<ToolDescriptor>,
+    ): Message.Assistant {
+        prompts += CapturedPrompt(prompt, tools)
+        return if (prompt.toolResults().isEmpty()) {
+            Message.Assistant(
+                MessagePart.Tool.Call(
+                    id = "browser-1",
+                    tool = "browser_navigate",
+                    args = buildJsonObject { put("url", "https://example.com") },
+                ),
+                ResponseMetaInfo.Empty,
+            )
+        } else {
+            Message.Assistant("Example Domain", ResponseMetaInfo.Empty)
+        }
+    }
+}
+
+private class FakeBrowserSession : McpServerSession {
+    var calledName: String? = null
+    var calledArguments: JsonObject? = null
+    var closed = false
+
+    override suspend fun listTools(): List<McpTool> = listOf(
+        McpTool(
+            name = "browser_navigate",
+            description = "Open a URL in the browser.",
+        ),
+    )
+
+    override suspend fun callTool(
+        name: String,
+        arguments: JsonObject,
+    ): CallToolResult {
+        calledName = name
+        calledArguments = arguments
+        return CallToolResult(content = listOf(TextContent("Example Domain")))
+    }
+
+    override suspend fun close() {
+        closed = true
+    }
+}
+
+private const val BROWSER_MCP_CONFIG = """
+{
+  "mcpServers": {
+    "browser": {
+      "command": "synthetic-browser"
+    }
+  }
+}
+"""
 
 private data class CapturedPrompt(
     val prompt: Prompt,

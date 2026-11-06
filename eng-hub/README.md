@@ -241,7 +241,8 @@ Other useful run tasks that exist today:
 ## Terminal chat agent
 
 The `terminalChat` task runs a separate JVM terminal program with the framework Skills `read` tool and the local
-`QWEN_3_8_27B` model from LM Studio. It does not start the Compose UI.
+`QWEN_3_8_27B` model from LM Studio. It does not start the Compose UI. An explicit `--mcp-config` argument adds
+tools from a configured `browser` MCP server to the same session.
 
 Start LM Studio and serve the model id `qwen/qwen3.8-27b` at `http://localhost:1234/v1`, then launch from the
 repository root:
@@ -266,10 +267,39 @@ you> /exit
 The program retries transient LM Studio HTTP failures. It accepts arbitrary prompts and file paths; no fixture
 file is bundled or required at startup.
 
+### Browser MCP tools
+
+Pass `--mcp-config` with a framework `McpConfig` JSON file to add browser tools alongside Skills `read`:
+
+```bash
+./gradlew :eng-hub:terminalChat --args="--mcp-config /path/to/mcp.json"
+```
+
+Example config shape with synthetic values:
+
+```json
+{
+  "mcpServers": {
+    "browser": {
+      "command": "example-browser-mcp",
+      "args": ["--headless"],
+      "env": {
+        "SYNTHETIC_SETTING": "not-a-secret"
+      }
+    }
+  }
+}
+```
+
+The terminal selects the server named `browser` and starts only that server. Other configured servers are ignored.
+The `browser` entry must exist and be enabled. Without `--mcp-config`, the terminal keeps the Skills-only behavior and
+does not read any MCP config, including Pi's config. The MCP manager is closed when the chat returns through `/exit`,
+end-of-input, a prompt failure, or a startup failure after tool discovery began.
+
 ### Framework dependency
 
-Eng Hub consumes the published `com.nimblygames.framework:LLM` and `:Skills` artifacts from the public Nimbly Games
-repository, with Maven Central for transitive dependencies. The coordinate is `3.0.3-SNAPSHOT`. Story 1 in the
+Eng Hub consumes the published `com.nimblygames.framework:LLM`, `:MCP`, and `:Skills` artifacts from the public Nimbly
+Games repository, with Maven Central for transitive dependencies. The coordinate is `3.0.3-SNAPSHOT`. Story 1 in the
 framework repository added public publishing for `Skills`, but did not publish a fixed `3.0.3` release: public metadata
 currently exposes only the mutable snapshot. Until a fixed release is published, a build re-resolving the snapshot can
 pick up a different framework revision.
@@ -286,21 +316,26 @@ History is process-local and is lost when the terminal exits.
 
 ### Trust and scope
 
-Only the framework Skills `read` tool is installed in this story. It can read any UTF-8 file the JVM process can
-access, including absolute paths and paths outside the launch directory. It is a trusted host capability, not a
-sandbox. Write, shell, browser MCP tools, Markdown skill loading, a GUI chat surface, a custom history store, and a
+The framework Skills `read` tool can read any UTF-8 file the JVM process can access, including absolute paths and
+paths outside the launch directory. An explicitly configured `browser` MCP server can start its own local process and
+receive the environment values in the config, and its tools can drive that browser. Both are trusted host
+capabilities, not a sandbox. Write, shell, Markdown skill loading, a GUI chat surface, a custom history store, and a
 native executable are intentionally out of scope for this terminal chat slice.
 
 ### Manual LM Studio smoke test
 
-Automated tests use a fake model and a temporary file. To verify the real end-to-end path, run LM Studio with the model
-above and, from the repository root:
+Automated tests use a fake model, a fake MCP session, and temporary files. To verify the real end-to-end path, run LM
+Studio with the model above and, from the repository root:
 
 1. Create any local text file containing a known fact, for example `/tmp/release-notes.txt` with `Release on Friday`.
 2. Run `./gradlew :eng-hub:terminalChat`.
 3. Ask it to read that file and report the fact.
 4. Ask a follow-up about the same fact.
 5. Confirm the first answer came from the `read` tool and the follow-up remembers it, then quit with `/exit` or Ctrl-D.
+
+For the browser path, pass a synthetic or personal `--mcp-config` file and ask it to open `https://example.com` and
+report the title. Confirm it invokes a browser MCP tool and reports `Example Domain`, then quit with `/exit` or Ctrl-D.
+Do not commit personal MCP configs, browser profiles, or credentials.
 
 ## Building
 
