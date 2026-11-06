@@ -53,6 +53,28 @@ class BrowserMcpToolsTest {
     }
 
     @Test
+    fun `rejects a browser server with a url but no command`() {
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                parseBrowserMcpConfig(
+                    """{"mcpServers":{"browser":{"url":"http://localhost:3000/mcp"}}}""",
+                )
+            }
+
+        assertEquals("MCP server 'browser' command is required for stdio connections.", failure.message)
+    }
+
+    @Test
+    fun `rejects a browser server without a command`() {
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                parseBrowserMcpConfig("""{"mcpServers":{"browser":{"args":["--port","0"]}}}""")
+            }
+
+        assertEquals("MCP server 'browser' command is required for stdio connections.", failure.message)
+    }
+
+    @Test
     fun `rejects malformed json`() {
         assertFailsWith<IllegalArgumentException> {
             parseBrowserMcpConfig("""{"mcpServers":""")

@@ -50,5 +50,8 @@ internal fun parseBrowserMcpConfig(configJson: String): McpConfig {
             "MCP config must define a '$BROWSER_MCP_SERVER_NAME' server."
         }
     require(browser.enabled) { "MCP server '$BROWSER_MCP_SERVER_NAME' must be enabled." }
+    require(!browser.command.isNullOrBlank()) {
+        "MCP server '$BROWSER_MCP_SERVER_NAME' command is required for stdio connections."
+    }
     return McpConfig(mapOf(BROWSER_MCP_SERVER_NAME to browser))
 }
