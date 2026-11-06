@@ -117,7 +117,6 @@ internal fun WorktreeArchiveBin(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "♻", style = MaterialTheme.typography.button)
                 if (needsForceReview) {
-                    // Anchored to the 40dp button frame, so the marker sits in the corner instead of over the glyph.
                     ForceReviewBadge(modifier = Modifier.align(Alignment.TopEnd))
                 }
             }
