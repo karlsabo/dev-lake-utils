@@ -57,9 +57,9 @@ class EngHubTerminalAgentTest {
             assertEquals(3, client.prompts.size)
             assertTrue(
                 client.prompts.all { captured ->
-                    captured.tools.map { tool -> tool.name } == listOf("read", "write")
+                    captured.tools.map { tool -> tool.name } == listOf("read", "write", "bash")
                 },
-                "omitting MCP config must leave the Skills read and write tools",
+                "omitting MCP config must leave the Skills read, write, and bash tools",
             )
             assertEquals(
                 listOf("Release on Friday"),
@@ -99,7 +99,7 @@ class EngHubTerminalAgentTest {
             assertEquals(2, client.prompts.size)
             assertTrue(
                 client.prompts.all { captured ->
-                    captured.tools.map { tool -> tool.name } == listOf("read", "write")
+                    captured.tools.map { tool -> tool.name } == listOf("read", "write", "bash")
                 },
             )
             assertEquals("write", client.calledTool)
@@ -112,6 +112,38 @@ class EngHubTerminalAgentTest {
             chat.close()
             executor.close()
             SystemFileSystem.delete(summary, mustExist = false)
+            SystemFileSystem.delete(directory)
+        }
+        assertTrue(client.closed)
+    }
+
+    @Test
+    fun `counts lines in a temporary file through the bash tool`() = runTest {
+        val directory = Path(SystemTemporaryDirectory, "eng-hub-terminal-${Random.nextLong()}")
+        SystemFileSystem.createDirectories(directory)
+        val lines = Path(directory, "lines.txt")
+        SystemFileSystem.sink(lines).buffered().use { it.writeString("first line\nsecond line\n") }
+        val client = BashScriptedLlmClient()
+        val executor = MultiLLMPromptExecutor(client)
+        val chat = EngHubTerminalAgent.create(executor, directory.toString(), "bash-session")
+        try {
+            assertEquals("2", chat.ask("Count the lines in lines.txt using bash."))
+
+            assertEquals(2, client.prompts.size)
+            assertTrue(
+                client.prompts.all { captured ->
+                    captured.tools.map { tool -> tool.name } == listOf("read", "write", "bash")
+                },
+            )
+            assertEquals("bash", client.calledTool)
+            assertEquals(
+                "2",
+                client.prompts.last().prompt.toolResults().single().output.trim(),
+            )
+        } finally {
+            chat.close()
+            executor.close()
+            SystemFileSystem.delete(lines, mustExist = false)
             SystemFileSystem.delete(directory)
         }
         assertTrue(client.closed)
@@ -169,7 +201,7 @@ class EngHubTerminalAgentTest {
 
             assertEquals(2, client.prompts.size)
             assertEquals(
-                listOf("read", "write", "browser_navigate"),
+                listOf("read", "write", "bash", "browser_navigate"),
                 client.prompts.first().tools.map { tool -> tool.name },
             )
             assertEquals(
@@ -336,6 +368,32 @@ private class WriteScriptedLlmClient(
             )
         } else {
             Message.Assistant(reply, ResponseMetaInfo.Empty)
+        }
+    }
+}
+
+private class BashScriptedLlmClient : RecordingLlmClient() {
+    var calledTool: String? = null
+
+    override suspend fun execute(
+        prompt: Prompt,
+        model: LLModel,
+        tools: List<ToolDescriptor>,
+    ): Message.Assistant {
+        prompts += CapturedPrompt(prompt, tools)
+        val toolResult = prompt.toolResults().singleOrNull()
+        return if (toolResult == null) {
+            calledTool = "bash"
+            Message.Assistant(
+                MessagePart.Tool.Call(
+                    id = "bash-1",
+                    tool = "bash",
+                    args = buildJsonObject { put("command", "wc -l < lines.txt") },
+                ),
+                ResponseMetaInfo.Empty,
+            )
+        } else {
+            Message.Assistant(toolResult.output.trim(), ResponseMetaInfo.Empty)
         }
     }
 }
