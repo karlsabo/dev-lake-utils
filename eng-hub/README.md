@@ -240,9 +240,9 @@ Other useful run tasks that exist today:
 
 ## Terminal chat agent
 
-The `terminalChat` task runs a separate JVM terminal program with the framework Skills `read` and `write` tools and
-the local `QWEN_3_8_27B` model from LM Studio. It does not start the Compose UI. An explicit `--mcp-config` argument
-adds tools from a configured `browser` MCP server to the same session.
+The `terminalChat` task runs a separate JVM terminal program with the framework Skills `read`, `write`, and `bash`
+tools and the local `QWEN_3_8_27B` model from LM Studio. It does not start the Compose UI. An explicit `--mcp-config`
+argument adds tools from a configured `browser` MCP server to the same session.
 
 Start LM Studio and serve the model id `qwen/qwen3.8-27b` at `http://localhost:1234/v1`, then launch from the
 repository root:
@@ -252,8 +252,8 @@ repository root:
 ```
 
 Relative file paths resolve from the terminal's launch working directory; the JavaExec task sets that to the
-repository root explicitly. Ask about any local text file, ask it to write one, then ask a follow-up in the same
-session. Quit with `/exit` or end-of-input (Ctrl-D).
+repository root explicitly. Ask about any local text file, ask it to write one, ask it to run a command, then ask a
+follow-up in the same session. Quit with `/exit` or end-of-input (Ctrl-D).
 
 Example conversation:
 
@@ -264,6 +264,8 @@ you> What day did I ask about?
 agent> Friday.
 you> Write summary.txt containing Release on Friday
 agent> Created summary.txt.
+you> Count the lines in /tmp/release-notes.txt using bash
+agent> 1
 you> /exit
 ```
 
@@ -272,8 +274,8 @@ file is bundled or required at startup.
 
 ### Browser MCP tools
 
-Pass `--mcp-config` with a framework `McpConfig` JSON file to add browser tools alongside Skills `read` and
-`write`:
+Pass `--mcp-config` with a framework `McpConfig` JSON file to add browser tools alongside Skills `read`, `write`,
+and `bash`:
 
 ```bash
 ./gradlew :eng-hub:terminalChat --args="--mcp-config /path/to/mcp.json"
@@ -296,9 +298,9 @@ Example config shape with synthetic values:
 ```
 
 The terminal selects the server named `browser` and starts only that server. Other configured servers are ignored.
-The `browser` entry must exist and be enabled. Without `--mcp-config`, the terminal keeps the Skills-only `read` and
-`write` behavior and does not read any MCP config, including Pi's config. The MCP manager is closed when the chat
-returns through `/exit`, end-of-input, a prompt failure, or a startup failure after tool discovery began.
+The `browser` entry must exist and be enabled. Without `--mcp-config`, the terminal keeps the Skills-only `read`,
+`write`, and `bash` behavior and does not read any MCP config, including Pi's config. The MCP manager is closed when
+the chat returns through `/exit`, end-of-input, a prompt failure, or a startup failure after tool discovery began.
 
 ### Framework dependency
 
@@ -306,7 +308,8 @@ Eng Hub consumes the published `com.nimblygames.framework:LLM`, `:MCP`, and `:Sk
 Games repository, with Maven Central for transitive dependencies. The coordinate is `3.0.3-SNAPSHOT`. Story 1 in the
 framework repository added public publishing for `Skills`, but did not publish a fixed `3.0.3` release: public metadata
 currently exposes only the mutable snapshot. Until a fixed release is published, a build re-resolving the snapshot can
-pick up a different framework revision.
+pick up a different framework revision. Framework process execution, which the `bash` tool needs, currently has only
+a JVM implementation, so the terminal chat remains a JVM launch.
 
 ### Conversation history and compaction
 
@@ -322,11 +325,12 @@ History is process-local and is lost when the terminal exits.
 
 The framework Skills `read` and `write` tools can access any UTF-8 file the JVM process can access, including
 absolute paths and paths outside the launch directory. The `write` tool creates or replaces a file's entire contents,
-creates missing parent directories, and has no approval UI or path confinement; it is a trusted local overwrite. An
-explicitly configured `browser` MCP server can start its own local process and receive the environment values in the
-config, and its tools can drive that browser. All of these are trusted host capabilities, not a sandbox. Shell,
-Markdown skill loading, a GUI chat surface, a custom history store, and a native executable are intentionally out of
-scope for this terminal chat slice.
+creates missing parent directories, and has no approval UI or path confinement; it is a trusted local overwrite. The
+`bash` tool runs arbitrary non-interactive commands with the host process's permissions, without a sandbox, path
+confinement, or command approval. An explicitly configured `browser` MCP server can start its own local process and
+receive the environment values in the config, and its tools can drive that browser. All of these are trusted host
+capabilities, not a sandbox. Markdown skill loading, a GUI chat surface, a custom history store, and a native
+executable are intentionally out of scope for this terminal chat slice.
 
 ### Manual LM Studio smoke test
 
@@ -342,6 +346,9 @@ Studio with the model above and, from the repository root:
 For the write path, use a disposable launch directory and ask `Write summary.txt containing Release on Friday`.
 Confirm that `summary.txt` exists with exactly `Release on Friday`. The Gradle task launches in the repository root,
 so use a disposable checkout copy or an absolute path inside a disposable directory rather than a real project file.
+
+For the bash path, create a disposable two-line file such as `/tmp/eng-hub-lines.txt` and ask it to count the lines
+using bash. Confirm it invokes the `bash` tool and replies `2`. Use only safe, disposable commands and files.
 
 For the browser path, pass a synthetic or personal `--mcp-config` file and ask it to open `https://example.com` and
 report the title. Confirm it invokes a browser MCP tool and reports `Example Domain`, then quit with `/exit` or Ctrl-D.

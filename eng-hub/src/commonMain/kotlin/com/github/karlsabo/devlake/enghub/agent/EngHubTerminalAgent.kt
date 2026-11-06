@@ -10,6 +10,7 @@ import ai.koog.agents.ext.agent.singleRunStrategyWithHistoryCompression
 import ai.koog.prompt.executor.model.PromptExecutor
 import com.nimblygames.llm.agent.QWEN_3_8_27B
 import com.nimblygames.skills.readToolRegistry
+import com.nimblygames.skills.shellToolRegistry
 import com.nimblygames.skills.writeToolRegistry
 import kotlinx.io.files.Path
 
@@ -30,6 +31,7 @@ private const val SYSTEM_PROMPT = """
 You are Eng Hub's terminal assistant.
 You can read UTF-8 text files with the read tool. Use it whenever the user asks about a file; never invent file contents.
 You can create or replace UTF-8 text files with the write tool. Use it when the user asks you to write a file.
+You can run non-interactive Bash commands with the bash tool. Use it when the user asks you to run a command or inspect files with shell tools.
 Relative paths resolve from the terminal's launch working directory.
 Keep responses concise and mention the path when reporting file contents.
 """
@@ -39,7 +41,7 @@ Browser MCP tools are available. Use them when the user asks you to open, naviga
 """
 
 /**
- * Builds the Eng Hub terminal agent with the framework Skills `read` and `write` tools plus Koog chat memory.
+ * Builds the Eng Hub terminal agent with the framework Skills `read`, `write`, and `bash` tools plus Koog chat memory.
  *
  * The agent keeps history for [sessionId] in Koog's in-memory chat history provider. Chat memory is
  * capped at [HISTORY_MESSAGE_LIMIT] messages so text-only turns stay bounded, and Koog's history
@@ -89,7 +91,10 @@ object EngHubTerminalAgent {
         browserMcpTools: BrowserMcpTools?,
     ): ToolRegistry {
         val mcpTools = browserMcpTools?.toolRegistry() ?: ToolRegistry.EMPTY
-        return readToolRegistry(workingDirectory) + writeToolRegistry(workingDirectory) + mcpTools
+        return readToolRegistry(workingDirectory) +
+            writeToolRegistry(workingDirectory) +
+            shellToolRegistry(workingDirectory) +
+            mcpTools
     }
 
     private fun systemPrompt(browserMcpTools: BrowserMcpTools?): String = if (browserMcpTools == null) {
