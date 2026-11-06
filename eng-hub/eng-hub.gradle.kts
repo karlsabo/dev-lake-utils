@@ -36,6 +36,7 @@ kotlin {
                 implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation("com.nimblygames.framework:LLM:$frameworkVersion")
+                implementation("com.nimblygames.framework:MCP:$frameworkVersion")
                 implementation("com.nimblygames.framework:Skills:$frameworkVersion")
             }
         }

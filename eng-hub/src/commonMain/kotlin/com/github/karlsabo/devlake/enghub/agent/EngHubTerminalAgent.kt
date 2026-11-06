@@ -4,6 +4,7 @@ import ai.koog.agents.chatMemory.feature.ChatMemory
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.agent.entity.AIAgentGraphStrategy
 import ai.koog.agents.core.dsl.extension.HistoryCompressionStrategy
+import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.ext.agent.HistoryCompressionConfig
 import ai.koog.agents.ext.agent.singleRunStrategyWithHistoryCompression
 import ai.koog.prompt.executor.model.PromptExecutor
@@ -31,6 +32,10 @@ Relative paths resolve from the terminal's launch working directory.
 Keep responses concise and mention the source path when reporting file contents.
 """
 
+private const val BROWSER_MCP_SYSTEM_PROMPT = """
+Browser MCP tools are available. Use them when the user asks you to open, navigate, or inspect a web page.
+"""
+
 /**
  * Builds the Eng Hub terminal agent with the framework Skills `read` tool and Koog chat memory.
  *
@@ -38,33 +43,62 @@ Keep responses concise and mention the source path when reporting file contents.
  * capped at [HISTORY_MESSAGE_LIMIT] messages so text-only turns stay bounded, and Koog's history
  * compression strategy summarizes the retained tail once a tool call grows a prompt beyond that
  * limit.
+ *
+ * When [browserMcpTools] is provided, its tools are added to the Skills `read` tool for the same
+ * session. The session owns the MCP manager and closes it on normal exit, input failure, or a
+ * construction failure after tool discovery has started.
  */
 object EngHubTerminalAgent {
-    fun create(
+    suspend fun create(
         promptExecutor: PromptExecutor,
         workingDirectory: String,
         sessionId: String = DEFAULT_TERMINAL_SESSION_ID,
+        browserMcpTools: BrowserMcpTools? = null,
     ): TerminalChatSession {
         require(Path(workingDirectory).isAbsolute) {
             "workingDirectory must be absolute: $workingDirectory"
         }
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }
 
-        val agent = AIAgent(
-            promptExecutor = promptExecutor,
-            llmModel = QWEN_3_8_27B,
-            strategy = chatStrategy(),
-            toolRegistry = readToolRegistry(workingDirectory),
-            systemPrompt = SYSTEM_PROMPT,
-            maxIterations = MAX_AGENT_ITERATIONS,
-            installFeatures = {
-                install(ChatMemory.Feature) {
-                    addPreProcessor(BoundedChatHistoryPreProcessor(HISTORY_MESSAGE_LIMIT))
-                }
-            },
-        )
-        return TerminalChatSession(agent, sessionId)
+        return runCatching {
+            val agent =
+                AIAgent(
+                    promptExecutor = promptExecutor,
+                    llmModel = QWEN_3_8_27B,
+                    strategy = chatStrategy(),
+                    toolRegistry = toolRegistry(workingDirectory, browserMcpTools),
+                    systemPrompt = systemPrompt(browserMcpTools),
+                    maxIterations = MAX_AGENT_ITERATIONS,
+                    installFeatures = {
+                        install(ChatMemory.Feature) {
+                            addPreProcessor(BoundedChatHistoryPreProcessor(HISTORY_MESSAGE_LIMIT))
+                        }
+                    },
+                )
+            TerminalChatSession(agent, sessionId, browserMcpTools)
+        }.getOrElse { failure ->
+            browserMcpTools?.closeAfterFailure(failure)
+            throw failure
+        }
     }
+
+    private suspend fun toolRegistry(
+        workingDirectory: String,
+        browserMcpTools: BrowserMcpTools?,
+    ): ToolRegistry {
+        val mcpTools = browserMcpTools?.toolRegistry() ?: ToolRegistry.EMPTY
+        return readToolRegistry(workingDirectory) + mcpTools
+    }
+
+    private fun systemPrompt(browserMcpTools: BrowserMcpTools?): String = if (browserMcpTools == null) {
+        SYSTEM_PROMPT
+    } else {
+        SYSTEM_PROMPT + BROWSER_MCP_SYSTEM_PROMPT
+    }
+}
+
+private suspend fun BrowserMcpTools.closeAfterFailure(failure: Throwable) {
+    runCatching { close() }.exceptionOrNull()?.let(failure::addSuppressed)
 }
 
 private fun chatStrategy(): AIAgentGraphStrategy<String, String> = singleRunStrategyWithHistoryCompression(

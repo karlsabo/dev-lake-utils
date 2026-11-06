@@ -21,10 +21,14 @@ interface ChatSession {
     suspend fun close()
 }
 
-/** Koog-backed chat session; [sessionId] selects the history kept by the installed chat memory feature. */
+/**
+ * Koog-backed chat session; [sessionId] selects the history kept by the installed chat memory feature.
+ * The session owns optional [browserMcpTools] and closes them even if closing the agent fails.
+ */
 class TerminalChatSession(
     private val agent: AIAgent<String, String>,
     private val sessionId: String,
+    private val browserMcpTools: BrowserMcpTools? = null,
 ) : ChatSession {
     override suspend fun ask(prompt: String): String {
         require(prompt.isNotBlank()) { "prompt must not be blank" }
@@ -32,7 +36,12 @@ class TerminalChatSession(
     }
 
     override suspend fun close() {
-        agent.close()
+        val failures =
+            buildList {
+                runCatching { agent.close() }.exceptionOrNull()?.let(::add)
+                runCatching { browserMcpTools?.close() }.exceptionOrNull()?.let(::add)
+            }
+        failures.throwCombined()
     }
 }
 
@@ -71,4 +80,10 @@ class TerminalChat(
         val response = session.ask(prompt)
         io.write("\n$ASSISTANT_PREFIX${response.trim()}\n")
     }
+}
+
+private fun List<Throwable>.throwCombined() {
+    val primary = firstOrNull() ?: return
+    drop(1).forEach(primary::addSuppressed)
+    throw primary
 }
