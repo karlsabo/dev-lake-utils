@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -15,6 +16,9 @@ import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import com.github.karlsabo.worktreearchive.WorktreeArchiveLifecycleState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+
+private const val BADGE_DESCRIPTION = "Force removal review required"
 
 class WorktreeArchiveBinTest {
     @OptIn(ExperimentalTestApi::class)
@@ -265,6 +269,62 @@ class WorktreeArchiveBinTest {
         onNodeWithText("0 seconds remaining").assertDoesNotExist()
         onNodeWithText("Review force removal").performClick()
         assertEquals(listOf("/repos/wip"), requests)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun forceReviewNeededBadgesClosedRecycleIconAndClearsWhenResolved() = runComposeUiTest {
+        val entries = mutableStateOf(
+            listOf(
+                WorktreeArchiveBinEntry("widgets", "feature/wip", 0, "/repos/wip", needsForceConfirmation = true),
+                WorktreeArchiveBinEntry("widgets", "feature/login", 42, "/repos/login"),
+            ),
+        )
+        setContent { MaterialTheme { WorktreeArchiveBin(entries = entries.value) } }
+
+        onNodeWithContentDescription("Recycle bin (2)").assertIsDisplayed()
+        onNodeWithContentDescription(BADGE_DESCRIPTION).assertIsDisplayed()
+        onNodeWithText("Confirmation required").assertDoesNotExist()
+
+        runOnIdle { entries.value = listOf(entries.value.last()) }
+
+        onNodeWithContentDescription("Recycle bin (1)").assertIsDisplayed()
+        onNodeWithContentDescription(BADGE_DESCRIPTION).assertDoesNotExist()
+    }
+
+    /**
+     * The marker hangs off the 40dp button frame, not off the glyph's layout box, so it must stay clear
+     * of the recycle symbol instead of covering it.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun forceReviewBadgeAnchorsToButtonCornerWithoutCoveringTheRecycleGlyph() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                WorktreeArchiveBin(
+                    entries = listOf(
+                        WorktreeArchiveBinEntry(
+                            "widgets",
+                            "feature/wip",
+                            0,
+                            "/repos/wip",
+                            needsForceConfirmation = true,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        val button = onNodeWithContentDescription("Recycle bin (1)").getUnclippedBoundsInRoot()
+        val glyph = onNodeWithText("\u267B", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val badge = onNodeWithContentDescription(BADGE_DESCRIPTION, useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+
+        assertEquals(button.top, badge.top, "badge $badge should start at the button top")
+        assertEquals(button.right, badge.right, "badge $badge should end at the button right")
+        val coversGlyph = badge.left < glyph.right && glyph.left < badge.right &&
+            badge.top < glyph.bottom && glyph.top < badge.bottom
+        assertFalse(coversGlyph, "badge $badge covers the recycle glyph $glyph")
     }
 
     @OptIn(ExperimentalTestApi::class)
