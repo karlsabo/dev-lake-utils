@@ -251,6 +251,25 @@ repository root:
 ./gradlew :eng-hub:terminalChat
 ```
 
+The default LM Studio base URL is `http://localhost:1234/v1`. To use a server on another host or port, pass
+`--lm-studio-base-url` (the `--lm-studio-base-url=URL` form also works):
+
+```bash
+./gradlew :eng-hub:terminalChat --args="--lm-studio-base-url http://192.168.1.50:1234/v1"
+```
+
+If the server requires API authentication, pass a file containing only the raw token. Surrounding whitespace and the
+trailing newline are trimmed, and the token is not printed. If this option is omitted, the existing `lm-studio` token is
+used for servers without authentication.
+
+```bash
+./gradlew :eng-hub:terminalChat \
+  --args="--lm-studio-base-url http://192.168.1.50:1234/v1 --lm-studio-api-key-file /secure/path/lm-studio-api-key"
+```
+
+The `--lm-studio-api-key-file=/secure/path/lm-studio-api-key` form also works. Keep the key file outside the repository
+and do not commit it.
+
 Relative file paths resolve from the terminal's launch working directory; the JavaExec task sets that to the
 repository root explicitly. Ask about any local text file, ask it to write one, ask it to run a command, then ask a
 follow-up in the same session. Quit with `/exit` or end-of-input (Ctrl-D).

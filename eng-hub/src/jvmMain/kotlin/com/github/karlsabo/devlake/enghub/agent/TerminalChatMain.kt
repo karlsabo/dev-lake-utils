@@ -11,10 +11,11 @@ import kotlin.system.exitProcess
 fun main(args: Array<String>) {
     val arguments = parseArguments(args)
     val workingDirectory = System.getProperty("user.dir")
+    val apiKey = arguments.lmStudioApiKeyPath?.let(::loadLmStudioApiKey) ?: LM_STUDIO_API_KEY
     val executor =
         buildOpenAICompatibleExecutor(
-            LM_STUDIO_API_KEY,
-            LM_STUDIO_BASE_URL,
+            apiKey,
+            arguments.lmStudioBaseUrl,
             LM_STUDIO_HTTP_MAX_RETRIES,
         )
 
@@ -42,6 +43,17 @@ private fun parseArguments(args: Array<String>): TerminalChatArguments = try {
     System.err.println("Eng Hub terminal chat: ${failure.message}")
     System.err.println(TerminalChatArguments.USAGE)
     exitProcess(2)
+}
+
+internal fun loadLmStudioApiKey(path: String): String {
+    val apiKey =
+        try {
+            Files.readString(Path.of(path)).trim()
+        } catch (failure: IOException) {
+            throw IllegalArgumentException("Cannot read LM Studio API key file '$path': ${failure.message}", failure)
+        }
+    require(apiKey.isNotEmpty()) { "LM Studio API key file '$path' must not be empty." }
+    return apiKey
 }
 
 private fun loadBrowserMcpTools(configPath: String): BrowserMcpTools {
