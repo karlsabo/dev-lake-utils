@@ -27,7 +27,7 @@ private const val STAGE_REVIEW_RESPONSE = """{"verdict":"pass","findings":[]}"""
 
 class EngHubStageAgentTest {
     @Test
-    fun `implementor edits Greeting kt and a fresh reviewer passes it`() = runTest {
+    fun `implementor edits Greeting kt and a fresh reviewer reads it before passing`() = runTest {
         val directory = Path(SystemTemporaryDirectory, "eng-hub-stage-${Random.nextLong()}")
         SystemFileSystem.createDirectories(directory)
         val greetingPath = Path(directory, "Greeting.kt")
@@ -60,16 +60,43 @@ class EngHubStageAgentTest {
         }
         assertTrue(client.closed)
 
-        assertEquals(3, client.prompts.size)
-        client.prompts.forEach { captured ->
+        assertEquals(4, client.prompts.size)
+        val implementorPrompts = client.prompts.take(2)
+        val reviewerPrompts = client.prompts.drop(2)
+        implementorPrompts.forEach { captured ->
             assertEquals(
                 listOf("read", "write", "bash"),
                 captured.tools.map { tool -> tool.name },
             )
         }
-        assertTrue(client.prompts[0].systemText().contains("implementor"))
-        assertTrue(client.prompts[1].systemText().contains("implementor"))
-        assertTrue(client.prompts[2].systemText().contains("reviewer"))
+        reviewerPrompts.forEach { captured ->
+            assertEquals(
+                listOf("read"),
+                captured.tools.map { tool -> tool.name },
+                "the reviewer must be inspection-only: no write and no bash",
+            )
+        }
+        assertTrue(implementorPrompts.all { captured -> captured.systemText().contains("implementor") })
+        assertTrue(reviewerPrompts.all { captured -> captured.systemText().contains("reviewer") })
+        assertTrue(
+            reviewerPrompts.last().prompt.toolResults().any { result ->
+                result.output.contains("Hello, Ada!")
+            },
+            "the reviewer must read Greeting.kt before passing",
+        )
+    }
+
+    @Test
+    fun `reviewer stage exposes only the read tool`() = runTest {
+        val directory = Path(SystemTemporaryDirectory, "eng-hub-stage-${Random.nextLong()}")
+        SystemFileSystem.createDirectories(directory)
+        try {
+            val registry = stageToolRegistry(directory.toString(), StageName.REVIEWER, null)
+
+            assertEquals(listOf("read"), registry.tools.map { tool -> tool.name })
+        } finally {
+            SystemFileSystem.delete(directory)
+        }
     }
 
     @Test
@@ -143,6 +170,15 @@ private class ImplementThenReviewLlmClient(
             )
 
             2 -> Message.Assistant(implementationResponse, ResponseMetaInfo.Empty)
+
+            3 -> Message.Assistant(
+                MessagePart.Tool.Call(
+                    id = "read-1",
+                    tool = "read",
+                    args = buildJsonObject { put("path", "Greeting.kt") },
+                ),
+                ResponseMetaInfo.Empty,
+            )
 
             else -> Message.Assistant(reviewResponse, ResponseMetaInfo.Empty)
         }

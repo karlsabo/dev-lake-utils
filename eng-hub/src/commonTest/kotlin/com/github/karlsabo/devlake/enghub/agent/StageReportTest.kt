@@ -94,6 +94,28 @@ class StageReportTest {
     }
 
     @Test
+    fun `rejects a pass that reports findings`() {
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                decodeReviewReport(
+                    """{"verdict":"pass","findings":["Greeting.kt still says Hello"]}""",
+                )
+            }
+
+        assertTrue(failure.message.orEmpty().contains("'pass' must not include findings"))
+    }
+
+    @Test
+    fun `rejects needs changes without findings`() {
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                decodeReviewReport("""{"verdict":"needs_changes","findings":[]}""")
+            }
+
+        assertTrue(failure.message.orEmpty().contains("'needs_changes' must include at least one finding"))
+    }
+
+    @Test
     fun `rejects an unknown verdict`() {
         assertFailsWith<IllegalArgumentException> {
             decodeReviewReport("""{"verdict":"maybe","findings":[]}""")

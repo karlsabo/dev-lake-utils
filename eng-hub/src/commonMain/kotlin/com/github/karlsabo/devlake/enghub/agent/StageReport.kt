@@ -52,6 +52,15 @@ internal fun decodeReviewReport(response: String): ReviewReport {
     require(report.findings.none { finding -> finding.isBlank() }) {
         "Reviewer report findings must not be blank."
     }
+    when (report.verdict) {
+        ReviewVerdict.PASS -> require(report.findings.isEmpty()) {
+            "Reviewer report 'pass' must not include findings."
+        }
+
+        ReviewVerdict.NEEDS_CHANGES -> require(report.findings.isNotEmpty()) {
+            "Reviewer report 'needs_changes' must include at least one finding."
+        }
+    }
     return report
 }
 

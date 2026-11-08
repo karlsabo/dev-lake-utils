@@ -379,13 +379,15 @@ Do not commit personal MCP configs, browser profiles, or credentials.
 The `implementReviewChat` task runs a separate JVM terminal program that carries one story through two model calls:
 
 1. an implementor stage with the same Skills `read`, `write`, and `bash` tools and `QWEN_3_8_27B` model as `terminalChat`
-2. a fresh reviewer stage with its own conversation, opened only after the implementor session closes
+2. a fresh reviewer stage with read-only inspection tools (Skills `read`; no `write` and no `bash`) and its own
+   conversation, opened only after the implementor session closes
 
 Every nonblank story line starts a new run, so a previous story's conversation never reaches the next implementor or
 reviewer. The implementor reports `{"files":["Greeting.kt"],"what":"Updated greeting","why":"Story asks to greet Ada"}`;
 the reviewer reports `{"verdict":"pass","findings":[]}` or `{"verdict":"needs_changes","findings":["..."]}`.
-Ordinary Kotlin code decodes and validates both reports; invalid JSON or blank fields fail the run instead of producing
-a review. The flow does not fix findings, commit, or open pull requests.
+Ordinary Kotlin code decodes and validates both reports; invalid JSON, blank fields, a `pass` with findings, or
+`needs_changes` with no findings fail the run instead of producing a review. The flow does not fix findings, commit, or
+open pull requests.
 
 Start LM Studio as for terminal chat, then launch from the repository root:
 
@@ -411,9 +413,9 @@ story> /exit
 
 Manual LM Studio smoke test: use a disposable checkout or directory, create `Greeting.kt` with a greeting that does not
 mention Ada, run `./gradlew :eng-hub:implementReviewChat`, and enter `Change Greeting.kt to greet Ada`. Confirm the
-implementor writes the file, the reviewer runs in a fresh conversation and reports a verdict, and the CLI prints the
-completed review. The implementor's `files` list is a claim, not proof of work; the reviewer inspects the working tree
-with its own tools.
+implementor writes the file, the reviewer runs in a fresh conversation, reads `Greeting.kt` before reporting a verdict,
+and the CLI prints the completed review. The implementor's `files` list is a claim, not proof of work; the reviewer
+inspects the working tree with its own `read` tool and cannot change it.
 
 ## Building
 
