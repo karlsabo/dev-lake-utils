@@ -2,7 +2,6 @@ package com.github.karlsabo.devlake.enghub.agent
 
 import com.nimblygames.llm.agent.buildOpenAICompatibleExecutor
 import kotlinx.coroutines.runBlocking
-import java.io.BufferedReader
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -57,22 +56,6 @@ internal fun loadLmStudioApiKey(path: String): String {
 }
 
 private fun loadBrowserMcpTools(configPath: String): BrowserMcpTools {
-    val config =
-        try {
-            Files.readString(Path.of(configPath))
-        } catch (failure: IOException) {
-            throw IllegalArgumentException("Cannot read MCP config '$configPath': ${failure.message}", failure)
-        }
+    val config = readMcpConfigFile(configPath)
     return BrowserMcpTools.fromConfigJson(config)
-}
-
-private class SystemTerminalIO : TerminalIO {
-    private val reader: BufferedReader = System.`in`.bufferedReader()
-
-    override fun readLine(): String? = reader.readLine()
-
-    override fun write(text: String) {
-        System.out.print(text)
-        System.out.flush()
-    }
 }

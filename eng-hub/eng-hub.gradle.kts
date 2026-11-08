@@ -118,3 +118,13 @@ createJvmExecTask(
     standardOutput = System.out
     errorOutput = System.err
 }
+
+createJvmExecTask(
+    taskName = "implementReviewChat",
+    mainClassName = "com.github.karlsabo.devlake.enghub.agent.ImplementReviewMainKt",
+) {
+    workingDir = rootProject.projectDir
+    standardInput = System.`in`
+    standardOutput = System.out
+    errorOutput = System.err
+}

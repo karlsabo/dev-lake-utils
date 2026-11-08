@@ -236,6 +236,7 @@ Other useful run tasks that exist today:
 ./gradlew :eng-hub:runDistributable
 ./gradlew :eng-hub:hotRunJvm
 ./gradlew :eng-hub:syncLlmFiles
+./gradlew :eng-hub:implementReviewChat
 ```
 
 ## Terminal chat agent
@@ -372,6 +373,47 @@ using bash. Confirm it invokes the `bash` tool and replies `2`. Use only safe, d
 For the browser path, pass a synthetic or personal `--mcp-config` file and ask it to open `https://example.com` and
 report the title. Confirm it invokes a browser MCP tool and reports `Example Domain`, then quit with `/exit` or Ctrl-D.
 Do not commit personal MCP configs, browser profiles, or credentials.
+
+## Implement-then-review agent
+
+The `implementReviewChat` task runs a separate JVM terminal program that carries one story through two model calls:
+
+1. an implementor stage with the same Skills `read`, `write`, and `bash` tools and `QWEN_3_8_27B` model as `terminalChat`
+2. a fresh reviewer stage with its own conversation, opened only after the implementor session closes
+
+Every nonblank story line starts a new run, so a previous story's conversation never reaches the next implementor or
+reviewer. The implementor reports `{"files":["Greeting.kt"],"what":"Updated greeting","why":"Story asks to greet Ada"}`;
+the reviewer reports `{"verdict":"pass","findings":[]}` or `{"verdict":"needs_changes","findings":["..."]}`.
+Ordinary Kotlin code decodes and validates both reports; invalid JSON or blank fields fail the run instead of producing
+a review. The flow does not fix findings, commit, or open pull requests.
+
+Start LM Studio as for terminal chat, then launch from the repository root:
+
+```bash
+./gradlew :eng-hub:implementReviewChat
+```
+
+The launcher accepts the same `--mcp-config`, `--lm-studio-base-url`, and `--lm-studio-api-key-file` options as
+`terminalChat`. With `--mcp-config`, each stage starts its own `browser` MCP manager, so closing the implementor cannot
+remove the reviewer's tools. Quit with `/exit` or Ctrl-D; every other nonblank line is a story.
+
+Example conversation with a disposable `Greeting.kt`:
+
+```text
+story> Change Greeting.kt to greet Ada
+implementor> files: Greeting.kt
+implementor> what: Updated greeting
+implementor> why: Story asks to greet Ada
+reviewer> pass
+reviewer> no findings
+story> /exit
+```
+
+Manual LM Studio smoke test: use a disposable checkout or directory, create `Greeting.kt` with a greeting that does not
+mention Ada, run `./gradlew :eng-hub:implementReviewChat`, and enter `Change Greeting.kt to greet Ada`. Confirm the
+implementor writes the file, the reviewer runs in a fresh conversation and reports a verdict, and the CLI prints the
+completed review. The implementor's `files` list is a claim, not proof of work; the reviewer inspects the working tree
+with its own tools.
 
 ## Building
 

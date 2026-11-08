@@ -2,10 +2,7 @@ package com.github.karlsabo.devlake.enghub.agent
 
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.prompt.Prompt
-import ai.koog.prompt.dsl.ModerationResult
-import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
-import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.MessagePart
@@ -287,22 +284,6 @@ class EngHubTerminalAgentTest {
     }
 }
 
-private abstract class RecordingLlmClient : LLMClient() {
-    val prompts = mutableListOf<CapturedPrompt>()
-    var closed = false
-
-    override suspend fun moderate(
-        prompt: Prompt,
-        model: LLModel,
-    ): ModerationResult = error("Moderation is not used")
-
-    override fun llmProvider(): LLMProvider = LLMProvider.OpenAI
-
-    override fun close() {
-        closed = true
-    }
-}
-
 private class TextOnlyLlmClient : RecordingLlmClient() {
     override suspend fun execute(
         prompt: Prompt,
@@ -455,14 +436,5 @@ private const val BROWSER_MCP_CONFIG = """
   }
 }
 """
-
-private data class CapturedPrompt(
-    val prompt: Prompt,
-    val tools: List<ToolDescriptor>,
-)
-
-private fun Prompt.toolResults(): List<MessagePart.Tool.Result> = messages.flatMap { message ->
-    message.parts.filterIsInstance<MessagePart.Tool.Result>()
-}
 
 private fun readFile(path: Path): String = SystemFileSystem.source(path).buffered().use { it.readString() }
