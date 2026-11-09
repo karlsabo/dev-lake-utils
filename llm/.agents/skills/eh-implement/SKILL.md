@@ -25,8 +25,10 @@ Expect input to be one of:
 
 ### Step 2: Find the seam
 
-- Read the surrounding code before editing.
-- Reuse existing abstractions when they fit.
+- Read the surrounding code; trace callers, tests, fixtures, config, and exports the change affects.
+- Check for data loss, exposure, or broken callers before choosing scope.
+- For bug fixes, search all callers and fix the root cause once.
+- Reuse existing abstractions and conventions when they fit.
 - If you need a new abstraction, introduce the smallest one that makes the next change easier.
 - Optimize for replaceability, low coupling, and clear contracts rather than cleverness.
 - If the change crosses service or data boundaries, make ownership, guarantees, and failure behavior explicit.
@@ -38,6 +40,9 @@ Expect input to be one of:
 - Make illegal states hard to represent. Validate assumptions and fail early when a contract is violated.
 - Remove duplication instead of copying logic into another place.
 - Fix nearby broken windows that directly obscure the change but do not sprawl into unrelated cleanup.
+- Prefer deletion, existing code, or the standard library over new code; avoid dependencies for a few lines.
+- Add no speculative options, wrappers, conversions, or configuration. Keep platform values as-is.
+- Preserve validation and error handling when moving code; never cut trust-boundary checks, security, or accessibility.
 - Prefer plain, obvious code over indirection.
 - If you are prototyping to learn, keep it disposable. Do not smuggle prototype shortcuts into the final code.
 - For distributed or data-heavy changes, be explicit about consistency, ownership, retries, idempotency, and failure modes.
@@ -64,6 +69,7 @@ Expect input to be one of:
 - Run the narrowest useful tests first, then broader tests as needed.
 - Do not assume behavior. Prove it with tests, logs, types, contracts, or direct inspection.
 - Verify the acceptance test, the main failure path, and any contract you changed.
+- Give new non-trivial logic a small test or assert-based check; trivial changes need none.
 - If architecture-level guarantees matter, add or update automated checks where practical.
 
 ### Step 6: Self-review
@@ -71,7 +77,7 @@ Expect input to be one of:
 - Check for accidental coupling, hidden duplication, oversized functions, leaky names, and comment noise.
 - Check whether the change still maps cleanly to one acceptance test.
 - If the slice grew beyond a couple of days of work, send it back through planning and split it.
-- Summarize the trade-offs and remaining risks.
+- End with one or two lines on what you skipped or did not check and any remaining risk.
 
 ## Principles from `notes.md`
 
