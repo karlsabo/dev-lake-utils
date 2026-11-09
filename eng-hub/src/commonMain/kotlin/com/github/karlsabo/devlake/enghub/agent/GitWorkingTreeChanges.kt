@@ -4,7 +4,7 @@ import com.github.karlsabo.git.GitCommandApi
 import com.github.karlsabo.git.GitCommandException
 import com.github.karlsabo.git.GitCommandService
 
-/** Prompt budget for the verified diff; the reviewer inspects larger changes with its `read` tool. */
+/** Prompt budget for the verified diff; the reviewer inspects surviving files with its `read` tool. */
 private const val MAX_REVIEW_PATCH_CHARS = 24_000
 
 private const val NUL = '\u0000'
@@ -36,10 +36,16 @@ class GitWorkingTreeChanges(
         "read the working-tree changes",
     ) {
         val revision = baseline.revision
-        val patch = truncateAtLineBoundary(readPatch(revision), maxPatchChars)
+        val changes = readChanges(revision)
+        val patch = boundedReviewDiff(
+            maxChars = maxPatchChars,
+            patch = readPatch(revision),
+            deleted = changes.filter { change -> change.kind == WorkingTreeChangeKind.DELETED },
+            filteredDiff = { filter -> readPatch(revision, filter) },
+        )
         WorkingTreeChangeReport(
             baselineRevision = revision,
-            changes = readChanges(revision),
+            changes = changes,
             patch = patch.text,
             patchTruncated = patch.truncated,
         )
@@ -57,6 +63,7 @@ class GitWorkingTreeChanges(
         git.execute(workingDirectory, "ls-files", "--others", "--exclude-standard", NUL_SEPARATED),
     ).map { path -> WorkingTreeChange(path, WorkingTreeChangeKind.ADDED) }
 
+    /** Diffs [revision] against the working tree with every status, which is the review diff when it fits. */
     private fun readPatch(revision: String): String = git.diff(
         workingDirectory,
         NO_COLOR,
@@ -64,6 +71,27 @@ class GitWorkingTreeChanges(
         NO_TEXTCONV,
         RELATIVE_PATHS,
         NO_RENAMES,
+        revision,
+        "--",
+    )
+
+    /**
+     * Diffs [revision] against the working tree keeping only the changes whose status [filter] selects.
+     *
+     * [boundedReviewDiff] splits the prompt budget with these filters, so the removed content of deleted
+     * paths can be read separately from the rest of the diff.
+     */
+    private fun readPatch(
+        revision: String,
+        filter: String,
+    ): String = git.diff(
+        workingDirectory,
+        NO_COLOR,
+        NO_EXT_DIFF,
+        NO_TEXTCONV,
+        RELATIVE_PATHS,
+        NO_RENAMES,
+        filter,
         revision,
         "--",
     )

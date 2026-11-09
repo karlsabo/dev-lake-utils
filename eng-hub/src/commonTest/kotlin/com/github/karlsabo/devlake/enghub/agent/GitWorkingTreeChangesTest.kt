@@ -130,6 +130,57 @@ class GitWorkingTreeChangesTest {
     }
 
     @Test
+    fun `keeps removed content when a large earlier diff pushes a deletion past the budget`() {
+        val repo = TempRepository()
+        try {
+            repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "line"))
+            repo.write("zzz-deleted.txt", "fun removed() = \"gone\"\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path, maxPatchChars = MAX_TEST_PATCH_CHARS)
+            val baseline = changes.baseline()
+
+            repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "changed"))
+            repo.delete("zzz-deleted.txt")
+
+            val report = changes.read(baseline)
+
+            assertChange(report, "zzz-deleted.txt", WorkingTreeChangeKind.DELETED)
+            assertTrue(report.patchTruncated, "the diff is past the budget, so it must be marked truncated")
+            assertTrue(
+                report.patch.contains("-fun removed() = \"gone\""),
+                "a deletion after the truncation point must stay inspectable",
+            )
+            assertTrue(report.patch.length <= MAX_TEST_PATCH_CHARS, "the reserved removal must fit the budget")
+            assertTrue(report.patch.endsWith("\n"), "truncation must stop at a line boundary")
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `fails the review when a deletion's removed content cannot fit the budget`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Deleted.kt", numberedLines(MAX_TEST_PATCH_CHARS, "removed"))
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path, maxPatchChars = MAX_TEST_PATCH_CHARS)
+            val baseline = changes.baseline()
+
+            repo.delete("Deleted.kt")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            assertTrue(
+                failure.message.orEmpty().contains("cannot fit the removed content"),
+                "an uninspectable deletion must fail closed, got: ${failure.message}",
+            )
+            assertTrue(failure.message.orEmpty().contains("Deleted.kt"))
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
     fun `reports paths relative to a working directory inside the repository`() {
         val repo = TempRepository()
         try {
@@ -176,6 +227,12 @@ class GitWorkingTreeChangesTest {
         )
     }
 }
+
+/** [count] lines tagged [label], long enough that a diff of them cannot fit a small budget. */
+private fun numberedLines(
+    count: Int,
+    label: String,
+): String = (1..count).joinToString("\n") { index -> "$label $index" } + "\n"
 
 /** A disposable git repository rooted below the system temporary directory. */
 private class TempRepository : TempDirectory("eng-hub-git-changes-${Random.nextLong()}") {

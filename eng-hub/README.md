@@ -420,7 +420,9 @@ The baseline is a commit, not the working tree state, so changes that were alrea
 reported too, and an implementor commit cannot hide a change from the review. The flow therefore needs a git working
 tree with at least one commit; anything else fails the run before the reviewer opens. When the diff exceeds the prompt
 budget, the prompt says it was truncated and how many changed paths were not listed, so the reviewer can fall back to
-`read` instead of silently passing unexamined work.
+`read` instead of silently passing unexamined work. A deleted path cannot be read back, so the removed content of every
+deletion is reserved inside the budget before the rest of the diff is cut; if that content alone does not fit, the run
+fails rather than asking the reviewer to judge a deletion it cannot inspect.
 
 Example conversation with a disposable `Greeting.kt`:
 

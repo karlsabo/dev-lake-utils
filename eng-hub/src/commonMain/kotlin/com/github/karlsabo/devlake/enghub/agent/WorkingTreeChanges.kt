@@ -36,6 +36,7 @@ data class WorkingTreeBaseline(
 data class WorkingTreeChangeReport(
     val baselineRevision: String,
     val changes: List<WorkingTreeChange>,
+    /** The unified diff; when [patchTruncated], the removed content of every deleted path is still complete. */
     val patch: String,
     val patchTruncated: Boolean,
 )
@@ -50,7 +51,13 @@ interface WorkingTreeChanges {
     /** Records the revision the implementor starts from. */
     fun baseline(): WorkingTreeBaseline
 
-    /** Reads every working-tree change relative to [baseline], including deletions and untracked paths. */
+    /**
+     * Reads every working-tree change relative to [baseline], including deletions and untracked paths.
+     *
+     * A reviewer can re-read a surviving file but never a deleted one, so a report whose diff dropped a
+     * deletion's removed content would let the reviewer pass on a change it could not inspect. Implementations
+     * keep that content within their prompt budget, or fail instead of returning the report.
+     */
     fun read(baseline: WorkingTreeBaseline): WorkingTreeChangeReport
 }
 

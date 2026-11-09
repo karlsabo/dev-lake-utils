@@ -59,6 +59,10 @@ class StagePromptsTest {
             )
 
         assertTrue(prompt.contains("Diff truncated"))
+        assertTrue(
+            prompt.contains("deleted file cannot be read"),
+            "the notice must say a deleted file's removed content is still in the patch",
+        )
     }
 
     @Test
