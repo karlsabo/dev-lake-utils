@@ -36,7 +36,12 @@ data class WorkingTreeBaseline(
 data class WorkingTreeChangeReport(
     val baselineRevision: String,
     val changes: List<WorkingTreeChange>,
-    /** The unified diff; when [patchTruncated], the removed content of every deleted path is still complete. */
+    /**
+     * The unified diff; when [patchTruncated], the removed content of every deleted path is still complete.
+     *
+     * A deleted path whose content git can only report as binary never reaches this report: [read] fails
+     * instead, because the reviewer could neither see the removed bytes nor reopen the deleted path.
+     */
     val patch: String,
     val patchTruncated: Boolean,
 )
@@ -54,9 +59,11 @@ interface WorkingTreeChanges {
     /**
      * Reads every working-tree change relative to [baseline], including deletions and untracked paths.
      *
-     * A reviewer can re-read a surviving file but never a deleted one, so a report whose diff dropped a
-     * deletion's removed content would let the reviewer pass on a change it could not inspect. Implementations
-     * keep that content within their prompt budget, or fail instead of returning the report.
+     * A reviewer can re-read a surviving file but never a deleted one, so a [WorkingTreeChangeReport] whose diff
+     * dropped a deletion's removed content would let the reviewer pass on a change it could not inspect.
+     * Implementations keep that content within their prompt budget, or fail instead of returning the report.
+     * They do the same when git can only describe a deleted path as binary, because a marker is not the removed
+     * content and the deleted path cannot be reopened.
      */
     fun read(baseline: WorkingTreeBaseline): WorkingTreeChangeReport
 }

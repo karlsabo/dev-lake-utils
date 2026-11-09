@@ -15,6 +15,10 @@ import kotlin.test.assertTrue
 
 private const val MAX_TEST_PATCH_CHARS = 400
 
+/** Bytes git treats as binary, so its diff carries a marker instead of the content. */
+private const val BINARY_PAYLOAD = "payload\u0000\u0001\u0002"
+private const val OTHER_BINARY_PAYLOAD = "other-payload\u0000\u0003"
+
 /**
  * Integration tests for [GitWorkingTreeChanges] against real, disposable git repositories.
  *
@@ -213,6 +217,75 @@ class GitWorkingTreeChangesTest {
         } finally {
             repository.delete()
         }
+    }
+
+    @Test
+    fun `fails the review when a deleted binary file's removed content is not inspectable`() {
+        val repo = TempRepository()
+        try {
+            repo.write("payload.bin", BINARY_PAYLOAD)
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.delete("payload.bin")
+
+            assertUninspectableBinaryDeletion(changes, baseline, "payload.bin")
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `fails the review for a deleted binary file even when the diff is split for truncation`() {
+        val repo = TempRepository()
+        try {
+            repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "line"))
+            repo.write("payload.bin", BINARY_PAYLOAD)
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path, maxPatchChars = MAX_TEST_PATCH_CHARS)
+            val baseline = changes.baseline()
+
+            repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "changed"))
+            repo.delete("payload.bin")
+
+            assertUninspectableBinaryDeletion(changes, baseline, "payload.bin")
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `reviews a modified binary file because the reviewer can still read it`() {
+        val repo = TempRepository()
+        try {
+            repo.write("payload.bin", BINARY_PAYLOAD)
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write("payload.bin", OTHER_BINARY_PAYLOAD)
+
+            val report = changes.read(baseline)
+
+            assertChange(report, "payload.bin", WorkingTreeChangeKind.MODIFIED)
+        } finally {
+            repo.delete()
+        }
+    }
+
+    private fun assertUninspectableBinaryDeletion(
+        changes: GitWorkingTreeChanges,
+        baseline: WorkingTreeBaseline,
+        path: String,
+    ) {
+        val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+        assertTrue(
+            failure.message.orEmpty().contains("cannot inspect the removed content of 1 deleted binary path(s)"),
+            "an uninspectable binary deletion must fail closed, got: ${failure.message}",
+        )
+        assertTrue(failure.message.orEmpty().contains(path))
     }
 
     private fun assertChange(

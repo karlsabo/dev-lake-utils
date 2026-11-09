@@ -411,6 +411,8 @@ verified change report:
   report and paths it deleted are both listed
 - every untracked path that is not ignored, listed as a new file
 - a bounded unified diff of tracked changes, including the removed lines of deleted files
+- a refusal to open the reviewer when a deletion's removed content cannot be shown, whether it does not fit the diff
+  budget or git can only report the file as binary
 
 Paths are relative to the launcher's working directory and match what the Skills `read` tool resolves. Ignored files
 (`.gitignore`) are excluded so build output does not flood the review. The reviewer never receives `bash` and never
@@ -422,7 +424,9 @@ tree with at least one commit; anything else fails the run before the reviewer o
 budget, the prompt says it was truncated and how many changed paths were not listed, so the reviewer can fall back to
 `read` instead of silently passing unexamined work. A deleted path cannot be read back, so the removed content of every
 deletion is reserved inside the budget before the rest of the diff is cut; if that content alone does not fit, the run
-fails rather than asking the reviewer to judge a deletion it cannot inspect.
+fails rather than asking the reviewer to judge a deletion it cannot inspect. The same holds for a deleted binary
+file: git reports it as a `Binary files ... differ` marker rather than as removed bytes, so the reviewer would never
+see what was removed, and the run fails instead of presenting that marker as a complete diff.
 
 Example conversation with a disposable `Greeting.kt`:
 

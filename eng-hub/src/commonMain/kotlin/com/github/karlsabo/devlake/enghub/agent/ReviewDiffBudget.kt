@@ -2,8 +2,13 @@ package com.github.karlsabo.devlake.enghub.agent
 
 private const val LINE_END = "\n"
 
-/** Isolates the removed content of deleted paths, which must survive truncation. */
-private const val DELETED_ONLY = "--diff-filter=D"
+/**
+ * Isolates the removed content of deleted paths, which must survive truncation.
+ *
+ * Shared with the deletion inspectability check, which reads the same filter to find deleted paths whose removed
+ * content the diff cannot carry.
+ */
+internal const val DELETED_ONLY = "--diff-filter=D"
 
 /** Isolates the rest of the diff, which truncation may cut. */
 private const val SURVIVING_ONLY = "--diff-filter=d"
@@ -55,3 +60,19 @@ private fun uninspectableDeletions(
     "$maxChars-character diff budget, and a deleted path cannot be read back: " +
     "${deleted.joinToString(", ") { change -> change.path }}. Failing the review rather than letting the " +
     "reviewer pass on deletions it cannot inspect."
+
+/**
+ * Explains a refusal to review deleted paths whose removed content the diff cannot carry.
+ *
+ * Git renders binary content as a `Binary files ... differ` marker instead of the removed bytes, and the
+ * reviewer cannot open a deleted path, so such a deletion reaches the review as a change nobody can see.
+ * Budgeting cannot help: the marker always fits, which is exactly why this has to fail closed.
+ *
+ * @param paths the deleted paths whose removed content git reports only as a binary marker.
+ */
+internal fun uninspectableBinaryDeletions(paths: List<String>): String {
+    val listed = paths.joinToString(", ")
+    return "Eng Hub cannot inspect the removed content of ${paths.size} deleted binary path(s), and a deleted " +
+        "path cannot be read back: $listed. Git reports binary content as a marker instead of the removed " +
+        "bytes, so the reviewer would judge a deletion it never saw. Failing the review instead."
+}
