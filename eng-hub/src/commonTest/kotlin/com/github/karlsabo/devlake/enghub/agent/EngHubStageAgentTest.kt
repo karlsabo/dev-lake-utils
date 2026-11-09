@@ -7,12 +7,16 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.ResponseMetaInfo
+import com.nimblygames.mcp.api.McpManager
+import com.nimblygames.mcp.api.McpTool
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.SystemTemporaryDirectory
 import kotlinx.io.readString
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.random.Random
@@ -87,14 +91,29 @@ class EngHubStageAgentTest {
     }
 
     @Test
-    fun `reviewer stage exposes only the read tool`() = runTest {
+    fun `reviewer never receives tools from an untrusted browser server`() = runTest {
         val directory = Path(SystemTemporaryDirectory, "eng-hub-stage-${Random.nextLong()}")
         SystemFileSystem.createDirectories(directory)
+        var discovered = false
+        val browserTools = BrowserMcpTools(object : McpManager {
+            override suspend fun listTools(): List<McpTool> {
+                discovered = true
+                return listOf(McpTool(name = "browser_execute_code", description = "Execute code"))
+            }
+
+            override suspend fun callTool(name: String, arguments: JsonObject): CallToolResult {
+                error("reviewer must not call browser tools")
+            }
+
+            override suspend fun close() = Unit
+        })
         try {
-            val registry = stageToolRegistry(directory.toString(), StageName.REVIEWER, null)
+            val registry = stageToolRegistry(directory.toString(), StageName.REVIEWER, browserTools)
 
             assertEquals(listOf("read"), registry.tools.map { tool -> tool.name })
+            assertTrue(!discovered, "the reviewer must not even start the untrusted server")
         } finally {
+            browserTools.close()
             SystemFileSystem.delete(directory)
         }
     }

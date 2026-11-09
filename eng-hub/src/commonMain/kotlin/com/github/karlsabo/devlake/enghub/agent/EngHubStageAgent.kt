@@ -82,7 +82,11 @@ object EngHubStageAgent {
             StageName.IMPLEMENTOR -> IMPLEMENTOR_SYSTEM_PROMPT
             StageName.REVIEWER -> REVIEWER_SYSTEM_PROMPT
         }
-        return if (browserMcpTools == null) role else role + BROWSER_MCP_SYSTEM_PROMPT
+        return if (stage == StageName.IMPLEMENTOR && browserMcpTools != null) {
+            role + BROWSER_MCP_SYSTEM_PROMPT
+        } else {
+            role
+        }
     }
 }
 
@@ -90,7 +94,8 @@ object EngHubStageAgent {
  * Tools for one stage. The implementor may change the working tree; the reviewer may only inspect it.
  *
  * The reviewer gets `read` instead of `write` and `bash`: `bash` can write files even when the
- * separate `write` tool is absent. Optional MCP tools are browser inspection tools.
+ * separate `write` tool is absent. Configured MCP servers are not trusted to be read-only,
+ * so only the implementor receives their tools.
  */
 internal suspend fun stageToolRegistry(
     workingDirectory: String,
@@ -98,8 +103,5 @@ internal suspend fun stageToolRegistry(
     browserMcpTools: BrowserMcpTools?,
 ): ToolRegistry = when (stage) {
     StageName.IMPLEMENTOR -> engHubToolRegistry(workingDirectory, browserMcpTools)
-
-    StageName.REVIEWER ->
-        readToolRegistry(workingDirectory) +
-            (browserMcpTools?.toolRegistry() ?: ToolRegistry.EMPTY)
+    StageName.REVIEWER -> readToolRegistry(workingDirectory)
 }
