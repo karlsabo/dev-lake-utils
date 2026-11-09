@@ -20,7 +20,7 @@ Expect input to be one of:
 ### Step 1: Lock the slice
 
 - Identify the acceptance tests being implemented.
-- Restate the observable behavior, what is in scope, and what is explicitly out of scope.
+- For non-trivial or ambiguous work, establish the observable behavior and scope before editing; ask when material ambiguity remains.
 - Prefer the smallest tracer-bullet path that proves the behavior end to end.
 
 ### Step 2: Find the seam
@@ -36,12 +36,12 @@ Expect input to be one of:
 
 ### Step 3: Implement
 
-- Keep functions small and single-purpose.
+- Keep functions cohesive; extract when it improves clarity, testability, or reuse—not merely to reduce line count.
 - Make illegal states hard to represent. Validate assumptions and fail early when a contract is violated.
-- Remove duplication instead of copying logic into another place.
+- Deduplicate shared behavior or knowledge, but do not merge merely similar-looking code with independent reasons to change.
 - Fix nearby broken windows that directly obscure the change but do not sprawl into unrelated cleanup.
 - Prefer deletion, existing code, or the standard library over new code; avoid dependencies for a few lines.
-- Add no speculative options, wrappers, conversions, or configuration. Keep platform values as-is.
+- Add no speculative options, wrappers, conversions, or configuration.
 - Preserve validation and error handling when moving code; never cut trust-boundary checks, security, or accessibility.
 - Prefer plain, obvious code over indirection.
 - If you are prototyping to learn, keep it disposable. Do not smuggle prototype shortcuts into the final code.
@@ -49,65 +49,23 @@ Expect input to be one of:
 
 ### Step 4: Comments and docs
 
-- Do not add comments that narrate what the next line or block does.
-- Inline comments are for `why`: constraints, invariants, trade-offs, or non-obvious behavior.
-- `What` comments belong only in doc comments on functions, classes, modules, or similar units, and those doc comments should be terse.
-- If the code is self-explanatory, prefer no comment.
-- Delete stale or noisy comments in code you touch.
-- Document public APIs and non-obvious behavior; skip obvious boilerplate.
-- Start with a one-line purpose or behavior summary.
-- Describe contracts, not implementation details.
-- For functions: clarify inputs, returns, exceptions, and side effects.
-- For classes: explain responsibilities, invariants, and lifecycle.
-- Specify meaningful constraints, units, edge cases, and concurrency requirements.
-- Explain why when intent is surprising.
-- Use short examples for tricky usage.
-- Follow language conventions; don’t duplicate names or type annotations.
+- Comments should explain non-obvious constraints, invariants, trade-offs, or behavior—not narrate the code.
+- Document public APIs and contracts where useful or required by repository conventions; skip obvious boilerplate.
+- Include inputs, returns, failures, side effects, units, or concurrency requirements only when they are non-obvious and relevant.
+- Remove stale or noisy comments in code you touch.
+- Follow existing repository and language conventions.
 
 ### Step 5: Validate
 
 - Run the narrowest useful tests first, then broader tests as needed.
 - Do not assume behavior. Prove it with tests, logs, types, contracts, or direct inspection.
 - Verify the acceptance test, the main failure path, and any contract you changed.
-- Give new non-trivial logic a small test or assert-based check; trivial changes need none.
+- Add or update focused automated tests for changed behavior and regression fixes; when that is impractical, perform and report an appropriate alternative verification.
 - If architecture-level guarantees matter, add or update automated checks where practical.
 
 ### Step 6: Self-review
 
 - Check for accidental coupling, hidden duplication, oversized functions, leaky names, and comment noise.
 - Check whether the change still maps cleanly to one acceptance test.
-- If the slice grew beyond a couple of days of work, send it back through planning and split it.
+- If the work expands into independent acceptance criteria or separately deployable changes, stop and replan or split it.
 - End with one or two lines on what you skipped or did not check and any remaining risk.
-
-## Principles from `notes.md`
-
-- Tracer bullets over big-bang rewrites
-- Trade-offs over "best practices"
-- DRY and decoupling are defaults
-- Crash early on violated assumptions
-- Test relentlessly
-- Be explicit about guarantees and data ownership
-- Keep the code easy to change
-
-## Red flags
-
-- Comments explaining obvious control flow, assignments, or syntax
-- Large functions mixing orchestration, validation, IO, and transformation
-- Hidden duplication across files or modules
-- New abstractions added before the first real use
-- Distributed behavior is added without naming consistency or failure guarantees
-
-# The Pragmatic Programmer
-
-* DRY (Don't Repeat Yourself) — Every piece of knowledge should have a single, authoritative representation.
-* Don't live with broken windows — Fix bad code, poor design, and wrong decisions as soon as you see them.
-* Make it easy to change — Good design is code that's easy to modify. If in doubt, make it replaceable.
-* Use tracer bullets — Build thin, end-to-end slices of functionality early to validate your approach.
-* Design with contracts — Use preconditions, postconditions, and invariants to make expectations explicit.
-* Crash early — A dead program causes less damage than a broken, limping one.
-* Decouple ruthlessly — Avoid coupling between components so changes don't ripple everywhere.
-* Use the power of plain text — Store knowledge in plain text; it outlives all other formats.
-* Iterate with users — Requirements are found, not given. Work closely and continuously with users.
-* Test relentlessly — Test your software, or your users will.
-* Don't assume — prove it — Assumptions in code are the root of most bugs.
-* Delight your users — The goal isn't to deliver what they asked for, but what they actually need.
