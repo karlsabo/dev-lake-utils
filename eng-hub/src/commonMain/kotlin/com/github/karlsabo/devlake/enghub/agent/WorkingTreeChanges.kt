@@ -70,7 +70,9 @@ interface WorkingTreeChanges {
      * filter command also fails: git applies it while reading changes, so it can execute code outside the
      * reviewer's read-only boundary and hide a changed line from both the path list and the diff. An untracked
      * directory git reports as one opaque entry, such as an untracked nested repository, fails too, because the
-     * files inside it appear in no diff and cannot be read by path.
+     * files inside it appear in no diff and cannot be read by path. An untracked symlink fails the same way: no
+     * diff carries the link, and the path-based `read` tool follows it instead of showing the target it names, so
+     * a dangling link can never be inspected.
      */
     fun read(baseline: WorkingTreeBaseline): WorkingTreeChangeReport
 }
@@ -107,6 +109,23 @@ internal fun uninspectableBinaryChanges(changes: List<WorkingTreeChange>): Strin
         "binary content as a marker instead of the bytes, an untracked binary path has no diff at all, and the " +
         "reviewer's read tool is a text tool, so neither side of the change could be inspected. Failing the " +
         "review instead."
+}
+
+/**
+ * Explains a refusal to review untracked symlinks whose target no reviewer tool can show.
+ *
+ * An untracked symlink appears in the path list as an added path but carries no diff, and the reviewer's `read`
+ * tool follows the link, showing the target's content instead of the link and the path it points at. A dangling
+ * link cannot be read at all, so the change would be reviewed without its target ever being seen.
+ *
+ * @param paths the untracked symlinks whose target the reviewer cannot inspect.
+ */
+internal fun uninspectableUntrackedSymlinks(paths: List<String>): String {
+    val listed = paths.joinToString(", ")
+    return "Eng Hub found ${paths.size} untracked symlink(s): $listed. Git lists an untracked symlink as an " +
+        "added path but carries no diff for it, and the reviewer's read tool follows the link instead of " +
+        "showing the path it points at, so a dangling link cannot be read at all. Failing the review instead " +
+        "of reviewing a change whose target was never seen."
 }
 
 /**

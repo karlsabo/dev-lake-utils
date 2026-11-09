@@ -1,14 +1,17 @@
 package com.github.karlsabo.devlake.enghub.agent
 
+import com.github.karlsabo.devlake.enghub.isSymbolicLink
 import com.github.karlsabo.git.GitCommandApi
 import com.github.karlsabo.git.GitCommandException
 import com.github.karlsabo.git.GitCommandService
+import kotlinx.io.files.Path
 
 /** Prompt budget for the verified diff; the reviewer inspects surviving files with its `read` tool. */
 private const val MAX_REVIEW_PATCH_CHARS = 24_000
 
 private const val NUL = '\u0000'
 private const val PATH_STATUS_PAIR = 2
+private const val OPAQUE_DIRECTORY_SUFFIX = '/'
 private const val NO_RENAMES = "--no-renames"
 private const val RELATIVE_PATHS = "--relative"
 private const val NUL_SEPARATED = "-z"
@@ -79,15 +82,21 @@ class GitWorkingTreeChanges(
     ).map { path -> WorkingTreeChange(path, WorkingTreeChangeKind.ADDED) }
 
     /**
-     * Fails when git reports an untracked directory as one opaque path instead of the files inside it.
+     * Fails when git reports an untracked path whose content no reviewer tool can inspect.
      *
      * `git ls-files --others` lists an untracked nested Git repository as `nested/`, so the files it holds
-     * appear in no diff and the path-based `read` tool cannot open the directory entry either. Failing closed
-     * avoids reviewing a change set whose contents are invisible.
+     * appear in no diff and the path-based `read` tool cannot open the directory entry either. It lists an
+     * untracked symlink like an added file, but no diff carries the link and `read` follows the link instead of
+     * showing the path it points at, so a dangling link cannot be read at all. Failing closed avoids reviewing
+     * a change set whose contents are invisible.
      */
     private fun requireInspectableUntrackedPaths(untracked: List<WorkingTreeChange>) {
-        val opaque = untracked.filter { change -> change.path.endsWith('/') }.map { change -> change.path }
+        val opaque = untracked.filter { change -> change.path.endsWith(OPAQUE_DIRECTORY_SUFFIX) }
+            .map { change -> change.path }
         check(opaque.isEmpty()) { opaqueUntrackedDirectories(opaque) }
+        val symlinks = untracked.filter { change -> Path(workingDirectory, change.path).isSymbolicLink() }
+            .map { change -> change.path }
+        check(symlinks.isEmpty()) { uninspectableUntrackedSymlinks(symlinks) }
     }
 
     /** Diffs [revision] against the working tree with every status, which is the review diff when it fits. */
@@ -175,8 +184,17 @@ private fun parseNameStatus(output: String): List<WorkingTreeChange> {
     }
 }
 
-/** Splits NUL-separated git path output, dropping the empty tail a trailing separator leaves. */
-internal fun splitNulPaths(output: String): List<String> = output.split(NUL).filter { path -> path.isNotEmpty() }
+/**
+ * Splits NUL-separated git output, dropping only the empty field a single trailing separator leaves behind.
+ *
+ * Interior empty fields are kept: `git check-attr -z` writes one for an attribute set to the empty string, and
+ * dropping it would shift every following field, so callers parse whole records instead of compacted ones.
+ */
+internal fun splitNulPaths(output: String): List<String> {
+    if (output.isEmpty()) return emptyList()
+    val fields = output.split(NUL)
+    return if (fields.last().isEmpty()) fields.dropLast(1) else fields
+}
 
 /**
  * Maps a git name-status code to a reviewable kind.

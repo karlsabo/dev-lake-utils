@@ -58,13 +58,26 @@ internal class GitConfiguredFilters(
         .filter { value -> value != UNSPECIFIED_ATTRIBUTE && value != UNSET_ATTRIBUTE }
         .toSet()
 
-    /** Reads `git check-attr -z filter`, whose output is a `path`, `attribute`, `value` triple per path. */
-    private fun filterDriverValues(paths: List<String>): List<String> = splitNulPaths(
-        git.executeRaw(
-            workingDirectory,
-            listOf("check-attr", NUL_SEPARATED, FILTER_ATTRIBUTE, END_OF_OPTIONS) + paths,
-        ),
-    ).chunked(ATTRIBUTE_FIELDS).mapNotNull { entry -> entry.getOrNull(VALUE_FIELD) }
+    /**
+     * Reads `git check-attr -z filter`, whose output is one `path`, `attribute`, `value` triple per path.
+     *
+     * The value field is empty for an attribute that is set to the empty string, as in `empty.txt filter=`, so
+     * the output is read as whole triples. Dropping an empty field instead would shift every following triple and
+     * read the next path as this one's filter driver, which would let that path's configured filter run unseen.
+     * An incomplete triple means the output is not the documented shape, so it fails instead of guessing.
+     */
+    private fun filterDriverValues(paths: List<String>): List<String> {
+        val fields = splitNulPaths(
+            git.executeRaw(
+                workingDirectory,
+                listOf("check-attr", NUL_SEPARATED, FILTER_ATTRIBUTE, END_OF_OPTIONS) + paths,
+            ),
+        )
+        check(fields.size % ATTRIBUTE_FIELDS == 0) {
+            "Unexpected git check-attr output: ${fields.size} field(s) for ${paths.size} path(s)."
+        }
+        return fields.chunked(ATTRIBUTE_FIELDS).map { entry -> entry[VALUE_FIELD] }
+    }
 
     /**
      * Lists the configured filter commands for [drivers].

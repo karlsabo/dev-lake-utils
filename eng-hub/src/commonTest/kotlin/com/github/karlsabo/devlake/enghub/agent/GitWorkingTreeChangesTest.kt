@@ -1,5 +1,6 @@
 package com.github.karlsabo.devlake.enghub.agent
 
+import com.github.karlsabo.devlake.enghub.isSymbolicLink
 import com.github.karlsabo.system.executeCommand
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -513,6 +514,65 @@ class GitWorkingTreeChangesTest {
     }
 
     @Test
+    fun `fails the review instead of running the filter of a path that follows an empty filter value`() {
+        val repo = TempRepository()
+        try {
+            repo.write("empty.txt", "alpha\n")
+            repo.write("trap.txt", "alpha\n")
+            // An empty filter value keeps a path with no filter, but git still writes an empty value field for it
+            // in `check-attr -z`. Dropping that field shifts the triples and hides the next path's driver.
+            repo.write(".gitattributes", "empty.txt filter=\ntrap.txt filter=evil\n")
+            repo.commitAll("baseline")
+            val marker = Path(repo.path, "filter-ran.txt").toString()
+            repo.config("filter.evil.clean", "cat; touch '$marker'")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write("trap.txt", "alpha\nbeta\n")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            assertTrue(
+                failure.message.orEmpty().contains("filter.evil.clean"),
+                "the driver after an empty filter value must be found, got: ${failure.message}",
+            )
+            assertFalse(
+                SystemFileSystem.exists(Path(marker)),
+                "a shifted triple must never let a configured clean filter run while the review reads changes",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `fails the review when an untracked symlink hides the target it points at`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.symlink("missing-link.txt", "missing.txt")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            val message = failure.message.orEmpty()
+            assertTrue(
+                message.contains("missing-link.txt"),
+                "the failure must name the untracked symlink, got: $message",
+            )
+            assertTrue(
+                message.contains("symlink"),
+                "the failure must explain that the target of a symlink is what it cannot show, got: $message",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
     fun `reviews a working tree whose filter attribute has no configured command`() {
         val repo = TempRepository()
         try {
@@ -622,6 +682,17 @@ internal class TempRepository : TempDirectory("eng-hub-git-changes-${Random.next
         SystemFileSystem.delete(Path(path, relativePath))
     }
 
+    fun symlink(
+        relativePath: String,
+        target: String,
+    ) {
+        val command = listOf("ln", "-s", target, Path(path, relativePath).toString())
+        val result = executeCommand(command, workingDirectory = null)
+        check(result.exitCode == 0) {
+            "Fixture symlink command failed (${result.exitCode}): ${command.joinToString(" ")}\n${result.stderr}"
+        }
+    }
+
     fun commitAll(message: String) {
         git("-C", path, "add", "--all")
         git("-C", path, "commit", "-q", "-m", message)
@@ -669,9 +740,27 @@ internal open class TempDirectory(
     }
 
     private fun deleteRecursively(directory: Path) {
+        if (directory.isSymbolicLink()) {
+            deleteSymbolicLink(directory)
+            return
+        }
         if (SystemFileSystem.metadataOrNull(directory)?.isDirectory == true) {
             SystemFileSystem.list(directory).forEach { child -> deleteRecursively(child) }
         }
         SystemFileSystem.delete(directory, mustExist = false)
+    }
+
+    /**
+     * Removes a symlink itself, including a dangling one.
+     *
+     * `SystemFileSystem.delete` first checks whether the path exists, and that check follows the link, so it
+     * leaves a dangling symlink behind and the parent directory then cannot be removed.
+     */
+    private fun deleteSymbolicLink(symlink: Path) {
+        val command = listOf("rm", "-f", symlink.toString())
+        val result = executeCommand(command, workingDirectory = null)
+        check(result.exitCode == 0) {
+            "Fixture symlink removal failed (${result.exitCode}): ${command.joinToString(" ")}\n${result.stderr}"
+        }
     }
 }
