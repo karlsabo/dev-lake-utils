@@ -20,6 +20,7 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -33,9 +34,12 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
@@ -50,7 +54,7 @@ private const val FORCE_REVIEW_BADGE_DESCRIPTION = "Force removal review require
 /** Largest marker that still clears the centred recycle glyph inside the 40dp button. */
 private val FORCE_REVIEW_BADGE_SIZE = 12.dp
 
-/** Pinned to the font size: the inherited Material line height would push "!" to the circle's bottom edge. */
+/** Rendered at a fixed 10dp because the inherited Material line height would push "!" to the circle's bottom edge. */
 private val FORCE_REVIEW_BADGE_GLYPH_SIZE = 10.sp
 
 internal data class WorktreeArchiveBinEntry(
@@ -115,8 +119,9 @@ internal fun WorktreeArchiveBin(
                 .semantics { contentDescription = "Recycle bin (${entries.size})" },
         ) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "♻", style = MaterialTheme.typography.button)
+                FixedSizeGlyph(text = "♻", style = MaterialTheme.typography.button)
                 if (needsForceReview) {
+                    // Anchored to the 40dp button frame, so the marker sits in the corner instead of over the glyph.
                     ForceReviewBadge(modifier = Modifier.align(Alignment.TopEnd))
                 }
             }
@@ -155,13 +160,28 @@ private fun ForceReviewBadge(modifier: Modifier = Modifier) {
             .semantics(mergeDescendants = true) { contentDescription = FORCE_REVIEW_BADGE_DESCRIPTION },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
+        FixedSizeGlyph(
             text = "!",
-            color = MaterialTheme.colors.onError,
-            fontSize = FORCE_REVIEW_BADGE_GLYPH_SIZE,
-            lineHeight = FORCE_REVIEW_BADGE_GLYPH_SIZE,
-            fontWeight = FontWeight.Bold,
+            style = TextStyle(
+                color = MaterialTheme.colors.onError,
+                fontSize = FORCE_REVIEW_BADGE_GLYPH_SIZE,
+                lineHeight = FORCE_REVIEW_BADGE_GLYPH_SIZE,
+                fontWeight = FontWeight.Bold,
+            ),
         )
+    }
+}
+
+/**
+ * Draws a glyph at a size fixed in dp rather than in scaled sp. Icons are not prose, so at 200% font scaling
+ * the recycle glyph would fill the 40dp button and the "!" would be clipped by its fixed 12dp circle.
+ */
+@Composable
+private fun FixedSizeGlyph(text: String, style: TextStyle) {
+    val density = LocalDensity.current
+    val dpDensity = remember(density) { Density(density.density, fontScale = 1f) }
+    CompositionLocalProvider(LocalDensity provides dpDensity) {
+        Text(text = text, style = style)
     }
 }
 
