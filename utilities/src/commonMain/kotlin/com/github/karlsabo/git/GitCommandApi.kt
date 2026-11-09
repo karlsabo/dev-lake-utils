@@ -108,6 +108,9 @@ interface GitHistoryCommandApi {
 
 interface GitRawCommandExecutor {
     fun execute(repoPath: String? = null, vararg args: String): String
+
+    /** Runs git from an argument list, for callers that already hold one instead of separate values. */
+    fun executeArgs(repoPath: String?, args: List<String>): String
 }
 
 interface GitCommandApi :

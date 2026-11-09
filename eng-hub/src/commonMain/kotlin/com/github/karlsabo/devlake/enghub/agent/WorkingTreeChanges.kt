@@ -66,7 +66,11 @@ interface WorkingTreeChanges {
      * They do the same for every binary change, added, staged, modified, or deleted, because git reports binary
      * content as a marker instead of the bytes and the reviewer's text-only `read` tool cannot show it either. A
      * working tree with more changed paths than the prompt lists also fails, because a path the prompt omits is one
-     * the reviewer cannot discover or read.
+     * the reviewer cannot discover or read. A working tree whose git configuration would run a clean or process
+     * filter command also fails: git applies it while reading changes, so it can execute code outside the
+     * reviewer's read-only boundary and hide a changed line from both the path list and the diff. An untracked
+     * directory git reports as one opaque entry, such as an untracked nested repository, fails too, because the
+     * files inside it appear in no diff and cannot be read by path.
      */
     fun read(baseline: WorkingTreeBaseline): WorkingTreeChangeReport
 }
@@ -103,6 +107,23 @@ internal fun uninspectableBinaryChanges(changes: List<WorkingTreeChange>): Strin
         "binary content as a marker instead of the bytes, an untracked binary path has no diff at all, and the " +
         "reviewer's read tool is a text tool, so neither side of the change could be inspected. Failing the " +
         "review instead."
+}
+
+/**
+ * Explains a refusal to review untracked directory entries git reports as one opaque path.
+ *
+ * An untracked nested Git repository is listed as `nested/`, so its contents appear in no diff and the
+ * path-based `read` tool cannot open the directory entry. Reviewing the reported change set would leave those
+ * files unexamined, so the review fails instead.
+ *
+ * @param paths the untracked directory entries whose contents git did not list.
+ */
+internal fun opaqueUntrackedDirectories(paths: List<String>): String {
+    val listed = paths.joinToString(", ")
+    return "Eng Hub found ${paths.size} untracked path(s) git reports as an opaque directory instead of the " +
+        "files inside it: $listed. Git lists an untracked nested repository this way, so a file inside it " +
+        "appears in no diff and cannot be read by path, and the directory entry is not a file the reviewer can " +
+        "read. Failing the review instead of reviewing a change set whose contents are invisible."
 }
 
 /** Text cut at a line boundary, plus whether anything was dropped. */

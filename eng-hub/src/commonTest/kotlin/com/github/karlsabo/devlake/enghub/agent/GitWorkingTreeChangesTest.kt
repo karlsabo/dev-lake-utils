@@ -404,6 +404,118 @@ class GitWorkingTreeChangesTest {
         }
     }
 
+    @Test
+    fun `fails the review instead of running a configured clean filter that hides a changed line`() {
+        val repo = TempRepository()
+        try {
+            repo.write("notes.txt", "alpha\n")
+            repo.write(".gitattributes", "*.txt filter=strip\n")
+            repo.commitAll("baseline")
+            val marker = Path(repo.path, "filter-ran.txt").toString()
+            repo.config("filter.strip.clean", "sed '/hidden/d'; touch '$marker'")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write("notes.txt", "alpha\nhidden\n")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            val message = failure.message.orEmpty()
+            assertTrue(
+                message.contains("filter.strip.clean"),
+                "the failure must name the configured filter command, got: $message",
+            )
+            assertTrue(
+                message.contains("clean filter"),
+                "the failure must explain how a clean filter hides a change, got: $message",
+            )
+            assertFalse(
+                SystemFileSystem.exists(Path(marker)),
+                "a repository-configured clean filter must never run while the review reads changes",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `fails the review instead of running a content-preserving configured clean filter`() {
+        val repo = TempRepository()
+        try {
+            repo.write("notes.txt", "alpha\n")
+            repo.write(".gitattributes", "*.txt filter=touch-marker\n")
+            repo.commitAll("baseline")
+            val marker = Path(repo.path, "filter-ran.txt").toString()
+            repo.config("filter.touch-marker.clean", "cat; touch '$marker'")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write("notes.txt", "alpha\nbeta\n")
+
+            assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            assertFalse(
+                SystemFileSystem.exists(Path(marker)),
+                "a filter command is outside the reviewer's read-only boundary even when it keeps content",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `reviews a working tree whose filter attribute has no configured command`() {
+        val repo = TempRepository()
+        try {
+            repo.write("notes.txt", "alpha\n")
+            repo.write(".gitattributes", "*.txt filter=inert\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write("notes.txt", "alpha\nbeta\n")
+
+            val report = changes.read(baseline)
+
+            assertChange(report, "notes.txt", WorkingTreeChangeKind.MODIFIED)
+            assertTrue(report.patch.contains("+beta"), "an inert filter must not block the review")
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `fails the review when an untracked nested repository hides the files inside it`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+            val nested = Path(repo.path, "nested").toString()
+            repo.git("init", "-q", nested)
+            repo.write("nested/hidden.txt", "hidden change\n")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            val message = failure.message.orEmpty()
+            assertTrue(
+                message.contains("nested/"),
+                "the failure must name the opaque directory git reported, got: $message",
+            )
+            assertTrue(
+                message.contains("nested repository"),
+                "the failure must explain that a nested repository is what hides the files, got: $message",
+            )
+            assertFalse(
+                message.contains("hidden.txt"),
+                "the opaque entry must fail closed instead of pretending hidden.txt was listed, got: $message",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
     private fun assertUninspectableBinaryChange(
         changes: GitWorkingTreeChanges,
         baseline: WorkingTreeBaseline,
@@ -481,12 +593,13 @@ internal class TempRepository : TempDirectory("eng-hub-git-changes-${Random.next
         git("-C", path, "update-index", "--chmod=+x", relativePath)
     }
 
-    private fun git(vararg arguments: String) {
+    fun git(vararg arguments: String): String {
         val command = listOf("git", *arguments)
         val result = executeCommand(command, workingDirectory = null)
         check(result.exitCode == 0) {
             "Fixture git command failed (${result.exitCode}): ${command.joinToString(" ")}\n${result.stderr}"
         }
+        return result.stdout
     }
 }
 

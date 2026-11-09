@@ -21,7 +21,8 @@ private const val NO_TEXTCONV = "--no-textconv"
  *
  * Every command here is a read-only git query: it lists paths and diffs content that the working tree
  * already holds. This class never runs the agent's `bash` tool and never hands the reviewer a command
- * surface of its own.
+ * surface of its own. Change discovery also refuses a working tree whose git configuration would run a
+ * filter command, because git applies that command while diffing and the reviewer must not execute it.
  */
 class GitWorkingTreeChanges(
     private val workingDirectory: String,
@@ -30,6 +31,7 @@ class GitWorkingTreeChanges(
     private val git: GitCommandApi = GitCommandService(),
 ) : WorkingTreeChanges {
     private val binaryChanges = GitBinaryChanges(workingDirectory, git)
+    private val configuredFilters = GitConfiguredFilters(workingDirectory, git)
 
     override fun baseline(): WorkingTreeBaseline = gitRead("record the baseline commit") {
         WorkingTreeBaseline(git.revParse(workingDirectory, "--verify", "HEAD"))
@@ -40,6 +42,11 @@ class GitWorkingTreeChanges(
     ) {
         val revision = baseline.revision
         val untracked = untrackedChanges()
+        // Both refusals run before any diff-bearing query. `git diff` and `git hash-object` pass a working-tree
+        // file through its configured clean filter, which could run a repository-configured command and hide a
+        // changed line; the guard reads only attributes and config, so it answers without executing anything.
+        requireInspectableUntrackedPaths(untracked)
+        configuredFilters.requireNoConfiguredCommands(untracked.map { change -> change.path })
         val changes = (trackedChanges(revision) + untracked)
             .distinctBy { change -> change.path }
             .sortedBy { change -> change.path }
@@ -70,6 +77,18 @@ class GitWorkingTreeChanges(
     private fun untrackedChanges(): List<WorkingTreeChange> = splitNulPaths(
         git.execute(workingDirectory, "ls-files", "--others", "--exclude-standard", NUL_SEPARATED),
     ).map { path -> WorkingTreeChange(path, WorkingTreeChangeKind.ADDED) }
+
+    /**
+     * Fails when git reports an untracked directory as one opaque path instead of the files inside it.
+     *
+     * `git ls-files --others` lists an untracked nested Git repository as `nested/`, so the files it holds
+     * appear in no diff and the path-based `read` tool cannot open the directory entry either. Failing closed
+     * avoids reviewing a change set whose contents are invisible.
+     */
+    private fun requireInspectableUntrackedPaths(untracked: List<WorkingTreeChange>) {
+        val opaque = untracked.filter { change -> change.path.endsWith('/') }.map { change -> change.path }
+        check(opaque.isEmpty()) { opaqueUntrackedDirectories(opaque) }
+    }
 
     /** Diffs [revision] against the working tree with every status, which is the review diff when it fits. */
     private fun readPatch(revision: String): String = git.diff(

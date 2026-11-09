@@ -39,7 +39,9 @@ private const val METADATA_FIELD_SEPARATOR = ' '
  * Every query here is read-only: it lists paths, compares blob ids, and sniffs leading bytes. No hook, no
  * textconv driver, and no shell of our own is involved: a textconv driver is deliberately off on every diff,
  * because it renders content with a repository-configured command outside the reviewer's boundary instead of
- * showing the bytes. Blob ids come from git's own hashing, so they compare like with like.
+ * showing the bytes. A configured clean or process filter never reaches these queries either, because
+ * [GitWorkingTreeChanges] refuses that working tree before any diff or hash runs. Blob ids come from git's own
+ * hashing, so they compare like with like.
  */
 internal class GitBinaryChanges(
     private val workingDirectory: String,

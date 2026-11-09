@@ -311,11 +311,13 @@ private class GitHistoryCommandService(
 private class GitRawCommandService(
     private val commandRunner: GitCliCommandRunner,
 ) : GitRawCommandExecutor {
-    override fun execute(repoPath: String?, vararg args: String): String {
+    override fun execute(repoPath: String?, vararg args: String): String = executeArgs(repoPath, args.toList())
+
+    override fun executeArgs(repoPath: String?, args: List<String>): String {
         val command = if (repoPath == null) {
-            listOf("git") + args.toList()
+            listOf("git") + args
         } else {
-            gitRepoCommand(repoPath, args.toList())
+            gitRepoCommand(repoPath, args)
         }
         return commandRunner.run(command)
     }

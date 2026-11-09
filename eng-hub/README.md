@@ -417,6 +417,12 @@ verified change report:
   and an untracked binary path appears in no diff at all
 - a refusal to open the reviewer when the working tree has more changed paths than the prompt lists, because an
   untracked path has no diff content and a path the prompt leaves out cannot be discovered or read
+- a refusal to open the reviewer when the repository configures a clean or process filter command for a working-tree
+  path, because git would run that command while diffing and a filter can hide a changed line from both the path list
+  and the diff
+- a refusal to open the reviewer when git reports an untracked directory as one opaque path, because an untracked
+  nested Git repository is listed only as `nested/`, so the files inside it appear in no diff and cannot be read by
+  path
 
 Paths are relative to the launcher's working directory and match what the Skills `read` tool resolves. Ignored files
 (`.gitignore`) are excluded so build output does not flood the review. The reviewer never receives `bash` and never
@@ -435,6 +441,16 @@ inspected. A mode-only change stays reviewable, because its mode lines are in th
 The run therefore stops before the reviewer opens instead of presenting a marker as a complete change. The prompt
 lists every changed path, so more changed paths than it can carry also fail the run: untracked paths appear in no
 diff, and the reviewer only reads paths the prompt names, so dropping one would hide a change from the review.
+
+Change discovery also stays inside the reviewer's read-only boundary when the repository configures git filters.
+`git diff` and `git hash-object` pass a working-tree file through the clean filter named by its `filter` attribute,
+and `--no-ext-diff --no-textconv` do not disable it. That filter is a command from the repository's own
+configuration, so it can run arbitrary code during the review and can rewrite content so a changed line stays out
+of `--name-status`, `--numstat`, and the patch. The flow reads the attribute and config values first, which runs
+nothing, and fails the run when a non-empty `filter.<driver>.clean` or `filter.<driver>.process` command applies to
+a tracked or untracked path. Similarly, `git ls-files --others` reports an untracked nested Git repository as a
+single `nested/` entry, so its files appear in no diff and the path-based read tool cannot open the directory entry;
+that also fails the run instead of reviewing a change set whose contents are invisible.
 
 Example conversation with a disposable `Greeting.kt`:
 
