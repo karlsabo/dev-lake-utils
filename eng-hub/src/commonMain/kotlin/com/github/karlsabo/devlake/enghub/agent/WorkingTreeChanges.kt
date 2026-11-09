@@ -63,10 +63,28 @@ interface WorkingTreeChanges {
      * dropped a deletion's removed content would let the reviewer pass on a change it could not inspect.
      * Implementations keep that content within their prompt budget, or fail instead of returning the report.
      * They do the same when git can only describe a deleted path as binary, because a marker is not the removed
-     * content and the deleted path cannot be reopened.
+     * content and the deleted path cannot be reopened. A working tree with more changed paths than the prompt
+     * lists also fails, because a path the prompt omits is one the reviewer cannot discover or read.
      */
     fun read(baseline: WorkingTreeBaseline): WorkingTreeChangeReport
 }
+
+/**
+ * Explains a refusal to review a working tree with more changed paths than the prompt can list.
+ *
+ * Untracked paths have no diff content, and the reviewer reads only the paths the prompt names, so a path the
+ * prompt drops cannot be rediscovered. Truncating the list would let the reviewer pass on changes it never saw.
+ *
+ * @param count the number of changed paths the working tree reported.
+ * @param limit the most changed paths the reviewer prompt can carry.
+ */
+internal fun tooManyChangedPaths(
+    count: Int,
+    limit: Int,
+): String = "Eng Hub found $count changed paths, more than the $limit the reviewer prompt can list. " +
+    "An untracked path has no diff content and the reviewer only reads the paths the prompt names, so a path " +
+    "left out of the list could be neither discovered nor read. Failing the review instead of listing only " +
+    "part of the change set."
 
 /** Text cut at a line boundary, plus whether anything was dropped. */
 internal data class BoundedText(

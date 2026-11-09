@@ -274,6 +274,56 @@ class GitWorkingTreeChangesTest {
         }
     }
 
+    @Test
+    fun `fails the review when the change set has more paths than the prompt can list`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path, maxChangedPaths = 1)
+            val baseline = changes.baseline()
+
+            repo.write("One.kt", "1\n")
+            repo.write("Two.kt", "2\n")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            val message = failure.message.orEmpty()
+            assertTrue(
+                message.contains("found 2 changed paths"),
+                "the failure must name how many paths it found, got: $message",
+            )
+            assertTrue(message.contains("more than the 1"), "the failure must name the prompt limit, got: $message")
+            assertTrue(
+                message.contains("could be neither discovered nor read"),
+                "the failure must explain why an omitted untracked path is unreachable, got: $message",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `reviews a change set that exactly fills the path limit`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path, maxChangedPaths = 2)
+            val baseline = changes.baseline()
+
+            repo.write("One.kt", "1\n")
+            repo.write("Two.kt", "2\n")
+
+            val report = changes.read(baseline)
+
+            assertEquals(2, report.changes.size, "a change set at the limit must still be reviewed")
+            assertChange(report, "Two.kt", WorkingTreeChangeKind.ADDED)
+        } finally {
+            repo.delete()
+        }
+    }
+
     private fun assertUninspectableBinaryDeletion(
         changes: GitWorkingTreeChanges,
         baseline: WorkingTreeBaseline,
@@ -308,7 +358,7 @@ private fun numberedLines(
 ): String = (1..count).joinToString("\n") { index -> "$label $index" } + "\n"
 
 /** A disposable git repository rooted below the system temporary directory. */
-private class TempRepository : TempDirectory("eng-hub-git-changes-${Random.nextLong()}") {
+internal class TempRepository : TempDirectory("eng-hub-git-changes-${Random.nextLong()}") {
     init {
         createDirectories()
         git("init", "-q", path)
@@ -344,7 +394,7 @@ private class TempRepository : TempDirectory("eng-hub-git-changes-${Random.nextL
 }
 
 /** A disposable directory below the system temporary directory. */
-private open class TempDirectory(
+internal open class TempDirectory(
     private val name: String,
 ) {
     val path: String = Path(SystemTemporaryDirectory, name).toString()

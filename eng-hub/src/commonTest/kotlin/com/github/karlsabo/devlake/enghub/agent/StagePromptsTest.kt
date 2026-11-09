@@ -66,10 +66,10 @@ class StagePromptsTest {
     }
 
     @Test
-    fun `says how many changed paths the prompt did not list`() {
+    fun `lists every changed path so no path is hidden from the reviewer`() {
         val changes =
             (1..MAX_PROMPT_CHANGED_PATHS + 1).map { index ->
-                WorkingTreeChange("File$index.kt", WorkingTreeChangeKind.MODIFIED)
+                WorkingTreeChange("File$index.kt", WorkingTreeChangeKind.ADDED)
             }
         val prompt =
             reviewerTaskPrompt(
@@ -78,8 +78,12 @@ class StagePromptsTest {
                 greetingReport(changes = changes),
             )
 
-        assertTrue(prompt.contains("and 1 more changed paths"))
-        assertFalse(prompt.contains("File${MAX_PROMPT_CHANGED_PATHS + 1}.kt"))
+        assertTrue(prompt.contains("A File1.kt"))
+        assertTrue(
+            prompt.contains("A File${MAX_PROMPT_CHANGED_PATHS + 1}.kt"),
+            "the last changed path must be listed, because the reviewer reads only the paths the prompt names",
+        )
+        assertFalse(prompt.contains("not listed here"), "the prompt must not truncate the path list")
     }
 
     @Test

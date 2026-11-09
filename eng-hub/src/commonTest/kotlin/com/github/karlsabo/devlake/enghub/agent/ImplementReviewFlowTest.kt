@@ -82,6 +82,40 @@ class ImplementReviewFlowTest {
     }
 
     @Test
+    fun `a change set the prompt cannot list does not start the reviewer`() = runTest {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
+            repo.commitAll("baseline")
+            repo.write("One.kt", "1\n")
+            repo.write("Two.kt", "2\n")
+            val opened = mutableListOf<StageName>()
+            val flow =
+                ImplementReviewFlow(
+                    StageSessionFactory { stage ->
+                        opened += stage
+                        FixedStageSession(responseFor(stage))
+                    },
+                    GitWorkingTreeChanges(repo.path, maxChangedPaths = 1),
+                )
+
+            val failure = assertFailsWith<IllegalStateException> { flow.run(STORY) }
+
+            assertTrue(
+                failure.message.orEmpty().contains("more than the 1 the reviewer prompt can list"),
+                "an unlistable change set must fail closed, got: ${failure.message}",
+            )
+            assertEquals(
+                listOf(StageName.IMPLEMENTOR),
+                opened,
+                "the reviewer must never open on a change set the prompt cannot list",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
     fun `a failed change read does not start the reviewer`() = runTest {
         val opened = mutableListOf<StageName>()
         val changes =
@@ -185,7 +219,7 @@ private class RecordingStageSession(
     }
 }
 
-private class FixedStageSession(
+internal class FixedStageSession(
     private val response: String,
 ) : ChatSession {
     override suspend fun ask(prompt: String): String = response

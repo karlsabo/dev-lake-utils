@@ -1,6 +1,11 @@
 package com.github.karlsabo.devlake.enghub.agent
 
-/** Paths the reviewer prompt lists before it summarizes that more changed paths exist. */
+/**
+ * Changed paths one review may carry.
+ *
+ * The prompt lists every one of them, so a working tree with more fails before the reviewer opens rather than
+ * leaving paths out of the prompt.
+ */
 internal const val MAX_PROMPT_CHANGED_PATHS = 500
 
 private const val NO_WORKING_TREE_CHANGES = "(no working-tree changes)"
@@ -48,8 +53,9 @@ internal fun reviewerTaskPrompt(
 /**
  * Renders the verified change report for the reviewer prompt.
  *
- * The path list is where omissions and deletions surface, so it keeps every changed path up to
- * [MAX_PROMPT_CHANGED_PATHS] and says how many it dropped rather than silently losing them. The diff is
+ * The path list is where omissions and deletions surface, so it lists every changed path the report holds.
+ * A report beyond [MAX_PROMPT_CHANGED_PATHS] never gets here: [WorkingTreeChanges.read] fails instead, because
+ * an untracked path has no diff content and a path the prompt leaves out cannot be discovered. The diff is
  * the content proof; when it is cut, the notice tells the reviewer to read the surviving files instead and
  * that a deleted file's removed content is still in the patch.
  */
@@ -58,13 +64,7 @@ internal fun verifiedChangesSection(changes: WorkingTreeChangeReport): String = 
     if (changes.changes.isEmpty()) {
         appendLine(NO_WORKING_TREE_CHANGES)
     } else {
-        changes.changes.take(MAX_PROMPT_CHANGED_PATHS).forEach { change ->
-            appendLine("${change.kind.label} ${change.path}")
-        }
-        val omitted = changes.changes.size - MAX_PROMPT_CHANGED_PATHS
-        if (omitted > 0) {
-            appendLine("... and $omitted more changed paths not listed here.")
-        }
+        changes.changes.forEach { change -> appendLine("${change.kind.label} ${change.path}") }
         appendLine()
         appendLine("Unified diff of tracked changes:")
         appendLine(changes.patch.ifEmpty { NO_TRACKED_DIFF })

@@ -31,6 +31,7 @@ private const val BINARY_COUNT = "-"
 class GitWorkingTreeChanges(
     private val workingDirectory: String,
     private val maxPatchChars: Int = MAX_REVIEW_PATCH_CHARS,
+    private val maxChangedPaths: Int = MAX_PROMPT_CHANGED_PATHS,
     private val git: GitCommandApi = GitCommandService(),
 ) : WorkingTreeChanges {
     override fun baseline(): WorkingTreeBaseline = gitRead("record the baseline commit") {
@@ -42,6 +43,10 @@ class GitWorkingTreeChanges(
     ) {
         val revision = baseline.revision
         val changes = readChanges(revision)
+        // The prompt is where a changed path becomes discoverable and an untracked path has no diff content, so a
+        // path the prompt drops could be neither found nor read. More paths than the prompt lists therefore fail
+        // the review instead of handing over a truncated list.
+        check(changes.size <= maxChangedPaths) { tooManyChangedPaths(changes.size, maxChangedPaths) }
         val deleted = changes.filter { change -> change.kind == WorkingTreeChangeKind.DELETED }
         requireInspectableDeletions(revision, deleted)
         val patch = boundedReviewDiff(
