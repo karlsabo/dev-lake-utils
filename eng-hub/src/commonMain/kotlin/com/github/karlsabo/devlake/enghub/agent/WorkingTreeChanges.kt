@@ -39,8 +39,9 @@ data class WorkingTreeChangeReport(
     /**
      * The unified diff; when [patchTruncated], the removed content of every deleted path is still complete.
      *
-     * A deleted path whose content git can only report as binary never reaches this report: [read] fails
-     * instead, because the reviewer could neither see the removed bytes nor reopen the deleted path.
+     * A path whose content git can only report as binary never reaches this report: [read] fails instead,
+     * because the diff would carry a marker rather than the bytes and the reviewer's text-only `read` tool
+     * cannot show binary content. An untracked binary path fails the same way.
      */
     val patch: String,
     val patchTruncated: Boolean,
@@ -62,9 +63,10 @@ interface WorkingTreeChanges {
      * A reviewer can re-read a surviving file but never a deleted one, so a [WorkingTreeChangeReport] whose diff
      * dropped a deletion's removed content would let the reviewer pass on a change it could not inspect.
      * Implementations keep that content within their prompt budget, or fail instead of returning the report.
-     * They do the same when git can only describe a deleted path as binary, because a marker is not the removed
-     * content and the deleted path cannot be reopened. A working tree with more changed paths than the prompt
-     * lists also fails, because a path the prompt omits is one the reviewer cannot discover or read.
+     * They do the same for every binary change, added, staged, modified, or deleted, because git reports binary
+     * content as a marker instead of the bytes and the reviewer's text-only `read` tool cannot show it either. A
+     * working tree with more changed paths than the prompt lists also fails, because a path the prompt omits is one
+     * the reviewer cannot discover or read.
      */
     fun read(baseline: WorkingTreeBaseline): WorkingTreeChangeReport
 }
@@ -85,6 +87,23 @@ internal fun tooManyChangedPaths(
     "An untracked path has no diff content and the reviewer only reads the paths the prompt names, so a path " +
     "left out of the list could be neither discovered nor read. Failing the review instead of listing only " +
     "part of the change set."
+
+/**
+ * Explains a refusal to review binary changes no reviewer tool can inspect.
+ *
+ * `git diff` renders binary content as a `Binary files ... differ` marker instead of the bytes, an untracked
+ * binary path appears in no diff at all, and the reviewer's `read` tool is a UTF-8 text tool. Neither side of
+ * such a change is reviewable, so the review fails instead of letting the reviewer pass on it.
+ *
+ * @param changes the changed binary paths whose content no reviewer tool can show.
+ */
+internal fun uninspectableBinaryChanges(changes: List<WorkingTreeChange>): String {
+    val listed = changes.joinToString(", ") { change -> "${change.kind.label} ${change.path}" }
+    return "Eng Hub cannot show the content of ${changes.size} changed binary path(s): $listed. Git reports " +
+        "binary content as a marker instead of the bytes, an untracked binary path has no diff at all, and the " +
+        "reviewer's read tool is a text tool, so neither side of the change could be inspected. Failing the " +
+        "review instead."
+}
 
 /** Text cut at a line boundary, plus whether anything was dropped. */
 internal data class BoundedText(

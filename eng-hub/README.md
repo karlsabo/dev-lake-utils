@@ -411,8 +411,10 @@ verified change report:
   report and paths it deleted are both listed
 - every untracked path that is not ignored, listed as a new file
 - a bounded unified diff of tracked changes, including the removed lines of deleted files
-- a refusal to open the reviewer when a deletion's removed content cannot be shown, whether it does not fit the diff
-  budget or git can only report the file as binary
+- a refusal to open the reviewer when a deletion's removed content does not fit the diff budget
+- a refusal to open the reviewer for any binary change it could not inspect, whether the path is added, staged,
+  modified, or deleted, because git reports binary content as a `Binary files ... differ` marker instead of bytes
+  and an untracked binary path appears in no diff at all
 - a refusal to open the reviewer when the working tree has more changed paths than the prompt lists, because an
   untracked path has no diff content and a path the prompt leaves out cannot be discovered or read
 
@@ -426,11 +428,13 @@ tree with at least one commit; anything else fails the run before the reviewer o
 budget, the prompt says it was truncated, so the reviewer can fall back to `read` instead of silently passing
 unexamined work. A deleted path cannot be read back, so the removed content of every deletion is reserved inside the
 budget before the rest of the diff is cut; if that content alone does not fit, the run fails rather than asking the
-reviewer to judge a deletion it cannot inspect. The same holds for a deleted binary
-file: git reports it as a `Binary files ... differ` marker rather than as removed bytes, so the reviewer would never
-see what was removed, and the run fails instead of presenting that marker as a complete diff. The prompt lists every
-changed path, so more changed paths than it can carry also fail the run: untracked paths appear in no diff, and the
-reviewer only reads paths the prompt names, so dropping one would hide a change from the review.
+reviewer to judge a deletion it cannot inspect. Binary changes fail the same way, whatever their status: a tracked
+binary path reaches the diff only as a `Binary files ... differ` marker rather than as bytes, an untracked binary path
+reaches no diff at all, and the reviewer's `read` tool is a text tool, so neither side of the change could be
+inspected. A mode-only change stays reviewable, because its mode lines are in the diff and its content is unchanged.
+The run therefore stops before the reviewer opens instead of presenting a marker as a complete change. The prompt
+lists every changed path, so more changed paths than it can carry also fail the run: untracked paths appear in no
+diff, and the reviewer only reads paths the prompt names, so dropping one would hide a change from the review.
 
 Example conversation with a disposable `Greeting.kt`:
 

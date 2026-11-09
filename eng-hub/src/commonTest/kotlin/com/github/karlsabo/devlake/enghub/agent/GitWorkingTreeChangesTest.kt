@@ -230,7 +230,7 @@ class GitWorkingTreeChangesTest {
 
             repo.delete("payload.bin")
 
-            assertUninspectableBinaryDeletion(changes, baseline, "payload.bin")
+            assertUninspectableBinaryChange(changes, baseline, "payload.bin")
         } finally {
             repo.delete()
         }
@@ -249,26 +249,106 @@ class GitWorkingTreeChangesTest {
             repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "changed"))
             repo.delete("payload.bin")
 
-            assertUninspectableBinaryDeletion(changes, baseline, "payload.bin")
+            assertUninspectableBinaryChange(changes, baseline, "payload.bin")
         } finally {
             repo.delete()
         }
     }
 
     @Test
-    fun `reviews a modified binary file because the reviewer can still read it`() {
+    fun `fails the review when a tracked binary file's content changes`() {
         val repo = TempRepository()
         try {
             repo.write("payload.bin", BINARY_PAYLOAD)
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
             repo.commitAll("baseline")
             val changes = GitWorkingTreeChanges(repo.path)
             val baseline = changes.baseline()
 
             repo.write("payload.bin", OTHER_BINARY_PAYLOAD)
+            repo.write("Greeting.kt", "fun greet() = \"Hello, Ada!\"\n")
+
+            val message = assertUninspectableBinaryChange(changes, baseline, "payload.bin")
+            assertFalse(
+                message.contains("Greeting.kt"),
+                "a readable text change must not be named as uninspectable, got: $message",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `fails the review when the implementor stages an added binary file`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write("payload.bin", BINARY_PAYLOAD)
+            repo.stage("payload.bin")
+
+            assertUninspectableBinaryChange(changes, baseline, "payload.bin")
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `fails the review when the implementor adds an untracked binary file`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write("payload.bin", BINARY_PAYLOAD)
+
+            assertUninspectableBinaryChange(changes, baseline, "payload.bin")
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `fails the review for a binary change inside a working directory that is a subdirectory`() {
+        val repo = TempRepository()
+        try {
+            repo.write("module/payload.bin", BINARY_PAYLOAD)
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(Path(repo.path, "module").toString())
+            val baseline = changes.baseline()
+
+            repo.write("module/payload.bin", OTHER_BINARY_PAYLOAD)
+
+            assertUninspectableBinaryChange(changes, baseline, "payload.bin")
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `reviews a binary file whose mode changed but whose content did not`() {
+        val repo = TempRepository()
+        try {
+            repo.write("payload.bin", BINARY_PAYLOAD)
+            repo.commitAll("baseline")
+            repo.config("core.filemode", "false")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.markExecutable("payload.bin")
 
             val report = changes.read(baseline)
 
             assertChange(report, "payload.bin", WorkingTreeChangeKind.MODIFIED)
+            assertTrue(
+                report.patch.contains("new mode 100755"),
+                "a mode-only change carries its mode lines, so it stays reviewable, got: ${report.patch}",
+            )
         } finally {
             repo.delete()
         }
@@ -324,18 +404,20 @@ class GitWorkingTreeChangesTest {
         }
     }
 
-    private fun assertUninspectableBinaryDeletion(
+    private fun assertUninspectableBinaryChange(
         changes: GitWorkingTreeChanges,
         baseline: WorkingTreeBaseline,
         path: String,
-    ) {
+    ): String {
         val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
 
+        val message = failure.message.orEmpty()
         assertTrue(
-            failure.message.orEmpty().contains("cannot inspect the removed content of 1 deleted binary path(s)"),
-            "an uninspectable binary deletion must fail closed, got: ${failure.message}",
+            message.contains("cannot show the content of 1 changed binary path(s)"),
+            "an uninspectable binary change must fail closed, got: $message",
         )
-        assertTrue(failure.message.orEmpty().contains(path))
+        assertTrue(message.contains(path), "the failure must name $path, got: $message")
+        return message
     }
 
     private fun assertChange(
@@ -382,6 +464,21 @@ internal class TempRepository : TempDirectory("eng-hub-git-changes-${Random.next
     fun commitAll(message: String) {
         git("-C", path, "add", "--all")
         git("-C", path, "commit", "-q", "-m", message)
+    }
+
+    fun stage(relativePath: String) {
+        git("-C", path, "add", "--", relativePath)
+    }
+
+    fun config(
+        key: String,
+        value: String,
+    ) {
+        git("-C", path, "config", key, value)
+    }
+
+    fun markExecutable(relativePath: String) {
+        git("-C", path, "update-index", "--chmod=+x", relativePath)
     }
 
     private fun git(vararg arguments: String) {
