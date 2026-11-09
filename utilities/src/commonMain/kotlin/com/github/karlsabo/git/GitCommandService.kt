@@ -23,7 +23,15 @@ private class DefaultGitCommandApi(
     GitRawCommandExecutor by GitRawCommandService(commandRunner)
 
 private class GitCliCommandRunner {
-    fun run(command: List<String>): String {
+    fun run(command: List<String>): String = runRaw(command).trim()
+
+    /**
+     * Returns stdout exactly as git wrote it.
+     *
+     * Trimming corrupts NUL-delimited output: `git ls-files -z` starts with the first path, so a leading
+     * space in that path is stripped and the caller then asks about a path that does not exist.
+     */
+    fun runRaw(command: List<String>): String {
         val result = runForResult(command)
         if (result.exitCode != 0) {
             throw GitCommandException(
@@ -32,7 +40,7 @@ private class GitCliCommandRunner {
                 gitOutput = result.stderr.ifEmpty { result.stdout },
             )
         }
-        return result.stdout.trim()
+        return result.stdout
     }
 
     fun runForResult(command: List<String>): ProcessResult {
@@ -313,13 +321,18 @@ private class GitRawCommandService(
 ) : GitRawCommandExecutor {
     override fun execute(repoPath: String?, vararg args: String): String = executeArgs(repoPath, args.toList())
 
-    override fun executeArgs(repoPath: String?, args: List<String>): String {
-        val command = if (repoPath == null) {
-            listOf("git") + args
-        } else {
-            gitRepoCommand(repoPath, args)
-        }
-        return commandRunner.run(command)
+    override fun executeArgs(repoPath: String?, args: List<String>): String = commandRunner.run(
+        rawCommand(repoPath, args),
+    )
+
+    override fun executeRaw(repoPath: String?, args: List<String>): String = commandRunner.runRaw(
+        rawCommand(repoPath, args),
+    )
+
+    private fun rawCommand(repoPath: String?, args: List<String>): List<String> = if (repoPath == null) {
+        listOf("git") + args
+    } else {
+        gitRepoCommand(repoPath, args)
     }
 }
 

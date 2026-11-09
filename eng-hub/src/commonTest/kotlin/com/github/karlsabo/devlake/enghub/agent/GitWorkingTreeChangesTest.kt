@@ -464,6 +464,55 @@ class GitWorkingTreeChangesTest {
     }
 
     @Test
+    fun `fails the review instead of running a configured clean filter on a path that starts with a space`() {
+        val repo = TempRepository()
+        try {
+            repo.write(" leading.txt", "alpha\n")
+            repo.write("leading.txt", "unfiltered\n")
+            repo.write(".gitattributes", "\" leading.txt\" filter=trap\n")
+            repo.commitAll("baseline")
+            val marker = Path(repo.path, "filter-ran.txt").toString()
+            repo.config("filter.trap.clean", "cat; touch '$marker'")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write(" leading.txt", "alpha\nbeta\n")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            assertTrue(
+                failure.message.orEmpty().contains("filter.trap.clean"),
+                "the filter of the only path it matches must be found, got: ${failure.message}",
+            )
+            assertFalse(
+                SystemFileSystem.exists(Path(marker)),
+                "a filter named by a leading-space path must never run, because trimming would miss it",
+            )
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `lists an untracked path that starts with a space without trimming it`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+
+            repo.write(" leading-new.txt", "new content\n")
+
+            val report = changes.read(baseline)
+
+            assertChange(report, " leading-new.txt", WorkingTreeChangeKind.ADDED)
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
     fun `reviews a working tree whose filter attribute has no configured command`() {
         val repo = TempRepository()
         try {

@@ -111,6 +111,14 @@ interface GitRawCommandExecutor {
 
     /** Runs git from an argument list, for callers that already hold one instead of separate values. */
     fun executeArgs(repoPath: String?, args: List<String>): String
+
+    /**
+     * Runs git from an argument list and returns stdout untouched.
+     *
+     * NUL-delimited output must not be trimmed, because the surrounding whitespace is part of a path: the first
+     * record starts the output, so a path with a leading space would lose it and name a different file.
+     */
+    fun executeRaw(repoPath: String?, args: List<String>): String
 }
 
 interface GitCommandApi :

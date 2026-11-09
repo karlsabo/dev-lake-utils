@@ -49,7 +49,7 @@ internal class GitConfiguredFilters(
     }
 
     private fun workingTreePaths(untrackedPaths: List<String>): List<String> = splitNulPaths(
-        git.execute(workingDirectory, "ls-files", NUL_SEPARATED),
+        git.executeRaw(workingDirectory, listOf("ls-files", NUL_SEPARATED)),
     ) + untrackedPaths
 
     private fun filterDrivers(paths: List<String>): Set<String> = paths
@@ -60,7 +60,7 @@ internal class GitConfiguredFilters(
 
     /** Reads `git check-attr -z filter`, whose output is a `path`, `attribute`, `value` triple per path. */
     private fun filterDriverValues(paths: List<String>): List<String> = splitNulPaths(
-        git.executeArgs(
+        git.executeRaw(
             workingDirectory,
             listOf("check-attr", NUL_SEPARATED, FILTER_ATTRIBUTE, END_OF_OPTIONS) + paths,
         ),
@@ -82,7 +82,7 @@ internal class GitConfiguredFilters(
 
     /** Reads every config value, including the ones a `-c` or an include directive contributes. */
     private fun configValues(): Map<String, String> = splitNulPaths(
-        git.execute(workingDirectory, "config", LIST_CONFIG, INCLUDE_CONFIG_FILES, NULL_SEPARATED),
+        git.executeRaw(workingDirectory, listOf("config", LIST_CONFIG, INCLUDE_CONFIG_FILES, NULL_SEPARATED)),
     ).associate { entry ->
         entry.substringBefore(CONFIG_VALUE_SEPARATOR) to entry.substringAfter(CONFIG_VALUE_SEPARATOR, "")
     }

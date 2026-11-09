@@ -114,7 +114,10 @@ internal class GitBinaryChanges(
         revision: String,
         path: String,
     ): String? = splitNulPaths(
-        git.execute(workingDirectory, "ls-tree", NUL_SEPARATED, revision, END_OF_OPTIONS, LITERAL_PATHSPEC + path),
+        git.executeRaw(
+            workingDirectory,
+            listOf("ls-tree", NUL_SEPARATED, revision, END_OF_OPTIONS, LITERAL_PATHSPEC + path),
+        ),
     ).firstOrNull()
         ?.substringBefore(PATH_FIELD_SEPARATOR)
         ?.substringAfterLast(METADATA_FIELD_SEPARATOR)

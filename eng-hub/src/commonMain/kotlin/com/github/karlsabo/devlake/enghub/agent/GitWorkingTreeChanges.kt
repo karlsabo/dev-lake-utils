@@ -75,7 +75,7 @@ class GitWorkingTreeChanges(
     )
 
     private fun untrackedChanges(): List<WorkingTreeChange> = splitNulPaths(
-        git.execute(workingDirectory, "ls-files", "--others", "--exclude-standard", NUL_SEPARATED),
+        git.executeRaw(workingDirectory, listOf("ls-files", "--others", "--exclude-standard", NUL_SEPARATED)),
     ).map { path -> WorkingTreeChange(path, WorkingTreeChangeKind.ADDED) }
 
     /**
