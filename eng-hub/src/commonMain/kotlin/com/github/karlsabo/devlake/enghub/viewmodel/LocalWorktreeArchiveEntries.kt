@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.update
 
 internal class LocalWorktreeArchiveEntries(
     private val state: EngHubViewModelState,
+    private val listPersistedJobs: () -> List<WorktreeArchiveJob>,
 ) {
     private val leases = MutableStateFlow<Map<String, LocalWorktreeMutationGuard.Lease>>(emptyMap())
 
@@ -31,6 +32,20 @@ internal class LocalWorktreeArchiveEntries(
         }
         state.newlyQueuedArchiveIds.update { it - queueId }
         logger.info { "Cleared archive entry for worktree $worktreePath" }
+    }
+
+    /**
+     * Clears [job] only when the persisted queue holds no record for its worktree path. A record under a
+     * different queue id means a newer attempt owns the path, so that entry is kept.
+     */
+    fun clearIfUnpersisted(job: WorktreeArchiveJob): Boolean {
+        val persistedJobs = runCatching(listPersistedJobs).getOrElse { failure ->
+            logger.error(failure) { "Failed to verify persisted archive for ${job.worktreePath}" }
+            null
+        }
+        val isStale = persistedJobs != null && persistedJobs.none { it.worktreePath == job.worktreePath }
+        if (isStale) clear(job.worktreePath, job.queueId)
+        return isStale
     }
 
     private fun release(worktreePath: String) {

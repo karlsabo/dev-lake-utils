@@ -226,6 +226,31 @@ class EngHubWorktreeArchiveCompletionTest {
             fixture.close()
         }
     }
+
+    @Test
+    fun completionConsumedByAnotherConsumerStillClearsItsBinEntry() = runBlocking {
+        val fixture = ArchiveCompletionFixture()
+        // The archive queue is a shared persisted file: a second consumer (another Eng Hub process) can
+        // complete the same removal first and delete the record this process is still reconciling.
+        fixture.store.beforeDeleteRemovingJob = { _, _ -> fixture.store.jobs.value = emptyList() }
+        try {
+            fixture.startRemoval()
+            fixture.allowArchive.complete(Unit)
+            fixture.awaitRefresh()
+            fixture.allowRefresh.complete(Unit)
+            withTimeout(2_000.milliseconds) {
+                fixture.viewModel.queuedWorktreeArchivesStateFlow.first { it.isEmpty() }
+            }
+            assertEquals(listOf(false), fixture.store.deleteRemovingJobResults.value)
+            assertEquals(emptyList(), fixture.store.listJobs())
+            assertEquals(null, fixture.viewModel.actionErrorStateFlow.value)
+            // Releasing the lease lets the worktree be mutated again instead of staying locked by a stale entry.
+            fixture.viewModel.updateLocalWorktreeFromOrigin(DEV_LAKE_ROOT, DEV_LAKE_SELECTED_WORKTREE, "feature/login")
+            withTimeout(2_000.milliseconds) { fixture.updateStarted.await() }
+        } finally {
+            fixture.close()
+        }
+    }
 }
 
 private class ArchiveCompletionFixture(

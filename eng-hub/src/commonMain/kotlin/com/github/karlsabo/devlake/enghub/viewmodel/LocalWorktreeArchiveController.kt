@@ -30,10 +30,15 @@ internal class LocalWorktreeArchiveController(
     localRepositories: LocalRepositoryController,
     private val errorReporter: ActionErrorReporter,
 ) {
-    private val entries = LocalWorktreeArchiveEntries(state)
-    private val completion = LocalWorktreeArchiveCompletion(viewModel, state, localRepositories, archive.store) { job ->
-        entries.clear(job.worktreePath, job.queueId)
-    }
+    private val entries = LocalWorktreeArchiveEntries(state, archive.store::listJobs)
+    private val completion = LocalWorktreeArchiveCompletion(
+        viewModel,
+        state,
+        localRepositories,
+        archive.store,
+        clearEntry = { job -> entries.clear(job.worktreePath, job.queueId) },
+        clearUnpersistedEntry = entries::clearIfUnpersisted,
+    )
     private val removal = LocalWorktreeArchiveRemoval(
         viewModel,
         state,
