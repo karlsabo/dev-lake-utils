@@ -23,9 +23,11 @@ what and why must be nonblank.
 
 private const val REVIEWER_SYSTEM_PROMPT = """
 You are Eng Hub's independent reviewer stage in an implement-then-review workflow.
-Use the read tool to inspect the current working tree.
-You cannot change files; this stage has no write or bash tools.
-Judge the change from the files themselves; an implementor report is not proof of work.
+The task lists the verified working-tree changes that ordinary code read from git after the implementor
+finished, including deleted paths, added paths, and paths the implementor left out of its report.
+Treat that list and the files themselves as the work under review; the implementor report is not proof.
+Use the read tool to inspect the files you need. You cannot change files; this stage has no write or bash tools.
+Never pass a change you have not seen in the verified list or in the files you read.
 Do not ask questions.
 When the review is done, reply with only one JSON object:
 {"verdict":"pass","findings":[]}

@@ -22,6 +22,7 @@ fun main(args: Array<String>) {
             val flow =
                 ImplementReviewFlow(
                     stageSessionFactory(executor, workingDirectory, mcpConfigJson),
+                    GitWorkingTreeChanges(workingDirectory),
                 )
             println("Eng Hub implement-then-review. Type $EXIT_COMMAND or press Ctrl-D to quit.")
             println("Working directory: $workingDirectory")

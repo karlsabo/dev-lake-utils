@@ -30,14 +30,22 @@ data class StoryFlowResult(
  * The implementor session is closed before the reviewer is opened, so the reviewer cannot inherit
  * the implementor's conversation. Both stages report JSON that ordinary code decodes and validates;
  * an invalid report fails the run instead of producing a review.
+ *
+ * The reviewer sees changes that [workingTreeChanges] read from the working tree, not the paths the
+ * implementor claims it touched. The baseline is recorded before the implementor starts, so an
+ * implementor commit cannot hide a change from the review, and a failed change read fails the run
+ * instead of letting the reviewer pass on an unchecked tree.
  */
 class ImplementReviewFlow(
     private val sessions: StageSessionFactory,
+    private val workingTreeChanges: WorkingTreeChanges,
 ) {
     suspend fun run(story: String): StoryFlowResult {
         require(story.isNotBlank()) { "story must not be blank" }
+        val baseline = workingTreeChanges.baseline()
         val implementation = implement(story)
-        val review = review(story, implementation)
+        val changes = workingTreeChanges.read(baseline)
+        val review = review(story, implementation, changes)
         return StoryFlowResult(implementation, review)
     }
 
@@ -48,8 +56,9 @@ class ImplementReviewFlow(
     private suspend fun review(
         story: String,
         implementation: ImplementationReport,
+        changes: WorkingTreeChangeReport,
     ): ReviewReport = withStage(StageName.REVIEWER) { session ->
-        decodeReviewReport(session.ask(reviewerTaskPrompt(story, implementation)))
+        decodeReviewReport(session.ask(reviewerTaskPrompt(story, implementation, changes)))
     }
 
     private suspend fun <T> withStage(

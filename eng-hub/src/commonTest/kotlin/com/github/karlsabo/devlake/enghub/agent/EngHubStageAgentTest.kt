@@ -49,6 +49,7 @@ class EngHubStageAgentTest {
                     StageSessionFactory { stage ->
                         EngHubStageAgent.create(executor, directory.toString(), stage)
                     },
+                    RecordingWorkingTreeChanges(),
                 )
 
             val result = flow.run(STAGE_STORY)
@@ -135,6 +136,7 @@ class EngHubStageAgentTest {
                 StageSessionFactory { stage ->
                     EngHubStageAgent.create(executor, directory.toString(), stage)
                 },
+                RecordingWorkingTreeChanges(),
             ).run(STAGE_STORY)
         } finally {
             executor.close()
@@ -154,6 +156,7 @@ class EngHubStageAgentTest {
         assertTrue(reviewerUserText.contains(STAGE_STORY))
         assertTrue(reviewerUserText.contains("what: Updated greeting"))
         assertTrue(reviewerUserText.contains("why: Story asks to greet Ada"))
+        assertTrue(reviewerUserText.contains("M Greeting.kt"), "the reviewer must see verified changes")
         assertTrue(
             client.prompts[1].prompt.toolResults().any { result ->
                 result.output.contains("Greeting.kt")

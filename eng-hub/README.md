@@ -380,7 +380,8 @@ The `implementReviewChat` task runs a separate JVM terminal program that carries
 
 1. an implementor stage with the same Skills `read`, `write`, and `bash` tools and `QWEN_3_8_27B` model as `terminalChat`
 2. a fresh reviewer stage with read-only inspection tools (Skills `read`; no `write` and no `bash`) and its own
-   conversation, opened only after the implementor session closes
+   conversation, opened only after the implementor session closes, with a verified change report read from the working
+   tree rather than from the implementor's report
 
 Every nonblank story line starts a new run, so a previous story's conversation never reaches the next implementor or
 reviewer. The implementor reports `{"files":["Greeting.kt"],"what":"Updated greeting","why":"Story asks to greet Ada"}`;
@@ -400,6 +401,27 @@ The launcher accepts the same `--mcp-config`, `--lm-studio-base-url`, and `--lm-
 `read`: configured MCP servers may expose write or code-execution tools, so their entire registry is excluded from
 the read-only reviewer stage. Quit with `/exit` or Ctrl-D; every other nonblank line is a story.
 
+### Verified changes for the reviewer
+
+Before the implementor starts, the flow records the working directory's `HEAD` commit as the baseline. After the
+implementor session closes, ordinary code reads the working tree with read-only git queries and gives the reviewer a
+verified change report:
+
+- every changed path from `git diff --name-status --no-renames <baseline>`, so paths the implementor left out of its
+  report and paths it deleted are both listed
+- every untracked path that is not ignored, listed as a new file
+- a bounded unified diff of tracked changes, including the removed lines of deleted files
+
+Paths are relative to the launcher's working directory and match what the Skills `read` tool resolves. Ignored files
+(`.gitignore`) are excluded so build output does not flood the review. The reviewer never receives `bash` and never
+queries git itself; the host code does the reading, so the reviewer stage keeps its `read`-only tool surface.
+
+The baseline is a commit, not the working tree state, so changes that were already uncommitted before the story are
+reported too, and an implementor commit cannot hide a change from the review. The flow therefore needs a git working
+tree with at least one commit; anything else fails the run before the reviewer opens. When the diff exceeds the prompt
+budget, the prompt says it was truncated and how many changed paths were not listed, so the reviewer can fall back to
+`read` instead of silently passing unexamined work.
+
 Example conversation with a disposable `Greeting.kt`:
 
 ```text
@@ -412,11 +434,12 @@ reviewer> no findings
 story> /exit
 ```
 
-Manual LM Studio smoke test: use a disposable checkout or directory, create `Greeting.kt` with a greeting that does not
-mention Ada, run `./gradlew :eng-hub:implementReviewChat`, and enter `Change Greeting.kt to greet Ada`. Confirm the
-implementor writes the file, the reviewer runs in a fresh conversation, reads `Greeting.kt` before reporting a verdict,
-and the CLI prints the completed review. The implementor's `files` list is a claim, not proof of work; the reviewer
-inspects the working tree with its own `read` tool and cannot change it.
+Manual LM Studio smoke test: use a disposable git checkout with at least one commit, create `Greeting.kt` with a greeting
+that does not mention Ada, run `./gradlew :eng-hub:implementReviewChat`, and enter `Change Greeting.kt to greet Ada`.
+Confirm the implementor writes the file, the reviewer runs in a fresh conversation, sees `M Greeting.kt` in its verified
+change report, reads `Greeting.kt` before reporting a verdict, and the CLI prints the completed review. The
+implementor's `files` list is a claim, not proof of work; the reviewer judges the verified working-tree changes and
+inspects files with its own `read` tool, and cannot change them.
 
 ## Building
 

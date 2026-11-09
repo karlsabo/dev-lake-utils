@@ -14,7 +14,7 @@ class ImplementReviewCliTest {
     @Test
     fun `runs one flow per story and displays the completed review`() = runTest {
         val io = RecordingStoryIo("Change Greeting.kt to greet Ada", EXIT_COMMAND, "ignored")
-        val flow = ImplementReviewFlow(SuccessfulStageFactory())
+        val flow = ImplementReviewFlow(SuccessfulStageFactory(), RecordingWorkingTreeChanges())
 
         ImplementReviewCli(flow, io).run()
 
@@ -31,7 +31,7 @@ class ImplementReviewCliTest {
         val io = RecordingStoryIo("First story", "Second story", EXIT_COMMAND)
         val factory = SuccessfulStageFactory()
 
-        ImplementReviewCli(ImplementReviewFlow(factory), io).run()
+        ImplementReviewCli(ImplementReviewFlow(factory, RecordingWorkingTreeChanges()), io).run()
 
         assertEquals(
             listOf(
@@ -49,7 +49,7 @@ class ImplementReviewCliTest {
         val io = RecordingStoryIo("", "   ", "Only story")
         val factory = SuccessfulStageFactory()
 
-        ImplementReviewCli(ImplementReviewFlow(factory), io).run()
+        ImplementReviewCli(ImplementReviewFlow(factory, RecordingWorkingTreeChanges()), io).run()
 
         assertEquals(listOf(StageName.IMPLEMENTOR, StageName.REVIEWER), factory.opened)
     }
