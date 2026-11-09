@@ -396,8 +396,9 @@ Start LM Studio as for terminal chat, then launch from the repository root:
 ```
 
 The launcher accepts the same `--mcp-config`, `--lm-studio-base-url`, and `--lm-studio-api-key-file` options as
-`terminalChat`. With `--mcp-config`, each stage starts its own `browser` MCP manager, so closing the implementor cannot
-remove the reviewer's tools. Quit with `/exit` or Ctrl-D; every other nonblank line is a story.
+`terminalChat`. With `--mcp-config`, only the implementor receives browser MCP tools. The reviewer has only Skills
+`read`: configured MCP servers may expose write or code-execution tools, so their entire registry is excluded from
+the read-only reviewer stage. Quit with `/exit` or Ctrl-D; every other nonblank line is a story.
 
 Example conversation with a disposable `Greeting.kt`:
 
