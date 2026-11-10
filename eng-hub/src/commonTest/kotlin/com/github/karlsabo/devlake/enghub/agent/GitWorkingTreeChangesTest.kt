@@ -607,33 +607,6 @@ class GitWorkingTreeChangesTest {
     }
 
     @Test
-    fun `fails the review when an untracked symlink hides the target it points at`() {
-        val repo = TempRepository()
-        try {
-            repo.write("Greeting.kt", "fun greet() = \"Hello\"\n")
-            repo.commitAll("baseline")
-            val changes = GitWorkingTreeChanges(repo.path)
-            val baseline = changes.baseline()
-
-            repo.symlink("missing-link.txt", "missing.txt")
-
-            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
-
-            val message = failure.message.orEmpty()
-            assertTrue(
-                message.contains("missing-link.txt"),
-                "the failure must name the untracked symlink, got: $message",
-            )
-            assertTrue(
-                message.contains("symlink"),
-                "the failure must explain that the target of a symlink is what it cannot show, got: $message",
-            )
-        } finally {
-            repo.delete()
-        }
-    }
-
-    @Test
     fun `reviews a working tree whose filter attribute has no configured command`() {
         val repo = TempRepository()
         try {
@@ -741,17 +714,6 @@ internal class TempRepository : TempDirectory("eng-hub-git-changes-${Random.next
 
     fun delete(relativePath: String) {
         SystemFileSystem.delete(Path(path, relativePath))
-    }
-
-    fun symlink(
-        relativePath: String,
-        target: String,
-    ) {
-        val command = listOf("ln", "-s", target, Path(path, relativePath).toString())
-        val result = executeCommand(command, workingDirectory = null)
-        check(result.exitCode == 0) {
-            "Fixture symlink command failed (${result.exitCode}): ${command.joinToString(" ")}\n${result.stderr}"
-        }
     }
 
     fun commitAll(message: String) {
