@@ -35,6 +35,7 @@ class GitWorkingTreeChanges(
 ) : WorkingTreeChanges {
     private val binaryChanges = GitBinaryChanges(workingDirectory, git)
     private val configuredFilters = GitConfiguredFilters(workingDirectory, git)
+    private val indexInspection = GitIndexInspection(workingDirectory, git)
 
     override fun baseline(): WorkingTreeBaseline = gitRead("record the baseline commit") {
         WorkingTreeBaseline(git.revParse(workingDirectory, "--verify", "HEAD"))
@@ -44,6 +45,7 @@ class GitWorkingTreeChanges(
         "read the working-tree changes",
     ) {
         val revision = baseline.revision
+        indexInspection.requireVisibleTrackedFiles()
         val untracked = untrackedChanges()
         // Both refusals run before any diff-bearing query. `git diff` and `git hash-object` pass a working-tree
         // file through its configured clean filter, which could run a repository-configured command and hide a
@@ -57,6 +59,7 @@ class GitWorkingTreeChanges(
         // path the prompt drops could be neither found nor read. More paths than the prompt lists therefore fail
         // the review instead of handing over a truncated list.
         check(changes.size <= maxChangedPaths) { tooManyChangedPaths(changes.size, maxChangedPaths) }
+        indexInspection.requireInspectableGitlinks(changes)
         requireInspectableChanges(revision, changes, untracked)
         val deleted = changes.filter { change -> change.kind == WorkingTreeChangeKind.DELETED }
         val patch = boundedReviewDiff(

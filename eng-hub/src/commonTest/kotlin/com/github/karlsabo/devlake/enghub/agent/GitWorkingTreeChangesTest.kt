@@ -95,6 +95,72 @@ class GitWorkingTreeChangesTest {
     }
 
     @Test
+    fun `refuses a hidden edit marked assume-unchanged`() {
+        val repo = TempRepository()
+        try {
+            repo.write("hidden.txt", "old\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+            repo.git("-C", repo.path, "update-index", "--assume-unchanged", "hidden.txt")
+            repo.write("hidden.txt", "new\n")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            assertTrue(failure.message.orEmpty().contains("hidden.txt"))
+            assertTrue(failure.message.orEmpty().contains("assume-unchanged"))
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `refuses a hidden edit marked skip-worktree`() {
+        val repo = TempRepository()
+        try {
+            repo.write("hidden.txt", "old\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+            repo.git("-C", repo.path, "update-index", "--skip-worktree", "hidden.txt")
+            repo.write("hidden.txt", "new\n")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            assertTrue(failure.message.orEmpty().contains("hidden.txt"))
+            assertTrue(failure.message.orEmpty().contains("skip-worktree"))
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `refuses edits inside a tracked submodule`() {
+        val repo = TempRepository()
+        try {
+            repo.write("Greeting.kt", "hello\n")
+            val nested = Path(repo.path, "nested").toString()
+            repo.git("init", "-q", nested)
+            repo.git("-C", nested, "config", "user.email", "reviewer@example.com")
+            repo.git("-C", nested, "config", "user.name", "Eng Hub Test")
+            repo.write("nested/hidden.txt", "old\n")
+            repo.git("-C", nested, "add", "hidden.txt")
+            repo.git("-C", nested, "commit", "-q", "-m", "nested baseline")
+            repo.commitAll("baseline with gitlink")
+            val changes = GitWorkingTreeChanges(repo.path)
+            val baseline = changes.baseline()
+            repo.write("nested/hidden.txt", "new\n")
+
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
+
+            assertTrue(failure.message.orEmpty().contains("nested"))
+            assertTrue(failure.message.orEmpty().contains("submodule"))
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
     fun `ignores ignored files so build output does not flood the review`() {
         val repo = TempRepository()
         try {

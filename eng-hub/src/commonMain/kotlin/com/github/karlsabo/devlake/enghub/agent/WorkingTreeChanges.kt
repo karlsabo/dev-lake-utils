@@ -72,7 +72,8 @@ interface WorkingTreeChanges {
      * directory git reports as one opaque entry, such as an untracked nested repository, fails too, because the
      * files inside it appear in no diff and cannot be read by path. An untracked symlink fails the same way: no
      * diff carries the link, and the path-based `read` tool follows it instead of showing the target it names, so
-     * a dangling link can never be inspected.
+     * a dangling link can never be inspected. Index flags that hide tracked edits, and changed tracked submodules
+     * whose nested files cannot be read through their gitlink diff, also fail before opening the reviewer.
      */
     fun read(baseline: WorkingTreeBaseline): WorkingTreeChangeReport
 }

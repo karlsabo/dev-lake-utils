@@ -423,6 +423,8 @@ verified change report:
 - a refusal to open the reviewer when git reports an untracked directory as one opaque path, because an untracked
   nested Git repository is listed only as `nested/`, so the files inside it appear in no diff and cannot be read by
   path
+- a refusal when tracked files have `assume-unchanged` or `skip-worktree` index flags, which can hide edits from
+  `git diff`, or when a tracked submodule changes, because its dirty files cannot be inspected through the gitlink diff
 
 Paths are relative to the launcher's working directory and match what the Skills `read` tool resolves. Ignored files
 (`.gitignore`) are excluded so build output does not flood the review. The reviewer never receives `bash` and never
@@ -450,7 +452,10 @@ of `--name-status`, `--numstat`, and the patch. The flow reads the attribute and
 nothing, and fails the run when a non-empty `filter.<driver>.clean` or `filter.<driver>.process` command applies to
 a tracked or untracked path. Similarly, `git ls-files --others` reports an untracked nested Git repository as a
 single `nested/` entry, so its files appear in no diff and the path-based read tool cannot open the directory entry;
-that also fails the run instead of reviewing a change set whose contents are invisible.
+that also fails the run instead of reviewing a change set whose contents are invisible. Git index flags can hide
+working-tree edits even without filters, so the flow refuses tracked paths marked `assume-unchanged` or
+`skip-worktree` before diffing. A changed tracked submodule also fails: its gitlink diff shows a commit ID (and
+possibly `-dirty`), not the modified files inside the submodule, and the reviewer cannot read its directory.
 
 Example conversation with a disposable `Greeting.kt`:
 
