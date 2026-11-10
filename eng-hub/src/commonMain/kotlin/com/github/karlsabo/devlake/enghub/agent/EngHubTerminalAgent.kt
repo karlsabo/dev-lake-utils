@@ -93,11 +93,7 @@ object EngHubTerminalAgent {
     }
 }
 
-/**
- * Assembles the Skills `read`, `write`, and `bash` tools plus any MCP tools for [workingDirectory].
- *
- * Terminal chat and the staged implement-then-review flow share the same tool surface.
- */
+/** Terminal chat and staged flows share this `read`/`write`/`bash` tool surface plus any MCP tools. */
 internal suspend fun engHubToolRegistry(
     workingDirectory: String,
     browserMcpTools: BrowserMcpTools?,

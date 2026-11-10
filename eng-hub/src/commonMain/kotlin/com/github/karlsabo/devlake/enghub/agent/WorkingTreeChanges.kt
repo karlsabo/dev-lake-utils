@@ -37,11 +37,10 @@ data class WorkingTreeChangeReport(
     val baselineRevision: String,
     val changes: List<WorkingTreeChange>,
     /**
-     * The unified diff; when [patchTruncated], the removed content of every deleted path is still complete.
+     * The unified diff. When [patchTruncated], every deleted path's removed content is still complete.
      *
-     * A path whose content git can only report as binary never reaches this report: [read] fails instead,
-     * because the diff would carry a marker rather than the bytes and the reviewer's text-only `read` tool
-     * cannot show binary content. An untracked binary path fails the same way.
+     * Binary changes never reach this report: [read] fails instead, because the reviewer's text-only `read`
+     * tool cannot show their bytes.
      */
     val patch: String,
     val patchTruncated: Boolean,
@@ -60,29 +59,17 @@ interface WorkingTreeChanges {
     /**
      * Reads every working-tree change relative to [baseline], including deletions and untracked paths.
      *
-     * A reviewer can re-read a surviving file but never a deleted one, so a [WorkingTreeChangeReport] whose diff
-     * dropped a deletion's removed content would let the reviewer pass on a change it could not inspect.
-     * Implementations keep that content within their prompt budget, or fail instead of returning the report.
-     * They do the same for every binary change, added, staged, modified, or deleted, because git reports binary
-     * content as a marker instead of the bytes and the reviewer's text-only `read` tool cannot show it either. A
-     * working tree with more changed paths than the prompt lists also fails, because a path the prompt omits is one
-     * the reviewer cannot discover or read. A working tree whose git configuration would run a clean or process
-     * filter command also fails: git applies it while reading changes, so it can execute code outside the
-     * reviewer's read-only boundary and hide a changed line from both the path list and the diff. An untracked
-     * directory git reports as one opaque entry, such as an untracked nested repository, fails too, because the
-     * files inside it appear in no diff and cannot be read by path. An untracked symlink fails the same way: no
-     * diff carries the link, and the path-based `read` tool follows it instead of showing the target it names, so
-     * a dangling link can never be inspected. Index flags that hide tracked edits, and changed tracked submodules
-     * whose nested files cannot be read through their gitlink diff, also fail before opening the reviewer.
+     * Fails closed on any change the reviewer could not inspect: a deletion whose removed content does not fit
+     * the prompt budget, binary paths (git shows a marker, or no diff for untracked; `read` is text-only),
+     * opaque untracked directories and untracked symlinks, more changed paths than the prompt lists, configured
+     * clean/process filters (which run repository code and can hide a line), hidden index flags, and changed
+     * tracked submodules.
      */
     fun read(baseline: WorkingTreeBaseline): WorkingTreeChangeReport
 }
 
 /**
  * Explains a refusal to review a working tree with more changed paths than the prompt can list.
- *
- * Untracked paths have no diff content, and the reviewer reads only the paths the prompt names, so a path the
- * prompt drops cannot be rediscovered. Truncating the list would let the reviewer pass on changes it never saw.
  *
  * @param count the number of changed paths the working tree reported.
  * @param limit the most changed paths the reviewer prompt can carry.
@@ -98,10 +85,6 @@ internal fun tooManyChangedPaths(
 /**
  * Explains a refusal to review binary changes no reviewer tool can inspect.
  *
- * `git diff` renders binary content as a `Binary files ... differ` marker instead of the bytes, an untracked
- * binary path appears in no diff at all, and the reviewer's `read` tool is a UTF-8 text tool. Neither side of
- * such a change is reviewable, so the review fails instead of letting the reviewer pass on it.
- *
  * @param changes the changed binary paths whose content no reviewer tool can show.
  */
 internal fun uninspectableBinaryChanges(changes: List<WorkingTreeChange>): String {
@@ -115,10 +98,6 @@ internal fun uninspectableBinaryChanges(changes: List<WorkingTreeChange>): Strin
 /**
  * Explains a refusal to review untracked symlinks whose target no reviewer tool can show.
  *
- * An untracked symlink appears in the path list as an added path but carries no diff, and the reviewer's `read`
- * tool follows the link, showing the target's content instead of the link and the path it points at. A dangling
- * link cannot be read at all, so the change would be reviewed without its target ever being seen.
- *
  * @param paths the untracked symlinks whose target the reviewer cannot inspect.
  */
 internal fun uninspectableUntrackedSymlinks(paths: List<String>): String {
@@ -131,10 +110,6 @@ internal fun uninspectableUntrackedSymlinks(paths: List<String>): String {
 
 /**
  * Explains a refusal to review untracked directory entries git reports as one opaque path.
- *
- * An untracked nested Git repository is listed as `nested/`, so its contents appear in no diff and the
- * path-based `read` tool cannot open the directory entry. Reviewing the reported change set would leave those
- * files unexamined, so the review fails instead.
  *
  * @param paths the untracked directory entries whose contents git did not list.
  */

@@ -13,14 +13,10 @@ private const val SURVIVING_ONLY = "--diff-filter=d"
 /**
  * Cuts the reviewer's diff to [maxChars] without dropping what a deleted path removed.
  *
- * The reviewer can re-read a surviving file with its `read` tool and can never read a deleted one, so a
- * deletion that truncation cuts off is a change it cannot inspect. A [patch] that fits is returned
- * untouched; a larger one is cut at a line boundary only after the removed content of [deleted] has been
- * reserved in full, and the surviving diff is cut to whatever budget is left. [filteredDiff] supplies both
- * halves of that split from the same diff options.
+ * The reviewer can re-read a surviving file but never a deleted one, so deletions are reserved in full and
+ * only the surviving diff is truncated. A patch that fits is returned untouched.
  *
- * @throws IllegalStateException when the removed content alone does not fit, so the review fails closed
- *   instead of asking the reviewer to judge a deletion it cannot see.
+ * @throws IllegalStateException when the removed content alone does not fit, so the review fails closed.
  */
 internal fun boundedReviewDiff(
     maxChars: Int,

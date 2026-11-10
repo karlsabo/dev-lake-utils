@@ -115,8 +115,7 @@ interface GitRawCommandExecutor {
     /**
      * Runs git from an argument list and returns stdout untouched.
      *
-     * NUL-delimited output must not be trimmed, because the surrounding whitespace is part of a path: the first
-     * record starts the output, so a path with a leading space would lose it and name a different file.
+     * NUL-delimited output must not be trimmed: trimming a leading path's space names a different file.
      */
     fun executeRaw(repoPath: String?, args: List<String>): String
 }

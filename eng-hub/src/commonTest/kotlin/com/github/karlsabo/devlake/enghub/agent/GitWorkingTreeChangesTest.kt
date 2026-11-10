@@ -20,12 +20,7 @@ private const val MAX_TEST_PATCH_CHARS = 400
 private const val BINARY_PAYLOAD = "payload\u0000\u0001\u0002"
 private const val OTHER_BINARY_PAYLOAD = "other-payload\u0000\u0003"
 
-/**
- * Integration tests for [GitWorkingTreeChanges] against real, disposable git repositories.
- *
- * They cover the reviewer's core guarantee: the change set comes from the working tree, so an edit the
- * implementor never reported and a file it deleted are both visible.
- */
+/** Integration tests for [GitWorkingTreeChanges] against real, disposable git repositories. */
 class GitWorkingTreeChangesTest {
     @Test
     fun `reports changed, added, and deleted paths the implementor did not report`() {
@@ -819,8 +814,8 @@ internal open class TempDirectory(
     /**
      * Removes a symlink itself, including a dangling one.
      *
-     * `SystemFileSystem.delete` first checks whether the path exists, and that check follows the link, so it
-     * leaves a dangling symlink behind and the parent directory then cannot be removed.
+     * `SystemFileSystem.delete` follows the link when checking existence, so a dangling symlink is left behind
+     * and its parent directory cannot be removed.
      */
     private fun deleteSymbolicLink(symlink: Path) {
         val command = listOf("rm", "-f", symlink.toString())

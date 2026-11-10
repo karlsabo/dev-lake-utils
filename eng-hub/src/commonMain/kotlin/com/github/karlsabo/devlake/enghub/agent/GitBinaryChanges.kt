@@ -29,19 +29,11 @@ private const val PATH_FIELD_SEPARATOR = '\t'
 private const val METADATA_FIELD_SEPARATOR = ' '
 
 /**
- * Finds changed paths whose content never reaches the reviewer, because no reviewer tool can show it.
+ * Finds changed paths whose content never reaches the reviewer's text-only `read` tool.
  *
- * The reviewer's `read` tool is a UTF-8 text tool and its only inspection surface. Git renders binary content
- * as a one-line `Binary files ... differ` marker instead of the bytes, so a tracked binary change loses the
- * content of at least one side, and an untracked binary path appears in no diff at all. Either way the reviewer
- * would judge a change it never saw.
- *
- * Every query here is read-only: it lists paths, compares blob ids, and sniffs leading bytes. No hook, no
- * textconv driver, and no shell of our own is involved: a textconv driver is deliberately off on every diff,
- * because it renders content with a repository-configured command outside the reviewer's boundary instead of
- * showing the bytes. A configured clean or process filter never reaches these queries either, because
- * [GitWorkingTreeChanges] refuses that working tree before any diff or hash runs. Blob ids come from git's own
- * hashing, so they compare like with like.
+ * Git renders binary content as a `Binary files ... differ` marker and omits untracked paths from every diff.
+ * Every query is read-only (paths, blob ids, leading-byte sniff): no hook, textconv, or shell is involved, and
+ * configured filters cannot reach it because [GitWorkingTreeChanges] refuses such a working tree first.
  */
 internal class GitBinaryChanges(
     private val workingDirectory: String,
@@ -59,13 +51,11 @@ internal class GitBinaryChanges(
     ): Set<String> = (changedBinaryPaths(revision) + untrackedBinaryPaths(untrackedPaths)).toSet()
 
     /**
-     * Lists changed tracked paths, whatever their status, whose diff carries a binary marker instead of bytes.
+     * Lists changed tracked paths whose diff carries a binary marker instead of bytes.
      *
-     * `--numstat` is the locale-independent signal: a path whose content git will not diff as text counts no
-     * lines. It also reports no line counts for a mode-only change, whose content is unchanged and whose mode
-     * lines the patch does carry, so each candidate's blob is compared with the baseline and only a real
-     * content change counts. The flags match the reviewer diff's on purpose, so a driver cannot make one query
-     * see content and the other not.
+     * `--numstat` reports no line counts for binary content, but also for a mode-only change, so each
+     * candidate's blob is compared with the baseline. Flags match the reviewer diff so a driver cannot make
+     * one query see content and the other not.
      */
     private fun changedBinaryPaths(revision: String): List<String> = numstatBinaryPaths(revision)
         .filter { path -> contentDiffers(revision, path) }
@@ -85,11 +75,9 @@ internal class GitBinaryChanges(
     ).mapNotNull(::binaryPath)
 
     /**
-     * Whether the bytes of [path] differ from [revision], so a binary marker hides a real content change.
+     * Whether [path]'s bytes differ from [revision], so a binary marker hides a real content change.
      *
-     * A path with no working-tree file is a deletion, which git describes only as a marker, so it counts as a
-     * content change. Anything without a comparable blob counts the same way: a change that cannot be shown is
-     * exactly what this check fails on.
+     * A deletion or any uncomparable blob counts as a change: what cannot be shown is what this check fails on.
      */
     private fun contentDiffers(
         revision: String,
@@ -127,12 +115,7 @@ internal class GitBinaryChanges(
         return metadata?.isRegularFile == true
     }
 
-    /**
-     * Lists untracked paths whose bytes the reviewer's text `read` tool cannot show.
-     *
-     * Untracked paths appear in no diff, so git never classifies them; this applies git's own heuristic instead,
-     * which is a NUL byte among the leading bytes.
-     */
+    /** Lists untracked paths whose bytes the text `read` tool cannot show, using git's NUL-byte heuristic. */
     private fun untrackedBinaryPaths(paths: List<String>): List<String> = paths.filter(::sniffsAsBinary)
 
     private fun sniffsAsBinary(path: String): Boolean {

@@ -36,10 +36,8 @@ A pass has no findings; needs_changes has at least one finding.
 """
 
 /**
- * Builds one isolated Koog conversation per implement-then-review stage.
- *
- * Each call creates a new agent with its own chat memory, so an implementor conversation never
- * reaches the reviewer. The stage owns optional [browserMcpTools] and closes them with its session.
+ * Builds one isolated Koog conversation per stage, each with its own chat memory, so an implementor
+ * conversation never reaches the reviewer.
  */
 object EngHubStageAgent {
     fun sessionId(stage: StageName): String = "eng-hub-stage-${stage.id}"
@@ -93,11 +91,10 @@ object EngHubStageAgent {
 }
 
 /**
- * Tools for one stage. The implementor may change the working tree; the reviewer may only inspect it.
+ * Tools for one stage: the implementor may change the working tree, the reviewer may only inspect it.
  *
- * The reviewer gets `read` instead of `write` and `bash`: `bash` can write files even when the
- * separate `write` tool is absent. Configured MCP servers are not trusted to be read-only,
- * so only the implementor receives their tools.
+ * The reviewer gets `read` only, because `bash` can write even without `write`. MCP servers are not trusted
+ * to be read-only, so only the implementor receives their tools.
  */
 internal suspend fun stageToolRegistry(
     workingDirectory: String,

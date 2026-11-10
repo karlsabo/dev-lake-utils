@@ -5,11 +5,9 @@ const val IMPLEMENTOR_PREFIX = "implementor> "
 const val REVIEWER_PREFIX = "reviewer> "
 
 /**
- * Reads stories until [EXIT_COMMAND] or end of input and runs a fresh implement-then-review flow
- * for each nonblank story.
+ * Reads stories until [EXIT_COMMAND] or end of input and runs a fresh flow for each nonblank one.
  *
- * A flow failure propagates to the caller; the launcher lets the process fail rather than printing a
- * review that was never produced.
+ * A flow failure propagates so the launcher fails instead of printing a review that was never produced.
  */
 class ImplementReviewCli(
     private val flow: ImplementReviewFlow,

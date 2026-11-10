@@ -20,12 +20,10 @@ private const val NO_EXT_DIFF = "--no-ext-diff"
 private const val NO_TEXTCONV = "--no-textconv"
 
 /**
- * Reads working-tree changes with git, relative to the reviewed working directory.
+ * Reads working-tree changes with read-only git queries relative to the reviewed working directory.
  *
- * Every command here is a read-only git query: it lists paths and diffs content that the working tree
- * already holds. This class never runs the agent's `bash` tool and never hands the reviewer a command
- * surface of its own. Change discovery also refuses a working tree whose git configuration would run a
- * filter command, because git applies that command while diffing and the reviewer must not execute it.
+ * No command surface is exposed to the reviewer, and a working tree whose git config would run a filter
+ * command is refused, because git executes that command while diffing.
  */
 class GitWorkingTreeChanges(
     private val workingDirectory: String,
@@ -47,17 +45,14 @@ class GitWorkingTreeChanges(
         val revision = baseline.revision
         indexInspection.requireVisibleTrackedFiles()
         val untracked = untrackedChanges()
-        // Both refusals run before any diff-bearing query. `git diff` and `git hash-object` pass a working-tree
-        // file through its configured clean filter, which could run a repository-configured command and hide a
-        // changed line; the guard reads only attributes and config, so it answers without executing anything.
+        // Both guards run before any diff-bearing query: git applies a configured clean filter while diffing,
+        // which could run repository code and hide a changed line. The guards read only attributes and config.
         requireInspectableUntrackedPaths(untracked)
         configuredFilters.requireNoConfiguredCommands(untracked.map { change -> change.path })
         val changes = (trackedChanges(revision) + untracked)
             .distinctBy { change -> change.path }
             .sortedBy { change -> change.path }
-        // The prompt is where a changed path becomes discoverable and an untracked path has no diff content, so a
-        // path the prompt drops could be neither found nor read. More paths than the prompt lists therefore fail
-        // the review instead of handing over a truncated list.
+        // A path the prompt drops could be neither discovered nor read, so overflow fails instead of truncating.
         check(changes.size <= maxChangedPaths) { tooManyChangedPaths(changes.size, maxChangedPaths) }
         indexInspection.requireInspectableGitlinks(changes)
         requireInspectableChanges(revision, changes, untracked)
@@ -85,13 +80,8 @@ class GitWorkingTreeChanges(
     ).map { path -> WorkingTreeChange(path, WorkingTreeChangeKind.ADDED) }
 
     /**
-     * Fails when git reports an untracked path whose content no reviewer tool can inspect.
-     *
-     * `git ls-files --others` lists an untracked nested Git repository as `nested/`, so the files it holds
-     * appear in no diff and the path-based `read` tool cannot open the directory entry either. It lists an
-     * untracked symlink like an added file, but no diff carries the link and `read` follows the link instead of
-     * showing the path it points at, so a dangling link cannot be read at all. Failing closed avoids reviewing
-     * a change set whose contents are invisible.
+     * Fails when git reports an untracked path no reviewer tool can inspect: an opaque directory (e.g. a nested
+     * repository) whose files appear in no diff, or a symlink that `read` follows instead of showing.
      */
     private fun requireInspectableUntrackedPaths(untracked: List<WorkingTreeChange>) {
         val opaque = untracked.filter { change -> change.path.endsWith(OPAQUE_DIRECTORY_SUFFIX) }
@@ -114,12 +104,7 @@ class GitWorkingTreeChanges(
         "--",
     )
 
-    /**
-     * Diffs [revision] against the working tree keeping only the changes whose status [filter] selects.
-     *
-     * [boundedReviewDiff] splits the prompt budget with these filters, so the removed content of deleted
-     * paths can be read separately from the rest of the diff.
-     */
+    /** Diffs [revision] against the working tree keeping only the changes whose status [filter] selects. */
     private fun readPatch(
         revision: String,
         filter: String,
@@ -136,18 +121,11 @@ class GitWorkingTreeChanges(
     )
 
     /**
-     * Fails when a changed path's content cannot reach the reviewer, because no reviewer tool can show it.
+     * Fails when a changed path's content cannot reach the reviewer.
      *
-     * Git renders binary content as a one-line `Binary files ... differ` marker instead of the bytes, and an
-     * untracked binary path appears in no diff at all, so neither side of such a change is available: a modified
-     * path loses its original content, a deleted path cannot be read back, and an untracked path was never in a
-     * diff. The reviewer's `read` tool is a UTF-8 text tool, so it cannot stand in for the missing bytes either.
-     * Textconv is not a way out: it runs a command from the repository's own configuration, which is outside the
-     * reviewer's read-only boundary, and its output is a rendering rather than the bytes. The review therefore
-     * fails closed instead of handing over a change the reviewer could only pass unexamined.
-     *
-     * Text review is unaffected: only paths whose content git will not diff as text are named, and a mode-only
-     * change carries its mode lines in the patch.
+     * Git renders binary content as a `Binary files ... differ` marker and omits untracked paths from every
+     * diff, and the reviewer's `read` tool is UTF-8 text, so neither side of such a change is inspectable.
+     * Textconv is not a way out: it runs a repository-configured command outside the read-only boundary.
      */
     private fun requireInspectableChanges(
         revision: String,
@@ -188,10 +166,10 @@ private fun parseNameStatus(output: String): List<WorkingTreeChange> {
 }
 
 /**
- * Splits NUL-separated git output, dropping only the empty field a single trailing separator leaves behind.
+ * Splits NUL-separated git output, dropping only the trailing empty field.
  *
- * Interior empty fields are kept: `git check-attr -z` writes one for an attribute set to the empty string, and
- * dropping it would shift every following field, so callers parse whole records instead of compacted ones.
+ * Interior empty fields are kept because `git check-attr -z` writes one for an empty attribute value, and
+ * dropping it would shift the following fields.
  */
 internal fun splitNulPaths(output: String): List<String> {
     if (output.isEmpty()) return emptyList()
@@ -202,8 +180,7 @@ internal fun splitNulPaths(output: String): List<String> {
 /**
  * Maps a git name-status code to a reviewable kind.
  *
- * Renames are disabled with `--no-renames`, so a rename arrives as a delete plus an add. Any remaining
- * code (`M`, `T`, `U`, ...) is reported as a modification so no changed path is dropped.
+ * Unknown codes map to MODIFIED so no changed path is dropped; renames arrive as a delete plus an add.
  */
 private fun kindOf(status: String): WorkingTreeChangeKind = when (status.firstOrNull()) {
     'A', 'C' -> WorkingTreeChangeKind.ADDED

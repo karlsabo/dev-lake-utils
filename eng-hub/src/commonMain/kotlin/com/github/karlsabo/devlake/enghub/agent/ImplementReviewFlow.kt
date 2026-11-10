@@ -9,10 +9,7 @@ enum class StageName(
 }
 
 /**
- * Opens a fresh conversation for [stage].
- *
- * Implementations must return an isolated session: opening one stage must not expose another
- * stage's messages, tool calls, or tool results.
+ * Opens an isolated conversation for [stage]; one stage must not expose another's messages or tools.
  */
 fun interface StageSessionFactory {
     suspend fun open(stage: StageName): ChatSession
@@ -27,14 +24,10 @@ data class StoryFlowResult(
 /**
  * Runs one story through a tool-capable implementor and then a fresh reviewer.
  *
- * The implementor session is closed before the reviewer is opened, so the reviewer cannot inherit
- * the implementor's conversation. Both stages report JSON that ordinary code decodes and validates;
- * an invalid report fails the run instead of producing a review.
- *
- * The reviewer sees changes that [workingTreeChanges] read from the working tree, not the paths the
- * implementor claims it touched. The baseline is recorded before the implementor starts, so an
- * implementor commit cannot hide a change from the review, and a failed change read fails the run
- * instead of letting the reviewer pass on an unchecked tree.
+ * The implementor session is closed before the reviewer opens, so the reviewer cannot inherit its
+ * conversation. The reviewer sees changes [workingTreeChanges] read from the working tree, not the paths the
+ * implementor claims; the baseline is recorded before the implementor starts, so a commit cannot hide a
+ * change, and a failed change read fails the run.
  */
 class ImplementReviewFlow(
     private val sessions: StageSessionFactory,

@@ -21,15 +21,10 @@ private const val PROCESS_COMMAND = ".process"
  * Fails a review when a repository-configured filter command could run or hide a change while git reads the
  * working tree.
  *
- * `git diff` and `git hash-object` pass a working-tree file through the clean filter its `filter` attribute
- * names before comparing it with the baseline blob. That filter is a command from the repository's own
- * configuration, so change discovery would execute untrusted code, and a filter that rewrites or drops lines
- * can keep a real change out of `--name-status`, `--numstat`, and the patch. `--no-ext-diff` and
- * `--no-textconv` do not disable it. Reading attributes and config values runs nothing, so this guard answers
- * first and the review fails closed when a command is configured.
- *
- * Every query here is metadata only: `git ls-files` lists paths, `git check-attr` reads attribute files, and
- * `git config --list` reads configuration. No configured command is ever executed.
+ * `git diff` and `git hash-object` pass a working-tree file through its clean filter before comparing it with
+ * the baseline. That command comes from the repository's config, so change discovery would execute untrusted
+ * code, and a filter that rewrites lines can hide a real change from the path list and the diff. `--no-ext-diff`
+ * and `--no-textconv` do not disable it. All queries here are metadata-only and run nothing.
  */
 internal class GitConfiguredFilters(
     private val workingDirectory: String,
@@ -38,8 +33,7 @@ internal class GitConfiguredFilters(
     /**
      * Fails when any tracked path or [untrackedPaths] path resolves to a filter with a configured command.
      *
-     * Every working-tree path is checked, not only the changed ones, because a filter that hides a line is
-     * exactly what keeps a changed path out of the change set in the first place.
+     * Every working-tree path is checked: a filter that hides a line can keep a changed path out of the set.
      */
     fun requireNoConfiguredCommands(untrackedPaths: List<String>) {
         val drivers = filterDrivers(workingTreePaths(untrackedPaths))
@@ -59,12 +53,10 @@ internal class GitConfiguredFilters(
         .toSet()
 
     /**
-     * Reads `git check-attr -z filter`, whose output is one `path`, `attribute`, `value` triple per path.
+     * Reads `git check-attr -z filter`, one `path`, `attribute`, `value` triple per path.
      *
-     * The value field is empty for an attribute that is set to the empty string, as in `empty.txt filter=`, so
-     * the output is read as whole triples. Dropping an empty field instead would shift every following triple and
-     * read the next path as this one's filter driver, which would let that path's configured filter run unseen.
-     * An incomplete triple means the output is not the documented shape, so it fails instead of guessing.
+     * The value is empty for an attribute set to the empty string (`filter=`), so whole triples are read;
+     * dropping an empty field would shift every later triple and let the wrong filter run unseen.
      */
     private fun filterDriverValues(paths: List<String>): List<String> {
         val fields = splitNulPaths(
@@ -80,10 +72,8 @@ internal class GitConfiguredFilters(
     }
 
     /**
-     * Lists the configured filter commands for [drivers].
-     *
-     * Git treats an empty value as unset, but a blank-looking value still reaches the shell, so every non-empty
-     * value counts as a command.
+     * Lists the configured filter commands for [drivers]. Git treats an empty value as unset, but a
+     * blank-looking value still reaches the shell, so every non-empty value counts.
      */
     private fun configuredCommands(drivers: Set<String>): List<String> {
         val config = configValues()
@@ -102,7 +92,7 @@ internal class GitConfiguredFilters(
 }
 
 /**
- * Explains a refusal to review a working tree whose git configuration would run a filter command.
+ * Explains a refusal to review a working tree whose git config would run a filter command.
  *
  * @param commands the configured filter keys git would run, in `filter.<driver>.<command>` form.
  */

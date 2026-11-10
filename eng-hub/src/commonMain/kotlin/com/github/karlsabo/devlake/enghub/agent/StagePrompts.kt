@@ -1,10 +1,8 @@
 package com.github.karlsabo.devlake.enghub.agent
 
 /**
- * Changed paths one review may carry.
- *
- * The prompt lists every one of them, so a working tree with more fails before the reviewer opens rather than
- * leaving paths out of the prompt.
+ * Changed paths one review may carry. The prompt lists every one, so a larger change set fails before the
+ * reviewer opens rather than dropping paths.
  */
 internal const val MAX_PROMPT_CHANGED_PATHS = 500
 
@@ -26,10 +24,8 @@ internal fun implementorTaskPrompt(story: String): String = """
 /**
  * The user prompt that starts the reviewer stage.
  *
- * It carries the story, the implementor's claims, and the changes ordinary code read from the working
- * tree after the implementor session closed. The verified changes are what the reviewer must judge:
- * the implementor's `files` list is only a claim, and a changed or deleted file it omits still appears
- * in the verified list.
+ * It carries the story, the implementor's unverified claims, and the changes read from the working tree after
+ * the implementor closed; the verified changes, not the claim, are what the reviewer judges.
  */
 internal fun reviewerTaskPrompt(
     story: String,
@@ -53,11 +49,8 @@ internal fun reviewerTaskPrompt(
 /**
  * Renders the verified change report for the reviewer prompt.
  *
- * The path list is where omissions and deletions surface, so it lists every changed path the report holds.
- * A report beyond [MAX_PROMPT_CHANGED_PATHS] never gets here: [WorkingTreeChanges.read] fails instead, because
- * an untracked path has no diff content and a path the prompt leaves out cannot be discovered. The diff is
- * the content proof; when it is cut, the notice tells the reviewer to read the surviving files instead and
- * that a deleted file's removed content is still in the patch.
+ * Every changed path is listed; overflow never gets here because [WorkingTreeChanges.read] fails first. When
+ * the diff is cut, the notice tells the reviewer to read the surviving files.
  */
 internal fun verifiedChangesSection(changes: WorkingTreeChangeReport): String = buildString {
     appendLine("Verified working-tree changes (git, baseline ${changes.baselineRevision}, working-directory paths):")

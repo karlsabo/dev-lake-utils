@@ -28,8 +28,8 @@ private class GitCliCommandRunner {
     /**
      * Returns stdout exactly as git wrote it.
      *
-     * Trimming corrupts NUL-delimited output: `git ls-files -z` starts with the first path, so a leading
-     * space in that path is stripped and the caller then asks about a path that does not exist.
+     * Trimming corrupts NUL-delimited output: `git ls-files -z` starts with the first path, so a leading space
+     * is stripped and the caller asks about a path that does not exist.
      */
     fun runRaw(command: List<String>): String {
         val result = runForResult(command)
