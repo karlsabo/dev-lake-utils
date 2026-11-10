@@ -49,7 +49,9 @@ Expect input to be one of:
 
 ### Step 4: Comments and docs
 
-- Comments should explain non-obvious constraints, invariants, trade-offs, or behavior—not narrate the code.
+- Default to no new comments. Prefer clear code and names.
+- Add a comment only to explain a non-obvious invariant, external constraint, or failure mode that cannot be made clear in code. Having a reason for the change is not enough to justify a code comment.
+- For configuration/value-only changes, change the value only. Put before/after sizing, incident history, ticket references, change rationale, rollout steps, and validation notes in the PR or ticket—not inline comments.
 - Document public APIs and contracts where useful or required by repository conventions; skip obvious boilerplate.
 - Include inputs, returns, failures, side effects, units, or concurrency requirements only when they are non-obvious and relevant.
 - Remove stale or noisy comments in code you touch.
@@ -66,6 +68,7 @@ Expect input to be one of:
 ### Step 6: Self-review
 
 - Check for accidental coupling, hidden duplication, oversized functions, leaky names, and comment noise.
+- Inspect every added comment in the diff. Delete comments that restate values, narrate the edit, or belong in the PR/ticket; keep only the non-obvious code constraints allowed in Step 4.
 - Check whether the change still maps cleanly to one acceptance test.
 - If the work expands into independent acceptance criteria or separately deployable changes, stop and replan or split it.
 - End with one or two lines on what you skipped or did not check and any remaining risk.
