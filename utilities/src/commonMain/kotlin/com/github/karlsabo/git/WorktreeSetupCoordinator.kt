@@ -187,6 +187,7 @@ class WorktreeSetupCoordinator private constructor(
     }
 
     private suspend fun performSetup(request: WorktreeSetupRequest): WorktreeSetupResult {
+        var setupRequest = request
         if (request.shouldEnsureRepositoryAndWorktree) {
             val cloneUrl = requireNotNull(request.cloneUrl)
             val branch = requireNotNull(request.branch)
@@ -198,11 +199,7 @@ class WorktreeSetupCoordinator private constructor(
 
             setStatus(request.worktreePath, WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE)
             val ensuredPath = WorktreePath(gitWorktreeApi.ensureWorktree(request.repoPath, branch))
-            if (ensuredPath != request.worktreePath) {
-                throw WorktreeSetupException(
-                    "ensureWorktree returned $ensuredPath, but request expected ${request.worktreePath}",
-                )
-            }
+            setupRequest = request.copy(worktreePath = ensuredPath)
         } else if (request.shouldCheckoutExistingBranch) {
             setStatus(request.worktreePath, WorktreeSetupStatus.CREATING_OR_REUSING_WORKTREE)
             val createdPath = WorktreePath(
@@ -239,11 +236,11 @@ class WorktreeSetupCoordinator private constructor(
             null
         } else {
             setStatus(request.worktreePath, WorktreeSetupStatus.RUNNING_SETUP_COMMANDS)
-            setupCommandRunner.runSetup(request)
+            setupCommandRunner.runSetup(setupRequest)
         }
 
         return WorktreeSetupResult(
-            worktreePath = request.worktreePath,
+            worktreePath = setupRequest.worktreePath,
             setupCommandResult = setupCommandResult,
         )
     }

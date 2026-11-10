@@ -547,6 +547,46 @@ class WorktreeSetupCoordinatorTest {
     }
 
     @Test
+    fun checkoutReusesExistingWorktreeAtDifferentPathForSetup() = runBlocking {
+        val repoPath = "/repos/app"
+        val branch = "feature/device-mfa"
+        val requestedPath = buildWorktreePath(repoPath, branch)
+        val existingPath = WorktreePath("/repos/app-202611-IAM-3186-device-mfa")
+        val git = FakeGitWorktreeApi().apply {
+            expectedRepoPath = repoPath
+            expectedCloneUrl = "https://github.com/example/app.git"
+            expectedBranch = branch
+            ensuredWorktreePath = existingPath
+        }
+        val setupPaths = mutableListOf<WorktreePath>()
+        val coordinator = WorktreeSetupCoordinator(
+            gitWorktreeApi = git,
+            setupCommandRunner = { request ->
+                setupPaths += request.worktreePath
+                WorktreeSetupCommandResult(exitCode = 0, stdout = "", stderr = "")
+            },
+            scope = this,
+        )
+
+        val result = withTimeout(1_000.milliseconds) {
+            coordinator.setup(
+                WorktreeSetupRequest(
+                    repoPath = repoPath,
+                    worktreePath = requestedPath,
+                    cloneUrl = git.expectedCloneUrl,
+                    branch = branch,
+                    setupShell = "/bin/sh",
+                    setupCommands = listOf("open ${'$'}worktree-dir"),
+                ),
+            ).await()
+        }
+
+        assertEquals(existingPath, result.worktreePath)
+        assertEquals(listOf(existingPath), setupPaths)
+        assertEquals(1, git.ensureWorktreeCalls)
+    }
+
+    @Test
     fun existingBranchRequestChecksOutBranchThenRunsSetupInWorktree() = runBlocking {
         val repoPath = "/repos/dev-lake-utils"
         val branch = "feature/existing-worktree"
@@ -560,7 +600,7 @@ class WorktreeSetupCoordinatorTest {
         }
         val coordinator = WorktreeSetupCoordinator(
             gitWorktreeApi = git,
-            setupCommandRunner = WorktreeSetupCommandRunner { request ->
+            setupCommandRunner = { request ->
                 events += "setup:${request.worktreePath.value}"
                 WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
             },
@@ -596,7 +636,7 @@ class WorktreeSetupCoordinatorTest {
         }
         val coordinator = WorktreeSetupCoordinator(
             gitWorktreeApi = git,
-            setupCommandRunner = WorktreeSetupCommandRunner { request ->
+            setupCommandRunner = { request ->
                 events += "setup:${request.worktreePath.value}"
                 WorktreeSetupCommandResult(exitCode = 0, stdout = "setup complete", stderr = "")
             },

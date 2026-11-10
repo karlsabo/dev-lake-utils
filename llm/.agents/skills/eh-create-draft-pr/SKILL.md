@@ -1,6 +1,6 @@
 ---
 name: eh-create-draft-pr
-description: Create a draft pull request with command line tools, including a description, test plan, PR template content, and a ticket link near the top.
+description: Create a draft pull request with command line tools, a ticket link, required template content, and at most 200 words of authored description.
 user-invocable: true
 allowed-tools: Bash(gh glab *), Read, Glob, Grep, Write, Edit
 ---
@@ -12,14 +12,38 @@ allowed-tools: Bash(gh glab *), Read, Glob, Grep, Write, Edit
 3. If there are staged or unstaged changes, ask whether they should be committed before creating the PR. Do not silently omit local changes from the PR.
 4. Push the branch. If the branch has no upstream yet, push with upstream tracking.
 5. Gather or infer the PR title, base branch, and ticket link. If any of these are unclear, ask.
-6. Create a draft PR using command line tools with a description and test plan. If a pull request template exists, fill it out. Put the ticket link near the top of the PR body.
+6. Draft the body in a temporary Markdown file using the rules below. Read it back and check its length before submitting.
+7. Create the draft PR with `gh pr create --draft --body-file <file>` (or the GitLab equivalent). Fetch the published description and verify it matches the file.
 
-## PR description best practices
+## Description limits — required, not suggestions
 
-- Keep the PR body short, terse, and concise: use a 1–3 sentence summary, only essential bullets, and a brief manual test plan.
-- Do not narrate the diff or enumerate every changed file and test. Omit generated release-note blocks and transient environment or workflow details unless they materially affect review or deployment.
-- Summarize completed validation and any material gaps in one short line without repeating the test plan.
-- Lead with the ticket link and a brief summary of the change and why it matters.
-- Call out only material scope limits, risks, or reviewer decisions; don't narrate the diff.
-- Keep the test plan short and reproducible; distinguish completed validation from steps still to run.
-- Follow the PR template, but remove boilerplate, repetition, and generated prose that adds no value.
+- Target **100–150 words; hard maximum 200 words of authored text**, unless the user or repository explicitly requires more detail. This includes summary, tests, risks, deployment, and monitoring combined, not 200 words per section. Do not pad short changes to meet the target.
+- Required template wording does not count toward that budget. Preserve repository-required headings/checklists, but do not expand checklist items with explanations or test inventories. Use one short line per required risk/deploy/monitoring section; mark inapplicable items honestly.
+- Without a required template, use only the ticket link, `Summary`, and `Test plan`. Add a risk/rollout bullet only for a material concern.
+- Put the ticket URL first, using the repository's required `Fixes`/`Part of` syntax. Summary: **at most two sentences** explaining the behavior change and why.
+- Test plan: **at most three bullets**: completed validation with its result, a reproducible manual check with expected behavior, and a material unverified gap if needed. Label planned/unrun checks; never claim they passed.
+- Do not list every file, function, test name, or edge case. No diff narration, implementation essay, raw logs, hook transcripts, local timeout/setup stories, repeated assurances, or generated release notes. Link detailed evidence instead of pasting it.
+- State each fact once. Do not repeat tests under the summary, checklist, risk section, and test plan.
+
+## Final length gate
+
+Before creating or updating the PR:
+
+1. Read the entire body file. Count words with `wc -w <file>`; if the total exceeds 200, separately count the authored text excluding unchanged required template wording.
+2. If authored text exceeds 200 words, **rewrite it before submitting**. Only an explicit user/repository requirement for additional detail overrides the cap; complexity or available context alone does not. Optional prose still must be cut. Moving prose into tables, HTML comments, or collapsible sections does not exempt it.
+3. Check: ticket first, summary at most two sentences, test plan at most three bullets, required template intact, no duplicated facts, no invented validation.
+
+## Example without a required template
+
+```markdown
+Fixes https://linear.app/example/issue/ABC-123
+
+## Summary
+Route device-verified users who still require MFA to setup before their original destination. This prevents account-setup API requests from receiving an HTML redirect.
+
+## Test plan
+- Completed: 231 focused auth tests passed; changed-line coverage 100%.
+- Not run: on staging, log in from a fresh browser with MFA required but unconfigured; verify device confirmation opens MFA setup, then reaches account setup after MFA enrollment.
+```
+
+Stop there. More available context is not a reason to add more text.

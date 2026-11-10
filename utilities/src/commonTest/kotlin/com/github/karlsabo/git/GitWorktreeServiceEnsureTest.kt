@@ -54,6 +54,18 @@ class GitWorktreeServiceEnsureTest {
     }
 
     @Test
+    fun ensureWorktree_branchCheckedOutAtDifferentPath_reusesThatPath() {
+        val fake = FakeGitCommandApi()
+        val branch = "karlsabo/iam-3186-route-device-verified-users-requiring-mfa"
+        val existingPath = "/tmp/app-202611-IAM-3186-device-mfa"
+        fake.worktreeListResult = "worktree $existingPath\nHEAD abc123\nbranch refs/heads/$branch\n"
+        val service = GitWorktreeService(fake)
+
+        assertEquals(existingPath, service.ensureWorktree("/tmp/app", branch))
+        assertTrue(fake.calls.none { it.method == "fetch" || it.method == "worktreeAdd" })
+    }
+
+    @Test
     fun ensureWorktree_invalidBranchWithWhitespaceFailsBeforeWorktreeCommands() {
         val fake = FakeGitCommandApi()
         val service = GitWorktreeService(fake)

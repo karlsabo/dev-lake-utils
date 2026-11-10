@@ -505,9 +505,9 @@ private class GitWorktreeCreator(
     fun ensureWorktree(repoPath: String, branch: String): String {
         branchValidator.validate(branch)
         val worktreePath = buildWorktreePath(repoPath, branch).value
-        if (planner.worktreeExists(repoPath, branch)) {
-            logger.info { "Worktree already exists at $worktreePath" }
-            return worktreePath
+        planner.listWorktrees(repoPath).firstOrNull { it.branch == branch }?.let { existing ->
+            logger.info { "Reusing existing worktree at ${existing.path} for branch $branch" }
+            return existing.path
         }
 
         fetchBranchBestEffort(repoPath, branch)
