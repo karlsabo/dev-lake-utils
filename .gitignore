@@ -2,6 +2,7 @@
 .gradle
 
 .idea
+.playwright-mcp/
 
 # Ignore Gradle build output directory
 build
