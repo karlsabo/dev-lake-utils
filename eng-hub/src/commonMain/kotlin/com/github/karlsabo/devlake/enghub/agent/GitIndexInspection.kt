@@ -25,14 +25,17 @@ internal class GitIndexInspection(
     }
 
     /** A gitlink's diff shows only its commit ID, not dirty files inside the submodule. */
-    fun requireInspectableGitlinks(changes: List<WorkingTreeChange>) {
+    fun requireInspectableGitlinks(revision: String, changes: List<WorkingTreeChange>) {
         val changedPaths = changes.map { change -> change.path }.toSet()
-        val gitlinks = splitNulPaths(
-            git.executeRaw(workingDirectory, listOf("ls-files", "--stage", NUL_SEPARATED, END_OF_OPTIONS)),
-        ).mapNotNull { entry ->
+        val index = git.executeRaw(workingDirectory, listOf("ls-files", "--stage", NUL_SEPARATED, END_OF_OPTIONS))
+        val baseline = git.executeRaw(
+            workingDirectory,
+            listOf("ls-tree", "-r", NUL_SEPARATED, revision, END_OF_OPTIONS),
+        )
+        val gitlinks = (splitNulPaths(index) + splitNulPaths(baseline)).mapNotNull { entry ->
             val path = entry.substringAfter('\t', missingDelimiterValue = "")
             path.takeIf { entry.startsWith("$GITLINK_MODE ") && it in changedPaths }
-        }
+        }.distinct()
         check(gitlinks.isEmpty()) {
             "Eng Hub cannot inspect changed tracked submodule(s): ${gitlinks.joinToString(", ")}. " +
                 "Git diff shows only the gitlink commit, not edits inside the submodule, and the reviewer " +

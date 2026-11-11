@@ -56,7 +56,7 @@ class GitWorkingTreeChanges(
             .sortedBy { change -> change.path }
         // A path the prompt drops could be neither discovered nor read, so overflow fails instead of truncating.
         check(changes.size <= maxChangedPaths) { tooManyChangedPaths(changes.size, maxChangedPaths) }
-        indexInspection.requireInspectableGitlinks(changes)
+        indexInspection.requireInspectableGitlinks(revision, changes)
         requireInspectableChanges(revision, changes, untracked)
         val nonAdded = changes.filter { change -> change.kind != WorkingTreeChangeKind.ADDED }
         val fullPatch = readPatch(revision)
