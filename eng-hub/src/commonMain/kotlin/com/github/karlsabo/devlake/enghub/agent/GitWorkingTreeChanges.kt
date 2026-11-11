@@ -60,13 +60,13 @@ class GitWorkingTreeChanges(
         requireInspectableChanges(revision, changes, untracked)
         val nonAdded = changes.filter { change -> change.kind != WorkingTreeChangeKind.ADDED }
         val fullPatch = readPatch(revision)
-        if (fullPatch.length > maxPatchChars) requireUncutSymlinkTargets(revision)
         val patch = boundedReviewDiff(
             maxChars = maxPatchChars,
             patch = fullPatch,
             nonAdded = nonAdded,
             filteredDiff = { filter -> readPatch(revision, filter) },
         )
+        if (patch.truncated) requireUncutSymlinkTargets(revision, patch.text)
         WorkingTreeChangeReport(
             baselineRevision = revision,
             changes = changes,
@@ -75,8 +75,8 @@ class GitWorkingTreeChanges(
         )
     }
 
-    /** A truncated diff cannot be repaired by `read` for either side of a tracked symlink. */
-    private fun requireUncutSymlinkTargets(revision: String) {
+    /** A cut symlink target diff cannot be repaired by `read`, which follows the link. */
+    private fun requireUncutSymlinkTargets(revision: String, patch: String) {
         val raw = splitNulPaths(
             git.diff(
                 workingDirectory,
@@ -94,7 +94,7 @@ class GitWorkingTreeChanges(
         val symlinks = raw.chunked(PATH_STATUS_PAIR).mapNotNull { entry ->
             val modes = requireNotNull(RAW_MODES.find(entry[0])) { "Unexpected git raw diff header" }
             entry[1].takeIf { SYMLINK_MODE in modes.groupValues.drop(1) }
-        }
+        }.filter { path -> !patch.contains(readSymlinkPatch(git, workingDirectory, revision, path)) }
         check(symlinks.isEmpty()) {
             "Eng Hub cannot fit the tracked symlink target diff into the reviewer's $maxPatchChars-character " +
                 "diff budget; read follows symlinks instead of showing their targets: ${symlinks.joinToString()}. " +
@@ -184,6 +184,23 @@ class GitWorkingTreeChanges(
         )
     }
 }
+
+private fun readSymlinkPatch(
+    git: GitCommandApi,
+    workingDirectory: String,
+    revision: String,
+    path: String,
+): String = git.diff(
+    workingDirectory,
+    NO_COLOR,
+    NO_EXT_DIFF,
+    NO_TEXTCONV,
+    RELATIVE_PATHS,
+    NO_RENAMES,
+    revision,
+    "--",
+    ":(literal)$path",
+)
 
 /** Parses `git diff --name-status -z`, which emits one status and one path per change. */
 private fun parseNameStatus(output: String): List<WorkingTreeChange> {
