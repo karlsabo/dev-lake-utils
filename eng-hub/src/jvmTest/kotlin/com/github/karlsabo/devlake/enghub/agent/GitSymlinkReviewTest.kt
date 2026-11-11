@@ -1,5 +1,7 @@
 package com.github.karlsabo.devlake.enghub.agent
 
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -10,22 +12,25 @@ class GitSymlinkReviewTest {
     @Test
     fun `fails when truncation would hide a tracked symlink target`() {
         val repo = TempRepository()
+        val link = Path.of(repo.path, "zzz-link.txt")
         try {
             repo.write("aaa-large.txt", lines("line"))
-            repo.symlink("zzz-link.txt", "original.txt")
+            Files.createSymbolicLink(link, Path.of("original.txt"))
             repo.commitAll("baseline")
             val changes = GitWorkingTreeChanges(repo.path, maxPatchChars = SYMLINK_TEST_BUDGET)
             val baseline = changes.baseline()
 
             repo.write("aaa-large.txt", lines("changed"))
-            repo.delete("zzz-link.txt")
-            repo.symlink("zzz-link.txt", "missing.txt")
+            Files.delete(link)
+            Files.createSymbolicLink(link, Path.of("missing.txt"))
 
             val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
 
-            assertTrue(failure.message.orEmpty().contains("zzz-link.txt"))
-            assertTrue(failure.message.orEmpty().contains("symlink target diff"))
+            val message = failure.message.orEmpty()
+            assertTrue(message.contains("zzz-link.txt"), "the failure must name the symlink, got: $message")
+            assertTrue(message.contains("symlink target diff"), "the failure must explain why, got: $message")
         } finally {
+            Files.deleteIfExists(link)
             repo.delete()
         }
     }
