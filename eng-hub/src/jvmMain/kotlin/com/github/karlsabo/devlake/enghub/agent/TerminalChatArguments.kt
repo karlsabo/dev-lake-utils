@@ -1,6 +1,6 @@
 package com.github.karlsabo.devlake.enghub.agent
 
-/** Command-line options for the terminal chat launcher. */
+/** Command-line options shared by the Eng Hub agent launchers. */
 internal data class TerminalChatArguments(
     val mcpConfigPath: String? = null,
     val lmStudioBaseUrl: String = LM_STUDIO_BASE_URL,
@@ -10,10 +10,12 @@ internal data class TerminalChatArguments(
         const val MCP_CONFIG_OPTION = "--mcp-config"
         const val LM_STUDIO_BASE_URL_OPTION = "--lm-studio-base-url"
         const val LM_STUDIO_API_KEY_FILE_OPTION = "--lm-studio-api-key-file"
-        const val USAGE =
-            "Usage: terminalChat [--mcp-config /path/to/config.json] " +
-                "[--lm-studio-base-url http://host:1234/v1] " +
-                "[--lm-studio-api-key-file /path/to/api-key]"
+        val USAGE: String = usage("terminalChat")
+
+        /** The usage line for the launcher task named [taskName]. */
+        fun usage(taskName: String): String = "Usage: $taskName [--mcp-config /path/to/config.json] " +
+            "[--lm-studio-base-url http://host:1234/v1] " +
+            "[--lm-studio-api-key-file /path/to/api-key]"
 
         fun parse(args: Array<out String>): TerminalChatArguments {
             var mcpConfigPath: String? = null

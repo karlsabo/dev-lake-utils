@@ -613,6 +613,30 @@ class GitCommandServiceTest {
     }
 
     @Test
+    fun executeRaw_keepsWhitespaceThatBelongsToTheFirstPath() {
+        val repoDir = createTempDir("repo")
+        try {
+            executeGit("init", repoDir)
+            executeGit("-C", repoDir, "config", "user.email", "test@test.com")
+            executeGit("-C", repoDir, "config", "user.name", "Test")
+            writeFixtureFile(repoDir, " leading.txt", "alpha\n")
+            executeGit("-C", repoDir, "add", ".")
+            executeGit("-C", repoDir, "commit", "-m", "initial")
+
+            val raw = service.executeRaw(repoDir, listOf("ls-files"))
+
+            assertEquals(" leading.txt\n", raw, "raw output must keep the leading space of the first path")
+            assertEquals(
+                "leading.txt",
+                service.execute(repoDir, "ls-files"),
+                "the trimmed escape hatch drops that space, which is why NUL-delimited paths need raw output",
+            )
+        } finally {
+            removeTempDir(repoDir)
+        }
+    }
+
+    @Test
     fun revParse_returnsHeadHash() {
         val repoDir = createTempDir("repo")
         try {

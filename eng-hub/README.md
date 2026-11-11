@@ -236,6 +236,7 @@ Other useful run tasks that exist today:
 ./gradlew :eng-hub:runDistributable
 ./gradlew :eng-hub:hotRunJvm
 ./gradlew :eng-hub:syncLlmFiles
+./gradlew :eng-hub:implementReviewChat
 ```
 
 ## Terminal chat agent
@@ -372,6 +373,108 @@ using bash. Confirm it invokes the `bash` tool and replies `2`. Use only safe, d
 For the browser path, pass a synthetic or personal `--mcp-config` file and ask it to open `https://example.com` and
 report the title. Confirm it invokes a browser MCP tool and reports `Example Domain`, then quit with `/exit` or Ctrl-D.
 Do not commit personal MCP configs, browser profiles, or credentials.
+
+## Implement-then-review agent
+
+The `implementReviewChat` task runs a separate JVM terminal program that carries one story through two model calls:
+
+1. an implementor stage with the same Skills `read`, `write`, and `bash` tools and `QWEN_3_8_27B` model as `terminalChat`
+2. a fresh reviewer stage with read-only inspection tools (Skills `read`; no `write` and no `bash`) and its own
+   conversation, opened only after the implementor session closes, with a verified change report read from the working
+   tree rather than from the implementor's report
+
+Every nonblank story line starts a new run, so a previous story's conversation never reaches the next implementor or
+reviewer. The implementor reports `{"files":["Greeting.kt"],"what":"Updated greeting","why":"Story asks to greet Ada"}`;
+the reviewer reports `{"verdict":"pass","findings":[]}` or `{"verdict":"needs_changes","findings":["..."]}`.
+Ordinary Kotlin code decodes and validates both reports; invalid JSON, blank fields, a `pass` with findings, or
+`needs_changes` with no findings fail the run instead of producing a review. The flow does not fix findings, commit, or
+open pull requests.
+
+Start LM Studio as for terminal chat, then launch from the repository root:
+
+```bash
+./gradlew :eng-hub:implementReviewChat
+```
+
+The launcher accepts the same `--mcp-config`, `--lm-studio-base-url`, and `--lm-studio-api-key-file` options as
+`terminalChat`. With `--mcp-config`, only the implementor receives browser MCP tools. The reviewer has only Skills
+`read`: configured MCP servers may expose write or code-execution tools, so their entire registry is excluded from
+the read-only reviewer stage. Quit with `/exit` or Ctrl-D; every other nonblank line is a story.
+
+### Verified changes for the reviewer
+
+Before the implementor starts, the flow records the working directory's `HEAD` commit as the baseline. After the
+implementor session closes, ordinary code reads the working tree with read-only git queries and gives the reviewer a
+verified change report:
+
+- every changed path from `git diff --name-status --no-renames <baseline>`, so paths the implementor left out of its
+  report and paths it deleted are both listed
+- every untracked path that is not ignored, listed as a new file
+- a bounded unified diff of tracked changes, including the removed lines of deleted files
+- a refusal to open the reviewer when a deletion's removed content does not fit the diff budget
+- a refusal to open the reviewer for any binary change it could not inspect, whether the path is added, staged,
+  modified, or deleted, because git reports binary content as a `Binary files ... differ` marker instead of bytes
+  and an untracked binary path appears in no diff at all
+- a refusal to open the reviewer when the working tree has more changed paths than the prompt lists, because an
+  untracked path has no diff content and a path the prompt leaves out cannot be discovered or read
+- a refusal to open the reviewer when the repository configures a clean or process filter command for a working-tree
+  path, because git would run that command while diffing and a filter can hide a changed line from both the path list
+  and the diff
+- a refusal to open the reviewer when git reports an untracked directory as one opaque path, because an untracked
+  nested Git repository is listed only as `nested/`, so the files inside it appear in no diff and cannot be read by
+  path
+- a refusal when tracked files have `assume-unchanged` or `skip-worktree` index flags, which can hide edits from
+  `git diff`, or when a tracked submodule changes, because its dirty files cannot be inspected through the gitlink diff
+
+Paths are relative to the launcher's working directory and match what the Skills `read` tool resolves. Ignored files
+(`.gitignore`) are excluded so build output does not flood the review. The reviewer never receives `bash` and never
+queries git itself; the host code does the reading, so the reviewer stage keeps its `read`-only tool surface.
+
+The baseline is a commit, not the working tree state, so changes that were already uncommitted before the story are
+reported too, and an implementor commit cannot hide a change from the review. The flow therefore needs a git working
+tree with at least one commit; anything else fails the run before the reviewer opens. When the diff exceeds the prompt
+budget, the prompt says it was truncated, so the reviewer can fall back to `read` instead of silently passing
+unexamined work. A deleted path cannot be read back, so the removed content of every deletion is reserved inside the
+budget before the rest of the diff is cut; if that content alone does not fit, the run fails rather than asking the
+reviewer to judge a deletion it cannot inspect. Binary changes fail the same way, whatever their status: a tracked
+binary path reaches the diff only as a `Binary files ... differ` marker rather than as bytes, an untracked binary path
+reaches no diff at all, and the reviewer's `read` tool is a text tool, so neither side of the change could be
+inspected. A mode-only change stays reviewable, because its mode lines are in the diff and its content is unchanged.
+The run therefore stops before the reviewer opens instead of presenting a marker as a complete change. The prompt
+lists every changed path, so more changed paths than it can carry also fail the run: untracked paths appear in no
+diff, and the reviewer only reads paths the prompt names, so dropping one would hide a change from the review.
+
+Change discovery also stays inside the reviewer's read-only boundary when the repository configures git filters.
+`git diff` and `git hash-object` pass a working-tree file through the clean filter named by its `filter` attribute,
+and `--no-ext-diff --no-textconv` do not disable it. That filter is a command from the repository's own
+configuration, so it can run arbitrary code during the review and can rewrite content so a changed line stays out
+of `--name-status`, `--numstat`, and the patch. The flow reads the attribute and config values first, which runs
+nothing, and fails the run when a non-empty `filter.<driver>.clean` or `filter.<driver>.process` command applies to
+a tracked or untracked path. Similarly, `git ls-files --others` reports an untracked nested Git repository as a
+single `nested/` entry, so its files appear in no diff and the path-based read tool cannot open the directory entry;
+that also fails the run instead of reviewing a change set whose contents are invisible. Git index flags can hide
+working-tree edits even without filters, so the flow refuses tracked paths marked `assume-unchanged` or
+`skip-worktree` before diffing. A changed tracked submodule also fails: its gitlink diff shows a commit ID (and
+possibly `-dirty`), not the modified files inside the submodule, and the reviewer cannot read its directory.
+
+Example conversation with a disposable `Greeting.kt`:
+
+```text
+story> Change Greeting.kt to greet Ada
+implementor> files: Greeting.kt
+implementor> what: Updated greeting
+implementor> why: Story asks to greet Ada
+reviewer> pass
+reviewer> no findings
+story> /exit
+```
+
+Manual LM Studio smoke test: use a disposable git checkout with at least one commit, create `Greeting.kt` with a greeting
+that does not mention Ada, run `./gradlew :eng-hub:implementReviewChat`, and enter `Change Greeting.kt to greet Ada`.
+Confirm the implementor writes the file, the reviewer runs in a fresh conversation, sees `M Greeting.kt` in its verified
+change report, reads `Greeting.kt` before reporting a verdict, and the CLI prints the completed review. The
+implementor's `files` list is a claim, not proof of work; the reviewer judges the verified working-tree changes and
+inspects files with its own `read` tool, and cannot change them.
 
 ## Building
 

@@ -43,6 +43,8 @@ internal class FakeGitCommandApi : GitCommandApi {
     var logAction: (String, Array<out String>) -> String = { _, _ -> "" }
     var revParseAction: (String, Array<out String>) -> String = { _, _ -> "" }
     var executeAction: (String?, Array<out String>) -> String = { _, _ -> "" }
+    var executeArgsAction: (String?, List<String>) -> String = { _, _ -> "" }
+    var executeRawAction: (String?, List<String>) -> String = { _, _ -> "" }
 
     override fun clone(url: String, targetPath: String) {
         calls.add(Call("clone", listOf(url, targetPath)))
@@ -223,5 +225,15 @@ internal class FakeGitCommandApi : GitCommandApi {
     override fun execute(repoPath: String?, vararg args: String): String {
         calls.add(Call("execute", listOfNotNull(repoPath) + args.toList()))
         return executeAction(repoPath, args)
+    }
+
+    override fun executeArgs(repoPath: String?, args: List<String>): String {
+        calls.add(Call("execute", listOfNotNull(repoPath) + args))
+        return executeArgsAction(repoPath, args)
+    }
+
+    override fun executeRaw(repoPath: String?, args: List<String>): String {
+        calls.add(Call("executeRaw", listOfNotNull(repoPath) + args))
+        return executeRawAction(repoPath, args)
     }
 }

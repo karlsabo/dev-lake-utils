@@ -27,7 +27,7 @@ private const val MAX_AGENT_ITERATIONS = 30
 internal const val HISTORY_MESSAGE_LIMIT = 60
 private const val HISTORY_MESSAGES_TO_KEEP = 20
 
-private const val SYSTEM_PROMPT = """
+internal const val AGENT_SYSTEM_PROMPT = """
 You are Eng Hub's terminal assistant.
 You can read UTF-8 text files with the read tool. Use it whenever the user asks about a file; never invent file contents.
 You can create or replace UTF-8 text files with the write tool. Use it when the user asks you to write a file.
@@ -36,7 +36,7 @@ Relative paths resolve from the terminal's launch working directory.
 Keep responses concise and mention the path when reporting file contents.
 """
 
-private const val BROWSER_MCP_SYSTEM_PROMPT = """
+internal const val BROWSER_MCP_SYSTEM_PROMPT = """
 Browser MCP tools are available. Use them when the user asks you to open, navigate, or inspect a web page.
 """
 
@@ -69,9 +69,9 @@ object EngHubTerminalAgent {
                 AIAgent(
                     promptExecutor = promptExecutor,
                     llmModel = QWEN_3_8_27B,
-                    strategy = chatStrategy(),
-                    toolRegistry = toolRegistry(workingDirectory, browserMcpTools),
-                    systemPrompt = systemPrompt(browserMcpTools),
+                    strategy = engHubChatStrategy(),
+                    toolRegistry = engHubToolRegistry(workingDirectory, browserMcpTools),
+                    systemPrompt = terminalSystemPrompt(browserMcpTools),
                     maxIterations = MAX_AGENT_ITERATIONS,
                     installFeatures = {
                         install(ChatMemory.Feature) {
@@ -86,29 +86,31 @@ object EngHubTerminalAgent {
         }
     }
 
-    private suspend fun toolRegistry(
-        workingDirectory: String,
-        browserMcpTools: BrowserMcpTools?,
-    ): ToolRegistry {
-        val mcpTools = browserMcpTools?.toolRegistry() ?: ToolRegistry.EMPTY
-        return readToolRegistry(workingDirectory) +
-            writeToolRegistry(workingDirectory) +
-            shellToolRegistry(workingDirectory) +
-            mcpTools
-    }
-
-    private fun systemPrompt(browserMcpTools: BrowserMcpTools?): String = if (browserMcpTools == null) {
-        SYSTEM_PROMPT
+    private fun terminalSystemPrompt(browserMcpTools: BrowserMcpTools?): String = if (browserMcpTools == null) {
+        AGENT_SYSTEM_PROMPT
     } else {
-        SYSTEM_PROMPT + BROWSER_MCP_SYSTEM_PROMPT
+        AGENT_SYSTEM_PROMPT + BROWSER_MCP_SYSTEM_PROMPT
     }
 }
 
-private suspend fun BrowserMcpTools.closeAfterFailure(failure: Throwable) {
+/** Terminal chat and staged flows share this `read`/`write`/`bash` tool surface plus any MCP tools. */
+internal suspend fun engHubToolRegistry(
+    workingDirectory: String,
+    browserMcpTools: BrowserMcpTools?,
+): ToolRegistry {
+    val mcpTools = browserMcpTools?.toolRegistry() ?: ToolRegistry.EMPTY
+    return readToolRegistry(workingDirectory) +
+        writeToolRegistry(workingDirectory) +
+        shellToolRegistry(workingDirectory) +
+        mcpTools
+}
+
+internal suspend fun BrowserMcpTools.closeAfterFailure(failure: Throwable) {
     runCatching { close() }.exceptionOrNull()?.let(failure::addSuppressed)
 }
 
-private fun chatStrategy(): AIAgentGraphStrategy<String, String> = singleRunStrategyWithHistoryCompression(
+/** Koog strategy with history compression, shared by terminal chat and staged flows. */
+internal fun engHubChatStrategy(): AIAgentGraphStrategy<String, String> = singleRunStrategyWithHistoryCompression(
     config = HistoryCompressionConfig(
         isHistoryTooBig = { prompt -> prompt.messages.size > HISTORY_MESSAGE_LIMIT },
         compressionStrategy = HistoryCompressionStrategy.FromLastNMessages(HISTORY_MESSAGES_TO_KEEP),
