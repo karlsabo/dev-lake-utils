@@ -713,7 +713,8 @@ internal class TempRepository : TempDirectory("eng-hub-git-changes-${Random.next
     }
 
     fun delete(relativePath: String) {
-        SystemFileSystem.delete(Path(path, relativePath))
+        val file = Path(path, relativePath)
+        if (file.isSymbolicLink()) deleteSymbolicLink(file) else SystemFileSystem.delete(file)
     }
 
     fun commitAll(message: String) {
@@ -779,7 +780,7 @@ internal open class TempDirectory(
      * `SystemFileSystem.delete` follows the link when checking existence, so a dangling symlink is left behind
      * and its parent directory cannot be removed.
      */
-    private fun deleteSymbolicLink(symlink: Path) {
+    protected fun deleteSymbolicLink(symlink: Path) {
         val command = listOf("rm", "-f", symlink.toString())
         val result = executeCommand(command, workingDirectory = null)
         check(result.exitCode == 0) {

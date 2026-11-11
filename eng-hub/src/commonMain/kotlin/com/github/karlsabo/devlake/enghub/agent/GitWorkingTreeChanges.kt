@@ -18,6 +18,8 @@ private const val NUL_SEPARATED = "-z"
 private const val NO_COLOR = "--no-color"
 private const val NO_EXT_DIFF = "--no-ext-diff"
 private const val NO_TEXTCONV = "--no-textconv"
+private const val SYMLINK_MODE = "120000"
+private val RAW_MODES = Regex("^:([0-7]{6}) ([0-7]{6}) ")
 
 /**
  * Reads working-tree changes with read-only git queries relative to the reviewed working directory.
@@ -57,9 +59,11 @@ class GitWorkingTreeChanges(
         indexInspection.requireInspectableGitlinks(changes)
         requireInspectableChanges(revision, changes, untracked)
         val deleted = changes.filter { change -> change.kind == WorkingTreeChangeKind.DELETED }
+        val fullPatch = readPatch(revision)
+        if (fullPatch.length > maxPatchChars) requireUncutSymlinkTargets(revision)
         val patch = boundedReviewDiff(
             maxChars = maxPatchChars,
-            patch = readPatch(revision),
+            patch = fullPatch,
             deleted = deleted,
             filteredDiff = { filter -> readPatch(revision, filter) },
         )
@@ -69,6 +73,33 @@ class GitWorkingTreeChanges(
             patch = patch.text,
             patchTruncated = patch.truncated,
         )
+    }
+
+    /** A truncated diff cannot be repaired by `read` for either side of a tracked symlink. */
+    private fun requireUncutSymlinkTargets(revision: String) {
+        val raw = splitNulPaths(
+            git.diff(
+                workingDirectory,
+                "--raw",
+                NO_EXT_DIFF,
+                NO_TEXTCONV,
+                NUL_SEPARATED,
+                RELATIVE_PATHS,
+                NO_RENAMES,
+                revision,
+                "--",
+            ),
+        )
+        check(raw.size % PATH_STATUS_PAIR == 0) { "Unexpected git raw diff output" }
+        val symlinks = raw.chunked(PATH_STATUS_PAIR).mapNotNull { entry ->
+            val modes = requireNotNull(RAW_MODES.find(entry[0])) { "Unexpected git raw diff header" }
+            entry[1].takeIf { SYMLINK_MODE in modes.groupValues.drop(1) }
+        }
+        check(symlinks.isEmpty()) {
+            "Eng Hub cannot fit the tracked symlink target diff into the reviewer's $maxPatchChars-character " +
+                "diff budget; read follows symlinks instead of showing their targets: ${symlinks.joinToString()}. " +
+                "Failing the review instead."
+        }
     }
 
     private fun trackedChanges(revision: String): List<WorkingTreeChange> = parseNameStatus(

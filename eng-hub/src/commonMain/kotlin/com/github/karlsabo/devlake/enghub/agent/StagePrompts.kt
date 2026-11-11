@@ -42,8 +42,9 @@ internal fun reviewerTaskPrompt(
     appendLine()
     append(verifiedChangesSection(changes))
     appendLine()
-    append("Review this implementation independently. Use the read tool to inspect the files you need, ")
-    append("and judge the verified changes and the files themselves.")
+    append("Review this implementation independently. Read the contents of every added (A) file ")
+    append("listed above before giving a pass verdict; untracked files have no diff. Use the read tool ")
+    append("to inspect other files as needed, and judge the verified changes and the files themselves.")
 }
 
 /**

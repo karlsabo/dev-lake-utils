@@ -30,6 +30,8 @@ class StagePromptsTest {
         assertTrue(prompt.contains("M Hidden.kt"), "an omitted edit must be discoverable")
         assertTrue(prompt.contains("D Removed.kt"), "a deletion must be discoverable")
         assertTrue(prompt.contains("A New.kt"), "an added path must be discoverable")
+        assertTrue(prompt.contains("Read the contents of every added (A) file"))
+        assertTrue(prompt.contains("before giving a pass verdict"))
         assertTrue(prompt.contains("-gone"), "deleted content must be inspectable")
         assertTrue(prompt.contains("baseline 4f0c1a2"))
         assertTrue(prompt.contains("unverified claim"))
