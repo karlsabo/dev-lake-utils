@@ -58,13 +58,13 @@ class GitWorkingTreeChanges(
         check(changes.size <= maxChangedPaths) { tooManyChangedPaths(changes.size, maxChangedPaths) }
         indexInspection.requireInspectableGitlinks(changes)
         requireInspectableChanges(revision, changes, untracked)
-        val deleted = changes.filter { change -> change.kind == WorkingTreeChangeKind.DELETED }
+        val nonAdded = changes.filter { change -> change.kind != WorkingTreeChangeKind.ADDED }
         val fullPatch = readPatch(revision)
         if (fullPatch.length > maxPatchChars) requireUncutSymlinkTargets(revision)
         val patch = boundedReviewDiff(
             maxChars = maxPatchChars,
             patch = fullPatch,
-            deleted = deleted,
+            nonAdded = nonAdded,
             filteredDiff = { filter -> readPatch(revision, filter) },
         )
         WorkingTreeChangeReport(

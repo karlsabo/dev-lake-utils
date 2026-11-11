@@ -37,7 +37,7 @@ data class WorkingTreeChangeReport(
     val baselineRevision: String,
     val changes: List<WorkingTreeChange>,
     /**
-     * The unified diff. When [patchTruncated], every deleted path's removed content is still complete.
+     * The unified diff. When [patchTruncated], modified and deleted paths retain their complete diff.
      *
      * Binary changes never reach this report: [read] fails instead, because the reviewer's text-only `read`
      * tool cannot show their bytes.
@@ -59,7 +59,7 @@ interface WorkingTreeChanges {
     /**
      * Reads every working-tree change relative to [baseline], including deletions and untracked paths.
      *
-     * Fails closed on any change the reviewer could not inspect: a deletion whose removed content does not fit
+     * Fails closed on any change the reviewer could not inspect: a modified or deleted diff that does not fit
      * the prompt budget, binary paths (git shows a marker, or no diff for untracked; `read` is text-only),
      * opaque untracked directories and untracked symlinks, more changed paths than the prompt lists, configured
      * clean/process filters (which run repository code and can hide a line), hidden index flags, and changed

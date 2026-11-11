@@ -175,7 +175,7 @@ class GitWorkingTreeChangesTest {
     }
 
     @Test
-    fun `truncates a diff that is larger than the prompt budget`() {
+    fun `fails when a modified file's diff exceeds the prompt budget`() {
         val repo = TempRepository()
         try {
             repo.write("Big.kt", (1..MAX_TEST_PATCH_CHARS).joinToString("\n") { index -> "line $index" } + "\n")
@@ -185,11 +185,10 @@ class GitWorkingTreeChangesTest {
 
             repo.write("Big.kt", (1..MAX_TEST_PATCH_CHARS).joinToString("\n") { index -> "changed $index" } + "\n")
 
-            val report = changes.read(baseline)
+            val failure = assertFailsWith<IllegalStateException> { changes.read(baseline) }
 
-            assertTrue(report.patchTruncated, "a diff past the budget must be marked truncated")
-            assertTrue(report.patch.length <= MAX_TEST_PATCH_CHARS)
-            assertTrue(report.patch.endsWith("\n"), "truncation must stop at a line boundary")
+            assertTrue(failure.message.orEmpty().contains("Big.kt"))
+            assertTrue(failure.message.orEmpty().contains("cannot fit the removed content"))
         } finally {
             repo.delete()
         }
@@ -199,13 +198,13 @@ class GitWorkingTreeChangesTest {
     fun `keeps removed content when a large earlier diff pushes a deletion past the budget`() {
         val repo = TempRepository()
         try {
-            repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "line"))
             repo.write("zzz-deleted.txt", "fun removed() = \"gone\"\n")
             repo.commitAll("baseline")
             val changes = GitWorkingTreeChanges(repo.path, maxPatchChars = MAX_TEST_PATCH_CHARS)
             val baseline = changes.baseline()
 
-            repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "changed"))
+            repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "added"))
+            repo.git("-C", repo.path, "add", "aaa-large.txt")
             repo.delete("zzz-deleted.txt")
 
             val report = changes.read(baseline)
@@ -218,6 +217,30 @@ class GitWorkingTreeChangesTest {
             )
             assertTrue(report.patch.length <= MAX_TEST_PATCH_CHARS, "the reserved removal must fit the budget")
             assertTrue(report.patch.endsWith("\n"), "truncation must stop at a line boundary")
+        } finally {
+            repo.delete()
+        }
+    }
+
+    @Test
+    fun `keeps removed lines from a modified file after a large added diff`() {
+        val repo = TempRepository()
+        try {
+            repo.write("zzz-modified.txt", "old baseline line\n")
+            repo.commitAll("baseline")
+            val changes = GitWorkingTreeChanges(repo.path, maxPatchChars = MAX_TEST_PATCH_CHARS)
+            val baseline = changes.baseline()
+
+            repo.write("aaa-large.txt", numberedLines(MAX_TEST_PATCH_CHARS, "added"))
+            repo.git("-C", repo.path, "add", "aaa-large.txt")
+            repo.write("zzz-modified.txt", "new working line\n")
+
+            val report = changes.read(baseline)
+
+            assertTrue(report.patchTruncated)
+            assertTrue(report.patch.contains("-old baseline line"))
+            assertTrue(report.patch.contains("+new working line"))
+            assertTrue(report.patch.length <= MAX_TEST_PATCH_CHARS)
         } finally {
             repo.delete()
         }
