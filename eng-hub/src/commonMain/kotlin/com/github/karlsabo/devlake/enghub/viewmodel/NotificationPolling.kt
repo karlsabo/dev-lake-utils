@@ -80,6 +80,7 @@ private fun polledNotifications(
                         access.services.pullRequestReviewApi.toNotificationUiStateOrNull(notif)
                     }
                     .toList()
+                    .sortedWith(compareBy({ it.updatedAtEpochMs }, { it.notificationThreadId }))
             }.rethrowCancellation().also { result ->
                 result.onFailure { logger.error(it) { "Error polling notifications" } }
             }
