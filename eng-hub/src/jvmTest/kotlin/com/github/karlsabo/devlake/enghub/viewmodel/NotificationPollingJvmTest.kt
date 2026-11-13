@@ -124,10 +124,15 @@ private fun acceptanceNotification(
 ): Notification = testNotification(
     id = threadId,
     subjectType = "PullRequest",
-    subjectUrl = "https://api.github.com/repos/test-org/test-repo/pulls/${threadId.removePrefix("thread-")}",
+    subjectUrl = acceptanceSubjectUrl(threadId),
     title = title,
     updatedAt = Instant.parse(updatedAt),
 )
+
+private fun acceptanceSubjectUrl(threadId: String): String {
+    val pullNumber = threadId.removePrefix("thread-")
+    return "https://api.github.com/repos/test-org/test-repo/pulls/$pullNumber"
+}
 
 /**
  * Forces the processing completion order of each poll by chaining every notification's enrichment lookup behind
@@ -136,7 +141,7 @@ private fun acceptanceNotification(
 private class CompletionOrderGitHubApi private constructor(
     private val delegate: NotificationPersistenceGitHubApi,
     private val notificationPolls: List<List<Notification>>,
-    private val completionOrders: List<List<String>>,
+    private val completionUrlsByPoll: List<List<String>>,
 ) : GitHubApi by delegate {
     constructor(
         notificationPolls: List<List<Notification>>,
@@ -148,10 +153,11 @@ private class CompletionOrderGitHubApi private constructor(
                 .associateWith { url -> PullRequest(url = url) },
         ),
         notificationPolls = notificationPolls,
-        completionOrders = completionOrders,
+        // Enrichment lookups receive the notification subject API url, so gate on that same key rather than thread ids.
+        completionUrlsByPoll = completionOrders.map { order -> order.map(::acceptanceSubjectUrl) },
     )
 
-    private val pollGates = completionOrders.indices.associateWith { CompletableDeferred<Unit>() }
+    private val pollGates = completionUrlsByPoll.indices.associateWith { CompletableDeferred<Unit>() }
     private val pollsStarted = AtomicInteger()
 
     @Volatile
@@ -164,7 +170,7 @@ private class CompletionOrderGitHubApi private constructor(
     override suspend fun listNotifications(): List<Notification> {
         val pollIndex = pollsStarted.getAndIncrement()
         // Cycle both input order and processing completion order so consecutive refreshes differ.
-        ordering = PollOrderingState(completionOrders[pollIndex % completionOrders.size])
+        ordering = PollOrderingState(completionUrlsByPoll[pollIndex % completionUrlsByPoll.size])
         pollGates[pollIndex]?.await()
         return notificationPolls[pollIndex % notificationPolls.size]
     }
@@ -182,12 +188,14 @@ private class PollOrderingState(
     private val enrichmentArrivals = completionOrder.associateWith { CompletableDeferred<Unit>() }
 
     suspend fun awaitTurn(url: String) {
+        val position = completionOrder.indexOf(url)
+        // A key mismatch would silently disable the gating, so fail instead of leaving the test unexercised.
+        check(position >= 0) { "Pull request url $url is not part of completion order $completionOrder" }
         val isProcessingCall = callsByUrl.computeIfAbsent(url) { AtomicInteger() }.getAndIncrement() == 0
         if (isProcessingCall) {
-            val position = completionOrder.indexOf(url)
             if (position > 0) enrichmentArrivals.getValue(completionOrder[position - 1]).await()
         } else {
-            enrichmentArrivals[url]?.complete(Unit)
+            enrichmentArrivals.getValue(url).complete(Unit)
         }
     }
 }
