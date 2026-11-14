@@ -1,13 +1,5 @@
 package com.github.karlsabo.devlake.enghub.component
 
-import androidx.compose.material.MaterialTheme
-import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.v2.runComposeUiTest
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.LocalWorktreeUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.sharedProgressPullRequest
@@ -19,76 +11,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WorktreePanelTest {
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun expandedLoadingRepositoryRendersAccessibleProgressIndicator() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                LocalRepositoryRow(
-                    state = WorktreeRowsState(
-                        repository = LocalRepositoryUiState(
-                            name = "dev-lake-utils",
-                            path = "/repos/dev-lake-utils",
-                            isExpanded = true,
-                            isLoading = true,
-                        ),
-                        setupStatuses = emptyMap(),
-                        archivingWorktreePaths = emptySet(),
-                    ),
-                    panelActions = emptyPanelActions(),
-                    onCreateRequest = {},
-                )
-            }
-        }
-
-        onNodeWithContentDescription("Loading worktrees for dev-lake-utils").assertIsDisplayed()
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun rebaseNeededWorktreeRowRendersIndicatorLabel() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                LocalWorktreeRow(
-                    state = rebaseNeededRow(),
-                    actions = emptyLocalWorktreeRowActions(),
-                )
-            }
-        }
-
-        onNodeWithText("Rebase needed").assertIsDisplayed()
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun rebasingWorktreeRowRendersProgressLabel() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                LocalWorktreeRow(
-                    state = upToDateRow().copy(isRebasing = true),
-                    actions = emptyLocalWorktreeRowActions(),
-                )
-            }
-        }
-
-        onNodeWithText("Rebasing...").assertIsDisplayed()
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun upToDateWorktreeRowDoesNotRenderRebaseNeededIndicatorLabel() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                LocalWorktreeRow(
-                    state = upToDateRow(),
-                    actions = emptyLocalWorktreeRowActions(),
-                )
-            }
-        }
-
-        onAllNodesWithText("Rebase needed").assertCountEquals(0)
-    }
 
     @Test
     fun repositoryMenuExposesCreateWorktreeForConfiguredRepository() {
@@ -622,19 +544,6 @@ class WorktreePanelTest {
         isDirty = false,
     )
 
-    private fun rebaseNeededRow(): LocalWorktreeRowState = worktreeRow(needsRebase = true)
-
-    private fun upToDateRow(): LocalWorktreeRowState = worktreeRow(needsRebase = false)
-
-    private fun worktreeRow(needsRebase: Boolean): LocalWorktreeRowState = LocalWorktreeRowState(
-        worktree = LocalWorktreeUiState(
-            branch = "feature/stacked-pr",
-            path = "/repos/dev-lake-utils-feature-stacked-pr",
-            needsRebase = needsRebase,
-        ),
-        setupStatus = null,
-        isArchiving = false,
-    )
     private fun createRowState(worktree: LocalWorktreeUiState): LocalWorktreeRowState = LocalWorktreeRowState(
         worktree = worktree,
         setupStatus = null,

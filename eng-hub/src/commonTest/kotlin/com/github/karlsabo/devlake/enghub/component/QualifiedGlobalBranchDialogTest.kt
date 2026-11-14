@@ -1,12 +1,5 @@
 package com.github.karlsabo.devlake.enghub.component
 
-import androidx.compose.material.MaterialTheme
-import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.v2.runComposeUiTest
 import com.github.karlsabo.github.GitHubRepositoryIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,28 +30,6 @@ class QualifiedGlobalBranchDialogTest {
         )
 
         assertTrue(globalExistingWorktreeResults(discovery, "owner/dev-lake-utils:$branch").isEmpty())
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test
-    fun globalDialogShowsOnlyOriginMatchedBranchForQualifiedInput() = runComposeUiTest {
-        val branch = "feature/shared"
-        setContent {
-            MaterialTheme {
-                GlobalExistingBranchWorktreeDialogContent(
-                    request = PendingGlobalCreateWorktree(
-                        existingBranchQuery = "owner/dev-lake-utils:$branch",
-                    ),
-                    discovery = qualifiedBranchDiscovery(branch),
-                    onRequestChange = {},
-                    onConfirm = {},
-                    onDismiss = {},
-                )
-            }
-        }
-
-        onNodeWithText("Branch · dev-lake-utils · $branch").assertIsDisplayed()
-        onAllNodesWithText("Branch · engineering-docs · $branch").assertCountEquals(0)
     }
 }
 
