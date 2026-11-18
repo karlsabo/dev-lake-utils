@@ -213,8 +213,7 @@ internal fun ExistingWorktreeDialogBody(
         }
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
-            value = state.query,
-            onValueChange = actions.onQueryChange,
+            state = rememberSyncedTextFieldState(state.query, actions.onQueryChange),
             label = { Text(state.searchLabel) },
             modifier = Modifier
                 .fillMaxWidth()

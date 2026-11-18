@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
@@ -42,11 +43,10 @@ internal fun SetupCommandEditor(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         OutlinedTextField(
-            value = state.draft,
-            onValueChange = actions.onDraftChange,
+            state = rememberSyncedTextFieldState(state.draft, actions.onDraftChange),
             label = { Text("New setup command") },
             isError = state.error != null,
-            singleLine = true,
+            lineLimits = TextFieldLineLimits.SingleLine,
             modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-new"),
         )
         state.error?.let {
@@ -97,11 +97,10 @@ private fun SetupCommandRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OutlinedTextField(
-                value = command,
-                onValueChange = actions.onCommandChange,
+                state = rememberSyncedTextFieldState(command, actions.onCommandChange),
                 label = { Text("Setup command") },
                 isError = error != null,
-                singleLine = true,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 modifier = Modifier.weight(1f).testTag(tag),
             )
             Button(

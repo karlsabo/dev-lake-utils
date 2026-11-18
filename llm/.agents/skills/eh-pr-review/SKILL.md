@@ -124,6 +124,6 @@ Never use normal note/discussion endpoints or `glab mr note` while staging: they
 Re-read the document and verify the head again. Publish only when the user or authorized calling workflow explicitly requests it.
 
 - **GitHub:** submit the saved pending review through `POST repos/{project}/pulls/{number}/reviews/{review_id}/events` with `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`. Use an explicitly requested event; for an unqualified publish/submit request, use `COMMENT`. Approval and change requests require their own explicit intent.
-- **GitLab:** publish only the draft IDs created for this review through each draft note's `publish` endpoint. Bulk publish also publishes pre-existing drafts; do not use it unless publishing all drafts is explicitly intended. Approval is a separate action requiring explicit authorization.
+- **GitLab:** publish only the draft IDs created for this review through each draft note's `publish` endpoint. Bulk publish also publishes pre-existing drafts; do not use it unless publishing all drafts is exp`licitly intended. Approval is a separate action requiring explicit authorization.
 
 Confirm published/submitted feedback and provide the PR/MR URL plus IDs or URLs when available.

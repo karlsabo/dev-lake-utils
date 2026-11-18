@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.OutlinedSecureTextField
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -21,12 +25,11 @@ import androidx.compose.ui.semantics.inputText
 import androidx.compose.ui.semantics.isSensitiveData
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.github.karlsabo.devlake.enghub.component.SetupCommandEditor
 import com.github.karlsabo.devlake.enghub.component.SetupCommandEditorActions
 import com.github.karlsabo.devlake.enghub.component.SetupCommandEditorState
+import com.github.karlsabo.devlake.enghub.component.rememberSyncedTextFieldState
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.MASKED_TOKEN
 import com.github.karlsabo.devlake.enghub.state.SettingsLocalRepositoryUiState
@@ -347,20 +350,31 @@ internal fun SettingsField(
     onValueChange: ((String) -> Unit)? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange ?: {},
-            label = { Text(label) },
-            readOnly = onValueChange == null,
-            isError = presentation.error != null,
-            singleLine = presentation.singleLine,
-            visualTransformation = if (presentation.password) {
-                PasswordVisualTransformation()
-            } else {
-                VisualTransformation.None
-            },
-            modifier = Modifier.fillMaxWidth().testTag(tag).secureTextSemantics(value, presentation.password),
-        )
+        val fieldState = rememberSyncedTextFieldState(value, onValueChange ?: {})
+        val fieldModifier = Modifier.fillMaxWidth().testTag(tag).secureTextSemantics(value, presentation.password)
+        if (presentation.password) {
+            OutlinedSecureTextField(
+                state = fieldState,
+                label = { Text(label) },
+                isError = presentation.error != null,
+                inputTransformation = RejectAllInput.takeIf { onValueChange == null },
+                textObfuscationMode = TextObfuscationMode.Hidden,
+                modifier = fieldModifier,
+            )
+        } else {
+            OutlinedTextField(
+                state = fieldState,
+                label = { Text(label) },
+                readOnly = onValueChange == null,
+                isError = presentation.error != null,
+                lineLimits = if (presentation.singleLine) {
+                    TextFieldLineLimits.SingleLine
+                } else {
+                    TextFieldLineLimits.MultiLine()
+                },
+                modifier = fieldModifier,
+            )
+        }
         presentation.error?.let {
             Text(
                 text = it,
@@ -371,6 +385,8 @@ internal fun SettingsField(
         }
     }
 }
+
+private val RejectAllInput = InputTransformation { revertAllChanges() }
 
 private fun Modifier.secureTextSemantics(value: String, password: Boolean): Modifier {
     if (!password) return this

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.MaterialTheme
@@ -116,10 +117,9 @@ private fun ActionSearchField(
 ) {
     Box {
         OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
+            state = rememberSyncedTextFieldState(query, onQueryChange),
             placeholder = { Text("Search actions…") },
-            singleLine = true,
+            lineLimits = TextFieldLineLimits.SingleLine,
             modifier = Modifier
                 .width(280.dp)
                 .focusRequester(focusRequester)
