@@ -19,7 +19,7 @@ Review the requested change and produce a planned-comments document. By default,
 
 ## 1. Resolve the request and snapshot its head
 
-Resolve the platform, project, host, and request from the supplied URL. Otherwise use the checkout's upstream/push remote, then `origin`; a bare number means a GitHub PR number or GitLab MR **IID**. For an unspecified request, detect one on the current branch and confirm its source repository and branch. Use `gh -R owner/repo` or `glab -R host/group/project` when the URL names a different project. Ask when the host, base, or repository is ambiguous.
+Resolve the platform, project, host, and request from the supplied URL. Otherwise use the checkout's upstream/push remote, then `origin`; a bare number means a GitHub PR number or GitLab MR **IID**. For an unspecified request, detect one on the current branch and confirm its source repository and branch. If a named request cannot be resolved, check the current branch with `gh pr status`/`gh pr view` (or `glab mr status`/`glab mr view`); the supplied name or number may be wrong. Confirm any detected substitution before reviewing. Use `gh -R owner/repo` or `glab -R host/group/project` when the URL names a different project. Ask when the host, base, or repository is ambiguous.
 
 Collect the description, title, author, base/head branches and SHAs, URL, full diff, changed paths, and commit messages. The description and commits explain intent; CI status and diff statistics are optional context, not review evidence.
 
@@ -43,8 +43,9 @@ Verify that local files represent the requested head before using them as eviden
 
 Derive `{comments_path}` once and reuse it:
 
-- Hosted: `${PLANNING_MARKDOWN_DIR}/{platform}-{host}-{project_slug}-{number}-{short_head_sha}-planned-comments.md`.
-- Local: `${PLANNING_MARKDOWN_DIR}/uncommitted-{repo_slug}-{branch_slug}-{timestamp}-planned-comments.md`, using `date +%Y%m%d-%H%M%S` and `detached` for an empty branch name.
+- Hosted: `${PLANNING_MARKDOWN_DIR}/comments/{timestamp}-{branch_slug}-{short_head_sha}-comments.md`.
+- Local: `${PLANNING_MARKDOWN_DIR}/comments/{timestamp}-{branch_slug}-{short_head_sha}-comments.md`, using `detached` for an empty branch name.
+- Generate `{timestamp}` once with `date +%Y-%m-%d-%H%M` and reuse it for both hosted and local filenames.
 - Include the full namespace in project slugs and replace characters outside `[A-Za-z0-9._-]` with `-`.
 
 ## 2. Build enough context
