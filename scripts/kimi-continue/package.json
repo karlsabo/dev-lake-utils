@@ -1,0 +1,9 @@
+{
+  "name": "kimi-continue",
+  "private": true,
+  "type": "module",
+  "description": "Local pi extension for automatically continuing stalled Kimi turns",
+  "scripts": {
+    "test": "node --test"
+  }
+}
