@@ -129,7 +129,8 @@ internal data class EngHubRepositoryChoice(
 internal data class EngHubRepositoryChooser(
     val choices: List<EngHubRepositoryChoice>,
     val selectedRepositoryId: Long?,
-    val selectedRepository: SettingsLocalRepositoryUiState?,
+    /** Selected repository while it stays relevant to the query, so a rename in progress keeps its editor. */
+    val editorRepository: SettingsLocalRepositoryUiState?,
     val isVisible: Boolean,
 )
 
@@ -193,7 +194,7 @@ internal fun settingsRenderPlan(
         }
         val visibleChooser = chooser?.takeIf { it.isVisible }
         val editor = if (section == EngHubSettingsSection.Repositories) {
-            repositoryEditor(state, navigation, visibleChooser, groups, query)
+            repositoryEditor(state, navigation, chooser, groups, query)
         } else {
             null
         }
@@ -235,7 +236,7 @@ private fun repositoryChooser(
     return EngHubRepositoryChooser(
         choices = choices,
         selectedRepositoryId = selectedId,
-        selectedRepository = selectedRepository.takeIf { editorIsRelevant },
+        editorRepository = selectedRepository.takeIf { editorIsRelevant },
         isVisible = groupMatches || matchingChoices.isNotEmpty(),
     )
 }
@@ -282,7 +283,7 @@ private fun repositoryEditor(
         repository.id == navigation.selectedRepositoryId
     } ?: return null
     val repositoryIndex = state.localRepositories.indexOf(selectedRepository)
-    val showPath = chooser?.selectedRepository != null
+    val showPath = chooser?.editorRepository != null
     val showSetupCommands = query.isBlank() || EngHubSettingGroupId.RepositorySetupCommands in groups
     return if (showPath || showSetupCommands) {
         RepositoryEditorView(repositoryIndex, selectedRepository, showPath, showSetupCommands)

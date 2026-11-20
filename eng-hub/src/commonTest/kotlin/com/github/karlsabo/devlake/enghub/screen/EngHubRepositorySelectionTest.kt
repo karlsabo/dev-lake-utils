@@ -29,7 +29,7 @@ class EngHubRepositorySelectionTest {
         val section = state.repositoriesSection(selectedWeb)
 
         assertEquals(listOf("/workspace/api", "/workspace/web"), section.repositoryChooser?.choices?.map { it.path })
-        assertEquals("/workspace/web", section.repositoryChooser?.selectedRepository?.path)
+        assertEquals("/workspace/web", section.repositoryChooser?.editorRepository?.path)
         assertEquals("/workspace/web", section.repositoryEditor?.repository?.path)
     }
 
@@ -129,15 +129,6 @@ private fun EngHubSettingsUiState.withPathError(
 ): EngHubSettingsUiState = copy(
     localRepositories = localRepositories.map { repository ->
         if (repository.id == repositoryId) repository.copy(pathError = error) else repository
-    },
-)
-
-private fun EngHubSettingsUiState.withPath(
-    repositoryId: Long,
-    path: String,
-): EngHubSettingsUiState = copy(
-    localRepositories = localRepositories.map { repository ->
-        if (repository.id == repositoryId) repository.copy(path = path) else repository
     },
 )
 

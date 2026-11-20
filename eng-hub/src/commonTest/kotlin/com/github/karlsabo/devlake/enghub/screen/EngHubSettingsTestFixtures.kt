@@ -30,3 +30,12 @@ internal fun EngHubSettingsUiState.repositoriesSection(
 ): SettingsSectionView = settingsRenderPlan(this, navigation).sections.single { section ->
     section.section == EngHubSettingsSection.Repositories
 }
+
+internal fun EngHubSettingsUiState.withPath(
+    repositoryId: Long,
+    path: String,
+): EngHubSettingsUiState = copy(
+    localRepositories = localRepositories.map { repository ->
+        if (repository.id == repositoryId) repository.copy(path = path) else repository
+    },
+)

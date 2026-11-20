@@ -143,6 +143,35 @@ class EngHubSettingsSearchTest {
     }
 
     @Test
+    fun chosenRepositoryStaysEditableWhileARenameRemovesTheLastMatchingChoice() {
+        val state = settingsState()
+        val chosen = initialSettingsNavigationState(state).withQuery("web").withSelectedRepository(2)
+
+        val plan = state.withPath(2, "/workspace/we").planFor(chosen)
+
+        assertFalse(plan.noMatches)
+        val section = plan.sections.single()
+        assertEquals(EngHubSettingsSection.Repositories, section.section)
+        assertTrue(section.groups.isEmpty())
+        assertNull(section.repositoryChooser)
+        assertEquals("/workspace/we", section.repositoryEditor?.repository?.path)
+        assertTrue(section.repositoryEditor?.showPath == true)
+        assertFalse(section.repositoryEditor?.showSetupCommands == true)
+    }
+
+    @Test
+    fun renamedPathWithoutAChoiceDuringSearchStillReportsNoMatches() {
+        val state = settingsState()
+        val selectedBeforeSearch = initialSettingsNavigationState(state).withSelectedRepository(2)
+        val searching = selectedBeforeSearch.withQuery("web")
+
+        val plan = state.withPath(2, "/workspace/we").planFor(searching)
+
+        assertTrue(plan.noMatches)
+        assertTrue(plan.sections.isEmpty())
+    }
+
+    @Test
     fun clearingTheQueryAfterChoosingARepositoryKeepsTheChosenRepository() {
         val state = settingsState()
         val beforeSearch = initialSettingsNavigationState(state).withSelectedRepository(1)
