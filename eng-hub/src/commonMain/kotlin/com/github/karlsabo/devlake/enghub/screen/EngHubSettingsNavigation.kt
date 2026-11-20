@@ -47,6 +47,16 @@ internal sealed interface PendingRepositorySelection {
     ) : PendingRepositorySelection
 }
 
+private fun PendingRepositorySelection.resolvedRepositoryId(
+    repositories: List<SettingsLocalRepositoryUiState>,
+): Long? = when (this) {
+    is PendingRepositorySelection.ById -> repositoryId.takeIf { id ->
+        repositories.any { repository -> repository.id == id }
+    }
+
+    is PendingRepositorySelection.ByPath -> repositories.firstOrNull { repository -> repository.path == path }?.id
+}
+
 internal fun initialSettingsNavigationState(state: EngHubSettingsUiState): EngHubSettingsNavigationState {
     val repositoryIds = state.localRepositories.map { repository -> repository.id }
     return EngHubSettingsNavigationState(
@@ -166,8 +176,12 @@ internal class EngHubSettingsNavigation(
         state = state.withSection(section)
     }
 
+    /**
+     * Choosing a repository explicitly supersedes any request that has not resolved yet, so a late restoration
+     * cannot override the selection the user just made.
+     */
     fun selectRepository(repositoryId: Long?) {
-        state = state.withSelectedRepository(repositoryId)
+        state = state.withSelectedRepository(repositoryId).copy(pendingRepositorySelection = null)
     }
 
     fun updateQuery(query: String) {
@@ -187,26 +201,34 @@ internal class EngHubSettingsNavigation(
         state = state.copy(pendingRepositorySelection = PendingRepositorySelection.ByPath(path))
     }
 
-    fun reconcileRepositories(repositories: List<SettingsLocalRepositoryUiState>) {
+    /**
+     * Retains a request whose target is still missing while [restorationInFlight], so a reconciliation that runs
+     * before the restored entry arrives cannot discard the selection. A restoration that ends without its target,
+     * like an explicit repository choice, cancels the request.
+     */
+    fun reconcileRepositories(
+        repositories: List<SettingsLocalRepositoryUiState>,
+        restorationInFlight: Boolean = false,
+    ) {
         var reconciled = state.withRepositoryIds(repositories.map { repository -> repository.id })
-        when (val pending = state.pendingRepositorySelection) {
-            is PendingRepositorySelection.ById -> reconciled = reconciled.withSelectedRepository(pending.repositoryId)
-
-            is PendingRepositorySelection.ByPath -> repositories.firstOrNull { repository ->
-                repository.path == pending.path
-            }?.let { repository ->
-                reconciled = reconciled.withSelectedRepository(repository.id)
-            }
-
-            null -> Unit
+        val pending = state.pendingRepositorySelection
+        val resolvedRepositoryId = pending?.resolvedRepositoryId(repositories)
+        if (resolvedRepositoryId != null) {
+            reconciled = reconciled.withSelectedRepository(resolvedRepositoryId)
         }
-        state = reconciled.copy(pendingRepositorySelection = null)
+        val retainedPending = pending?.takeIf { resolvedRepositoryId == null && restorationInFlight }
+        state = reconciled.copy(pendingRepositorySelection = retainedPending)
     }
 }
 
 @Composable
 internal fun rememberEngHubSettingsNavigation(state: EngHubSettingsUiState): EngHubSettingsNavigation {
     val navigation = remember { EngHubSettingsNavigation(initialSettingsNavigationState(state)) }
-    LaunchedEffect(state.localRepositories) { navigation.reconcileRepositories(state.localRepositories) }
+    LaunchedEffect(state.localRepositories, state.restoringLocalRepositoryPath) {
+        navigation.reconcileRepositories(
+            state.localRepositories,
+            restorationInFlight = state.restoringLocalRepositoryPath != null,
+        )
+    }
     return navigation
 }

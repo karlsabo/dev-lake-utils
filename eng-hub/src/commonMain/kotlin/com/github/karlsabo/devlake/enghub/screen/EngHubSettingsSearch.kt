@@ -25,13 +25,15 @@ internal const val SETUP_SHELL_LABEL = "Setup shell"
 
 /**
  * Discoverable settings metadata. Labels are shared with the rendered form fields so search cannot silently
- * diverge from the form; descriptions and aliases only add search vocabulary.
+ * diverge from the form; [fieldLabels] name the controls a group renders besides its own label; descriptions and
+ * aliases only add search vocabulary.
  */
 internal enum class EngHubSettingGroupId(
     val section: EngHubSettingsSection,
     val label: String,
     val description: String,
     val aliases: List<String> = emptyList(),
+    val fieldLabels: List<String> = emptyList(),
 ) {
     SecretFilePath(
         section = EngHubSettingsSection.GitHubAccess,
@@ -50,6 +52,7 @@ internal enum class EngHubSettingGroupId(
         label = ORGANIZATION_IDS_LABEL,
         description = "Organizations to read activity from",
         aliases = listOf("org", "organizations"),
+        fieldLabels = listOf(NEW_ORGANIZATION_ID_LABEL),
     ),
     GitHubAuthor(
         section = EngHubSettingsSection.GitHubActivity,
@@ -80,6 +83,7 @@ internal enum class EngHubSettingGroupId(
         label = REPOSITORIES_LABEL,
         description = "Choose and configure a repository",
         aliases = listOf("repo", "repository", "repository settings"),
+        fieldLabels = listOf(REPOSITORY_PATH_LABEL, NEW_REPOSITORY_PATH_LABEL),
     ),
     RepositorySetupCommands(
         section = EngHubSettingsSection.Repositories,
@@ -110,7 +114,7 @@ internal enum class EngHubSettingGroupId(
 internal fun EngHubSettingGroupId.matchesQuery(query: String): Boolean {
     val trimmedQuery = query.trim()
     if (trimmedQuery.isEmpty()) return false
-    return (listOf(label, description) + aliases).any { candidate ->
+    return (listOf(label, description) + fieldLabels + aliases).any { candidate ->
         candidate.contains(trimmedQuery, ignoreCase = true)
     }
 }

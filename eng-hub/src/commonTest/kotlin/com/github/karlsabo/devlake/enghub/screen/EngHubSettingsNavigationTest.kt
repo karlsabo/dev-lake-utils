@@ -148,6 +148,62 @@ class EngHubSettingsNavigationTest {
     }
 
     @Test
+    fun undoSelectionSurvivesAnInterveningReconciliationBeforeItsTargetArrives() {
+        val state = settingsState()
+        val removed = state.copy(localRepositories = state.localRepositories.filter { it.id == 2L })
+        val navigation = EngHubSettingsNavigation(initialSettingsNavigationState(removed))
+        val draftOnly = removed.copy(
+            localRepositories = removed.localRepositories.map { repository ->
+                repository.copy(setupCommandDraft = "open")
+            },
+        )
+
+        navigation.requestRepositorySelectionByPath("/workspace/api")
+        navigation.reconcileRepositories(draftOnly.localRepositories, restorationInFlight = true)
+        assertEquals(2L, navigation.state.selectedRepositoryId)
+
+        navigation.reconcileRepositories(state.localRepositories, restorationInFlight = false)
+        assertEquals(1L, navigation.state.selectedRepositoryId)
+        assertEquals("/workspace/api", state.repositoriesSection(navigation.state).repositoryEditor?.repository?.path)
+    }
+
+    @Test
+    fun restorationThatEndsWithoutItsTargetCancelsTheUndoSelection() {
+        val state = settingsState()
+        val removed = state.copy(localRepositories = state.localRepositories.filter { it.id == 2L })
+        val navigation = EngHubSettingsNavigation(initialSettingsNavigationState(removed))
+
+        navigation.requestRepositorySelectionByPath("/workspace/api")
+        navigation.reconcileRepositories(removed.localRepositories, restorationInFlight = true)
+        navigation.reconcileRepositories(removed.localRepositories, restorationInFlight = false)
+        assertNull(navigation.state.pendingRepositorySelection)
+
+        navigation.reconcileRepositories(
+            settingsState(
+                repositories = listOf(
+                    LocalRepositoryConfig(path = "/workspace/web"),
+                    LocalRepositoryConfig(path = "/workspace/api"),
+                ),
+            ).localRepositories,
+        )
+        assertEquals(2L, navigation.state.selectedRepositoryId)
+    }
+
+    @Test
+    fun explicitRepositoryChoiceSupersedesAPendingUndoSelection() {
+        val state = settingsState()
+        val removed = state.copy(localRepositories = state.localRepositories.filter { it.id == 2L })
+        val navigation = EngHubSettingsNavigation(initialSettingsNavigationState(removed))
+
+        navigation.requestRepositorySelectionByPath("/workspace/api")
+        navigation.selectRepository(2)
+        navigation.reconcileRepositories(state.localRepositories)
+
+        assertEquals(2L, navigation.state.selectedRepositoryId)
+        assertNull(navigation.state.pendingRepositorySelection)
+    }
+
+    @Test
     fun repositoryIdentityOutsideTheCurrentListIsIgnored() {
         val state = settingsState()
 

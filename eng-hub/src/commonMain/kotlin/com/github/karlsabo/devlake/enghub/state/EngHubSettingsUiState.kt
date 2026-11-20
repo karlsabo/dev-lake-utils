@@ -39,6 +39,8 @@ data class EngHubSettingsUiState(
     val localRepositoryDraft: String = "",
     val localRepositoryError: String? = null,
     val removedLocalRepositoryPath: String? = null,
+    /** Path whose undo restoration is still being persisted; null when no restoration is in flight. */
+    val restoringLocalRepositoryPath: String? = null,
     val setupShell: String,
     val gitHubTokenPath: String,
     val gitHubTokenPathError: String? = null,

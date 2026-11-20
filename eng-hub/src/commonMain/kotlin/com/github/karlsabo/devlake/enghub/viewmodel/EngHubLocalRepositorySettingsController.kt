@@ -106,7 +106,10 @@ internal class EngHubLocalRepositorySettingsController(
         val removal = pendingRemoval ?: return
         pendingRemoval = null
         removalExpirationJob?.cancel()
-        mutableUiState.value = mutableUiState.value.copy(removedLocalRepositoryPath = null)
+        mutableUiState.value = mutableUiState.value.copy(
+            removedLocalRepositoryPath = null,
+            restoringLocalRepositoryPath = removal.repository?.path ?: removal.persistedPath,
+        )
         persistRestoration(removal)
     }
 
@@ -136,37 +139,44 @@ internal class EngHubLocalRepositorySettingsController(
     private fun persistRestoration(removal: PendingRepositoryRemoval) {
         val pendingPersistence = removalPersistenceJob
         val operationKey = dependencies.configPersistence.newOperationKey("repository-restore")
+        val restorationPath = removal.repository?.path ?: removal.persistedPath
         removalPersistenceJob = dependencies.operationTracker.launch {
-            pendingPersistence?.join()
-            val repository = removal.repository ?: return@launch
-            dependencies.pathEditor.withReservedRestoration(repository.path) {
-                var restorationApplied = false
-                val persisted = dependencies.configPersistence.update(operationKey) { currentConfig ->
-                    val restored = currentConfig.withLocalRepositoryRestored(repository, removal.persistedIndex)
-                    restorationApplied = restored != currentConfig
-                    restored
-                }
-                if (!persisted || !restorationApplied) return@withReservedRestoration
+            try {
+                pendingPersistence?.join()
+                val repository = removal.repository ?: return@launch
+                dependencies.pathEditor.withReservedRestoration(repository.path) {
+                    var restorationApplied = false
+                    val persisted = dependencies.configPersistence.update(operationKey) { currentConfig ->
+                        val restored = currentConfig.withLocalRepositoryRestored(repository, removal.persistedIndex)
+                        restorationApplied = restored != currentConfig
+                        restored
+                    }
+                    if (!persisted || !restorationApplied) return@withReservedRestoration
 
-                val insertionIndex = removal.persistedIndex.coerceIn(
-                    minimumValue = 0,
-                    maximumValue = mutableUiState.value.localRepositories.size,
-                )
-                val restoredRepositories = mutableUiState.value.localRepositories.withRepositoryRestored(
-                    repository,
-                    removal.repositoryId,
-                    insertionIndex,
-                )
-                if (restoredRepositories.size == mutableUiState.value.localRepositories.size) {
-                    return@withReservedRestoration
+                    val insertionIndex = removal.persistedIndex.coerceIn(
+                        minimumValue = 0,
+                        maximumValue = mutableUiState.value.localRepositories.size,
+                    )
+                    val restoredRepositories = mutableUiState.value.localRepositories.withRepositoryRestored(
+                        repository,
+                        removal.repositoryId,
+                        insertionIndex,
+                    )
+                    if (restoredRepositories.size == mutableUiState.value.localRepositories.size) {
+                        return@withReservedRestoration
+                    }
+                    val identityIndex = dependencies.pathEditor.insertRepository(
+                        insertionIndex,
+                        removal.repositoryId,
+                        repository.path,
+                    ) ?: return@withReservedRestoration
+                    mutableUiState.value = mutableUiState.value.copy(localRepositories = restoredRepositories)
+                    structureCallbacks.onInserted(identityIndex)
                 }
-                val identityIndex = dependencies.pathEditor.insertRepository(
-                    insertionIndex,
-                    removal.repositoryId,
-                    repository.path,
-                ) ?: return@withReservedRestoration
-                mutableUiState.value = mutableUiState.value.copy(localRepositories = restoredRepositories)
-                structureCallbacks.onInserted(identityIndex)
+            } finally {
+                if (mutableUiState.value.restoringLocalRepositoryPath == restorationPath) {
+                    mutableUiState.value = mutableUiState.value.copy(restoringLocalRepositoryPath = null)
+                }
             }
         }
     }

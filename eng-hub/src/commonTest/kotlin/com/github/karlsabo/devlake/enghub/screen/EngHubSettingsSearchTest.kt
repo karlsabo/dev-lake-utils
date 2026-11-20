@@ -205,6 +205,33 @@ class EngHubSettingsSearchTest {
     }
 
     @Test
+    fun repositoryFieldLabelsFindTheRepositoryControls() {
+        val state = settingsState()
+
+        listOf(REPOSITORY_PATH_LABEL, NEW_REPOSITORY_PATH_LABEL).forEach { label ->
+            val plan = state.planFor(initialSettingsNavigationState(state).withQuery(label))
+            val section = plan.sections.single()
+
+            assertEquals(EngHubSettingsSection.Repositories, section.section)
+            assertEquals(listOf(EngHubSettingGroupId.Repositories), section.groups)
+            assertTrue(section.repositoryChooser?.isVisible == true)
+            val editor = section.repositoryEditor ?: error("expected the repository editor for $label")
+            assertTrue(editor.showPath)
+            assertEquals("/workspace/api", editor.repository.path)
+        }
+    }
+
+    @Test
+    fun newOrganizationIdLabelFindsTheOrganizationGroup() {
+        val state = settingsState()
+
+        val plan = state.planFor(initialSettingsNavigationState(state).withQuery(NEW_ORGANIZATION_ID_LABEL))
+
+        assertEquals(listOf(EngHubSettingsSection.GitHubActivity), plan.sections.map { it.section })
+        assertEquals(listOf(EngHubSettingGroupId.OrganizationIds), plan.sections.single().groups)
+    }
+
+    @Test
     fun setupCommandSearchMountsTheSelectedRepositoryCommands() {
         val state = settingsState()
 
