@@ -86,7 +86,7 @@ internal suspend fun buildPullRequestUiStates(
     issues: List<Issue>,
     reviewApi: GitHubPullRequestReviewApi,
     summaryApi: GitHubPullRequestSummaryApi,
-): List<PullRequestUiState> = issues.map { issue ->
+): List<PullRequestUiState> = issues.sortedBy { it.createdAt }.map { issue ->
     val pr = reviewApi.getPullRequestByUrl(issue.pullRequestDetailsUrl)
     val headRef = pr.head?.ref
     val headSha = pr.head?.sha
