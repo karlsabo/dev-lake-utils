@@ -111,6 +111,29 @@ class EngHubSettingsNavigationTest {
     }
 
     @Test
+    fun addingAnotherRepositorySelectsTheNewEntryBeforeNavigationReconciles() {
+        val state = settingsState()
+        val navigation = EngHubSettingsNavigation(initialSettingsNavigationState(state))
+        val addedState = settingsState(
+            repositories = listOf(
+                LocalRepositoryConfig(path = "/workspace/api"),
+                LocalRepositoryConfig(path = "/workspace/web"),
+                LocalRepositoryConfig(path = "/workspace/docs"),
+            ),
+        )
+
+        navigation.requestRepositorySelection(3)
+        assertEquals(1L, navigation.state.selectedRepositoryId)
+
+        navigation.reconcileRepositories(addedState.localRepositories)
+        assertEquals(3L, addedState.repositoriesSection(navigation.state).repositoryEditor?.repository?.id)
+
+        navigation.selectRepository(1)
+        navigation.reconcileRepositories(addedState.localRepositories)
+        assertEquals(1L, navigation.state.selectedRepositoryId)
+    }
+
+    @Test
     fun undoingARemovalSelectsTheRestoredRepository() {
         val state = settingsState()
         val removed = state.copy(localRepositories = state.localRepositories.filter { it.id == 2L })
@@ -142,6 +165,6 @@ class EngHubSettingsNavigationTest {
 
         assertEquals("", selected.query)
         assertEquals(EngHubSettingsSection.GitHubAccess, selected.section)
-        assertNull(selected.preSearchDestination)
+        assertNull(selected.restoreDestination)
     }
 }

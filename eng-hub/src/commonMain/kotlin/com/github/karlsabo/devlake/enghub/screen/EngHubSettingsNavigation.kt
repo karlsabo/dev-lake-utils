@@ -31,10 +31,21 @@ internal data class EngHubSettingsNavigationState(
     val section: EngHubSettingsSection = EngHubSettingsSection.GitHubAccess,
     val selectedRepositoryId: Long? = null,
     val query: String = "",
-    val preSearchDestination: SettingsDestination? = null,
-    val destinationSelectedDuringSearch: Boolean = false,
-    val pendingRestoredPath: String? = null,
+    val restoreDestination: SettingsDestination? = null,
+    val repositorySelectedDuringSearch: Boolean = false,
+    val pendingRepositorySelection: PendingRepositorySelection? = null,
 )
+
+/** A selection requested before navigation observes the repository list that contains it. */
+internal sealed interface PendingRepositorySelection {
+    data class ById(
+        val repositoryId: Long,
+    ) : PendingRepositorySelection
+
+    data class ByPath(
+        val path: String,
+    ) : PendingRepositorySelection
+}
 
 internal fun initialSettingsNavigationState(state: EngHubSettingsUiState): EngHubSettingsNavigationState {
     val repositoryIds = state.localRepositories.map { repository -> repository.id }
@@ -77,26 +88,22 @@ internal fun EngHubSettingsNavigationState.withQuery(query: String): EngHubSetti
 
     this.query.isBlank() -> copy(
         query = query,
-        preSearchDestination = SettingsDestination(section, selectedRepositoryId),
-        destinationSelectedDuringSearch = false,
+        restoreDestination = SettingsDestination(section, selectedRepositoryId),
+        repositorySelectedDuringSearch = false,
     )
 
-    else -> copy(
-        query = query,
-        preSearchDestination = preSearchDestination ?: SettingsDestination(section, selectedRepositoryId),
-    )
+    else -> copy(query = query)
 }
 
 internal fun EngHubSettingsNavigationState.clearedQuery(): EngHubSettingsNavigationState {
     if (query.isEmpty()) return this
-    val restoreDestination = if (destinationSelectedDuringSearch) null else preSearchDestination
     val restoredRepositoryId = restoreDestination?.repositoryId?.takeIf { id -> id in repositoryIds }
     return copy(
         query = "",
         section = restoreDestination?.section ?: section,
         selectedRepositoryId = restoredRepositoryId ?: selectedRepositoryId,
-        preSearchDestination = null,
-        destinationSelectedDuringSearch = false,
+        restoreDestination = null,
+        repositorySelectedDuringSearch = false,
     )
 }
 
@@ -106,16 +113,29 @@ internal fun EngHubSettingsNavigationState.withSection(
 ): EngHubSettingsNavigationState = if (query.isBlank()) {
     copy(section = section)
 } else {
-    copy(section = section, query = "", preSearchDestination = null, destinationSelectedDuringSearch = false)
+    copy(
+        section = section,
+        query = "",
+        restoreDestination = null,
+        repositorySelectedDuringSearch = false,
+    )
 }
 
+/**
+ * Choosing a repository during a search makes Repositories and that identity the destination restored when the
+ * query clears, so the choice survives clearing even when the search started from another section.
+ */
 internal fun EngHubSettingsNavigationState.withSelectedRepository(
     repositoryId: Long?,
-): EngHubSettingsNavigationState {
-    if (repositoryId != null && repositoryId !in repositoryIds) return this
-    return copy(
+): EngHubSettingsNavigationState = when {
+    repositoryId != null && repositoryId !in repositoryIds -> this
+
+    query.isBlank() -> copy(selectedRepositoryId = repositoryId)
+
+    else -> copy(
         selectedRepositoryId = repositoryId,
-        destinationSelectedDuringSearch = destinationSelectedDuringSearch || query.isNotBlank(),
+        restoreDestination = repositoryId?.let { id -> SettingsDestination(EngHubSettingsSection.Repositories, id) },
+        repositorySelectedDuringSearch = true,
     )
 }
 
@@ -158,17 +178,29 @@ internal class EngHubSettingsNavigation(
         state = state.clearedQuery()
     }
 
+    /** Defers the selection until the next [reconcileRepositories] observes the new repository id. */
+    fun requestRepositorySelection(repositoryId: Long) {
+        state = state.copy(pendingRepositorySelection = PendingRepositorySelection.ById(repositoryId))
+    }
+
     fun requestRepositorySelectionByPath(path: String) {
-        state = state.copy(pendingRestoredPath = path)
+        state = state.copy(pendingRepositorySelection = PendingRepositorySelection.ByPath(path))
     }
 
     fun reconcileRepositories(repositories: List<SettingsLocalRepositoryUiState>) {
-        val restoredId = state.pendingRestoredPath?.let { path ->
-            repositories.firstOrNull { repository -> repository.path == path }?.id
-        }
         var reconciled = state.withRepositoryIds(repositories.map { repository -> repository.id })
-        if (restoredId != null) reconciled = reconciled.withSelectedRepository(restoredId)
-        state = reconciled.copy(pendingRestoredPath = null)
+        when (val pending = state.pendingRepositorySelection) {
+            is PendingRepositorySelection.ById -> reconciled = reconciled.withSelectedRepository(pending.repositoryId)
+
+            is PendingRepositorySelection.ByPath -> repositories.firstOrNull { repository ->
+                repository.path == pending.path
+            }?.let { repository ->
+                reconciled = reconciled.withSelectedRepository(repository.id)
+            }
+
+            null -> Unit
+        }
+        state = reconciled.copy(pendingRepositorySelection = null)
     }
 }
 

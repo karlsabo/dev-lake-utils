@@ -67,11 +67,14 @@ internal fun RepositoriesSettingsContent(
                 chooser = chooser,
                 state = state,
                 actions = actions,
-                onSelectRepository = navigation::selectRepository,
-                onUndoRemoval = {
-                    state.removedLocalRepositoryPath?.let(navigation::requestRepositorySelectionByPath)
-                    actions.onUndoLocalRepositoryRemoval()
-                },
+                chooserActions = RepositoryChooserActions(
+                    onSelectRepository = navigation::selectRepository,
+                    onRepositoryAdded = navigation::requestRepositorySelection,
+                    onUndoRemoval = {
+                        state.removedLocalRepositoryPath?.let(navigation::requestRepositorySelectionByPath)
+                        actions.onUndoLocalRepositoryRemoval()
+                    },
+                ),
             )
         }
         sectionView.repositoryEditor?.let { editor ->
@@ -80,13 +83,18 @@ internal fun RepositoriesSettingsContent(
     }
 }
 
+private data class RepositoryChooserActions(
+    val onSelectRepository: (Long) -> Unit,
+    val onRepositoryAdded: (Long) -> Unit,
+    val onUndoRemoval: () -> Unit,
+)
+
 @Composable
 private fun RepositoryChooser(
     chooser: EngHubRepositoryChooser,
     state: EngHubSettingsUiState,
     actions: EngHubSettingsActions,
-    onSelectRepository: (Long) -> Unit,
-    onUndoRemoval: () -> Unit,
+    chooserActions: RepositoryChooserActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (chooser.choices.isEmpty()) {
@@ -100,7 +108,7 @@ private fun RepositoryChooser(
                     RepositoryChoiceRow(
                         choice = choice,
                         selected = choice.id == chooser.selectedRepositoryId,
-                        onSelect = { onSelectRepository(choice.id) },
+                        onSelect = { chooserActions.onSelectRepository(choice.id) },
                     )
                 }
             }
@@ -114,7 +122,7 @@ private fun RepositoryChooser(
         )
         Button(
             onClick = {
-                actions.onAddLocalRepository()?.let(onSelectRepository)
+                actions.onAddLocalRepository()?.let(chooserActions.onRepositoryAdded)
             },
             modifier = Modifier.testTag("repository-add"),
         ) {
@@ -128,7 +136,7 @@ private fun RepositoryChooser(
             ) {
                 Text("Removed $path")
                 Button(
-                    onClick = onUndoRemoval,
+                    onClick = chooserActions.onUndoRemoval,
                     modifier = Modifier.testTag("repository-removal-undo-action"),
                 ) {
                     Text("Undo")

@@ -155,6 +155,20 @@ class EngHubSettingsSearchTest {
     }
 
     @Test
+    fun clearingTheQueryAfterChoosingARepositoryFromAnotherSectionOpensRepositories() {
+        val state = settingsState()
+        val beforeSearch = initialSettingsNavigationState(state)
+            .withSection(EngHubSettingsSection.PlanningAndSetup)
+
+        val cleared = beforeSearch.withQuery("web").withSelectedRepository(2).clearedQuery()
+
+        assertEquals("", cleared.query)
+        assertEquals(EngHubSettingsSection.Repositories, cleared.section)
+        assertEquals(2L, cleared.selectedRepositoryId)
+        assertEquals("/workspace/web", state.repositoriesSection(cleared).repositoryEditor?.repository?.path)
+    }
+
+    @Test
     fun clearingTheQueryWithoutAnExplicitSelectionRestoresThePreSearchDestination() {
         val state = settingsState()
         val beforeSearch = initialSettingsNavigationState(state)

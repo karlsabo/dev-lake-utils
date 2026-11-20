@@ -226,7 +226,7 @@ private fun repositoryChooser(
     val choices = if (groupMatches) allChoices else matchingChoices
     val selectedId = navigation.selectedRepositoryId?.takeIf { id -> allChoices.any { it.id == id } }
     val selectedRepository = state.localRepositories.firstOrNull { repository -> repository.id == selectedId }
-    val editorIsRelevant = trimmedQuery.isEmpty() || groupMatches || navigation.destinationSelectedDuringSearch ||
+    val editorIsRelevant = trimmedQuery.isEmpty() || groupMatches || navigation.repositorySelectedDuringSearch ||
         matchingChoices.any { choice -> choice.id == selectedId }
     return EngHubRepositoryChooser(
         choices = choices,
