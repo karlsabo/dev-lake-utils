@@ -44,18 +44,19 @@ internal class EngHubLocalRepositorySettingsController(
         mutableUiState.value = mutableUiState.value.copy(localRepositoryDraft = path, localRepositoryError = null)
     }
 
-    fun add() {
+    fun add(): Long? {
         val state = mutableUiState.value
         val path = state.localRepositoryDraft
         val error = path.localRepositoryValidationError(state.localRepositories.map { it.path }, dependencies.osFamily)
         if (error != null) {
             mutableUiState.value = state.copy(localRepositoryError = error)
-            return
+            return null
         }
 
-        dependencies.pathEditor.addRepository(path)
+        val repositoryId = dependencies.pathEditor.addRepository(path)
         mutableUiState.value = state.copy(
             localRepositories = state.localRepositories + SettingsLocalRepositoryUiState(
+                id = repositoryId,
                 path = path,
                 setupCommands = emptyList(),
             ),
@@ -68,6 +69,7 @@ internal class EngHubLocalRepositorySettingsController(
                 currentConfig.copy(localRepositories = currentConfig.localRepositories + LocalRepositoryConfig(path))
             }
         }
+        return repositoryId
     }
 
     fun updatePath(repositoryIndex: Int, path: String) {
@@ -104,7 +106,10 @@ internal class EngHubLocalRepositorySettingsController(
         val removal = pendingRemoval ?: return
         pendingRemoval = null
         removalExpirationJob?.cancel()
-        mutableUiState.value = mutableUiState.value.copy(removedLocalRepositoryPath = null)
+        mutableUiState.value = mutableUiState.value.copy(
+            removedLocalRepositoryPath = null,
+            restoringLocalRepositoryPath = removal.repository?.path ?: removal.persistedPath,
+        )
         persistRestoration(removal)
     }
 
@@ -134,36 +139,44 @@ internal class EngHubLocalRepositorySettingsController(
     private fun persistRestoration(removal: PendingRepositoryRemoval) {
         val pendingPersistence = removalPersistenceJob
         val operationKey = dependencies.configPersistence.newOperationKey("repository-restore")
+        val restorationPath = removal.repository?.path ?: removal.persistedPath
         removalPersistenceJob = dependencies.operationTracker.launch {
-            pendingPersistence?.join()
-            val repository = removal.repository ?: return@launch
-            dependencies.pathEditor.withReservedRestoration(repository.path) {
-                var restorationApplied = false
-                val persisted = dependencies.configPersistence.update(operationKey) { currentConfig ->
-                    val restored = currentConfig.withLocalRepositoryRestored(repository, removal.persistedIndex)
-                    restorationApplied = restored != currentConfig
-                    restored
-                }
-                if (!persisted || !restorationApplied) return@withReservedRestoration
+            try {
+                pendingPersistence?.join()
+                val repository = removal.repository ?: return@launch
+                dependencies.pathEditor.withReservedRestoration(repository.path) {
+                    var restorationApplied = false
+                    val persisted = dependencies.configPersistence.update(operationKey) { currentConfig ->
+                        val restored = currentConfig.withLocalRepositoryRestored(repository, removal.persistedIndex)
+                        restorationApplied = restored != currentConfig
+                        restored
+                    }
+                    if (!persisted || !restorationApplied) return@withReservedRestoration
 
-                val insertionIndex = removal.persistedIndex.coerceIn(
-                    minimumValue = 0,
-                    maximumValue = mutableUiState.value.localRepositories.size,
-                )
-                val restoredRepositories = mutableUiState.value.localRepositories.withRepositoryRestored(
-                    repository,
-                    insertionIndex,
-                )
-                if (restoredRepositories.size == mutableUiState.value.localRepositories.size) {
-                    return@withReservedRestoration
+                    val insertionIndex = removal.persistedIndex.coerceIn(
+                        minimumValue = 0,
+                        maximumValue = mutableUiState.value.localRepositories.size,
+                    )
+                    val restoredRepositories = mutableUiState.value.localRepositories.withRepositoryRestored(
+                        repository,
+                        removal.repositoryId,
+                        insertionIndex,
+                    )
+                    if (restoredRepositories.size == mutableUiState.value.localRepositories.size) {
+                        return@withReservedRestoration
+                    }
+                    val identityIndex = dependencies.pathEditor.insertRepository(
+                        insertionIndex,
+                        removal.repositoryId,
+                        repository.path,
+                    ) ?: return@withReservedRestoration
+                    mutableUiState.value = mutableUiState.value.copy(localRepositories = restoredRepositories)
+                    structureCallbacks.onInserted(identityIndex)
                 }
-                val identityIndex = dependencies.pathEditor.insertRepository(
-                    insertionIndex,
-                    removal.repositoryId,
-                    repository.path,
-                ) ?: return@withReservedRestoration
-                mutableUiState.value = mutableUiState.value.copy(localRepositories = restoredRepositories)
-                structureCallbacks.onInserted(identityIndex)
+            } finally {
+                if (mutableUiState.value.restoringLocalRepositoryPath == restorationPath) {
+                    mutableUiState.value = mutableUiState.value.copy(restoringLocalRepositoryPath = null)
+                }
             }
         }
     }
@@ -196,12 +209,16 @@ internal fun reconcileSettingsRepositories(
         repository.path.normalizedRepositoryPath(osFamily) !in previousPaths &&
             !pathEditor.representsCommittedRepository(repository.path, committedPaths)
     }
-    addedRepositories.forEach { repository -> pathEditor.addRepository(repository.path) }
+    val addedRepositoryStates = addedRepositories.map { repository ->
+        SettingsLocalRepositoryUiState(
+            id = pathEditor.addRepository(repository.path),
+            path = repository.path,
+            setupCommands = repository.setupCommands,
+        )
+    }
     mutableUiState.value = state.copy(
         committedConfig = config,
-        localRepositories = state.localRepositories + addedRepositories.map { repository ->
-            SettingsLocalRepositoryUiState(repository.path, repository.setupCommands)
-        },
+        localRepositories = state.localRepositories + addedRepositoryStates,
     )
     pathEditor.revalidatePendingPaths()
 }

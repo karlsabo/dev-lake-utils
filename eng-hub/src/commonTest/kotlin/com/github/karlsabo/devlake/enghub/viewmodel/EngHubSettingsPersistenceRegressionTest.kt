@@ -436,6 +436,22 @@ class EngHubSettingsPersistenceRegressionTest {
         assertTrue(writer.savedConfigs.isEmpty())
     }
 
+    @Test
+    fun failedRepositoryRestorationPublishesThenClearsItsInFlightMarker() = runTest {
+        val repository = LocalRepositoryConfig("/workspace/api")
+        val state = RegressionConfigState(EngHubConfig(localRepositories = listOf(repository)))
+        val viewModel = regressionViewModel(VerificationFailureConfigWriter(), state)
+
+        viewModel.localRepositorySettings.remove(0)
+        viewModel.localRepositorySettings.undoRemoval()
+        assertEquals(repository.path, viewModel.uiState.value.restoringLocalRepositoryPath)
+
+        runCurrent()
+
+        assertEquals(null, viewModel.uiState.value.restoringLocalRepositoryPath)
+        assertEquals(emptyList(), viewModel.uiState.value.localRepositories)
+    }
+
     private fun TestScope.regressionViewModel(
         writer: EngHubConfigWriter,
         state: RegressionConfigState = RegressionConfigState(EngHubConfig(gitHubAuthor = "octocat")),

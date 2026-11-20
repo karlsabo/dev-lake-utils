@@ -16,9 +16,9 @@ import com.github.karlsabo.git.WorktreeSetupStatus
 internal fun EngHubPaneContent(
     state: EngHubScreenState,
     actions: EngHubScreenActions,
+    settingsNavigation: EngHubSettingsNavigation,
     modifier: Modifier = Modifier,
-    exitState: WorktreeRowExitState = WorktreeRowExitState(),
-    archiveFlight: WorktreeArchiveFlightState = WorktreeArchiveFlightState(),
+    motion: WorktreePaneMotion = WorktreePaneMotion(),
 ) {
     when (state.selectedPane) {
         EngHubPane.PullRequests -> PullRequestsPane(
@@ -37,14 +37,15 @@ internal fun EngHubPaneContent(
             state = state.worktrees,
             actions = actions,
             modifier = modifier,
-            exitState = exitState,
-            archiveFlight = archiveFlight,
+            exitState = motion.exitState,
+            archiveFlight = motion.archiveFlight,
         )
 
         EngHubPane.Settings -> EngHubSettingsScreen(
             state = state.settings,
-            actions = actions.settings,
+            navigation = settingsNavigation,
             modifier = modifier,
+            actions = actions.settings,
         )
     }
 }

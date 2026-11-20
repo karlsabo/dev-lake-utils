@@ -100,6 +100,7 @@ internal fun EngHubScreenContent(
     actions: EngHubScreenActions,
 ) {
     var pendingGlobalCreateWorktree by remember { mutableStateOf<PendingGlobalCreateWorktree?>(null) }
+    val settingsNavigation = rememberEngHubSettingsNavigation(state.settings)
     val exitState = rememberWorktreeRowExitState(state.worktrees.queuedArchiveWorktreePaths)
     val archiveFlight = rememberWorktreeArchiveFlightState(
         queuedWorktreePaths = state.worktrees.queuedArchiveWorktreePaths,
@@ -138,8 +139,8 @@ internal fun EngHubScreenContent(
     EngHubScreenBody(
         state = state,
         actions = actions,
-        exitState = exitState,
-        archiveFlight = archiveFlight,
+        motion = WorktreePaneMotion(exitState = exitState, archiveFlight = archiveFlight),
+        settingsNavigation = settingsNavigation,
         onCreateWorktree = { pendingGlobalCreateWorktree = PendingGlobalCreateWorktree() },
     )
 }
