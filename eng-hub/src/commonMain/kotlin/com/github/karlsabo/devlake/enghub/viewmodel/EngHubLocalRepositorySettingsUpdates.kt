@@ -95,10 +95,12 @@ internal fun EngHubConfig.withLocalRepositoryRestored(
 
 internal fun List<SettingsLocalRepositoryUiState>.withRepositoryRestored(
     repository: LocalRepositoryConfig,
+    repositoryId: Long,
     index: Int,
 ): List<SettingsLocalRepositoryUiState> {
     if (any { it.path.normalizedRepositoryPath() == repository.path.normalizedRepositoryPath() }) return this
     val restoredRepository = SettingsLocalRepositoryUiState(
+        id = repositoryId,
         path = repository.path,
         setupCommands = repository.setupCommands,
     )

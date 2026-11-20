@@ -44,18 +44,19 @@ internal class EngHubLocalRepositorySettingsController(
         mutableUiState.value = mutableUiState.value.copy(localRepositoryDraft = path, localRepositoryError = null)
     }
 
-    fun add() {
+    fun add(): Long? {
         val state = mutableUiState.value
         val path = state.localRepositoryDraft
         val error = path.localRepositoryValidationError(state.localRepositories.map { it.path }, dependencies.osFamily)
         if (error != null) {
             mutableUiState.value = state.copy(localRepositoryError = error)
-            return
+            return null
         }
 
-        dependencies.pathEditor.addRepository(path)
+        val repositoryId = dependencies.pathEditor.addRepository(path)
         mutableUiState.value = state.copy(
             localRepositories = state.localRepositories + SettingsLocalRepositoryUiState(
+                id = repositoryId,
                 path = path,
                 setupCommands = emptyList(),
             ),
@@ -68,6 +69,7 @@ internal class EngHubLocalRepositorySettingsController(
                 currentConfig.copy(localRepositories = currentConfig.localRepositories + LocalRepositoryConfig(path))
             }
         }
+        return repositoryId
     }
 
     fun updatePath(repositoryIndex: Int, path: String) {
@@ -152,6 +154,7 @@ internal class EngHubLocalRepositorySettingsController(
                 )
                 val restoredRepositories = mutableUiState.value.localRepositories.withRepositoryRestored(
                     repository,
+                    removal.repositoryId,
                     insertionIndex,
                 )
                 if (restoredRepositories.size == mutableUiState.value.localRepositories.size) {
@@ -196,12 +199,16 @@ internal fun reconcileSettingsRepositories(
         repository.path.normalizedRepositoryPath(osFamily) !in previousPaths &&
             !pathEditor.representsCommittedRepository(repository.path, committedPaths)
     }
-    addedRepositories.forEach { repository -> pathEditor.addRepository(repository.path) }
+    val addedRepositoryStates = addedRepositories.map { repository ->
+        SettingsLocalRepositoryUiState(
+            id = pathEditor.addRepository(repository.path),
+            path = repository.path,
+            setupCommands = repository.setupCommands,
+        )
+    }
     mutableUiState.value = state.copy(
         committedConfig = config,
-        localRepositories = state.localRepositories + addedRepositories.map { repository ->
-            SettingsLocalRepositoryUiState(repository.path, repository.setupCommands)
-        },
+        localRepositories = state.localRepositories + addedRepositoryStates,
     )
     pathEditor.revalidatePendingPaths()
 }

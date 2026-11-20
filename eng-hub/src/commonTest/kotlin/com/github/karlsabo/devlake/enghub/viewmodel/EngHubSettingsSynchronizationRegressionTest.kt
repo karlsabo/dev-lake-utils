@@ -284,6 +284,67 @@ class EngHubSettingsSynchronizationRegressionTest {
         assertEquals(external.setupCommands, repositories.last().setupCommands)
     }
 
+    @Test
+    fun repositoryIdentitySurvivesADebouncedPathRename() = runTest {
+        val original = LocalRepositoryConfig(path = "/workspace/api", setupCommands = listOf("prepare"))
+        val other = LocalRepositoryConfig(path = "/workspace/web", setupCommands = listOf("keep"))
+        val configState = SynchronizationConfigState(EngHubConfig(localRepositories = listOf(original, other)))
+        val viewModel = synchronizationViewModel(configState = configState)
+        val identityBeforeEdit = viewModel.uiState.value.localRepositories.first().id
+        val otherIdentity = viewModel.uiState.value.localRepositories.last().id
+
+        viewModel.localRepositorySettings.updatePath(0, "/workspace/api-renamed")
+        advanceTimeBy(750.milliseconds)
+        runCurrent()
+        viewModel.flushPendingEdits()
+
+        val repositories = viewModel.uiState.value.localRepositories
+        assertEquals(identityBeforeEdit, repositories.first().id)
+        assertEquals(otherIdentity, repositories.last().id)
+        assertEquals("/workspace/api-renamed", repositories.first().path)
+        assertEquals(2, repositories.map { repository -> repository.id }.distinct().size)
+    }
+
+    @Test
+    fun addingRepositoriesKeepsEveryIdentityDistinct() = runTest {
+        val configState = SynchronizationConfigState(
+            EngHubConfig(localRepositories = listOf(LocalRepositoryConfig(path = "/workspace/api"))),
+        )
+        val viewModel = synchronizationViewModel(configState = configState)
+
+        viewModel.localRepositorySettings.updateDraft("/workspace/web")
+        val addedIdentity = viewModel.localRepositorySettings.add()
+        runCurrent()
+
+        val identities = viewModel.uiState.value.localRepositories.map { repository -> repository.id }
+        assertEquals(addedIdentity, identities.last())
+        assertEquals(identities.size, identities.distinct().size)
+    }
+
+    @Test
+    fun switchingTheRenderedRepositoryDoesNotCommitOrDropAPendingCommandDraft() = runTest {
+        val configState = SynchronizationConfigState(
+            EngHubConfig(
+                localRepositories = listOf(
+                    LocalRepositoryConfig(path = "/workspace/api", setupCommands = listOf("prepare")),
+                    LocalRepositoryConfig(path = "/workspace/web"),
+                ),
+            ),
+        )
+        val viewModel = synchronizationViewModel(configState = configState)
+        val committedBeforeSelection = configState.current
+
+        viewModel.setupCommandSettings.updateDraft(0, "bootstrap --fast")
+        advanceTimeBy(750.milliseconds)
+        runCurrent()
+        viewModel.flushPendingEdits()
+
+        val api = viewModel.uiState.value.localRepositories.first()
+        assertEquals("bootstrap --fast", api.setupCommandDraft)
+        assertEquals(listOf("prepare"), api.setupCommands)
+        assertEquals(committedBeforeSelection, configState.current)
+    }
+
     private fun TestScope.viewModelWithCollidingPathDraft(): CollidingRepositoryFixture {
         val original = LocalRepositoryConfig(path = "/workspace/old", setupCommands = listOf("original"))
         val external = LocalRepositoryConfig(path = "/workspace/external", setupCommands = listOf("external"))

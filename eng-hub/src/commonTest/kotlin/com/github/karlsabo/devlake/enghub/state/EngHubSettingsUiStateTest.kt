@@ -32,10 +32,12 @@ class EngHubSettingsUiStateTest {
         assertEquals(
             listOf(
                 SettingsLocalRepositoryUiState(
+                    id = 1,
                     path = "/workspace/api",
                     setupCommands = listOf("cp .env.example .env", "direnv allow"),
                 ),
                 SettingsLocalRepositoryUiState(
+                    id = 2,
                     path = "/workspace/web",
                     setupCommands = emptyList(),
                 ),

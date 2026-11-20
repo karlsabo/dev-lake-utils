@@ -48,6 +48,8 @@ data class EngHubSettingsUiState(
 )
 
 data class SettingsLocalRepositoryUiState(
+    /** Session-local identity, stable across path edits; never persisted. */
+    val id: Long,
     val path: String,
     val setupCommands: List<String>,
     val pathError: String? = null,
@@ -69,8 +71,9 @@ internal fun createEngHubSettingsUiState(
     gitHubAuthor = engHubConfig.gitHubAuthor,
     planningMarkdownDir = engHubConfig.planningMarkdownDir,
     alertTriageWhereToLook = engHubConfig.llmTemplateValues[ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KEY].orEmpty(),
-    localRepositories = engHubConfig.localRepositories.map { repository ->
+    localRepositories = engHubConfig.localRepositories.mapIndexed { index, repository ->
         SettingsLocalRepositoryUiState(
+            id = index + 1L,
             path = repository.path,
             setupCommands = repository.setupCommands,
         )

@@ -28,14 +28,15 @@ internal class EngHubLocalRepositoryPathEditor(
     private val osFamily: OsFamily,
 ) {
     private val repositoryIds = RepositoryIds(
-        mutableUiState.value.committedConfig.localRepositories.map { repository -> repository.path },
-        osFamily,
+        initialIds = mutableUiState.value.localRepositories.map { repository -> repository.id },
+        initialPaths = mutableUiState.value.committedConfig.localRepositories.map { repository -> repository.path },
+        osFamily = osFamily,
     )
     private val pathCommitJobs = mutableMapOf<Long, Job>()
     private val pendingPathEdits = mutableMapOf<Long, PendingRepositoryPathEdit>()
     private val reservedRestorationPaths = mutableSetOf<String>()
 
-    val addRepository: (String) -> Unit = repositoryIds::add
+    val addRepository: (String) -> Long = repositoryIds::add
 
     fun updatePath(repositoryIndex: Int, path: String) {
         if (!repositoryIds.contains(repositoryIndex)) return
@@ -223,14 +224,15 @@ internal class EngHubLocalRepositoryPathEditor(
 }
 
 private class RepositoryIds(
+    initialIds: List<Long>,
     initialPaths: List<String>,
     private val osFamily: OsFamily,
 ) {
-    private var nextId = 0L
-    private val identities = initialPaths.associateTo(mutableMapOf()) { path ->
-        val identity = RepositoryIdentity(++nextId, path)
-        identity.id to identity
-    }
+    private var nextId = initialIds.maxOrNull() ?: 0L
+    private val identities = initialPaths.mapIndexed { index, path ->
+        val id = initialIds.getOrElse(index) { ++nextId }
+        RepositoryIdentity(id, path)
+    }.associateByTo(mutableMapOf()) { identity -> identity.id }
     private val orderedIds = identities.keys.toMutableList()
 
     operator fun get(index: Int): Long = orderedIds[index]
@@ -242,10 +244,11 @@ private class RepositoryIds(
         identities.getValue(id).persistedPath.normalizedRepositoryPath(osFamily) == normalizedPath
     }
 
-    fun add(path: String) {
+    fun add(path: String): Long {
         val identity = RepositoryIdentity(++nextId, path)
         identities[identity.id] = identity
         orderedIds += identity.id
+        return identity.id
     }
 
     fun remove(index: Int): Long = orderedIds.removeAt(index)

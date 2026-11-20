@@ -49,6 +49,8 @@ kotlin {
         getByName("jvmTest") {
             dependencies {
                 implementation(libs.bundles.junit)
+                implementation(libs.compose.ui.test.junit4)
+                implementation(compose.desktop.currentOs)
                 runtimeOnly(libs.junit.platform.launcher)
             }
         }

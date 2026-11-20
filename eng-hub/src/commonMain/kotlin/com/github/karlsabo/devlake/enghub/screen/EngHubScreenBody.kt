@@ -25,8 +25,8 @@ import com.github.karlsabo.devlake.enghub.component.WorktreeRowExitState
 internal fun EngHubScreenBody(
     state: EngHubScreenState,
     actions: EngHubScreenActions,
-    exitState: WorktreeRowExitState,
-    archiveFlight: WorktreeArchiveFlightState,
+    motion: WorktreePaneMotion,
+    settingsNavigation: EngHubSettingsNavigation,
     onCreateWorktree: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -37,8 +37,8 @@ internal fun EngHubScreenBody(
                 archiveBin = WorktreeArchiveBinSection(
                     entries = state.archiveBinEntries,
                     actions = actions.archiveBinActions(),
-                    onBoundsUpdate = archiveFlight.onBinBoundsUpdate,
-                    pulseWorktreePaths = archiveFlight.binPulsePaths,
+                    onBoundsUpdate = motion.archiveFlight.onBinBoundsUpdate,
+                    pulseWorktreePaths = motion.archiveFlight.binPulsePaths,
                 ),
                 onPaneSelect = actions.onPaneSelected,
             )
@@ -58,13 +58,13 @@ internal fun EngHubScreenBody(
                 EngHubPaneContent(
                     state = state,
                     actions = actions,
+                    settingsNavigation = settingsNavigation,
+                    motion = motion,
                     modifier = Modifier.weight(1f),
-                    exitState = exitState,
-                    archiveFlight = archiveFlight,
                 )
             }
         }
-        WorktreeArchiveFlightOverlay(state = archiveFlight, modifier = Modifier.fillMaxSize())
+        WorktreeArchiveFlightOverlay(state = motion.archiveFlight, modifier = Modifier.fillMaxSize())
     }
 }
 

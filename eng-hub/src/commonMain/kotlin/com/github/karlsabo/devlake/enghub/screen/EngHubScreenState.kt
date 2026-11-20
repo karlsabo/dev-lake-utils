@@ -76,7 +76,7 @@ internal data class EngHubSettingsActions(
     val onAddOrganizationId: () -> Unit = {},
     val onRemoveOrganizationId: (Int) -> Unit = {},
     val onLocalRepositoryDraftChange: (String) -> Unit = {},
-    val onAddLocalRepository: () -> Unit = {},
+    val onAddLocalRepository: () -> Long? = { null },
     val onLocalRepositoryPathChange: (repositoryIndex: Int, path: String) -> Unit = { _, _ -> },
     val onChooseLocalRepositoryPath: (Int) -> Unit = {},
     val onRemoveLocalRepository: (Int) -> Unit = {},
