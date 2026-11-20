@@ -77,6 +77,36 @@ class EngHubSettingsRenderedLayoutTest {
     }
 
     @Test
+    fun repositoryListSitsBesideTheSelectedRepositoryDetailsOnAWidePane() = runSettingsUiTest {
+        val state = repositoriesState()
+        setContentInPane(DESKTOP_PANE_WIDTH, DESKTOP_PANE_HEIGHT, state)
+
+        val listBounds = onNodeWithTag("repository-chooser").getUnclippedBoundsInRoot()
+        val pathBounds = onNodeWithTag("repository-0-path").getUnclippedBoundsInRoot()
+
+        onNodeWithTag("repository-new-browse").assertIsDisplayed()
+        onNodeWithTag("repository-choice-${state.localRepositories.first().id}").assertIsSelected()
+        assertTrue(
+            listBounds.right.value <= pathBounds.left.value,
+            "Repository list must sit left of the selected repository details",
+        )
+    }
+
+    @Test
+    fun narrowPaneStacksTheRepositoryListAboveTheSelectedRepositoryDetails() = runSettingsUiTest {
+        setContentInPane(COMPACT_PANE_WIDTH, SMALL_PANE_HEIGHT, repositoriesState())
+
+        onNodeWithTag("repository-0-path").performScrollTo()
+        val listBounds = onNodeWithTag("repository-chooser").getUnclippedBoundsInRoot()
+        val pathBounds = onNodeWithTag("repository-0-path").getUnclippedBoundsInRoot()
+
+        assertTrue(
+            listBounds.bottom.value <= pathBounds.top.value,
+            "Repository list must stack above the selected repository details on a narrow pane",
+        )
+    }
+
+    @Test
     fun sectionNavigationMarksTheSelectedSection() = runSettingsUiTest {
         setContentInPane(DESKTOP_PANE_WIDTH, DESKTOP_PANE_HEIGHT, repositoriesState())
 

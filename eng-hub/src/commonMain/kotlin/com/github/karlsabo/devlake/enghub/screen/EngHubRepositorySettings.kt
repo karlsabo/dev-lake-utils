@@ -4,32 +4,29 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.Button
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.RadioButton
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.enghub.component.DestructiveButton
 import com.github.karlsabo.devlake.enghub.component.SetupCommandEditor
 import com.github.karlsabo.devlake.enghub.component.SetupCommandEditorActions
 import com.github.karlsabo.devlake.enghub.component.SetupCommandEditorState
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
-import com.github.karlsabo.devlake.enghub.state.SettingsLocalRepositoryUiState
 
-internal const val NO_REPOSITORIES_LABEL = "No repositories configured yet"
-internal const val NEW_REPOSITORY_PATH_LABEL = "New repository path"
 internal const val REMOVE_REPOSITORY_LABEL = "Remove repository"
+internal const val GENERAL_REPOSITORY_SETTINGS_LABEL = "General"
+internal const val CONFIGURED_REPOSITORIES_LABEL = "Configured repositories"
+internal const val SELECT_REPOSITORY_HINT = "Select a repository to edit its path and setup commands"
+
+private val RepositoryListWidth = 300.dp
 
 @Composable
 internal fun RepositoriesSettingsContent(
@@ -39,155 +36,136 @@ internal fun RepositoriesSettingsContent(
     compact: Boolean,
     actions: EngHubSettingsActions,
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         val groups = sectionView.groups
-        if (EngHubSettingGroupId.RepositoriesBaseDirectory in groups) {
-            SettingsPickerField(
-                label = REPOSITORIES_BASE_DIR_LABEL,
-                value = state.repositoriesBaseDir,
-                tag = "repositories-base-dir",
-                presentation = SettingsPickerPresentation(compact = compact),
-                actions = SettingsPickerActions(
-                    onValueChange = actions.onRepositoriesBaseDirChange,
-                    onBrowse = actions.onChooseRepositoriesBaseDir,
-                ),
-            )
+        val showBaseDirectory = EngHubSettingGroupId.RepositoriesBaseDirectory in groups
+        val showPollInterval = EngHubSettingGroupId.WorktreePollInterval in groups
+        if (showBaseDirectory || showPollInterval) {
+            SettingsCard(title = GENERAL_REPOSITORY_SETTINGS_LABEL) {
+                if (showBaseDirectory) RepositoriesBaseDirectoryField(state, compact, actions)
+                if (showPollInterval) WorktreePollIntervalField(state, actions)
+            }
         }
-        if (EngHubSettingGroupId.WorktreePollInterval in groups) {
-            SettingsField(
-                label = WORKTREE_POLL_INTERVAL_LABEL,
-                value = state.worktreePollIntervalSeconds,
-                tag = "worktree-poll-interval",
-                presentation = SettingsFieldPresentation(error = state.worktreePollIntervalError),
-                onValueChange = actions.onWorktreePollIntervalChange,
-            )
-        }
-        sectionView.repositoryChooser?.let { chooser ->
-            RepositoryChooser(
-                chooser = chooser,
-                state = state,
-                actions = actions,
-                chooserActions = RepositoryChooserActions(
-                    onSelectRepository = navigation::selectRepository,
-                    onRepositoryAdded = navigation::requestRepositorySelection,
-                    onUndoRemoval = {
-                        state.removedLocalRepositoryPath?.let(navigation::requestRepositorySelectionByPath)
-                        actions.onUndoLocalRepositoryRemoval()
-                    },
-                ),
-            )
-        }
-        sectionView.repositoryEditor?.let { editor ->
-            RepositoryEditor(editor = editor, compact = compact, actions = actions)
+        if (sectionView.repositoryChooser != null || sectionView.repositoryEditor != null) {
+            SettingsCard(title = CONFIGURED_REPOSITORIES_LABEL) {
+                RepositoryListAndDetail(
+                    state = state,
+                    sectionView = sectionView,
+                    navigation = navigation,
+                    compact = compact,
+                    actions = actions,
+                )
+            }
         }
     }
 }
 
-private data class RepositoryChooserActions(
-    val onSelectRepository: (Long) -> Unit,
-    val onRepositoryAdded: (Long) -> Unit,
-    val onUndoRemoval: () -> Unit,
+@Composable
+private fun RepositoriesBaseDirectoryField(
+    state: EngHubSettingsUiState,
+    compact: Boolean,
+    actions: EngHubSettingsActions,
+) {
+    SettingsPickerField(
+        label = REPOSITORIES_BASE_DIR_LABEL,
+        value = state.repositoriesBaseDir,
+        tag = "repositories-base-dir",
+        presentation = SettingsPickerPresentation(compact = compact),
+        actions = SettingsPickerActions(
+            onValueChange = actions.onRepositoriesBaseDirChange,
+            onBrowse = actions.onChooseRepositoriesBaseDir,
+        ),
+    )
+}
+
+@Composable
+private fun WorktreePollIntervalField(
+    state: EngHubSettingsUiState,
+    actions: EngHubSettingsActions,
+) {
+    SettingsField(
+        label = WORKTREE_POLL_INTERVAL_LABEL,
+        value = state.worktreePollIntervalSeconds,
+        tag = "worktree-poll-interval",
+        presentation = SettingsFieldPresentation(error = state.worktreePollIntervalError),
+        onValueChange = actions.onWorktreePollIntervalChange,
+    )
+}
+
+/** The list sits beside the selected repository's details on wide panes and above them on compact ones. */
+@Composable
+private fun RepositoryListAndDetail(
+    state: EngHubSettingsUiState,
+    sectionView: SettingsSectionView,
+    navigation: EngHubSettingsNavigation,
+    compact: Boolean,
+    actions: EngHubSettingsActions,
+) {
+    val chooser = sectionView.repositoryChooser
+    val listPane: @Composable (Modifier) -> Unit = { modifier ->
+        chooser?.let {
+            RepositoryChooserPane(
+                chooser = it,
+                state = state,
+                actions = actions,
+                chooserActions = repositoryChooserActions(state, navigation, actions),
+                modifier = modifier,
+            )
+        }
+    }
+    val detailPane: @Composable (Modifier) -> Unit = { modifier ->
+        RepositoryDetailPane(
+            editor = sectionView.repositoryEditor,
+            hasChoices = chooser?.choices?.isNotEmpty() == true,
+            compact = compact,
+            actions = actions,
+            modifier = modifier,
+        )
+    }
+    if (compact || chooser == null) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            listPane(Modifier.fillMaxWidth())
+            detailPane(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            listPane(Modifier.width(RepositoryListWidth))
+            detailPane(Modifier.weight(1f))
+        }
+    }
+}
+
+private fun repositoryChooserActions(
+    state: EngHubSettingsUiState,
+    navigation: EngHubSettingsNavigation,
+    actions: EngHubSettingsActions,
+) = RepositoryChooserActions(
+    onSelectRepository = navigation::selectRepository,
+    onRepositoryAdded = navigation::requestRepositorySelection,
+    onUndoRemoval = {
+        state.removedLocalRepositoryPath?.let(navigation::requestRepositorySelectionByPath)
+        actions.onUndoLocalRepositoryRemoval()
+    },
 )
 
 @Composable
-private fun RepositoryChooser(
-    chooser: EngHubRepositoryChooser,
-    state: EngHubSettingsUiState,
+private fun RepositoryDetailPane(
+    editor: RepositoryEditorView?,
+    hasChoices: Boolean,
+    compact: Boolean,
     actions: EngHubSettingsActions,
-    chooserActions: RepositoryChooserActions,
+    modifier: Modifier = Modifier,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (chooser.choices.isEmpty()) {
-            SettingsEmptyHint(text = NO_REPOSITORIES_LABEL, tag = "repository-empty")
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 168.dp).testTag("repository-chooser"),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                items(chooser.choices, key = { choice -> choice.id }) { choice ->
-                    RepositoryChoiceRow(
-                        choice = choice,
-                        selected = choice.id == chooser.selectedRepositoryId,
-                        onSelect = { chooserActions.onSelectRepository(choice.id) },
-                    )
-                }
-            }
-        }
-        SettingsField(
-            label = NEW_REPOSITORY_PATH_LABEL,
-            value = state.localRepositoryDraft,
-            tag = "repository-new",
-            presentation = SettingsFieldPresentation(error = state.localRepositoryError),
-            onValueChange = actions.onLocalRepositoryDraftChange,
-        )
-        Button(
-            onClick = {
-                actions.onAddLocalRepository()?.let(chooserActions.onRepositoryAdded)
-            },
-            modifier = Modifier.testTag("repository-add"),
+    SettingsPane(modifier = modifier) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Add repository")
-        }
-        state.removedLocalRepositoryPath?.let { path ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.testTag("repository-removal-undo"),
-            ) {
-                Text("Removed $path")
-                Button(
-                    onClick = chooserActions.onUndoRemoval,
-                    modifier = Modifier.testTag("repository-removal-undo-action"),
-                ) {
-                    Text("Undo")
-                }
+            when {
+                editor != null -> RepositoryEditor(editor = editor, compact = compact, actions = actions)
+                hasChoices -> SettingsEmptyHint(text = SELECT_REPOSITORY_HINT, tag = "repository-select-hint")
+                else -> SettingsEmptyHint(text = NO_REPOSITORIES_LABEL, tag = "repository-detail-empty")
             }
-        }
-    }
-}
-
-@Composable
-private fun RepositoryChoiceRow(
-    choice: EngHubRepositoryChoice,
-    selected: Boolean,
-    onSelect: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .selectable(selected = selected, onClick = onSelect)
-            .semantics { contentDescription = choice.accessibleLabel() }
-            .testTag("repository-choice-${choice.id}")
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Column(modifier = Modifier.weight(1f)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = choice.name,
-                    style = MaterialTheme.typography.body2,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (choice.hasValidationError) {
-                    Text(
-                        text = "!",
-                        color = MaterialTheme.colors.error,
-                        style = MaterialTheme.typography.body2,
-                        modifier = Modifier.testTag("repository-choice-${choice.id}-error"),
-                    )
-                }
-            }
-            Text(
-                text = choice.path,
-                style = MaterialTheme.typography.caption,
-                color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }
@@ -199,30 +177,33 @@ private fun RepositoryEditor(
     actions: EngHubSettingsActions,
 ) {
     val repositoryIndex = editor.repositoryIndex
-    val repository: SettingsLocalRepositoryUiState = editor.repository
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (editor.showPath) {
-            SettingsPickerField(
-                label = REPOSITORY_PATH_LABEL,
-                value = repository.path,
-                tag = "repository-$repositoryIndex-path",
-                presentation = SettingsPickerPresentation(error = repository.pathError, compact = compact),
-                actions = SettingsPickerActions(
-                    onValueChange = { path -> actions.onLocalRepositoryPathChange(repositoryIndex, path) },
-                    onBrowse = { actions.onChooseLocalRepositoryPath(repositoryIndex) },
-                ),
-            )
-            Button(
+    val repository = editor.repository
+    RepositoryDetailHeader(
+        name = repositoryBasename(repository.path),
+        path = repository.path.takeUnless { editor.showPath },
+        tag = "repository-$repositoryIndex-context",
+    )
+    if (editor.showPath) {
+        SettingsPickerField(
+            label = REPOSITORY_PATH_LABEL,
+            value = repository.path,
+            tag = "repository-$repositoryIndex-path",
+            presentation = SettingsPickerPresentation(error = repository.pathError, compact = compact),
+            actions = SettingsPickerActions(
+                onValueChange = { path -> actions.onLocalRepositoryPathChange(repositoryIndex, path) },
+                onBrowse = { actions.onChooseLocalRepositoryPath(repositoryIndex) },
+            ),
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            DestructiveButton(
+                text = REMOVE_REPOSITORY_LABEL,
+                tag = "repository-$repositoryIndex-remove",
                 onClick = { actions.onRemoveLocalRepository(repositoryIndex) },
-                modifier = Modifier.testTag("repository-$repositoryIndex-remove"),
-            ) {
-                Text(REMOVE_REPOSITORY_LABEL)
-            }
+            )
         }
-        if (editor.showSetupCommands) {
-            if (!editor.showPath) {
-                SettingsEmptyHint(text = repository.path, tag = "repository-$repositoryIndex-context")
-            }
+    }
+    if (editor.showSetupCommands) {
+        SettingsCard(title = SETUP_COMMANDS_LABEL) {
             SetupCommandEditor(
                 state = SetupCommandEditorState(
                     repositoryIndex = repositoryIndex,
@@ -239,6 +220,32 @@ private fun RepositoryEditor(
                     },
                     onRemove = { commandIndex -> actions.onRemoveSetupCommand(repositoryIndex, commandIndex) },
                 ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RepositoryDetailHeader(
+    name: String,
+    path: String?,
+    tag: String,
+) {
+    Column(modifier = Modifier.fillMaxWidth().testTag(tag)) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.h6,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        path?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.caption,
+                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
+internal const val LOCAL_REPOSITORY_PICKER_TITLE = "Choose local repository directory"
+
 internal class EngHubDirectorySettingsController(
     private val directoryPicker: DirectoryPicker,
     private val coroutineScope: CoroutineScope,
@@ -38,6 +40,14 @@ internal class EngHubDirectorySettingsController(
     fun updatePlanningMarkdownDir(path: String) = updateText(planningMarkdownDir, path)
 
     fun choosePlanningMarkdownDir() = choose(planningMarkdownDir)
+
+    /** Fills the new-repository draft from the picker; adding the repository stays an explicit user action. */
+    fun chooseLocalRepositoryDraft() {
+        operationTracker.launch {
+            val path = directoryPicker.pickDirectory(LOCAL_REPOSITORY_PICKER_TITLE) ?: return@launch
+            mutableUiState.value = mutableUiState.value.copy(localRepositoryDraft = path, localRepositoryError = null)
+        }
+    }
 
     suspend fun flushPendingEdits() {
         flush(repositoriesBaseDir)

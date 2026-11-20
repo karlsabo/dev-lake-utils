@@ -1,16 +1,19 @@
 package com.github.karlsabo.devlake.enghub.screen
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
@@ -26,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -211,56 +215,68 @@ private fun SettingsBody(
     modifier: Modifier = Modifier,
 ) {
     val renderPlan = settingsRenderPlan(state, navigation.state)
-    Column(
-        modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(end = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        if (renderPlan.noMatches) {
-            Text(
-                text = NO_MATCHING_SETTINGS_LABEL,
-                style = MaterialTheme.typography.body2,
-                modifier = Modifier.testTag("settings-no-matches"),
-            )
-            return@Column
-        }
-        renderPlan.sections.forEach { sectionView ->
-            SettingsSection(sectionView.section.label) {
-                when (sectionView.section) {
-                    EngHubSettingsSection.GitHubAccess -> GitHubAccessSettings(
-                        state = state,
-                        groups = sectionView.groups,
-                        compact = compact,
-                        actions = actions,
-                    )
-
-                    EngHubSettingsSection.GitHubActivity -> GitHubActivitySettings(
-                        state = state,
-                        groups = sectionView.groups,
-                        actions = actions,
-                    )
-
-                    EngHubSettingsSection.Repositories -> RepositoriesSettingsContent(
-                        state = state,
-                        sectionView = sectionView,
-                        navigation = navigation,
-                        compact = compact,
-                        actions = actions,
-                    )
-
-                    EngHubSettingsSection.LlmSkillTemplates -> LlmSkillTemplateSettings(
-                        state = state,
-                        groups = sectionView.groups,
-                        actions = actions,
-                    )
-
-                    EngHubSettingsSection.PlanningAndSetup -> PlanningAndSetupSettings(
-                        state = state,
-                        groups = sectionView.groups,
-                        compact = compact,
-                        actions = actions,
-                    )
+    val scrollState = rememberScrollState()
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(end = SettingsScrollbarGutter, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            if (renderPlan.noMatches) {
+                Text(
+                    text = NO_MATCHING_SETTINGS_LABEL,
+                    style = MaterialTheme.typography.body2,
+                    modifier = Modifier.testTag("settings-no-matches"),
+                )
+            }
+            renderPlan.sections.forEach { sectionView ->
+                SettingsSection(sectionView.section.label) {
+                    SettingsSectionContent(sectionView, state, navigation, compact, actions)
                 }
             }
+        }
+        SettingsVerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        )
+    }
+}
+
+/** Repositories lays out its own cards; every other section is one card around its setting groups. */
+@Composable
+private fun SettingsSectionContent(
+    sectionView: SettingsSectionView,
+    state: EngHubSettingsUiState,
+    navigation: EngHubSettingsNavigation,
+    compact: Boolean,
+    actions: EngHubSettingsActions,
+) {
+    val groups = sectionView.groups
+    when (sectionView.section) {
+        EngHubSettingsSection.Repositories -> RepositoriesSettingsContent(
+            state = state,
+            sectionView = sectionView,
+            navigation = navigation,
+            compact = compact,
+            actions = actions,
+        )
+
+        EngHubSettingsSection.GitHubAccess -> SettingsCard(title = null) {
+            GitHubAccessSettings(state = state, groups = groups, compact = compact, actions = actions)
+        }
+
+        EngHubSettingsSection.GitHubActivity -> SettingsCard(title = null) {
+            GitHubActivitySettings(state = state, groups = groups, actions = actions)
+        }
+
+        EngHubSettingsSection.LlmSkillTemplates -> SettingsCard(title = null) {
+            LlmSkillTemplateSettings(state = state, groups = groups, actions = actions)
+        }
+
+        EngHubSettingsSection.PlanningAndSetup -> SettingsCard(title = null) {
+            PlanningAndSetupSettings(state = state, groups = groups, compact = compact, actions = actions)
         }
     }
 }

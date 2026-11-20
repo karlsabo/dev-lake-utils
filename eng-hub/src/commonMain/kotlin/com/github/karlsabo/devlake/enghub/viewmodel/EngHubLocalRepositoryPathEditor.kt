@@ -64,7 +64,7 @@ internal class EngHubLocalRepositoryPathEditor(
     fun choosePath(repositoryIndex: Int) {
         val id = repositoryIds.idOrNull(repositoryIndex) ?: return
         operationTracker.launch {
-            val selectedPath = directoryPicker.pickDirectory("Choose local repository directory") ?: return@launch
+            val selectedPath = directoryPicker.pickDirectory(LOCAL_REPOSITORY_PICKER_TITLE) ?: return@launch
             val currentIndex = repositoryIds.indexOf(id)
             if (currentIndex == -1) return@launch
             val error = selectedPath.localRepositoryValidationError(
