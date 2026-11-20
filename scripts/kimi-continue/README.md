@@ -14,8 +14,7 @@ All of these must hold:
 - the model id is exactly `accounts/fireworks/models/kimi-k3p1-pro`
 - `stopReason` is `"stop"`, and the turn completed with no tool results
 - the message has no `thinking` and no `toolCall` parts
-- the last non-empty text line contains a sentence that *starts* with an intent to act,
-  and that line does not end with `?`:
+- the last non-empty text line contains a sentence that *starts* with an intent to act:
   - `I'll`, `I will`, `Let me`, `I can`, `Use `, or `Should ` at the start of a sentence
   - an imperative action verb such as `Read docs.` or `Check the diff.` at the start
     of a sentence, including after `Now`, `Then`, or `Next`
@@ -23,6 +22,11 @@ All of these must hold:
     clause (`I'll`, `I will`, `Let me`, `I can`, `we'll`). A comma or colon after the
     sequencing word is optional and is consumed, so punctuation alone is not an action:
     "Now, the implementation is complete." is a completed-task summary and does not count.
+  - a direct final-answer introduction, `So`, optionally followed by a comma, or
+    `Perhaps`, followed by an optional `short` and then `answer`, `response`, or `respond`
+    at the start of the final sentence. This covers Kimi stopping at "So short answer:
+    producing the answer; descriptions such as "The short answer is complete." do not
+    match.
 
 Matching only at the start of a sentence keeps completed-task summaries out, such as
 "The Next.js upgrade is complete." or "All tests pass. Now, the implementation is

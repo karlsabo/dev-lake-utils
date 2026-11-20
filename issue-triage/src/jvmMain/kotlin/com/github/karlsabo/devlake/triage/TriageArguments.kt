@@ -3,8 +3,8 @@ package com.github.karlsabo.devlake.triage
 import java.nio.file.Files
 import java.nio.file.Path
 
-internal const val DEFAULT_ASSESSMENT_MODEL = "openai-codex/gpt-5.6-sol"
-internal const val DEFAULT_THINKING_LEVEL = "medium"
+internal const val DEFAULT_ASSESSMENT_MODEL = "openai-codex/gpt-6.1-sol"
+internal const val DEFAULT_THINKING_LEVEL = "high"
 internal const val DEFAULT_ASSESSMENT_CONCURRENCY = 4
 
 internal data class TriageArguments(

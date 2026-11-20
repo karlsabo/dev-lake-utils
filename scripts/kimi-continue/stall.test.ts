@@ -43,9 +43,11 @@ const STALLS = [
   "No subagent. Should have no yaml module. Could use `ruby -ryaml`.\nShould read notification policy path exact list `rg --files notification-policies/iam`. Then read main identity file perhaps generated name.",
   // 2026-11-19T22-46-06-014Z* (response to the first automatic nudge)
   "I have tool calls above actually need continue. No response. Read docs.",
+  // 2026-11-06T21-15-58-468Z* (next user message: "What's your answer?")
+  "What I should distinguish is evals: they run under Pants and already import klaviyo, so no same restriction. Routing them through helper avoids divergence but extends duplication and requires loosening BUILD visibility. Reusing knotary there would arguably be cleaner; for maintenance scripts true reuse requires changing execution contract to Pants/packaged env or extracting small standalone shared lib. So short answer: duplicate was deliberate to preserve direct-python CLI workflow, not technically required, and it's fair to question",
 ];
 
-test("detects the five recorded Kimi K3.1 Pro stalls", () => {
+test("detects the six recorded Kimi K3.1 Pro stalls", () => {
   for (const text of STALLS) {
     assert.equal(isStalledTurn(textTurn(text), KIMI), true, text);
   }
@@ -54,6 +56,28 @@ test("detects the five recorded Kimi K3.1 Pro stalls", () => {
 test("accepts an imperative action at the start of a sentence", () => {
   assert.equal(isStalledTurn(textTurn("Read docs."), KIMI), true);
   assert.equal(isStalledTurn(textTurn("Check the diff, then run the tests."), KIMI), true);
+});
+
+test("detects an unfinished final-answer introduction", () => {
+  const intents = [
+    "So short answer: duplicate was deliberate, and it's fair to question",
+    "So respond: we should keep the existing API",
+    "Perhaps respond with a three-paragraph explanation.",
+    "Would this violate sharing? So short answer: no, because the execution contracts differ",
+  ];
+  for (const text of intents) {
+    assert.equal(isStalledTurn(textTurn(text), KIMI), true, text);
+  }
+
+  const finals = [
+    "The short answer is complete.",
+    "So the answer is documented below.",
+    "We gave a short answer and recorded the supporting evidence.",
+    "Perhaps respond: should I use option A?",
+  ];
+  for (const text of finals) {
+    assert.equal(isStalledTurn(textTurn(text), KIMI), false, text);
+  }
 });
 
 test("passes genuine final answers through", () => {

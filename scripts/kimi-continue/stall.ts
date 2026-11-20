@@ -80,6 +80,9 @@ const ACTION_VERBS = [
 
 const ACTION_VERB_STARTER = new RegExp(`^(?:${ACTION_VERBS.join("|")})\\b`, "i");
 
+/** A direct announcement of the final answer; unlike an action verb, the sentence is often unfinished. */
+const FINAL_RESPONSE_START = /^(?:So|Perhaps),?\s+(?:short\s+)?(?:answer|response|respond)\b/i;
+
 /** Sequencing words. "Now", "Then", and "Next" only express intent when an action follows. */
 const SEQUENCE_STARTER = /^(?:Now|Then|Next)\b/i;
 
@@ -142,7 +145,13 @@ export function isStalledTurn(message: StallCandidate, modelId: string | undefin
 
   const lastLine = lines.at(-1);
   if (lastLine === undefined) return false;
-  if (lastLine.endsWith("?")) return false;
 
-  return sentences(lastLine).some(statesIntent);
+  const finalSentences = sentences(lastLine);
+  const lastSentence = finalSentences.at(-1);
+  return (
+    finalSentences.some(statesIntent) ||
+    (lastSentence !== undefined &&
+      !lastSentence.endsWith("?") &&
+      FINAL_RESPONSE_START.test(lastSentence))
+  );
 }
