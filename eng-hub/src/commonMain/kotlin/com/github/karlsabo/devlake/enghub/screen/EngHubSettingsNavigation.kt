@@ -117,17 +117,21 @@ internal fun EngHubSettingsNavigationState.clearedQuery(): EngHubSettingsNavigat
     )
 }
 
-/** Choosing a section ends an active search; the explicit choice wins over restoring the pre-search view. */
+/**
+ * Choosing a section ends an active search and cancels an unresolved selection request. Both are explicit choices that
+ * win over restoring the pre-search view or resolving a pending one.
+ */
 internal fun EngHubSettingsNavigationState.withSection(
     section: EngHubSettingsSection,
 ): EngHubSettingsNavigationState = if (query.isBlank()) {
-    copy(section = section)
+    copy(section = section, pendingRepositorySelection = null)
 } else {
     copy(
         section = section,
         query = "",
         restoreDestination = null,
         repositorySelectedDuringSearch = false,
+        pendingRepositorySelection = null,
     )
 }
 

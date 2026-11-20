@@ -204,6 +204,35 @@ class EngHubSettingsNavigationTest {
     }
 
     @Test
+    fun sectionNavigationCancelsAPendingUndoSelection() {
+        val state = settingsState()
+        val removed = state.copy(localRepositories = state.localRepositories.filter { it.id == 2L })
+        val navigation = EngHubSettingsNavigation(initialSettingsNavigationState(removed))
+
+        navigation.requestRepositorySelectionByPath("/workspace/api")
+        navigation.selectSection(EngHubSettingsSection.PlanningAndSetup)
+
+        assertNull(navigation.state.pendingRepositorySelection)
+    }
+
+    @Test
+    fun lateUndoRestorationDoesNotSupersedeASectionNavigationAndNewSearch() {
+        val state = settingsState()
+        val removed = state.copy(localRepositories = state.localRepositories.filter { it.id == 2L })
+        val navigation = EngHubSettingsNavigation(initialSettingsNavigationState(removed))
+
+        navigation.requestRepositorySelectionByPath("/workspace/api")
+        navigation.selectSection(EngHubSettingsSection.PlanningAndSetup)
+        navigation.updateQuery("setup shell")
+        navigation.reconcileRepositories(state.localRepositories)
+        navigation.clearQuery()
+
+        assertEquals(EngHubSettingsSection.PlanningAndSetup, navigation.state.section)
+        assertNull(navigation.state.restoreDestination)
+        assertEquals(EngHubSettingsSection.PlanningAndSetup, state.planFor(navigation.state).sections.single().section)
+    }
+
+    @Test
     fun repositoryIdentityOutsideTheCurrentListIsIgnored() {
         val state = settingsState()
 
