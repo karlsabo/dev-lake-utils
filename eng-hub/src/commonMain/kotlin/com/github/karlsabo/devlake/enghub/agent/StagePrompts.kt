@@ -62,9 +62,14 @@ internal fun reviewerTaskPrompt(
 /**
  * The follow-up prompt sent in a stage's existing conversation after its report fails validation.
  *
- * The prompt is self-contained: it carries the stage's original task prompt and the rejected reply, so the
- * repair does not depend on those messages surviving the session's bounded history. The repair still runs in
- * the same session, so the tool exchange is present when the history cap keeps it.
+ * The prompt is self-contained and still runs in the same session, so the tool exchange is present when the
+ * history cap keeps it.
+ *
+ * @param stage the stage whose report contract the reply must satisfy.
+ * @param taskPrompt the stage's original task prompt, carried so no earlier message must survive the history
+ *   cap.
+ * @param rejectedReply the invalid reply, carried for the same reason.
+ * @param rejectionReason the validation failure, which the reply must correct.
  */
 internal fun reportRepairPrompt(
     stage: StageName,

@@ -40,6 +40,9 @@ enum class ReviewVerdict {
  *
  * This is the only failure the flow repairs. Transport, executor, tool, and other failures do not use this
  * type, so they keep propagating unchanged instead of receiving a repair turn.
+ *
+ * @param message the validation failure, which the repair prompt carries as the rejection reason.
+ * @param cause the decode failure, when the reply could not be deserialized.
  */
 class InvalidStageReportException(
     message: String,
