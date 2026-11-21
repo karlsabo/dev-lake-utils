@@ -25,22 +25,14 @@ data class StoryFlowResult(
 )
 
 /**
- * Runs one story through a tool-capable implementor and then a fresh reviewer.
+ * Runs one story through an implementor and a reviewer that cannot inherit its conversation.
  *
- * The implementor session is closed before the reviewer opens, so the reviewer cannot inherit its
- * conversation. The baseline is recorded before the implementor starts, so a commit cannot hide a change, and
- * a failed change read fails the run.
+ * The reviewer judges changes read from the working tree after the implementor finishes, so a commit cannot hide
+ * a change. Only report-validation failures are repaired, by re-asking the same session without replaying the stage.
  *
- * A stage report that fails validation is repaired in the same session by re-asking with a self-contained
- * prompt that carries the stage's original task prompt, the rejected reply, the rejection reason, and the
- * report contract. The flow does not reopen or replay the stage, but the stage's tools remain available to
- * the repair reply. Failures other than [InvalidStageReportException] propagate without a repair turn.
- *
- * @param sessions opens each stage's isolated conversation.
- * @param workingTreeChanges reads the changes the reviewer sees from the working tree, not the paths the
- *   implementor claims.
- * @param repairBudget the repair asks allowed per stage (default one), not model turns; the run fails when
- *   they are exhausted.
+ * @param sessions opens each stage's conversation.
+ * @param workingTreeChanges reads the working tree, not the paths the implementor claims.
+ * @param repairBudget repair asks allowed per stage (default one), not model turns.
  */
 class ImplementReviewFlow(
     private val sessions: StageSessionFactory,
