@@ -386,9 +386,14 @@ The `implementReviewChat` task runs a separate JVM terminal program that carries
 Every nonblank story line starts a new run, so a previous story's conversation never reaches the next implementor or
 reviewer. The implementor reports `{"files":["Greeting.kt"],"what":"Updated greeting","why":"Story asks to greet Ada"}`;
 the reviewer reports `{"verdict":"pass","findings":[]}` or `{"verdict":"needs_changes","findings":["..."]}`.
-Ordinary Kotlin code decodes and validates both reports; invalid JSON, blank fields, a `pass` with findings, or
-`needs_changes` with no findings fail the run instead of producing a review. The flow does not fix findings, commit, or
-open pull requests.
+Ordinary Kotlin code decodes and validates both reports. Invalid JSON, blank fields, a `pass` with findings, or
+`needs_changes` with no findings are report-validation failures: the flow re-asks the same stage conversation with a
+self-contained prompt carrying the stage's original task prompt, the rejected reply, the precise rejection reason, and
+the expected JSON contract. It does not reopen or replay the stage, but the stage's tools remain available to the repair
+reply. The repair budget counts repair asks (default one per stage) and is set by the caller with
+`ImplementReviewFlow(..., repairBudget = n)`; it does not count model turns. An exhausted budget fails the run instead
+of producing a review. Transport, executor, and tool failures are not
+repaired. The flow does not fix findings, commit, or open pull requests.
 
 Start LM Studio as for terminal chat, then launch from the repository root:
 

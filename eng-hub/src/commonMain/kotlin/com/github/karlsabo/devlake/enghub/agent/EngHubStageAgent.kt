@@ -16,10 +16,7 @@ Use the read, write, and bash tools to make the requested change in the current 
 Relative paths resolve from the terminal's launch working directory.
 Do not ask questions and do not describe the change outside the report.
 When the work is done, reply with only one JSON object:
-{"files":["relative/path.kt"],"what":"what changed","why":"why it changed"}
-files lists every file you touched and may be empty when the story needs no edit.
-what and why must be nonblank.
-"""
+""" + IMPLEMENTOR_REPORT_CONTRACT
 
 private const val REVIEWER_SYSTEM_PROMPT = """
 You are Eng Hub's independent reviewer stage in an implement-then-review workflow.
@@ -30,10 +27,7 @@ Use the read tool to inspect the files you need. You cannot change files; this s
 Never pass a change you have not seen in the verified list or in the files you read.
 Do not ask questions.
 When the review is done, reply with only one JSON object:
-{"verdict":"pass","findings":[]}
-verdict is "pass" or "needs_changes". findings lists concrete problems, one per entry.
-A pass has no findings; needs_changes has at least one finding.
-"""
+""" + REVIEWER_REPORT_CONTRACT
 
 /**
  * Builds one isolated Koog conversation per stage, each with its own chat memory, so an implementor
