@@ -3,7 +3,8 @@
 A local [pi](https://pi.dev) extension. Nothing here is published; pi loads these files
 through the `extensions` array in `~/.pi/agent/settings.json`.
 
-Kimi K3.1 Pro (`accounts/fireworks/models/kimi-k3p1-pro`) sometimes ends a turn after
+Kimi K3.1 Pro (`moonshotai/kimi-k3.1-pro` on OpenRouter,
+`accounts/fireworks/models/kimi-k3p1-pro` on Fireworks) sometimes ends a turn after
 saying what it will do next without making the tool call, so the user has to type
 "continue". This extension detects that stall and continues the run automatically.
 
@@ -11,7 +12,11 @@ saying what it will do next without making the tool call, so the user has to typ
 
 All of these must hold:
 
-- the model id is exactly `accounts/fireworks/models/kimi-k3p1-pro`
+- the model id names the K3.1 Pro family, compared case-insensitively on the last path
+  segment with separators ignored: `moonshotai/kimi-k3.1-pro`,
+  `accounts/fireworks/models/kimi-k3p1-pro`, `kimi-k3-1-pro`, `kimi-k31-pro`, and
+  trailing variant tags such as `:free` or `-preview` all match. Other Kimi models
+  (`moonshotai/kimi-k3`, `moonshotai/kimi-k2.6`) do not.
 - `stopReason` is `"stop"`, and the turn completed with no tool results
 - the message has no `thinking` and no `toolCall` parts
 - the last non-empty text line contains a sentence that *starts* with an intent to act:

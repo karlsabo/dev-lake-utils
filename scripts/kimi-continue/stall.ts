@@ -1,7 +1,21 @@
 import type {AssistantMessage} from "@earendil-works/pi-ai";
 
-/** Exact model id of Kimi K3.1 Pro. Other Kimi models are out of scope. */
-export const KIMI_K3_1_PRO_MODEL_ID = "accounts/fireworks/models/kimi-k3p1-pro";
+/** Model id of Kimi K3.1 Pro on the OpenRouter provider, the one in use. */
+export const KIMI_K3_1_PRO_MODEL_ID = "moonshotai/kimi-k3.1-pro";
+
+/**
+ * Kimi K3.1 Pro ids: `moonshotai/kimi-k3.1-pro` on OpenRouter,
+ * `accounts/fireworks/models/kimi-k3p1-pro` on Fireworks (`p` for the version dot).
+ * Sibling Kimi models such as `kimi-k3` and `kimi-k2.6` do not match.
+ */
+const KIMI_K3_1_PRO = /^kimi\s?k3\s?(?:p\s?)?1\s?pro(?:\s|$)/;
+
+/** True when the model id names Kimi K3.1 Pro, whatever the provider prefix or separators. */
+export function isKimiK31ProModel(modelId: string | undefined): boolean {
+  if (modelId === undefined) return false;
+  const segment = modelId.slice(modelId.lastIndexOf("/") + 1).toLowerCase();
+  return KIMI_K3_1_PRO.test(segment.replace(/[^a-z0-9]+/g, " "));
+}
 
 /** The fields the stall rule reads from an assistant message. */
 export type StallCandidate = Pick<AssistantMessage, "role" | "content" | "stopReason">;
@@ -127,7 +141,7 @@ function statesIntent(sentence: string): boolean {
  * the user to type "continue".
  */
 export function isStalledTurn(message: StallCandidate, modelId: string | undefined): boolean {
-  if (modelId !== KIMI_K3_1_PRO_MODEL_ID) return false;
+  if (!isKimiK31ProModel(modelId)) return false;
   if (message.role !== "assistant") return false;
   if (message.stopReason !== "stop") return false;
   if (message.content.some((part) => part.type === "thinking" || part.type === "toolCall")) {

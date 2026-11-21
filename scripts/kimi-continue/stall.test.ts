@@ -164,12 +164,37 @@ test("ignores error and aborted responses", () => {
   assert.equal(isStalledTurn(textTurn(STALLS[0], "aborted"), KIMI), false);
 });
 
-test("only matches the exact Kimi K3.1 Pro model id", () => {
-  assert.equal(isStalledTurn(textTurn(STALLS[0]), "kimi-k3"), false);
-  assert.equal(
-    isStalledTurn(textTurn(STALLS[0]), "accounts/fireworks/models/kimi-k3"),
-    false,
-  );
+test("matches Kimi K3.1 Pro across provider prefixes and id spellings", () => {
+  const ids = [
+    "moonshotai/kimi-k3.1-pro",
+    "accounts/fireworks/models/kimi-k3p1-pro",
+    "kimi-k3.1-pro",
+    "kimi-k3p1-pro",
+    "kimi-k3-1-pro",
+    "kimi-k31-pro",
+    "Kimi-K3.1-Pro",
+    "moonshotai/kimi-k3.1-pro:free",
+    "kimi-k3.1-pro-preview",
+  ];
+  for (const id of ids) {
+    assert.equal(isStalledTurn(textTurn(STALLS[0]), id), true, id);
+  }
+});
+
+test("ignores other Kimi models", () => {
+  const ids = [
+    "moonshotai/kimi-k3",
+    "kimi-k3",
+    "accounts/fireworks/models/kimi-k3",
+    "kimi-k3.1",
+    "moonshotai/kimi-k2.6",
+    "cf/moonshotai/kimi-k2.6",
+    "kimi-k3.2-pro",
+    "my-kimi-k3.1-pro",
+  ];
+  for (const id of ids) {
+    assert.equal(isStalledTurn(textTurn(STALLS[0]), id), false, id);
+  }
   assert.equal(isStalledTurn(textTurn(STALLS[0]), undefined), false);
 });
 
