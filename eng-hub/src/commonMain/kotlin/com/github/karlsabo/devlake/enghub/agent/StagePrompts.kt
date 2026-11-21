@@ -62,19 +62,28 @@ internal fun reviewerTaskPrompt(
 /**
  * The follow-up prompt sent in a stage's existing conversation after its report fails validation.
  *
- * The session already holds the stage's request, reply, and tool exchange, so this prompt carries only the
- * precise rejection and the contract the next reply must satisfy; it does not replay the stage.
+ * The prompt is self-contained: it carries the stage's original task prompt and the rejected reply, so the
+ * repair does not depend on those messages surviving the session's bounded history. The repair still runs in
+ * the same session, so the tool exchange is present when the history cap keeps it.
  */
 internal fun reportRepairPrompt(
     stage: StageName,
+    taskPrompt: String,
+    rejectedReply: String,
     rejectionReason: String,
 ): String = buildString {
+    appendLine("The ${stage.id} stage's original request was:")
+    appendLine(taskPrompt.trim())
+    appendLine()
     appendLine("Your previous reply could not be accepted as the ${stage.id} report.")
+    appendLine("Rejected reply:")
+    appendLine(rejectedReply.trim())
+    appendLine()
     appendLine("Rejection reason: $rejectionReason")
     appendLine()
     appendLine("Reply again with only one JSON object, using this contract:")
     append(stageReportContract(stage))
-    append("Do not rerun the stage or repeat completed tool work; correct the report only.")
+    append("Do not repeat completed tool work; correct the report only.")
 }
 
 internal fun stageReportContract(stage: StageName): String = when (stage) {

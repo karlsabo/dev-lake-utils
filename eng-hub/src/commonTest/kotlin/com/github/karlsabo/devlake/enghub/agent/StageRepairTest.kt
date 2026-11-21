@@ -4,7 +4,6 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private const val REPAIR_STORY = "Change Greeting.kt to greet Ada"
@@ -39,7 +38,11 @@ class StageRepairTest {
         assertTrue(repairPrompt.contains("Rejection reason: Implementor response is not a valid report"))
         assertTrue(repairPrompt.contains("\"files\":[\"relative/path.kt\"]"))
         assertTrue(repairPrompt.contains("what and why must be nonblank"))
-        assertFalse(repairPrompt.contains(REPAIR_STORY), "the repair turn must not replay the stage request")
+        assertTrue(
+            repairPrompt.contains(implementorTaskPrompt(REPAIR_STORY)),
+            "the repair turn must carry the stage request",
+        )
+        assertTrue(repairPrompt.contains("Updated greeting"), "the repair turn must carry the rejected reply")
     }
 
     @Test
@@ -58,6 +61,14 @@ class StageRepairTest {
         assertTrue(repairPrompt.contains("Rejection reason: Reviewer response is not a valid report"))
         assertTrue(repairPrompt.contains("\"verdict\":\"pass\""))
         assertTrue(repairPrompt.contains("A pass has no findings"))
+        val reviewerTask =
+            reviewerTaskPrompt(
+                REPAIR_STORY,
+                decodeImplementationReport(REPAIR_IMPLEMENTATION),
+                greetingReport(),
+            )
+        assertTrue(repairPrompt.contains(reviewerTask), "the repair turn must carry the stage request")
+        assertTrue(repairPrompt.contains("looks fine"), "the repair turn must carry the rejected reply")
     }
 
     @Test

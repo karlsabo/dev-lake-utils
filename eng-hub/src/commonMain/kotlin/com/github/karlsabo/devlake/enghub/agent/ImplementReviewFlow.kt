@@ -32,9 +32,11 @@ data class StoryFlowResult(
  * implementor claims; the baseline is recorded before the implementor starts, so a commit cannot hide a
  * change, and a failed change read fails the run.
  *
- * A stage report that fails validation is repaired in the same session, which already holds the stage's
- * request, reply, and tool exchange. [repairBudget] bounds those repair replies; the run fails when it is
- * exhausted. Failures other than [InvalidStageReportException] propagate without a repair turn.
+ * A stage report that fails validation is repaired in the same session by re-asking with a self-contained
+ * prompt that carries the stage's original task prompt, the rejected reply, the rejection reason, and the
+ * report contract. The flow does not reopen or replay the stage, but the stage's tools remain available to
+ * the repair reply. [repairBudget] counts repair asks (default one per stage), not model turns; the run fails
+ * when it is exhausted. Failures other than [InvalidStageReportException] propagate without a repair turn.
  */
 class ImplementReviewFlow(
     private val sessions: StageSessionFactory,
@@ -86,7 +88,7 @@ class ImplementReviewFlow(
             } catch (rejection: InvalidStageReportException) {
                 if (repairsRemaining == 0) throw rejection
                 repairsRemaining--
-                nextPrompt = reportRepairPrompt(stage, rejection.message.orEmpty())
+                nextPrompt = reportRepairPrompt(stage, prompt, response, rejection.message.orEmpty())
             }
         }
     }
