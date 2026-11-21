@@ -13,6 +13,18 @@ private const val TRUNCATED_PATCH_NOTICE =
     "[Diff truncated to fit this prompt; read every added file. " +
         "Diffs of modified and deleted files are kept in full because their removed lines cannot be read.]"
 
+/** The report contract the implementor stage must satisfy. */
+internal const val IMPLEMENTOR_REPORT_CONTRACT = """{"files":["relative/path.kt"],"what":"what changed","why":"why it changed"}
+files lists every file you touched and may be empty when the story needs no edit.
+what and why must be nonblank.
+"""
+
+/** The report contract the reviewer stage must satisfy. */
+internal const val REVIEWER_REPORT_CONTRACT = """{"verdict":"pass","findings":[]}
+verdict is "pass" or "needs_changes". findings lists concrete problems, one per entry.
+A pass has no findings; needs_changes has at least one finding.
+"""
+
 /** The user prompt that starts the implementor stage for [story]. */
 internal fun implementorTaskPrompt(story: String): String = """
     Story:
@@ -45,6 +57,29 @@ internal fun reviewerTaskPrompt(
     append("Review this implementation independently. Read the contents of every added (A) file ")
     append("listed above before giving a pass verdict; untracked files have no diff. Use the read tool ")
     append("to inspect other files as needed, and judge the verified changes and the files themselves.")
+}
+
+/**
+ * The follow-up prompt sent in a stage's existing conversation after its report fails validation.
+ *
+ * The session already holds the stage's request, reply, and tool exchange, so this prompt carries only the
+ * precise rejection and the contract the next reply must satisfy; it does not replay the stage.
+ */
+internal fun reportRepairPrompt(
+    stage: StageName,
+    rejectionReason: String,
+): String = buildString {
+    appendLine("Your previous reply could not be accepted as the ${stage.id} report.")
+    appendLine("Rejection reason: $rejectionReason")
+    appendLine()
+    appendLine("Reply again with only one JSON object, using this contract:")
+    append(stageReportContract(stage))
+    append("Do not rerun the stage or repeat completed tool work; correct the report only.")
+}
+
+internal fun stageReportContract(stage: StageName): String = when (stage) {
+    StageName.IMPLEMENTOR -> IMPLEMENTOR_REPORT_CONTRACT
+    StageName.REVIEWER -> REVIEWER_REPORT_CONTRACT
 }
 
 /**

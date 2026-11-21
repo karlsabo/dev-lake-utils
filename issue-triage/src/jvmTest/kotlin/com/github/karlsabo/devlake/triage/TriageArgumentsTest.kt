@@ -34,8 +34,8 @@ class TriageArgumentsTest {
         assertEquals("Test Project", arguments.project)
         assertEquals("test-label", arguments.label)
         assertEquals(listOf(firstRoot, secondRoot), arguments.repositoryRoots)
-        assertEquals("openai-codex/gpt-5.6-sol", arguments.model)
-        assertEquals("medium", arguments.thinking)
+        assertEquals(DEFAULT_ASSESSMENT_MODEL, arguments.model)
+        assertEquals(DEFAULT_THINKING_LEVEL, arguments.thinking)
         assertEquals(emptySet(), arguments.retriage)
         assertEquals(4, arguments.assessmentConcurrency)
     }

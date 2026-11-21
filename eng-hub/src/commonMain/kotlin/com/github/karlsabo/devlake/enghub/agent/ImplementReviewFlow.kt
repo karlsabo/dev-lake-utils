@@ -15,6 +15,9 @@ fun interface StageSessionFactory {
     suspend fun open(stage: StageName): ChatSession
 }
 
+/** The default number of repair replies allowed after one stage report fails validation. */
+const val DEFAULT_STAGE_REPAIR_BUDGET = 1
+
 /** The validated reports from one implement-then-review run. */
 data class StoryFlowResult(
     val implementation: ImplementationReport,
@@ -28,11 +31,20 @@ data class StoryFlowResult(
  * conversation. The reviewer sees changes [workingTreeChanges] read from the working tree, not the paths the
  * implementor claims; the baseline is recorded before the implementor starts, so a commit cannot hide a
  * change, and a failed change read fails the run.
+ *
+ * A stage report that fails validation is repaired in the same session, which already holds the stage's
+ * request, reply, and tool exchange. [repairBudget] bounds those repair replies; the run fails when it is
+ * exhausted. Failures other than [InvalidStageReportException] propagate without a repair turn.
  */
 class ImplementReviewFlow(
     private val sessions: StageSessionFactory,
     private val workingTreeChanges: WorkingTreeChanges,
+    private val repairBudget: Int = DEFAULT_STAGE_REPAIR_BUDGET,
 ) {
+    init {
+        require(repairBudget >= 0) { "repairBudget must not be negative: $repairBudget" }
+    }
+
     suspend fun run(story: String): StoryFlowResult {
         require(story.isNotBlank()) { "story must not be blank" }
         val baseline = workingTreeChanges.baseline()
@@ -43,7 +55,7 @@ class ImplementReviewFlow(
     }
 
     private suspend fun implement(story: String): ImplementationReport = withStage(StageName.IMPLEMENTOR) { session ->
-        decodeImplementationReport(session.ask(implementorTaskPrompt(story)))
+        askForReport(session, StageName.IMPLEMENTOR, implementorTaskPrompt(story), ::decodeImplementationReport)
     }
 
     private suspend fun review(
@@ -51,7 +63,32 @@ class ImplementReviewFlow(
         implementation: ImplementationReport,
         changes: WorkingTreeChangeReport,
     ): ReviewReport = withStage(StageName.REVIEWER) { session ->
-        decodeReviewReport(session.ask(reviewerTaskPrompt(story, implementation, changes)))
+        askForReport(
+            session,
+            StageName.REVIEWER,
+            reviewerTaskPrompt(story, implementation, changes),
+            ::decodeReviewReport,
+        )
+    }
+
+    private suspend fun <T> askForReport(
+        session: ChatSession,
+        stage: StageName,
+        prompt: String,
+        decode: (String) -> T,
+    ): T {
+        var nextPrompt = prompt
+        var repairsRemaining = repairBudget
+        while (true) {
+            val response = session.ask(nextPrompt)
+            try {
+                return decode(response)
+            } catch (rejection: InvalidStageReportException) {
+                if (repairsRemaining == 0) throw rejection
+                repairsRemaining--
+                nextPrompt = reportRepairPrompt(stage, rejection.message.orEmpty())
+            }
+        }
     }
 
     private suspend fun <T> withStage(

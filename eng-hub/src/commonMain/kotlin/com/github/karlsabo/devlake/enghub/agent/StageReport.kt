@@ -35,34 +35,47 @@ enum class ReviewVerdict {
     NEEDS_CHANGES,
 }
 
+/**
+ * A stage reply that is not a valid report.
+ *
+ * This is the only failure the flow repairs. Transport, executor, tool, and other failures do not use this
+ * type, so they keep propagating unchanged instead of receiving a repair turn.
+ */
+class InvalidStageReportException(
+    message: String,
+    cause: Throwable? = null,
+) : IllegalArgumentException(message, cause)
+
 private val reportJson = Json
 
 internal fun decodeImplementationReport(response: String): ImplementationReport {
     val report = decodeReport("Implementor", response, ImplementationReport.serializer())
-    require(report.files.none { file -> file.isBlank() }) {
-        "Implementor report file entries must not be blank."
+    if (report.files.any { file -> file.isBlank() }) {
+        rejectReport("Implementor report file entries must not be blank.")
     }
-    require(report.what.isNotBlank()) { "Implementor report 'what' must not be blank." }
-    require(report.why.isNotBlank()) { "Implementor report 'why' must not be blank." }
+    if (report.what.isBlank()) rejectReport("Implementor report 'what' must not be blank.")
+    if (report.why.isBlank()) rejectReport("Implementor report 'why' must not be blank.")
     return report
 }
 
 internal fun decodeReviewReport(response: String): ReviewReport {
     val report = decodeReport("Reviewer", response, ReviewReport.serializer())
-    require(report.findings.none { finding -> finding.isBlank() }) {
-        "Reviewer report findings must not be blank."
+    if (report.findings.any { finding -> finding.isBlank() }) {
+        rejectReport("Reviewer report findings must not be blank.")
     }
     when (report.verdict) {
-        ReviewVerdict.PASS -> require(report.findings.isEmpty()) {
-            "Reviewer report 'pass' must not include findings."
+        ReviewVerdict.PASS -> if (report.findings.isNotEmpty()) {
+            rejectReport("Reviewer report 'pass' must not include findings.")
         }
 
-        ReviewVerdict.NEEDS_CHANGES -> require(report.findings.isNotEmpty()) {
-            "Reviewer report 'needs_changes' must include at least one finding."
+        ReviewVerdict.NEEDS_CHANGES -> if (report.findings.isEmpty()) {
+            rejectReport("Reviewer report 'needs_changes' must include at least one finding.")
         }
     }
     return report
 }
+
+private fun rejectReport(message: String): Nothing = throw InvalidStageReportException(message)
 
 private fun <T> decodeReport(
     stage: String,
@@ -71,5 +84,5 @@ private fun <T> decodeReport(
 ): T = try {
     reportJson.decodeFromString(deserializer, response)
 } catch (failure: SerializationException) {
-    throw IllegalArgumentException("$stage response is not a valid report: ${failure.message}", failure)
+    throw InvalidStageReportException("$stage response is not a valid report: ${failure.message}", failure)
 }
