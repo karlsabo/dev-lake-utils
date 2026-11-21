@@ -46,6 +46,28 @@ class StageRepairTest {
     }
 
     @Test
+    fun `repairs a domain-invalid implementor report with the precise reason`() = runTest {
+        val implementor =
+            ScriptedStageSession(
+                """{"files":["Greeting.kt"],"what":" ","why":"Story asks to greet Ada"}""",
+                REPAIR_IMPLEMENTATION,
+            )
+        val flow = ImplementReviewFlow(
+            reviewerStageFactory(implementor, FixedStageSession(REPAIR_REVIEW)),
+            RecordingWorkingTreeChanges(),
+        )
+
+        val result = flow.run(REPAIR_STORY)
+
+        assertEquals("Updated greeting", result.implementation.what)
+        assertEquals(2, implementor.prompts.size)
+        assertTrue(
+            implementor.prompts[1]
+                .contains("Rejection reason: Implementor report 'what' must not be blank."),
+        )
+    }
+
+    @Test
     fun `repairs a malformed reviewer report without rerunning the implementor`() = runTest {
         val implementor = ScriptedStageSession(REPAIR_IMPLEMENTATION)
         val reviewer = ScriptedStageSession("looks fine", REPAIR_REVIEW)
