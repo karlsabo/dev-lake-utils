@@ -57,15 +57,15 @@ class StageReportTest {
     @Test
     fun `rejects blank implementor report contents`() {
         val blankWhat =
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<InvalidStageReportException> {
                 decodeImplementationReport("""{"files":[],"what":" ","why":"Already done"}""")
             }
         val blankWhy =
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<InvalidStageReportException> {
                 decodeImplementationReport("""{"files":[],"what":"No edit","why":""}""")
             }
         val blankFile =
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<InvalidStageReportException> {
                 decodeImplementationReport("""{"files":[" "],"what":"No edit","why":"Already done"}""")
             }
 
@@ -96,7 +96,7 @@ class StageReportTest {
     @Test
     fun `rejects a pass that reports findings`() {
         val failure =
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<InvalidStageReportException> {
                 decodeReviewReport(
                     """{"verdict":"pass","findings":["Greeting.kt still says Hello"]}""",
                 )
@@ -108,7 +108,7 @@ class StageReportTest {
     @Test
     fun `rejects needs changes without findings`() {
         val failure =
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<InvalidStageReportException> {
                 decodeReviewReport("""{"verdict":"needs_changes","findings":[]}""")
             }
 
@@ -125,7 +125,7 @@ class StageReportTest {
     @Test
     fun `rejects blank reviewer findings`() {
         val failure =
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<InvalidStageReportException> {
                 decodeReviewReport("""{"verdict":"needs_changes","findings":[""]}""")
             }
 
