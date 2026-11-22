@@ -1,6 +1,7 @@
 package com.github.karlsabo.github.config
 
 import com.github.karlsabo.secret.SecretFileWriteException
+import com.github.karlsabo.secret.SecretFileWriter
 import com.github.karlsabo.secret.createSecretFileWriter
 import kotlinx.io.files.Path
 
@@ -26,9 +27,11 @@ fun interface GitHubSecretFileWriter {
     fun write(path: Path, encodedSecret: String)
 }
 
-internal fun createGitHubSecretFileWriter(): GitHubSecretFileWriter = GitHubSecretFileWriter { path, encodedSecret ->
+internal fun createGitHubSecretFileWriter(
+    secretFileWriter: SecretFileWriter = createSecretFileWriter(GITHUB_PROVIDER_LABEL),
+): GitHubSecretFileWriter = GitHubSecretFileWriter { path, encodedSecret ->
     try {
-        createSecretFileWriter(GITHUB_PROVIDER_LABEL).write(path, encodedSecret)
+        secretFileWriter.write(path, encodedSecret)
     } catch (error: SecretFileWriteException) {
         throw GitHubSecretWriteException(error.message ?: "Could not securely write GitHub secret file: $path", error)
     }

@@ -149,7 +149,7 @@ internal fun pullRequestsForConfig(
     reviewApi: GitHubPullRequestReviewApi,
     summaryApi: GitHubPullRequestSummaryApi,
     config: EngHubConfig,
-): Flow<Result<List<PullRequestUiState>>> = if (config.organizationIds.isEmpty()) {
+): Flow<Result<List<PullRequestUiState>>> = if (config.organizationIds.isEmpty() || config.gitHubAuthor.isBlank()) {
     flowOf(Result.success(emptyList()))
 } else {
     flow {
