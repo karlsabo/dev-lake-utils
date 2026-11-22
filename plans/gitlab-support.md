@@ -171,3 +171,5 @@ Paths below are relative to `/home/karl/git/dev-lake-utils/`. Each acceptance cr
 **Scope:** Cross-project MR branch checkout; permissions to clone source project are required. **Notes:** `CheckoutController.kt` currently constructs a GitHub clone URL from the target repo name; the source repository identity and remote must survive the MR mapping and use existing Git credentials.
 
 **Sequence:** 1 → 21/22 → 2/3/4/5/16/17 → 6 → 7/8/10/11/13/15 → 14/20; 3 → 23; 18 → 19 after MR discovery; 9 and 12 depend on capability verification. Story 17 can be absorbed into story 1 if that acceptance example already demonstrates both providers. Update this mapping after reviewing the tests with the user.
+
+**Progress:** story 1 done in https://github.com/karlsabo/dev-lake-utils/pull/42. Story 2’s behaviour (Open in Browser uses the API-provided MR web URL) ships with it, but its acceptance test is still outstanding. Live GitLab 19.5+ verification remains unavailable.
