@@ -289,6 +289,7 @@ internal data class LocalRepositoryViewModelServices(
         override fun record(job: WorktreeArchiveJob) = Unit
         override fun matches(job: WorktreeArchiveJob) = true
     },
+    val desktopLauncher: DesktopLauncher = LocalRepositoryNoOpDesktopLauncher(),
 )
 
 internal fun createLocalRepositoryViewModel(
@@ -309,7 +310,7 @@ internal fun createLocalRepositoryViewModel(
         directoryPicker = LocalRepositoryNoOpDirectoryPicker(),
         configWriter = configWriter,
     ),
-    desktopServices = EngHubDesktopServices(LocalRepositoryNoOpDesktopLauncher()),
+    desktopServices = EngHubDesktopServices(services.desktopLauncher),
     config = EngHubConfig(
         pollIntervalMs = 60_000,
         worktreePollIntervalMs = testConfig.worktreePollIntervalMs,
