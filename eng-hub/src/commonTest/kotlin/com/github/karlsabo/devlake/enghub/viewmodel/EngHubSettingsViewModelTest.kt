@@ -757,13 +757,15 @@ internal fun kotlinx.coroutines.test.TestScope.settingsViewModel(
     repositoryPathOsFamily: OsFamily = osFamily(),
 ) = EngHubSettingsViewModel(
     engHubConfig = configState.current,
-    loadedGitHubConfig = dependencies.loadedGitHubConfig,
+    loadedAccessConfigs = LoadedAccessConfigs(dependencies.loadedGitHubConfig),
     directoryPicker = dependencies.directoryPicker,
     filePicker = dependencies.filePicker,
     persistence = EngHubSettingsPersistence(
-        gitHubSecretWriter = dependencies.gitHubSecretWriter,
-        saveGitHubAccess = dependencies.saveGitHubAccess,
-        onGitHubAccessCommitted = dependencies.onGitHubAccessCommitted,
+        gitHub = GitHubAccessPersistence(
+            secretWriter = dependencies.gitHubSecretWriter,
+            saveAccess = dependencies.saveGitHubAccess,
+            onAccessCommitted = dependencies.onGitHubAccessCommitted,
+        ),
         committedConfigUpdates = configState.updates,
         updateConfig = { transform ->
             transform(configState.current).also { updatedConfig ->

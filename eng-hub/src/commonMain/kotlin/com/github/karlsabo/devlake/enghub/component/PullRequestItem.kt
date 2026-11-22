@@ -14,7 +14,9 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.enghub.state.PullRequestProvider
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
 import com.github.karlsabo.git.WorktreeSetupStatus
 
@@ -39,8 +41,14 @@ fun PullRequestItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "#${pr.number} ${pr.title}",
+                        text = "${pr.referenceLabel} ${pr.title}",
                         style = MaterialTheme.typography.subtitle1,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = pr.provider.label,
+                        style = MaterialTheme.typography.caption,
+                        modifier = Modifier.testTag("pull-request-provider-${pr.provider.name}"),
                     )
                     if (pr.isDraft) {
                         Spacer(modifier = Modifier.width(8.dp))
@@ -52,9 +60,11 @@ fun PullRequestItem(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(text = pr.repositoryFullName, style = MaterialTheme.typography.caption)
-                    StatusBadge(status = pr.ciStatus)
-                    Text(text = pr.ciSummaryText, style = MaterialTheme.typography.caption)
-                    Text(text = pr.reviewSummaryText, style = MaterialTheme.typography.caption)
+                    if (pr.provider == PullRequestProvider.GitHub) {
+                        StatusBadge(status = pr.ciStatus)
+                        Text(text = pr.ciSummaryText, style = MaterialTheme.typography.caption)
+                        Text(text = pr.reviewSummaryText, style = MaterialTheme.typography.caption)
+                    }
                 }
             }
 

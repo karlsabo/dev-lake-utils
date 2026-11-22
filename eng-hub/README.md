@@ -1,6 +1,6 @@
 # Eng Hub
 
-Desktop Compose app for watching GitHub pull requests and notifications, then taking a few common actions without living in the browser.
+Desktop Compose app for watching GitHub pull requests, authored GitLab merge requests, and GitHub notifications, then taking a few common actions without living in the browser.
 
 ## What It Currently Does
 
@@ -13,7 +13,9 @@ The app has four panes:
 
 ### Pull Requests pane
 
-The pull request pane polls GitHub on a timer and shows open pull requests for the configured `gitHubAuthor` across the configured `organizationIds`.
+The pull request pane polls on a timer and shows open pull requests for the configured `gitHubAuthor` across the configured `organizationIds`, plus open merge requests authored by the configured GitLab account.
+
+GitHub items are labelled `GitHub` with a `#` reference; GitLab items are labelled `GitLab` with a `!` reference such as `!42`. GitLab items come from the one configured self-managed instance and cover every project visible to the account. CI status, review summaries, and `Setup` remain GitHub features in this slice, so GitLab items show their provider, project, reference, title, and draft state only.
 
 Each item currently shows:
 
@@ -65,7 +67,7 @@ This is important because the app is already opinionated, not just a passive das
 
 ## Local Setup
 
-The app stores two config files under the shared `DevLakeUtils` application directory. On first launch, Settings opens with defaults so these files can be created through the application.
+The app stores two configuration files under the shared `DevLakeUtils` application directory, plus separate protected secret files for provider tokens. On first launch, Settings opens with defaults so these files can be created through the application.
 
 Config directory by OS:
 
@@ -77,6 +79,8 @@ Configuration files:
 
 - `github-config.json`
 - `eng-hub-config.json`
+
+GitLab settings live in `eng-hub-config.json`. The GitLab personal access token is stored only in the separate secret file named by `gitLabTokenPath`; that file is written with owner-only permissions and replaced atomically.
 
 ### `github-config.json`
 
@@ -98,6 +102,16 @@ Example secret file:
 }
 ```
 
+The GitLab secret file uses the same protection with its own field:
+
+```json
+{
+  "gitLabToken": "glpat-xxx"
+}
+```
+
+Create a `read_api` personal access token for this read-only slice. Configure the instance URL, secret file path, and token under **GitLab access** in Settings, then use **Validate connection** to check the account through the configured instance. Saved tokens are masked and never displayed.
+
 ### `eng-hub-config.json`
 
 Example:
@@ -111,6 +125,8 @@ Example:
   "worktreePollIntervalMs": 120000,
   "repositoriesBaseDir": "/Users/you/git",
   "gitHubAuthor": "your-github-login",
+  "gitLabInstanceUrl": "https://gitlab.internal.example",
+  "gitLabTokenPath": "/absolute/path/to/gitlab-token.json",
   "planningMarkdownDir": "/Users/you/notebook/llm-planning",
   "llmTemplateValues": {
     "ALERT_TRIAGE_WHERE_TO_LOOK": "- Incident management: inspect the active incident.\n- Observability: compare service health with the alert window."
@@ -135,6 +151,8 @@ Field meanings:
 - `worktreePollIntervalMs`: refresh interval for local worktree discovery and status
 - `repositoriesBaseDir`: where repos are cloned if missing
 - `gitHubAuthor`: GitHub login used for the pull request query
+- `gitLabInstanceUrl`: HTTPS URL of the self-managed GitLab instance, without credentials, query, or fragment. Leaving it blank disables GitLab.
+- `gitLabTokenPath`: absolute path to the file that holds the GitLab personal access token
 - `planningMarkdownDir`: absolute directory used when syncing LLM markdown templates that contain `${PLANNING_MARKDOWN_DIR}`
 - `llmTemplateValues`: Markdown fragments for Eng Hub's known template keys, currently `ALERT_TRIAGE_WHERE_TO_LOOK`. Known tokens are substituted while syncing skill Markdown, nested Markdown references, guidelines, and notes; unrelated tokens such as shell variables remain unchanged. Values are inserted without reformatting. Non-Markdown files are copied unchanged. `PLANNING_MARKDOWN_DIR` is reserved for the dedicated setting above and cannot be overridden through this map. If a known template value is absent or blank, synchronization logs an error and installs corrective guidance in place of that token; configure the named value in Eng Hub Settings and rerun `syncLlmFiles`.
 - `localRepositories`: local repository roots managed by Eng Hub; each entry has an absolute `path` and optional `setupCommands`. Duplicate checks resolve separators plus lexical `.` and `..` segments without accessing the filesystem, while the configured spelling is preserved. Path identity is case-insensitive on Windows and macOS and case-sensitive on Linux. macOS uses the conservative case-insensitive identity because detecting a case-sensitive volume would require filesystem access that Settings intentionally avoids.
@@ -546,6 +564,7 @@ These are the most obvious gaps from the current implementation:
 - Clearer wording around `Setup`: it creates a worktree and runs commands, but it does not directly open an editor unless your configured commands do that
 - Per-item setup progress instead of one global `Setting up...` state
 - Search, filtering, and sorting in both panes once the lists get large
+- GitLab CI status, review summaries, browser, worktree, and notification parity
 - A visible activity log for automatic actions like auto-approval and auto-dismissal
 - Better bootstrap UX when config is missing, especially for first-time setup
 - Platform support clarification and validation for the Compose Desktop package targets

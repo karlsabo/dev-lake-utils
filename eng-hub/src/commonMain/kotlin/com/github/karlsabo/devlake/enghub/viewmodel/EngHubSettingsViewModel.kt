@@ -6,6 +6,8 @@ import com.github.karlsabo.devlake.enghub.FilePicker
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.createEngHubSettingsUiState
 import com.github.karlsabo.github.config.LoadedGitHubConfig
+import com.github.karlsabo.gitlab.config.GitLabSecret
+import com.github.karlsabo.gitlab.config.LoadedGitLabConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,19 +27,25 @@ internal const val POLL_INTERVAL_ERROR = "Enter a positive whole number of secon
 internal const val ORGANIZATION_ID_BLANK_ERROR = "Enter an organization ID"
 internal const val ORGANIZATION_ID_DUPLICATE_ERROR = "Organization ID already exists"
 
+data class LoadedAccessConfigs(
+    val gitHub: LoadedGitHubConfig,
+    val gitLab: LoadedGitLabConfig = LoadedGitLabConfig("", "", GitLabSecret("")),
+)
+
 class EngHubSettingsViewModel(
     engHubConfig: EngHubConfig,
-    loadedGitHubConfig: LoadedGitHubConfig,
+    loadedAccessConfigs: LoadedAccessConfigs,
     directoryPicker: DirectoryPicker,
     filePicker: FilePicker,
-    persistence: EngHubSettingsPersistence,
+    internal val persistence: EngHubSettingsPersistence,
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
     private val mutableUiState = MutableStateFlow(
         createEngHubSettingsUiState(
             engHubConfig,
-            loadedGitHubConfig.config,
-            loadedGitHubConfig.secret,
+            loadedAccessConfigs.gitHub.config,
+            loadedAccessConfigs.gitHub.secret,
+            loadedAccessConfigs.gitLab,
         ),
     )
     private val operationTracker = EngHubSettingsOperationTracker(coroutineScope)
@@ -61,6 +69,14 @@ class EngHubSettingsViewModel(
         mutableUiState = mutableUiState,
         filePicker = filePicker,
         persistence = persistence,
+    )
+    internal val gitLabSettings = EngHubGitLabSettingsController(
+        coroutineScope = coroutineScope,
+        operationTracker = operationTracker,
+        mutableUiState = mutableUiState,
+        filePicker = filePicker,
+        persistence = persistence,
+        configPersistence = configPersistence,
     )
     internal val directorySettings = EngHubDirectorySettingsController(
         directoryPicker = directoryPicker,
@@ -166,6 +182,7 @@ class EngHubSettingsViewModel(
         localRepositorySettings.flushPendingEdits()
         setupCommandSettings.flushPendingEdits()
         gitHubTokenSettings.flushPendingEdit()
+        gitLabSettings.flushPendingEdit()
         operationTracker.awaitIdle()
         configPersistence.retryPendingUpdates()
     }

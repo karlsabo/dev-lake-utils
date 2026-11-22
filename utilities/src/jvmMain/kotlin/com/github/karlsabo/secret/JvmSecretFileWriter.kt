@@ -1,8 +1,6 @@
-package com.github.karlsabo.github.config
+package com.github.karlsabo.secret
 
-import com.github.karlsabo.tools.lenientJson
 import kotlinx.io.files.Path
-import kotlinx.serialization.SerializationException
 import java.io.IOException
 import java.nio.file.FileSystems
 import java.nio.file.Files
@@ -12,35 +10,34 @@ import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.nio.file.attribute.BasicFileAttributes
 
-internal actual fun createGitHubSecretFileWriter(): GitHubSecretFileWriter = JvmGitHubSecretFileWriter()
+internal actual fun createSecretFileWriter(providerLabel: String): SecretFileWriter = JvmSecretFileWriter(providerLabel)
 
-internal class JvmGitHubSecretFileWriter(
+internal class JvmSecretFileWriter(
+    private val providerLabel: String,
     private val moveFile: (java.nio.file.Path, java.nio.file.Path) -> Unit = ::atomicReplace,
-) : GitHubSecretFileWriter {
+) : SecretFileWriter {
     override fun write(path: Path, encodedSecret: String) {
         val primaryPath = java.nio.file.Path.of(path.toString())
         val pendingPath = java.nio.file.Path.of("$path.new")
         val backupPath = java.nio.file.Path.of("$path.bak")
-        validateSecretDestinations(path, primaryPath, pendingPath, backupPath)
+        validateSecretDestinations(providerLabel, path, primaryPath, pendingPath, backupPath)
         try {
-            val filePermissions = createJvmSecretFilePermissions()
+            val filePermissions = createJvmSecretFilePermissions(providerLabel = providerLabel)
             Files.deleteIfExists(pendingPath)
             filePermissions.create(pendingPath, encodedSecret.encodeToByteArray())
             verifyPendingSecret(pendingPath, encodedSecret, filePermissions)
             promoteSecret(pendingPath, primaryPath, backupPath, filePermissions)
-        } catch (error: GitHubSecretWriteException) {
+        } catch (error: SecretFileWriteException) {
             deleteBestEffort(pendingPath)
             throw error
         } catch (error: IOException) {
-            throwWriteException(path, pendingPath, error)
+            throwWriteException(providerLabel, path, pendingPath, error)
         } catch (error: SecurityException) {
-            throwWriteException(path, pendingPath, error)
+            throwWriteException(providerLabel, path, pendingPath, error)
         } catch (error: UnsupportedOperationException) {
-            throwWriteException(path, pendingPath, error)
-        } catch (error: SerializationException) {
-            throwWriteException(path, pendingPath, error)
+            throwWriteException(providerLabel, path, pendingPath, error)
         } catch (error: IllegalArgumentException) {
-            throwWriteException(path, pendingPath, error)
+            throwWriteException(providerLabel, path, pendingPath, error)
         }
     }
 
@@ -49,10 +46,8 @@ internal class JvmGitHubSecretFileWriter(
         encodedSecret: String,
         filePermissions: JvmSecretFilePermissions,
     ) {
-        val expected = lenientJson.decodeFromString<GitHubSecret>(encodedSecret)
-        val actual = lenientJson.decodeFromString<GitHubSecret>(Files.readString(path))
-        if (actual != expected) {
-            throw GitHubSecretWriteException("Could not verify pending GitHub secret file")
+        if (Files.readString(path) != encodedSecret) {
+            throw SecretFileWriteException("Could not verify pending $providerLabel secret file")
         }
         filePermissions.verify(path)
     }
@@ -78,7 +73,7 @@ internal class JvmGitHubSecretFileWriter(
             restoreAfterPromotionFailure(rotatedPrimary, backupPath, primaryPath, error)
         } catch (error: UnsupportedOperationException) {
             restoreAfterPromotionFailure(rotatedPrimary, backupPath, primaryPath, error)
-        } catch (error: GitHubSecretWriteException) {
+        } catch (error: SecretFileWriteException) {
             restoreAfterPromotionFailure(rotatedPrimary, backupPath, primaryPath, error)
         }
     }
@@ -111,58 +106,67 @@ internal class JvmGitHubSecretFileWriter(
             // The promotion failure is the useful error to report.
         }
     }
+}
 
-    private fun throwWriteException(
-        path: Path,
-        pendingPath: java.nio.file.Path,
-        error: Throwable,
-    ): Nothing {
-        deleteBestEffort(pendingPath)
-        throw GitHubSecretWriteException("Could not securely write GitHub secret file: $path", error)
-    }
+private fun throwWriteException(
+    providerLabel: String,
+    path: Path,
+    pendingPath: java.nio.file.Path,
+    error: Throwable,
+): Nothing {
+    deleteBestEffort(pendingPath)
+    throw SecretFileWriteException("Could not securely write $providerLabel secret file: $path", error)
+}
 
-    private fun deleteBestEffort(path: java.nio.file.Path) {
-        try {
-            Files.deleteIfExists(path)
-        } catch (_: IOException) {
-            // Cleanup must not hide the storage failure.
-        } catch (_: SecurityException) {
-            // Cleanup must not hide the storage failure.
-        }
+private fun deleteBestEffort(path: java.nio.file.Path) {
+    try {
+        Files.deleteIfExists(path)
+    } catch (_: IOException) {
+        // Cleanup must not hide the storage failure.
+    } catch (_: SecurityException) {
+        // Cleanup must not hide the storage failure.
     }
 }
 
 private fun validateSecretDestinations(
+    providerLabel: String,
     configuredPath: Path,
     primaryPath: java.nio.file.Path,
     pendingPath: java.nio.file.Path,
     backupPath: java.nio.file.Path,
 ) {
     listOf(primaryPath, pendingPath, backupPath).forEach { candidate ->
-        val attributes = readSecretAttributes(configuredPath, candidate) ?: return@forEach
+        val attributes = readSecretAttributes(providerLabel, configuredPath, candidate) ?: return@forEach
         if (!attributes.isRegularFile) {
-            throw GitHubSecretWriteException("GitHub secret destination must be a regular file: $configuredPath")
+            throw SecretFileWriteException(
+                "$providerLabel secret destination must be a regular file: $configuredPath",
+            )
         }
-        if (candidate == primaryPath && hasMultipleHardLinks(configuredPath, candidate)) {
-            throw GitHubSecretWriteException(
-                "GitHub secret destination must not have multiple hard links: $configuredPath",
+        if (candidate == primaryPath && hasMultipleHardLinks(providerLabel, configuredPath, candidate)) {
+            throw SecretFileWriteException(
+                "$providerLabel secret destination must not have multiple hard links: $configuredPath",
             )
         }
     }
 }
 
-private fun hasMultipleHardLinks(configuredPath: Path, candidate: java.nio.file.Path): Boolean {
+private fun hasMultipleHardLinks(
+    providerLabel: String,
+    configuredPath: Path,
+    candidate: java.nio.file.Path,
+): Boolean {
     if (!FileSystems.getDefault().supportedFileAttributeViews().contains("unix")) return false
     return try {
         (Files.getAttribute(candidate, "unix:nlink", NOFOLLOW_LINKS) as Number).toLong() > 1L
     } catch (error: IOException) {
-        throwSecretInspectionFailure(configuredPath, error)
+        throwSecretInspectionFailure(providerLabel, configuredPath, error)
     } catch (error: SecurityException) {
-        throwSecretInspectionFailure(configuredPath, error)
+        throwSecretInspectionFailure(providerLabel, configuredPath, error)
     }
 }
 
 private fun readSecretAttributes(
+    providerLabel: String,
     configuredPath: Path,
     candidate: java.nio.file.Path,
 ): BasicFileAttributes? = try {
@@ -170,16 +174,20 @@ private fun readSecretAttributes(
 } catch (_: NoSuchFileException) {
     null
 } catch (error: IOException) {
-    throwSecretInspectionFailure(configuredPath, error)
+    throwSecretInspectionFailure(providerLabel, configuredPath, error)
 } catch (error: SecurityException) {
-    throwSecretInspectionFailure(configuredPath, error)
+    throwSecretInspectionFailure(providerLabel, configuredPath, error)
 }
 
-private fun throwSecretInspectionFailure(configuredPath: Path, error: Throwable): Nothing {
-    val message = "Could not inspect GitHub secret destination: $configuredPath"
-    throw GitHubSecretWriteException(message, error)
+private fun throwSecretInspectionFailure(
+    providerLabel: String,
+    configuredPath: Path,
+    error: Throwable,
+): Nothing {
+    val message = "Could not inspect $providerLabel secret destination: $configuredPath"
+    throw SecretFileWriteException(message, error)
 }
 
-private fun atomicReplace(source: java.nio.file.Path, target: java.nio.file.Path) {
+internal fun atomicReplace(source: java.nio.file.Path, target: java.nio.file.Path) {
     Files.move(source, target, ATOMIC_MOVE, REPLACE_EXISTING)
 }

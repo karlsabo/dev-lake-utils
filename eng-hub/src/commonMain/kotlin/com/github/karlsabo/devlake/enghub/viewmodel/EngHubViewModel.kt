@@ -6,10 +6,11 @@ import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
-import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestsResult
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupHandle
 import com.github.karlsabo.git.WorktreeSetupStatus
+import com.github.karlsabo.gitlab.config.GitLabApiRestConfig
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.worktreearchive.WorktreeArchiveJob
 import com.github.karlsabo.worktreearchive.WorktreeArchiveStore
@@ -93,6 +94,7 @@ class EngHubViewModel internal constructor(
     )
     private val errorReporter = ActionErrorReporter(state)
     private val currentGitHubAccess = MutableStateFlow(CommittedGitHubAccess(gitHubServices, isReady = true))
+    private val currentGitLabAccess = MutableStateFlow(CommittedGitLabAccess())
     private val gitHubServiceActionTracker = GitHubServiceActionTracker(viewModelScope)
     private val localRepositoriesController = LocalRepositoryController(
         viewModel = this,
@@ -225,14 +227,19 @@ class EngHubViewModel internal constructor(
         currentGitHubAccess.value = currentGitHubAccess.value.copy(isReady = isReady)
     }
 
+    internal val updateGitLabAccess: (GitLabApiRestConfig?) -> Unit = { apiConfig ->
+        currentGitLabAccess.value = CommittedGitLabAccess(apiConfig)
+    }
+
     internal fun updateGitHubAccess(gitHubServices: EngHubGitHubServices, isReady: Boolean) {
         val replacedServices = currentGitHubAccess.value.services
         currentGitHubAccess.value = CommittedGitHubAccess(gitHubServices, isReady)
         if (replacedServices !== gitHubServices) gitHubServiceActionTracker.retire(replacedServices)
     }
 
-    val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = pullRequestsStateFlow(
+    val pullRequests: StateFlow<PullRequestsResult?> = pullRequestsStateFlow(
         gitHubAccess = currentGitHubAccess,
+        gitLabAccess = currentGitLabAccess,
         configs = state.config,
     )
     val notifications: StateFlow<Result<List<NotificationUiState>>?> = notificationsStateFlow(

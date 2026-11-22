@@ -41,6 +41,21 @@ class ConfigDrivenPollingTest {
     }
 
     @Test
+    fun blankAuthorReturnsAnEmptyResultWithoutCallingGitHub() = runTest {
+        val api = RecordingGitHubApi(emptyMap())
+
+        val result = pullRequestsForConfig(
+            searchApi = api,
+            reviewApi = api,
+            summaryApi = api,
+            config = EngHubConfig(organizationIds = listOf("test-org"), gitHubAuthor = ""),
+        ).first()
+
+        assertEquals(emptyList(), result.getOrThrow())
+        assertEquals(0, api.openPullRequestCalls)
+    }
+
+    @Test
     fun initialPullRequestFailureIsEmittedAndRetryRecovers() = runBlocking {
         val api = RecordingGitHubApi(emptyMap(), openPullRequests = emptyList())
         var calls = 0

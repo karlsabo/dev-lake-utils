@@ -2,10 +2,12 @@ package com.github.karlsabo.devlake.enghub
 
 import com.github.karlsabo.devlake.enghub.screen.EngHubPane
 import com.github.karlsabo.devlake.enghub.screen.initialEngHubPane
+import com.github.karlsabo.devlake.enghub.state.MASKED_TOKEN
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubDesktopServices
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubGitHubServices
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubWorktreeServices
+import com.github.karlsabo.devlake.enghub.viewmodel.GITLAB_SECRET_PATH_ERROR
 import com.github.karlsabo.devlake.enghub.viewmodel.RecordingWorktreeArchiveStore
 import com.github.karlsabo.git.GitWorktreeApi
 import com.github.karlsabo.git.RepositoryWorktrees
@@ -23,7 +25,12 @@ import com.github.karlsabo.github.config.GitHubApiRestConfig
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubConfigStore
 import com.github.karlsabo.github.config.GitHubSecret
+import com.github.karlsabo.github.config.GitHubSecretWriteException
 import com.github.karlsabo.github.config.LoadedGitHubConfig
+import com.github.karlsabo.gitlab.config.GitLabSecret
+import com.github.karlsabo.gitlab.config.GitLabSecretFileWriter
+import com.github.karlsabo.gitlab.config.GitLabSecretStore
+import com.github.karlsabo.gitlab.config.GitLabSecretWriteException
 import com.github.karlsabo.notifications.IgnoredNotificationThread
 import com.github.karlsabo.notifications.NotificationIgnoreStore
 import com.github.karlsabo.notifications.SaveIgnoredNotificationThreadRequest
@@ -42,6 +49,7 @@ import kotlinx.io.writeString
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -49,6 +57,112 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 class EngHubDependenciesTest {
+
+    @Test
+    fun gitLabAccessLoadsFromEnabledHubConfigAndItsSeparateSecret() {
+        val config = EngHubConfig(
+            gitLabInstanceUrl = "https://gitlab.internal.example",
+            gitLabTokenPath = "/secrets/gitlab.json",
+        )
+
+        val loaded = loadEngHubDependencies(
+            loadConfig = { config },
+            loadGitHubSettingsConfig = { null },
+            componentFactory = ::testEngHubComponent,
+            infrastructure = SettingsInfrastructure(
+                gitLab = GitLabSettingsInfrastructure(loadSecret = { GitLabSecret("saved-token") }),
+            ),
+        )
+
+        val settings = loaded.settingsViewModel.uiState.value
+        assertEquals("https://gitlab.internal.example", settings.gitLabInstanceUrl)
+        assertEquals("/secrets/gitlab.json", settings.gitLabTokenPath)
+        assertEquals(MASKED_TOKEN, settings.gitLabToken.maskedValue)
+        assertTrue(settings.gitLabAccessReady)
+        assertFalse(settings.gitHubAccessReady)
+    }
+
+    @Test
+    fun gitLabSecretPathCannotAliasProtectedConfiguration() {
+        val config = EngHubConfig(
+            gitLabInstanceUrl = "https://gitlab.internal.example",
+            gitLabTokenPath = "/secrets/gitlab.json",
+        )
+        var secretWrites = 0
+        val loaded = loadEngHubDependencies(
+            loadConfig = { config },
+            loadGitHubSettingsConfig = { null },
+            componentFactory = ::testEngHubComponent,
+            infrastructure = SettingsInfrastructure(
+                gitLab = GitLabSettingsInfrastructure(
+                    secretStore = GitLabSecretStore(GitLabSecretFileWriter { _, _ -> secretWrites++ }),
+                    protectedPaths = emptyList(),
+                    loadSecret = { null },
+                ),
+            ),
+        )
+
+        loaded.settingsViewModel.gitLabSettings.updateSecretPath(engHubConfigPath.toString())
+        loaded.settingsViewModel.gitLabSettings.updateToken("saved-token")
+        runBlocking { loaded.settingsViewModel.flushPendingEdits() }
+
+        assertEquals(GITLAB_SECRET_PATH_ERROR, loaded.settingsViewModel.uiState.value.gitLabTokenPathError)
+        assertEquals(0, secretWrites)
+    }
+
+    @Test
+    fun gitLabSecretPathCannotAliasTheGitHubSecret() {
+        val gitHubSecretPath = "/secrets/github-secret.json"
+        val loaded = loadEngHubDependencies(
+            loadConfig = {
+                EngHubConfig(
+                    gitLabInstanceUrl = "https://gitlab.internal.example",
+                    gitLabTokenPath = "/secrets/gitlab.json",
+                )
+            },
+            loadGitHubSettingsConfig = {
+                LoadedGitHubConfig(
+                    config = GitHubConfig(tokenPath = gitHubSecretPath),
+                    secret = GitHubSecret("existing-github-token"),
+                )
+            },
+            componentFactory = ::testEngHubComponent,
+            infrastructure = SettingsInfrastructure(
+                gitLab = GitLabSettingsInfrastructure(protectedPaths = emptyList(), loadSecret = { null }),
+            ),
+        )
+
+        val error = assertFailsWith<GitLabSecretWriteException> {
+            loaded.settingsViewModel.persistence.gitLab.validateSecretPath(Path(gitHubSecretPath))
+        }
+
+        assertTrue("protected" in error.message.orEmpty())
+    }
+
+    @Test
+    fun gitHubSecretPathCannotAliasTheGitLabSecret() {
+        val gitLabSecretPath = "/secrets/gitlab.json"
+        val loaded = loadEngHubDependencies(
+            loadConfig = {
+                EngHubConfig(
+                    gitLabInstanceUrl = "https://gitlab.internal.example",
+                    gitLabTokenPath = gitLabSecretPath,
+                )
+            },
+            loadGitHubSettingsConfig = { null },
+            componentFactory = ::testEngHubComponent,
+            infrastructure = SettingsInfrastructure(
+                gitHub = GitHubSettingsInfrastructure(protectedPaths = emptyList()),
+                gitLab = GitLabSettingsInfrastructure(loadSecret = { GitLabSecret("existing-gitlab-token") }),
+            ),
+        )
+
+        val error = assertFailsWith<GitHubSecretWriteException> {
+            loaded.settingsViewModel.persistence.gitHub.validateSecretPath(Path(gitLabSecretPath))
+        }
+
+        assertTrue("protected" in error.message.orEmpty())
+    }
 
     @Test
     fun malformedGitHubConfigurationRecoversAsFreshSettings() {
@@ -129,10 +243,12 @@ class EngHubDependenciesTest {
                 gitHubConfigFilePath = gitHubPath,
                 loadGitHubSettingsConfig = { loadedGitHubConfig },
                 componentFactory = ::testEngHubComponent,
-                gitHubSettingsInfrastructure = GitHubSettingsInfrastructure(
-                    filePicker = RecordingFilePicker(),
-                    configStore = configStore,
-                    protectedPaths = protectedContents.keys.toList(),
+                infrastructure = SettingsInfrastructure(
+                    gitHub = GitHubSettingsInfrastructure(
+                        filePicker = RecordingFilePicker(),
+                        configStore = configStore,
+                        protectedPaths = protectedContents.keys.toList(),
+                    ),
                 ),
             )
 

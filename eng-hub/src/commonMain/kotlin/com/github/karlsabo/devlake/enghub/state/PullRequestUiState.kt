@@ -6,6 +6,17 @@ import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.extractOwnerAndRepo
 import com.github.karlsabo.github.pullRequestApiUrl
+import com.github.karlsabo.gitlab.GitLabMergeRequest
+import com.github.karlsabo.gitlab.isDraft
+import com.github.karlsabo.gitlab.repositoryPath
+
+enum class PullRequestProvider(
+    val label: String,
+    val referencePrefix: String,
+) {
+    GitHub(label = "GitHub", referencePrefix = "#"),
+    GitLab(label = "GitLab", referencePrefix = "!"),
+}
 
 data class PullRequestUiState(
     val number: Int,
@@ -22,7 +33,11 @@ data class PullRequestUiState(
     val reviewSummaryText: String,
     val headRef: String?,
     val apiUrl: String,
-)
+    val provider: PullRequestProvider = PullRequestProvider.GitHub,
+) {
+    val referenceLabel: String
+        get() = "${provider.referencePrefix}$number"
+}
 
 fun Issue.toPullRequestUiState(
     checkRunSummary: CheckRunSummary,
@@ -61,5 +76,31 @@ fun Issue.toPullRequestUiState(
         reviewSummaryText = reviewSummaryText,
         headRef = headRef,
         apiUrl = pullRequestApiUrl.orEmpty(),
+    )
+}
+
+/**
+ * Setup and CI/review enrichment are out of scope for the first GitLab slice, so the branch stays hidden from
+ * worktree actions and the summary fields remain empty.
+ */
+fun GitLabMergeRequest.toPullRequestUiState(): PullRequestUiState {
+    val fullName = repositoryPath()
+    val namespaceSeparator = fullName.lastIndexOf('/')
+    return PullRequestUiState(
+        number = iid,
+        title = title,
+        htmlUrl = webUrl,
+        repositoryFullName = fullName,
+        owner = if (namespaceSeparator > 0) fullName.substring(0, namespaceSeparator) else "",
+        repo = fullName.substringAfterLast('/'),
+        isDraft = isDraft,
+        ciStatus = CiStatus.PENDING,
+        ciSummaryText = "",
+        approvedCount = 0,
+        requestedCount = 0,
+        reviewSummaryText = "",
+        headRef = null,
+        apiUrl = "",
+        provider = PullRequestProvider.GitLab,
     )
 }

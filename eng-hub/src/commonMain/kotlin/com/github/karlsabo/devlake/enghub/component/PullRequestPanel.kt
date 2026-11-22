@@ -12,7 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.github.karlsabo.devlake.enghub.state.PullRequestProviderFailure
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestsResult
 import com.github.karlsabo.git.WorktreeSetupStatus
 
 internal fun PullRequestUiState.checkoutSetupStatus(
@@ -27,7 +29,7 @@ data class PullRequestPanelActions(
 
 @Composable
 fun PullRequestPanel(
-    pullRequestsResult: Result<List<PullRequestUiState>>?,
+    pullRequestsResult: PullRequestsResult?,
     actions: PullRequestPanelActions,
     modifier: Modifier = Modifier,
     organizationIdsEmpty: Boolean = false,
@@ -45,34 +47,38 @@ fun PullRequestPanel(
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             return@Box
         }
-        pullRequestsResult.fold(
-            onSuccess = { pullRequests ->
-                if (pullRequests.isEmpty()) {
-                    Text(
-                        text = "No open pull requests",
-                        modifier = Modifier.padding(8.dp),
-                        style = MaterialTheme.typography.body2,
-                    )
-                } else {
-                    LazyColumn {
-                        items(pullRequests, key = { it.number }) { pr ->
-                            PullRequestItem(
-                                pr = pr,
-                                onOpenInBrowser = actions.onOpenInBrowser,
-                                onCheckoutAndOpen = actions.onCheckoutAndOpen,
-                                setupStatus = pr.checkoutSetupStatus(actions.setupStatusFor),
-                            )
-                        }
-                    }
-                }
-            },
-            onFailure = { error ->
-                Text(
-                    text = "Error loading pull requests: ${error.message}",
-                    color = MaterialTheme.colors.error,
-                    modifier = Modifier.padding(8.dp),
+        if (pullRequestsResult.pullRequests.isEmpty() && pullRequestsResult.failures.isEmpty()) {
+            Text(
+                text = "No open pull requests or merge requests",
+                modifier = Modifier.padding(8.dp),
+                style = MaterialTheme.typography.body2,
+            )
+            return@Box
+        }
+        LazyColumn {
+            items(pullRequestsResult.failures, key = { "failure-${it.provider.name}" }) { failure ->
+                PullRequestFailureItem(failure)
+            }
+            items(
+                pullRequestsResult.pullRequests,
+                key = { "${it.provider.name}-${it.repositoryFullName}-${it.number}" },
+            ) { pr ->
+                PullRequestItem(
+                    pr = pr,
+                    onOpenInBrowser = actions.onOpenInBrowser,
+                    onCheckoutAndOpen = actions.onCheckoutAndOpen,
+                    setupStatus = pr.checkoutSetupStatus(actions.setupStatusFor),
                 )
-            },
-        )
+            }
+        }
     }
+}
+
+@Composable
+private fun PullRequestFailureItem(failure: PullRequestProviderFailure) {
+    Text(
+        text = "Error loading ${failure.provider.label} pull requests: ${failure.message}",
+        color = MaterialTheme.colors.error,
+        modifier = Modifier.padding(8.dp),
+    )
 }

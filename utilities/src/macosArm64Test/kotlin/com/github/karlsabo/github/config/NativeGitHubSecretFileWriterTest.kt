@@ -1,5 +1,6 @@
 package com.github.karlsabo.github.config
 
+import com.github.karlsabo.secret.createOwnerOnlySecretFile
 import com.github.karlsabo.tools.lenientJson
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -29,7 +30,7 @@ class NativeGitHubSecretFileWriterTest {
         val secretPath = Path(directory, "github-secret.json.new")
         SystemFileSystem.createDirectories(directory)
 
-        val descriptor = createOwnerOnlySecretFile(secretPath)
+        val descriptor = createOwnerOnlySecretFile(secretPath, "GitHub")
         try {
             memScoped {
                 val fileStatus = alloc<stat>()

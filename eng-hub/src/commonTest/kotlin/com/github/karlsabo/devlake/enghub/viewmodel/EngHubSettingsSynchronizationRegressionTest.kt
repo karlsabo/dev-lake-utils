@@ -370,15 +370,17 @@ class EngHubSettingsSynchronizationRegressionTest {
         callbacks: GitHubSynchronizationCallbacks = GitHubSynchronizationCallbacks(),
     ) = EngHubSettingsViewModel(
         engHubConfig = configState.current,
-        loadedGitHubConfig = loadedGitHubConfig,
+        loadedAccessConfigs = LoadedAccessConfigs(loadedGitHubConfig),
         directoryPicker = NoOpSynchronizationDirectoryPicker,
         filePicker = NoOpSynchronizationFilePicker,
         persistence = EngHubSettingsPersistence(
             updateConfig = configState::update,
-            gitHubSecretWriter = secretWriter,
-            validateGitHubSecretPath = callbacks.validateSecretPath,
-            saveGitHubAccess = saveGitHubAccess,
-            onGitHubAccessCommitted = callbacks.onAccessCommitted,
+            gitHub = GitHubAccessPersistence(
+                secretWriter = secretWriter,
+                validateSecretPath = callbacks.validateSecretPath,
+                saveAccess = saveGitHubAccess,
+                onAccessCommitted = callbacks.onAccessCommitted,
+            ),
             committedConfigUpdates = configState.updates,
         ),
         coroutineScope = backgroundScope,

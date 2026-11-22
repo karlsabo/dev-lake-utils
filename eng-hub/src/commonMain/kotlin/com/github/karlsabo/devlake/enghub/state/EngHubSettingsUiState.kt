@@ -4,22 +4,26 @@ import com.github.karlsabo.devlake.enghub.ALERT_TRIAGE_WHERE_TO_LOOK_TEMPLATE_KE
 import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
+import com.github.karlsabo.gitlab.config.GitLabSecret
+import com.github.karlsabo.gitlab.config.LoadedGitLabConfig
 
 internal const val MASKED_TOKEN = "••••••••"
 
-class GitHubTokenUiState internal constructor(
+class MaskedTokenUiState internal constructor(
     internal val value: String,
     private val draftValue: String? = null,
 ) {
     val maskedValue: String = if (value.isEmpty()) "" else MASKED_TOKEN
     internal val fieldValue: String = draftValue ?: value
 
-    internal fun withDraft(token: String): GitHubTokenUiState = GitHubTokenUiState(value, token)
+    internal fun withDraft(token: String): MaskedTokenUiState = MaskedTokenUiState(value, token)
 
-    internal fun withCommittedToken(token: String): GitHubTokenUiState = GitHubTokenUiState(token)
+    internal fun withCommittedToken(token: String): MaskedTokenUiState = MaskedTokenUiState(token)
 
-    override fun toString(): String = "GitHubTokenUiState()"
+    override fun toString(): String = "MaskedTokenUiState()"
 }
+
+internal typealias GitHubTokenUiState = MaskedTokenUiState
 
 data class EngHubSettingsUiState(
     val committedConfig: EngHubConfig,
@@ -44,9 +48,17 @@ data class EngHubSettingsUiState(
     val setupShell: String,
     val gitHubTokenPath: String,
     val gitHubTokenPathError: String? = null,
-    val gitHubToken: GitHubTokenUiState,
+    val gitHubToken: MaskedTokenUiState,
     val gitHubTokenError: String? = null,
     val gitHubAccessReady: Boolean,
+    val gitLabInstanceUrl: String,
+    val gitLabInstanceUrlError: String? = null,
+    val gitLabTokenPath: String,
+    val gitLabTokenPathError: String? = null,
+    val gitLabToken: MaskedTokenUiState,
+    val gitLabTokenError: String? = null,
+    val gitLabAccessReady: Boolean,
+    val gitLabValidationMessage: String? = null,
 )
 
 data class SettingsLocalRepositoryUiState(
@@ -64,6 +76,7 @@ internal fun createEngHubSettingsUiState(
     engHubConfig: EngHubConfig,
     gitHubConfig: GitHubConfig,
     gitHubSecret: GitHubSecret,
+    gitLabConfig: LoadedGitLabConfig = LoadedGitLabConfig("", "", GitLabSecret("")),
 ): EngHubSettingsUiState = EngHubSettingsUiState(
     committedConfig = engHubConfig,
     organizationIds = engHubConfig.organizationIds,
@@ -82,6 +95,10 @@ internal fun createEngHubSettingsUiState(
     },
     setupShell = engHubConfig.setupShell,
     gitHubTokenPath = gitHubConfig.tokenPath,
-    gitHubToken = GitHubTokenUiState(gitHubSecret.githubToken),
+    gitHubToken = MaskedTokenUiState(gitHubSecret.githubToken),
     gitHubAccessReady = gitHubConfig.tokenPath.isNotBlank() && gitHubSecret.githubToken.isNotBlank(),
+    gitLabInstanceUrl = gitLabConfig.instanceUrl,
+    gitLabTokenPath = gitLabConfig.tokenPath,
+    gitLabToken = MaskedTokenUiState(gitLabConfig.secret.gitLabToken),
+    gitLabAccessReady = gitLabConfig.isAccessReady(),
 )

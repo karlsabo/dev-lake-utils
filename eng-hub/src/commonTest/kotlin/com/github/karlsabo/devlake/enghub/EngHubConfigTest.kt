@@ -23,6 +23,14 @@ import kotlin.test.assertTrue
 class EngHubConfigTest {
 
     @Test
+    fun gitLabInstanceUrlMustBeHttpsWhenItIsConfigured() {
+        assertTrue(EngHubConfig().isPersistenceValid())
+        assertTrue(EngHubConfig(gitLabInstanceUrl = "https://gitlab.internal.example").isPersistenceValid())
+        assertFalse(EngHubConfig(gitLabInstanceUrl = "http://gitlab.internal.example").isPersistenceValid())
+        assertFalse(EngHubConfig(gitLabInstanceUrl = "gitlab.internal.example").isPersistenceValid())
+    }
+
+    @Test
     fun serializesAndDeserializesNewSetupFields() {
         val config = EngHubConfig(
             organizationIds = listOf("example-org"),
@@ -30,6 +38,8 @@ class EngHubConfigTest {
             worktreePollIntervalMs = 120_000,
             repositoriesBaseDir = "/tmp/example/repos",
             gitHubAuthor = "example-author",
+            gitLabInstanceUrl = "https://gitlab.internal.example",
+            gitLabTokenPath = "/tmp/example/gitlab-secret.json",
             planningMarkdownDir = "/tmp/example/llm-planning",
             llmTemplateValues = mapOf(
                 "ALERT_TRIAGE_WHERE_TO_LOOK" to "- Incident management: inspect the active incident",
@@ -57,6 +67,8 @@ class EngHubConfigTest {
         assertTrue(json.contains("\"planningMarkdownDir\""))
         assertTrue(json.contains("\"llmTemplateValues\""))
         assertTrue(json.contains("\"localRepositories\""))
+        assertTrue(json.contains("\"gitLabInstanceUrl\""))
+        assertTrue(json.contains("\"gitLabTokenPath\""))
         assertTrue(json.contains("\"worktreePollIntervalMs\""))
     }
 

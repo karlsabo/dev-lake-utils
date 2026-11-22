@@ -14,6 +14,7 @@ internal enum class EngHubSettingsSection(
     val label: String,
 ) {
     GitHubAccess("GitHub access"),
+    GitLabAccess("GitLab access"),
     GitHubActivity("GitHub activity"),
     Repositories("Repositories"),
     LlmSkillTemplates("LLM skill templates"),
@@ -155,6 +156,9 @@ internal fun EngHubSettingsNavigationState.withSelectedRepository(
 
 internal fun EngHubSettingsUiState.sectionsWithValidationErrors(): Set<EngHubSettingsSection> = buildSet {
     if (gitHubTokenPathError != null || gitHubTokenError != null) add(EngHubSettingsSection.GitHubAccess)
+    if (gitLabInstanceUrlError != null || gitLabTokenPathError != null || gitLabTokenError != null) {
+        add(EngHubSettingsSection.GitLabAccess)
+    }
     if (organizationIdError != null || pollIntervalError != null) add(EngHubSettingsSection.GitHubActivity)
     if (worktreePollIntervalError != null || localRepositoryError != null ||
         localRepositories.any { repository -> repository.hasValidationError }

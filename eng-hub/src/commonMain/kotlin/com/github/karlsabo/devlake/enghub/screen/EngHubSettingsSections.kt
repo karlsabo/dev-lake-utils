@@ -186,3 +186,62 @@ internal fun SettingsEmptyHint(
         modifier = Modifier.fillMaxWidth().testTag(tag),
     )
 }
+
+@Composable
+internal fun GitLabAccessSettings(
+    state: EngHubSettingsUiState,
+    groups: List<EngHubSettingGroupId>,
+    compact: Boolean,
+    actions: EngHubSettingsActions,
+) {
+    groups.forEach { group ->
+        when (group) {
+            EngHubSettingGroupId.GitLabInstanceUrl -> SettingsField(
+                label = GITLAB_INSTANCE_URL_LABEL,
+                value = state.gitLabInstanceUrl,
+                tag = "gitlab-instance-url",
+                presentation = SettingsFieldPresentation(error = state.gitLabInstanceUrlError),
+                onValueChange = actions.onGitLabInstanceUrlChange,
+            )
+
+            EngHubSettingGroupId.GitLabSecretFilePath -> SettingsPickerField(
+                label = GITLAB_SECRET_FILE_PATH_LABEL,
+                value = state.gitLabTokenPath,
+                tag = "gitlab-token-path",
+                presentation = SettingsPickerPresentation(error = state.gitLabTokenPathError, compact = compact),
+                actions = SettingsPickerActions(
+                    onValueChange = actions.onGitLabTokenPathChange,
+                    onBrowse = actions.onChooseGitLabTokenPath,
+                ),
+            )
+
+            EngHubSettingGroupId.GitLabToken -> SettingsField(
+                label = GITLAB_TOKEN_LABEL,
+                value = state.gitLabToken.fieldValue,
+                tag = "gitlab-token",
+                presentation = SettingsFieldPresentation(password = true, error = state.gitLabTokenError),
+                onValueChange = actions.onGitLabTokenChange,
+            )
+
+            else -> Unit
+        }
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Button(
+            onClick = actions.onValidateGitLabAccess,
+            modifier = Modifier.testTag("gitlab-validate"),
+        ) {
+            Text("Validate connection")
+        }
+        state.gitLabValidationMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.caption,
+                modifier = Modifier.testTag("gitlab-validation"),
+            )
+        }
+    }
+}

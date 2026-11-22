@@ -460,16 +460,20 @@ class EngHubSettingsPersistenceRegressionTest {
         coroutineScope: CoroutineScope = this,
     ) = EngHubSettingsViewModel(
         engHubConfig = state.current,
-        loadedGitHubConfig = LoadedGitHubConfig(
-            GitHubConfig("/secrets/github.json"),
-            GitHubSecret("token"),
+        loadedAccessConfigs = LoadedAccessConfigs(
+            LoadedGitHubConfig(
+                GitHubConfig("/secrets/github.json"),
+                GitHubSecret("token"),
+            ),
         ),
         directoryPicker = NoOpRegressionDirectoryPicker,
         filePicker = NoOpRegressionFilePicker,
         persistence = EngHubSettingsPersistence(
             updateConfig = { transform -> state.update(transform, writer) },
-            gitHubSecretWriter = secretWriter,
-            onGitHubAccessCommitted = onGitHubAccessCommitted,
+            gitHub = GitHubAccessPersistence(
+                secretWriter = secretWriter,
+                onAccessCommitted = onGitHubAccessCommitted,
+            ),
         ),
         coroutineScope = coroutineScope,
     )

@@ -1,5 +1,8 @@
 package com.github.karlsabo.github.config
 
+import com.github.karlsabo.secret.JvmSecretFileWriter
+import com.github.karlsabo.secret.SecretFileWriteException
+import com.github.karlsabo.secret.createJvmSecretFilePermissions
 import com.github.karlsabo.tools.lenientJson
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
@@ -236,7 +239,7 @@ class GitHubSecretFileWriterTest {
                     .build(),
             )
 
-            assertFailsWith<GitHubSecretWriteException> {
+            assertFailsWith<SecretFileWriteException> {
                 createJvmSecretFilePermissions(setOf("acl")).verify(secretPath)
             }
         } finally {
@@ -246,7 +249,7 @@ class GitHubSecretFileWriterTest {
 
     @Test
     fun rejectsFileSystemsWithoutSupportedPermissionModel() {
-        assertFailsWith<GitHubSecretWriteException> {
+        assertFailsWith<SecretFileWriteException> {
             createJvmSecretFilePermissions(emptySet())
         }
     }
@@ -279,10 +282,12 @@ class GitHubSecretFileWriterTest {
         val backupPath = directory.resolve("github-secret.json.bak")
         val initialStore = GitHubConfigStore()
         initialStore.save(Path(secretPath.toString()), GitHubSecret("old-token"))
-        val failingWriter = JvmGitHubSecretFileWriter { source, destination ->
-            if (source == pendingPath && destination == secretPath) throw IOException("promotion failed")
-            Files.move(source, destination, ATOMIC_MOVE, REPLACE_EXISTING)
-        }
+        val failingWriter = createGitHubSecretFileWriter(
+            JvmSecretFileWriter("GitHub") { source, destination ->
+                if (source == pendingPath && destination == secretPath) throw IOException("promotion failed")
+                Files.move(source, destination, ATOMIC_MOVE, REPLACE_EXISTING)
+            },
+        )
 
         try {
             assertFailsWith<GitHubSecretWriteException> {
