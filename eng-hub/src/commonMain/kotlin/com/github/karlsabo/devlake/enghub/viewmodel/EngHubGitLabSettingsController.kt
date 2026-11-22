@@ -131,7 +131,8 @@ internal class EngHubGitLabSettingsController(
         if (!hasPendingEdit) return
         val draft = mutableUiState.value.gitLabDraft()
         if (!mutableUiState.validateGitLabDraft(draft)) return
-        hasPendingEdit = committer.commit(draft)
+        val commitFailed = committer.commit(draft)
+        hasPendingEdit = commitFailed || !mutableUiState.value.matchesGitLabDraft(draft)
     }
 
     private fun currentApiConfig(): GitLabApiRestConfig? {
@@ -198,6 +199,8 @@ private class GitLabAccessCommitter(
         val remainingDraftToken = currentState.gitLabToken.fieldValue.takeUnless {
             currentState.matchesGitLabDraft(draft)
         }
+        val urlMatchesDraft = currentState.gitLabInstanceUrl.trim() == draft.instanceUrl
+        val pathMatchesDraft = currentState.gitLabTokenPath == draft.tokenPath
         committedSecretPath = draft.tokenPath
         committedInstanceUrl = draft.normalizedInstanceUrl.orEmpty()
         committedToken = draft.token
@@ -205,8 +208,8 @@ private class GitLabAccessCommitter(
             draft.tokenPath.isNotBlank() &&
             draft.token.isNotBlank()
         mutableUiState.value = currentState.copy(
-            gitLabInstanceUrl = committedInstanceUrl,
-            gitLabTokenPath = draft.tokenPath,
+            gitLabInstanceUrl = if (urlMatchesDraft) committedInstanceUrl else currentState.gitLabInstanceUrl,
+            gitLabTokenPath = if (pathMatchesDraft) draft.tokenPath else currentState.gitLabTokenPath,
             gitLabToken = MaskedTokenUiState(draft.token, remainingDraftToken),
             gitLabInstanceUrlError = null,
             gitLabTokenPathError = null,

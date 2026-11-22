@@ -56,6 +56,38 @@ class EngHubGitLabSettingsViewModelTest {
     }
 
     @Test
+    fun aNewerEditSurvivesACommitThatWasAlreadyRunning() = runTest {
+        val persistence = RecordingGitLabPersistence()
+        var triggerNewerEdit = true
+        lateinit var viewModel: EngHubSettingsViewModel
+        viewModel = gitLabSettingsViewModel(
+            currentConfig = MutableStateFlow(EngHubConfig()),
+            persistence = persistence,
+            onSecretSave = { _, _ ->
+                if (triggerNewerEdit) {
+                    triggerNewerEdit = false
+                    viewModel.gitLabSettings.updateSecretPath("/secrets/newer.json")
+                }
+            },
+        )
+
+        viewModel.gitLabSettings.updateInstanceUrl("https://gitlab.internal.example")
+        viewModel.gitLabSettings.updateSecretPath("/secrets/first.json")
+        viewModel.gitLabSettings.updateToken("glpat-synthetic")
+        advanceTimeBy(750.milliseconds)
+        runCurrent()
+
+        assertEquals("/secrets/newer.json", viewModel.uiState.value.gitLabTokenPath)
+
+        viewModel.flushPendingEdits()
+        runCurrent()
+
+        assertEquals("/secrets/newer.json", viewModel.uiState.value.gitLabTokenPath)
+        assertEquals("/secrets/newer.json", persistence.configUpdates.last().gitLabTokenPath)
+        assertEquals(Path("/secrets/newer.json"), persistence.secrets.last().first)
+    }
+
+    @Test
     fun anUnencryptedInstanceUrlIsRejectedWithoutPersistingAnything() = runTest {
         val persistence = RecordingGitLabPersistence()
         val currentConfig = MutableStateFlow(EngHubConfig())
@@ -156,6 +188,7 @@ class EngHubGitLabSettingsViewModelTest {
         currentConfig: MutableStateFlow<EngHubConfig>,
         persistence: RecordingGitLabPersistence,
         loadedGitLabConfig: LoadedGitLabConfig = LoadedGitLabConfig("", "", GitLabSecret("")),
+        onSecretSave: ((Path, GitLabSecret) -> Unit)? = null,
     ) = EngHubSettingsViewModel(
         engHubConfig = currentConfig.value,
         loadedAccessConfigs = LoadedAccessConfigs(
@@ -173,7 +206,10 @@ class EngHubGitLabSettingsViewModelTest {
             },
             gitHub = GitHubAccessPersistence(secretWriter = GitHubSecretWriter { _, _ -> }),
             gitLab = GitLabAccessPersistence(
-                saveSecret = { path, secret -> persistence.secrets += path to secret },
+                saveSecret = { path, secret ->
+                    persistence.secrets += path to secret
+                    onSecretSave?.invoke(path, secret)
+                },
                 onAccessCommitted = { apiConfig -> persistence.committedAccesses += apiConfig },
                 validateAccess = { apiConfig -> persistence.validate(apiConfig) },
             ),

@@ -59,7 +59,10 @@ fun PullRequestPanel(
             items(pullRequestsResult.failures, key = { "failure-${it.provider.name}" }) { failure ->
                 PullRequestFailureItem(failure)
             }
-            items(pullRequestsResult.pullRequests, key = { "${it.provider.name}-${it.number}" }) { pr ->
+            items(
+                pullRequestsResult.pullRequests,
+                key = { "${it.provider.name}-${it.repositoryFullName}-${it.number}" },
+            ) { pr ->
                 PullRequestItem(
                     pr = pr,
                     onOpenInBrowser = actions.onOpenInBrowser,
