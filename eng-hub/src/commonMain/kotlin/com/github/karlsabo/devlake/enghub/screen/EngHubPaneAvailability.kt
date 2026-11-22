@@ -13,7 +13,8 @@ internal fun engHubPaneAvailability(
 ): Map<EngHubPane, EngHubPaneAvailability> = EngHubPane.entries.associateWith { pane ->
     when (pane) {
         EngHubPane.PullRequests -> when {
-            !settings.gitHubAccessReady -> disabledPane("Enter a GitHub secret path and token in Settings")
+            settings.gitLabAccessReady -> enabledPane()
+            !settings.gitHubAccessReady -> disabledPane("Enter a GitHub or GitLab token in Settings")
             settings.committedConfig.gitHubAuthor.isBlank() -> disabledPane("Enter a GitHub author in Settings")
             else -> enabledPane()
         }

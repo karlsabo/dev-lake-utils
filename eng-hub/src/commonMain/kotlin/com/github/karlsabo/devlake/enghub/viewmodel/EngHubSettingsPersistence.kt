@@ -7,6 +7,8 @@ import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
 import com.github.karlsabo.github.config.GitHubSecretWriter
 import com.github.karlsabo.github.config.LoadedGitHubConfig
+import com.github.karlsabo.gitlab.config.GitLabApiRestConfig
+import com.github.karlsabo.gitlab.config.GitLabSecret
 import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.osFamily
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,15 +20,27 @@ import kotlinx.io.files.Path
 internal const val SETTINGS_PERSISTENCE_ERROR =
     "Could not save settings. Check the configuration file path and permissions, then edit the value to retry."
 
-class EngHubSettingsPersistence(
-    internal val updateConfig: suspend ((EngHubConfig) -> EngHubConfig) -> EngHubConfig,
-    internal val gitHubSecretWriter: GitHubSecretWriter,
-    internal val validateGitHubSecretPath: (Path) -> Unit = {},
-    internal val saveGitHubAccess: suspend (Path, GitHubSecret) -> LoadedGitHubConfig = { path, secret ->
-        gitHubSecretWriter.save(path, secret)
+data class GitHubAccessPersistence(
+    val secretWriter: GitHubSecretWriter,
+    val validateSecretPath: (Path) -> Unit = {},
+    val saveAccess: suspend (Path, GitHubSecret) -> LoadedGitHubConfig = { path, secret ->
+        secretWriter.save(path, secret)
         LoadedGitHubConfig(GitHubConfig(path.toString()), secret)
     },
-    internal val onGitHubAccessCommitted: (LoadedGitHubConfig) -> Unit = {},
+    val onAccessCommitted: (LoadedGitHubConfig) -> Unit = {},
+)
+
+data class GitLabAccessPersistence(
+    val saveSecret: suspend (Path, GitLabSecret) -> Unit = { _, _ -> },
+    val validateSecretPath: (Path) -> Unit = {},
+    val onAccessCommitted: (GitLabApiRestConfig?) -> Unit = {},
+    val validateAccess: suspend (GitLabApiRestConfig) -> String = { "" },
+)
+
+class EngHubSettingsPersistence(
+    internal val updateConfig: suspend ((EngHubConfig) -> EngHubConfig) -> EngHubConfig,
+    internal val gitHub: GitHubAccessPersistence,
+    internal val gitLab: GitLabAccessPersistence = GitLabAccessPersistence(),
     internal val committedConfigUpdates: StateFlow<EngHubConfig>? = null,
 ) {
     internal var repositoryPathOsFamily: OsFamily = osFamily()

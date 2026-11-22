@@ -10,6 +10,9 @@ internal const val VALIDATION_ERROR_SUFFIX = "has validation error"
 
 internal const val SECRET_FILE_PATH_LABEL = "Secret file path"
 internal const val GITHUB_TOKEN_LABEL = "GitHub token"
+internal const val GITLAB_INSTANCE_URL_LABEL = "GitLab instance URL"
+internal const val GITLAB_SECRET_FILE_PATH_LABEL = "GitLab secret file path"
+internal const val GITLAB_TOKEN_LABEL = "GitLab token"
 internal const val ORGANIZATION_IDS_LABEL = "Organization IDs"
 internal const val NEW_ORGANIZATION_ID_LABEL = "New organization ID"
 internal const val GITHUB_AUTHOR_LABEL = "GitHub author"
@@ -46,6 +49,24 @@ internal enum class EngHubSettingGroupId(
         label = GITHUB_TOKEN_LABEL,
         description = "GitHub personal access token",
         aliases = listOf("credential", "pat"),
+    ),
+    GitLabInstanceUrl(
+        section = EngHubSettingsSection.GitLabAccess,
+        label = GITLAB_INSTANCE_URL_LABEL,
+        description = "HTTPS URL of the self-managed GitLab instance",
+        aliases = listOf("gitlab", "host", "server"),
+    ),
+    GitLabSecretFilePath(
+        section = EngHubSettingsSection.GitLabAccess,
+        label = GITLAB_SECRET_FILE_PATH_LABEL,
+        description = "File that stores the GitLab personal access token",
+        aliases = listOf("credential", "secret", "pat"),
+    ),
+    GitLabToken(
+        section = EngHubSettingsSection.GitLabAccess,
+        label = GITLAB_TOKEN_LABEL,
+        description = "GitLab personal access token used for reads",
+        aliases = listOf("credential", "pat", "gitlab"),
     ),
     OrganizationIds(
         section = EngHubSettingsSection.GitHubActivity,

@@ -2,6 +2,7 @@
 
 package com.github.karlsabo.devlake.enghub
 
+import com.github.karlsabo.gitlab.isValidGitLabInstanceUrl
 import com.github.karlsabo.system.OsFamily
 import com.github.karlsabo.system.osFamily
 import com.github.karlsabo.tools.DEV_METRICS_APP_NAME
@@ -28,6 +29,8 @@ data class EngHubConfig(
     val worktreePollIntervalMs: Long = 2.minutes.inWholeMilliseconds,
     val repositoriesBaseDir: String = "",
     val gitHubAuthor: String = "",
+    val gitLabInstanceUrl: String = "",
+    val gitLabTokenPath: String = "",
     val planningMarkdownDir: String = "",
     val llmTemplateValues: Map<String, String> = emptyMap(),
     val localRepositories: List<LocalRepositoryConfig> = emptyList(),
@@ -61,7 +64,9 @@ internal fun EngHubConfig.isPersistenceValid(family: OsFamily = osFamily()): Boo
     }
     val repositoryPaths = localRepositories.map { it.path.normalizedRepositoryPath(family) }
     val repositoryPathsAreUnique = repositoryPaths.distinct().size == repositoryPaths.size
-    return intervalsAreValid && organizationsAreValid && repositoriesHaveValues && repositoryPathsAreUnique
+    val gitLabInstanceIsValid = gitLabInstanceUrl.isBlank() || isValidGitLabInstanceUrl(gitLabInstanceUrl)
+    return intervalsAreValid && organizationsAreValid && repositoriesHaveValues && repositoryPathsAreUnique &&
+        gitLabInstanceIsValid
 }
 
 val engHubConfigPath: Path =

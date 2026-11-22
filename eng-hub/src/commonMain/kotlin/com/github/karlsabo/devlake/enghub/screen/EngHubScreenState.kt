@@ -39,12 +39,6 @@ internal data class EngHubScreenState(
     val settings: EngHubSettingsUiState,
 )
 
-internal data class PullRequestsPaneState(
-    val result: Result<List<PullRequestUiState>>?,
-    val organizationIdsEmpty: Boolean,
-    val setupStatuses: Map<WorktreePath, WorktreeSetupStatus>,
-)
-
 internal data class NotificationsPaneState(
     val result: Result<List<NotificationUiState>>?,
     val actingOnThreadIds: Set<String>,
@@ -72,6 +66,11 @@ internal data class EngHubSettingsActions(
     val onGitHubTokenPathChange: (String) -> Unit = {},
     val onChooseGitHubTokenPath: () -> Unit = {},
     val onGitHubTokenChange: (String) -> Unit = {},
+    val onGitLabInstanceUrlChange: (String) -> Unit = {},
+    val onGitLabTokenPathChange: (String) -> Unit = {},
+    val onChooseGitLabTokenPath: () -> Unit = {},
+    val onGitLabTokenChange: (String) -> Unit = {},
+    val onValidateGitLabAccess: () -> Unit = {},
     val onOrganizationIdDraftChange: (String) -> Unit = {},
     val onAddOrganizationId: () -> Unit = {},
     val onRemoveOrganizationId: (Int) -> Unit = {},
@@ -132,11 +131,7 @@ internal fun collectEngHubScreenState(
         actionError = actionError,
         archiveBinEntries = worktreeMutations.archiveBinEntries,
         globalExistingBranchDiscovery = globalExistingBranchDiscovery.toUiState(),
-        pullRequests = PullRequestsPaneState(
-            result = activityResults.pullRequests,
-            organizationIdsEmpty = settings.committedConfig.organizationIds.isEmpty(),
-            setupStatuses = setupStatuses,
-        ),
+        pullRequests = pullRequestsPaneState(activityResults.pullRequests, settings, setupStatuses),
         notifications = NotificationsPaneState(
             result = activityResults.notifications,
             actingOnThreadIds = actingOnThreadIds,
@@ -275,6 +270,11 @@ private fun engHubSettingsActions(viewModel: EngHubSettingsViewModel) = EngHubSe
     onGitHubTokenPathChange = viewModel.gitHubTokenSettings::updateSecretPath,
     onChooseGitHubTokenPath = viewModel.gitHubTokenSettings::chooseSecretPath,
     onGitHubTokenChange = viewModel.gitHubTokenSettings::updateToken,
+    onGitLabInstanceUrlChange = viewModel.gitLabSettings::updateInstanceUrl,
+    onGitLabTokenPathChange = viewModel.gitLabSettings::updateSecretPath,
+    onChooseGitLabTokenPath = viewModel.gitLabSettings::chooseSecretPath,
+    onGitLabTokenChange = viewModel.gitLabSettings::updateToken,
+    onValidateGitLabAccess = viewModel.gitLabSettings::validateAccess,
     onOrganizationIdDraftChange = viewModel::updateOrganizationIdDraft,
     onAddOrganizationId = viewModel::addOrganizationId,
     onRemoveOrganizationId = viewModel::removeOrganizationId,

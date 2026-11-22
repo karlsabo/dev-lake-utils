@@ -17,6 +17,9 @@ import com.github.karlsabo.github.Issue
 import com.github.karlsabo.github.ReviewSummary
 import com.github.karlsabo.github.extractOwnerAndRepo
 import com.github.karlsabo.github.pullRequestDetailsUrl
+import com.github.karlsabo.gitlab.GitLabMergeRequestApi
+import com.github.karlsabo.gitlab.GitLabRestApi
+import com.github.karlsabo.gitlab.config.GitLabApiRestConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -35,23 +38,97 @@ internal const val POLLING_RETRY_DELAY_MS = 5_000L
 internal const val STATE_FLOW_STOP_TIMEOUT_MS = 5_000L
 private const val ZERO_CHECK_RUNS = 0
 
+internal data class CommittedGitLabAccess(
+    val apiConfig: GitLabApiRestConfig? = null,
+    val createApi: (GitLabApiRestConfig) -> GitLabMergeRequestApi = { GitLabRestApi(it) },
+) {
+    val isReady: Boolean
+        get() = apiConfig != null
+}
+
+private data class PullRequestPollingInputs(
+    val config: EngHubConfig,
+    val gitHubAccess: CommittedGitHubAccess,
+    val gitLabAccess: CommittedGitLabAccess,
+)
+
 internal fun ViewModel.pullRequestsStateFlow(
     gitHubAccess: StateFlow<CommittedGitHubAccess>,
+    gitLabAccess: StateFlow<CommittedGitLabAccess>,
     configs: StateFlow<EngHubConfig>,
-): StateFlow<Result<List<PullRequestUiState>>?> = combine(configs, gitHubAccess) { config, access ->
-    config to access
-}.flatMapLatest { (config, access) ->
-    if (!access.isReady) {
-        flowOf(null)
-    } else {
-        pullRequestsForConfig(
-            searchApi = access.services.pullRequestSearchApi,
-            reviewApi = access.services.pullRequestReviewApi,
-            summaryApi = access.services.pullRequestSummaryApi,
-            config = config,
-        ).clearBeforeFirstEmission()
+): StateFlow<Result<List<PullRequestUiState>>?> = combine(
+    configs,
+    gitHubAccess,
+    gitLabAccess,
+) { config, gitHub, gitLab -> PullRequestPollingInputs(config, gitHub, gitLab) }
+    .flatMapLatest { inputs ->
+        combine(
+            gitHubPullRequestsFlow(inputs.config, inputs.gitHubAccess),
+            gitLabPullRequestsFlow(inputs.config, inputs.gitLabAccess),
+        ) { gitHubResult, gitLabResult -> mergePullRequestResults(gitHubResult, gitLabResult) }
     }
-}.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_FLOW_STOP_TIMEOUT_MS), null)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_FLOW_STOP_TIMEOUT_MS), null)
+
+private fun gitHubPullRequestsFlow(
+    config: EngHubConfig,
+    access: CommittedGitHubAccess,
+): Flow<Result<List<PullRequestUiState>>?> = if (!access.isReady) {
+    flowOf(null)
+} else {
+    pullRequestsForConfig(
+        searchApi = access.services.pullRequestSearchApi,
+        reviewApi = access.services.pullRequestReviewApi,
+        summaryApi = access.services.pullRequestSummaryApi,
+        config = config,
+    ).clearBeforeFirstEmission()
+}
+
+private fun gitLabPullRequestsFlow(
+    config: EngHubConfig,
+    access: CommittedGitLabAccess,
+): Flow<Result<List<PullRequestUiState>>?> {
+    val apiConfig = access.apiConfig
+    if (!access.isReady || apiConfig == null) return flowOf(null)
+    return gitLabPullRequestsForConfig(config, access.createApi, apiConfig).clearBeforeFirstEmission()
+}
+
+internal fun mergePullRequestResults(
+    gitHubResult: Result<List<PullRequestUiState>>?,
+    gitLabResult: Result<List<PullRequestUiState>>?,
+): Result<List<PullRequestUiState>>? {
+    val results = listOfNotNull(gitHubResult, gitLabResult)
+    if (results.isEmpty()) return null
+    val successfulLists = results.mapNotNull { result -> result.getOrNull() }
+    return if (successfulLists.isEmpty()) {
+        results.first().exceptionOrNull()?.let { error -> Result.failure(error) }
+    } else {
+        Result.success(successfulLists.flatten())
+    }
+}
+
+internal fun gitLabPullRequestsForConfig(
+    config: EngHubConfig,
+    createApi: (GitLabApiRestConfig) -> GitLabMergeRequestApi,
+    apiConfig: GitLabApiRestConfig,
+): Flow<Result<List<PullRequestUiState>>> = flow {
+    val api = createApi(apiConfig)
+    try {
+        var hasEmittedResult = false
+        while (true) {
+            val result = runCatching {
+                api.getAuthoredOpenMergeRequests().map { mergeRequest -> mergeRequest.toPullRequestUiState() }
+            }.rethrowCancellation()
+            result.onFailure { logger.error(it) { "Error polling GitLab merge requests" } }
+            if (result.isSuccess || !hasEmittedResult) {
+                emit(result)
+                hasEmittedResult = true
+            }
+            delay((if (result.isSuccess) config.pollIntervalMs else POLLING_RETRY_DELAY_MS).milliseconds)
+        }
+    } finally {
+        api.close()
+    }
+}.flowOn(Dispatchers.IO)
 
 internal fun pullRequestsForConfig(
     searchApi: GitHubPullRequestSearchApi,

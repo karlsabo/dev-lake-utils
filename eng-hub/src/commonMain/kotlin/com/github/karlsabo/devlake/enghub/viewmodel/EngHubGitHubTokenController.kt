@@ -101,7 +101,7 @@ internal class EngHubGitHubTokenController(
         writeMutex.withLock {
             try {
                 val loadedConfig = saveDraft(draft)
-                persistence.onGitHubAccessCommitted(loadedConfig)
+                persistence.gitHub.onAccessCommitted(loadedConfig)
                 markCommitted(draft)
             } catch (_: GitHubSecretWriteException) {
                 markSaveFailed(draft, tokenError = GITHUB_SECRET_SAVE_ERROR)
@@ -113,13 +113,13 @@ internal class EngHubGitHubTokenController(
 
     private suspend fun saveDraft(draft: GitHubAccessDraft): LoadedGitHubConfig {
         val secretPath = Path(draft.path)
-        persistence.validateGitHubSecretPath(secretPath)
+        persistence.gitHub.validateSecretPath(secretPath)
         val secret = GitHubSecret(draft.token)
         return if (draft.path == committedPath) {
-            persistence.gitHubSecretWriter.save(secretPath, secret)
+            persistence.gitHub.secretWriter.save(secretPath, secret)
             LoadedGitHubConfig(GitHubConfig(draft.path), secret)
         } else {
-            persistence.saveGitHubAccess(secretPath, secret)
+            persistence.gitHub.saveAccess(secretPath, secret)
         }
     }
 

@@ -1,4 +1,4 @@
-package com.github.karlsabo.github.config
+package com.github.karlsabo.secret
 
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
@@ -17,14 +17,14 @@ import platform.posix.open
 import platform.posix.stat
 import platform.posix.unlink
 
-internal fun createOwnerOnlySecretFile(path: Path): Int {
+internal fun createOwnerOnlySecretFile(path: Path, providerLabel: String): Int {
     val mode = ownerReadWriteMode()
     val descriptor = open(path.toString(), O_WRONLY or O_CREAT or O_EXCL, mode)
-    requireOpenDescriptor(descriptor, path)
+    requireOpenDescriptor(descriptor, path, providerLabel)
     try {
-        configureOwnerOnlyDescriptor(descriptor, mode, path)
+        configureOwnerOnlyDescriptor(descriptor, mode, path, providerLabel)
         return descriptor
-    } catch (error: GitHubSecretWriteException) {
+    } catch (error: SecretFileWriteException) {
         close(descriptor)
         unlink(path.toString())
         throw error
@@ -33,29 +33,38 @@ internal fun createOwnerOnlySecretFile(path: Path): Int {
 
 internal fun ownerReadWriteMode(): platform.posix.mode_t = OWNER_MODE.convert()
 
-internal fun secureWriteFailure(path: Path): GitHubSecretWriteException {
-    val message = "Could not securely write GitHub secret file: $path"
-    return GitHubSecretWriteException(message)
+internal fun secureWriteFailure(path: Path, providerLabel: String): SecretFileWriteException {
+    val message = "Could not securely write $providerLabel secret file: $path"
+    return SecretFileWriteException(message)
 }
 
-private fun requireOpenDescriptor(descriptor: Int, path: Path) {
-    if (descriptor == -1) throw secureWriteFailure(path)
+private fun requireOpenDescriptor(
+    descriptor: Int,
+    path: Path,
+    providerLabel: String,
+) {
+    if (descriptor == -1) throw secureWriteFailure(path, providerLabel)
 }
 
 private fun configureOwnerOnlyDescriptor(
     descriptor: Int,
     mode: platform.posix.mode_t,
     path: Path,
+    providerLabel: String,
 ) {
-    if (fchmod(descriptor, mode) != 0) throw secureWriteFailure(path)
-    verifyOwnerOnlyDescriptor(descriptor, path)
+    if (fchmod(descriptor, mode) != 0) throw secureWriteFailure(path, providerLabel)
+    verifyOwnerOnlyDescriptor(descriptor, path, providerLabel)
 }
 
-private fun verifyOwnerOnlyDescriptor(descriptor: Int, path: Path) = memScoped {
+private fun verifyOwnerOnlyDescriptor(
+    descriptor: Int,
+    path: Path,
+    providerLabel: String,
+) = memScoped {
     val fileStatus = alloc<stat>()
     if (fstat(descriptor, fileStatus.ptr) != 0 || fileStatus.st_mode.toInt() and PERMISSION_MASK != OWNER_MODE) {
-        throw GitHubSecretWriteException(
-            "GitHub secret file permissions could not be restricted to its owner: $path",
+        throw SecretFileWriteException(
+            "$providerLabel secret file permissions could not be restricted to its owner: $path",
         )
     }
 }

@@ -1,5 +1,7 @@
 package com.github.karlsabo.github.config
 
+import com.github.karlsabo.secret.SecretFileWriteException
+import com.github.karlsabo.secret.createJvmSecretFilePermissions
 import com.github.karlsabo.tools.lenientJson
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
@@ -236,7 +238,7 @@ class GitHubSecretFileWriterTest {
                     .build(),
             )
 
-            assertFailsWith<GitHubSecretWriteException> {
+            assertFailsWith<SecretFileWriteException> {
                 createJvmSecretFilePermissions(setOf("acl")).verify(secretPath)
             }
         } finally {
@@ -246,7 +248,7 @@ class GitHubSecretFileWriterTest {
 
     @Test
     fun rejectsFileSystemsWithoutSupportedPermissionModel() {
-        assertFailsWith<GitHubSecretWriteException> {
+        assertFailsWith<SecretFileWriteException> {
             createJvmSecretFilePermissions(emptySet())
         }
     }

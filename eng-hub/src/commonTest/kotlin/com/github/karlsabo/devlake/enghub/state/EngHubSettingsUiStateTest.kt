@@ -5,6 +5,8 @@ import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.LocalRepositoryConfig
 import com.github.karlsabo.github.config.GitHubConfig
 import com.github.karlsabo.github.config.GitHubSecret
+import com.github.karlsabo.gitlab.config.GitLabSecret
+import com.github.karlsabo.gitlab.config.LoadedGitLabConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -15,6 +17,11 @@ class EngHubSettingsUiStateTest {
             engHubConfig = representativeEngHubConfig(),
             gitHubConfig = GitHubConfig(tokenPath = "/secrets/github.json"),
             gitHubSecret = GitHubSecret(githubToken = "github_pat_private"),
+            gitLabConfig = LoadedGitLabConfig(
+                instanceUrl = "https://gitlab.internal.example",
+                tokenPath = "/secrets/gitlab.json",
+                secret = GitLabSecret("glpat_private"),
+            ),
         )
 
         assertEquals(listOf("acme", "widgets"), state.organizationIds)
@@ -28,7 +35,12 @@ class EngHubSettingsUiStateTest {
         assertEquals("/secrets/github.json", state.gitHubTokenPath)
         assertEquals("••••••••", state.gitHubToken.maskedValue)
         assertEquals("github_pat_private", state.gitHubToken.value)
-        assertEquals("GitHubTokenUiState()", state.gitHubToken.toString())
+        assertEquals("MaskedTokenUiState()", state.gitHubToken.toString())
+        assertEquals("https://gitlab.internal.example", state.gitLabInstanceUrl)
+        assertEquals("/secrets/gitlab.json", state.gitLabTokenPath)
+        assertEquals("••••••••", state.gitLabToken.maskedValue)
+        assertEquals("glpat_private", state.gitLabToken.value)
+        assertEquals("MaskedTokenUiState()", state.gitLabToken.toString())
         assertEquals(
             listOf(
                 SettingsLocalRepositoryUiState(

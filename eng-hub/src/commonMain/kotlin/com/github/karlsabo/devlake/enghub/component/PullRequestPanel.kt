@@ -49,13 +49,13 @@ fun PullRequestPanel(
             onSuccess = { pullRequests ->
                 if (pullRequests.isEmpty()) {
                     Text(
-                        text = "No open pull requests",
+                        text = "No open pull requests or merge requests",
                         modifier = Modifier.padding(8.dp),
                         style = MaterialTheme.typography.body2,
                     )
                 } else {
                     LazyColumn {
-                        items(pullRequests, key = { it.number }) { pr ->
+                        items(pullRequests, key = { "${it.provider.name}-${it.number}" }) { pr ->
                             PullRequestItem(
                                 pr = pr,
                                 onOpenInBrowser = actions.onOpenInBrowser,

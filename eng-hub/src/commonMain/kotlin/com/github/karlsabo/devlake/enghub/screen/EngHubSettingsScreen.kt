@@ -267,6 +267,10 @@ private fun SettingsSectionContent(
             GitHubAccessSettings(state = state, groups = groups, compact = compact, actions = actions)
         }
 
+        EngHubSettingsSection.GitLabAccess -> SettingsCard(title = null) {
+            GitLabAccessSettings(state = state, groups = groups, compact = compact, actions = actions)
+        }
+
         EngHubSettingsSection.GitHubActivity -> SettingsCard(title = null) {
             GitHubActivitySettings(state = state, groups = groups, actions = actions)
         }
