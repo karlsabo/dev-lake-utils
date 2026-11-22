@@ -11,11 +11,16 @@ import com.github.karlsabo.gitlab.GitLabMergeRequestReferences
 import com.github.karlsabo.gitlab.GitLabUser
 import com.github.karlsabo.gitlab.config.GitLabApiRestConfig
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 class GitLabPullRequestPollingTest {
     private val apiConfig = GitLabApiRestConfig("https://gitlab.internal.example", "glpat-synthetic")
@@ -47,19 +52,41 @@ class GitLabPullRequestPollingTest {
     }
 
     @Test
+    fun failureAfterASuccessfulPollIsStillReported() = runBlocking {
+        var polls = 0
+        val api = object : GitLabMergeRequestApi {
+            override suspend fun getAuthenticatedUser(): GitLabUser = GitLabUser(id = 1, username = "atlas-user")
+
+            override suspend fun getAuthoredOpenMergeRequests(): List<GitLabMergeRequest> {
+                polls++
+                if (polls > 1) error("token expired")
+                return listOf(mergeRequest())
+            }
+        }
+
+        val results = withTimeout(10_000.milliseconds) {
+            gitLabPullRequestsForConfig(EngHubConfig(pollIntervalMs = 1), { api }, apiConfig).take(2).toList()
+        }
+
+        assertEquals(listOf("!42"), results[0].getOrThrow().map { it.referenceLabel })
+        assertEquals("token expired", results[1].exceptionOrNull()?.message)
+        assertEquals(2, polls)
+    }
+
+    @Test
     fun githubAndGitLabResultsCoexistWithDistinctProviderLabels() {
         val github = gitHubPullRequest()
         val gitLab = mergeRequest().toPullRequestUiState()
 
         val merged = mergePullRequestResults(Result.success(listOf(github)), Result.success(listOf(gitLab)))
 
-        val items = merged?.getOrThrow().orEmpty()
-        assertEquals(listOf("GitHub", "GitLab"), items.map { it.provider.label })
-        assertEquals(listOf("#7", "!42"), items.map { it.referenceLabel })
+        assertEquals(listOf("GitHub", "GitLab"), merged?.pullRequests.orEmpty().map { it.provider.label })
+        assertEquals(listOf("#7", "!42"), merged?.pullRequests.orEmpty().map { it.referenceLabel })
+        assertEquals(emptyList(), merged?.failures)
     }
 
     @Test
-    fun oneProviderFailureDoesNotHideTheOtherProvidersItems() {
+    fun oneProviderFailureRemainsObservableNextToTheOtherProvidersItems() {
         val gitLab = mergeRequest().toPullRequestUiState()
 
         val merged = mergePullRequestResults(
@@ -67,7 +94,9 @@ class GitLabPullRequestPollingTest {
             Result.success(listOf(gitLab)),
         )
 
-        assertEquals(listOf("!42"), merged?.getOrThrow().orEmpty().map { it.referenceLabel })
+        assertEquals(listOf("!42"), merged?.pullRequests.orEmpty().map { it.referenceLabel })
+        assertEquals(listOf(PullRequestProvider.GitHub), merged?.failures.orEmpty().map { it.provider })
+        assertEquals(listOf("GitHub unavailable"), merged?.failures.orEmpty().map { it.message })
     }
 
     @Test

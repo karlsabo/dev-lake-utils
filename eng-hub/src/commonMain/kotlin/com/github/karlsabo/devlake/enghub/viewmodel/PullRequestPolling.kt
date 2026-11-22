@@ -5,7 +5,10 @@ package com.github.karlsabo.devlake.enghub.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.karlsabo.devlake.enghub.EngHubConfig
+import com.github.karlsabo.devlake.enghub.state.PullRequestProvider
+import com.github.karlsabo.devlake.enghub.state.PullRequestProviderFailure
 import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestsResult
 import com.github.karlsabo.devlake.enghub.state.toPullRequestUiState
 import com.github.karlsabo.github.CheckRunSummary
 import com.github.karlsabo.github.CiStatus.PENDING
@@ -56,7 +59,7 @@ internal fun ViewModel.pullRequestsStateFlow(
     gitHubAccess: StateFlow<CommittedGitHubAccess>,
     gitLabAccess: StateFlow<CommittedGitLabAccess>,
     configs: StateFlow<EngHubConfig>,
-): StateFlow<Result<List<PullRequestUiState>>?> = combine(
+): StateFlow<PullRequestsResult?> = combine(
     configs,
     gitHubAccess,
     gitLabAccess,
@@ -95,16 +98,31 @@ private fun gitLabPullRequestsFlow(
 internal fun mergePullRequestResults(
     gitHubResult: Result<List<PullRequestUiState>>?,
     gitLabResult: Result<List<PullRequestUiState>>?,
-): Result<List<PullRequestUiState>>? {
-    val results = listOfNotNull(gitHubResult, gitLabResult)
-    if (results.isEmpty()) return null
-    val successfulLists = results.mapNotNull { result -> result.getOrNull() }
-    return if (successfulLists.isEmpty()) {
-        results.first().exceptionOrNull()?.let { error -> Result.failure(error) }
-    } else {
-        Result.success(successfulLists.flatten())
-    }
+): PullRequestsResult? {
+    val providerResults = listOfNotNull(
+        gitHubResult?.toProviderResult(PullRequestProvider.GitHub),
+        gitLabResult?.toProviderResult(PullRequestProvider.GitLab),
+    )
+    if (providerResults.isEmpty()) return null
+    return PullRequestsResult(
+        pullRequests = providerResults.flatMap(ProviderResult::pullRequests),
+        failures = providerResults.mapNotNull(ProviderResult::failure),
+    )
 }
+
+private data class ProviderResult(
+    val pullRequests: List<PullRequestUiState>,
+    val failure: PullRequestProviderFailure?,
+)
+
+private fun Result<List<PullRequestUiState>>.toProviderResult(
+    provider: PullRequestProvider,
+): ProviderResult = ProviderResult(
+    pullRequests = getOrNull().orEmpty(),
+    failure = exceptionOrNull()?.let { error ->
+        PullRequestProviderFailure(provider = provider, message = error.message ?: "Unknown error")
+    },
+)
 
 internal fun gitLabPullRequestsForConfig(
     config: EngHubConfig,
@@ -113,16 +131,12 @@ internal fun gitLabPullRequestsForConfig(
 ): Flow<Result<List<PullRequestUiState>>> = flow {
     val api = createApi(apiConfig)
     try {
-        var hasEmittedResult = false
         while (true) {
             val result = runCatching {
                 api.getAuthoredOpenMergeRequests().map { mergeRequest -> mergeRequest.toPullRequestUiState() }
             }.rethrowCancellation()
             result.onFailure { logger.error(it) { "Error polling GitLab merge requests" } }
-            if (result.isSuccess || !hasEmittedResult) {
-                emit(result)
-                hasEmittedResult = true
-            }
+            emit(result)
             delay((if (result.isSuccess) config.pollIntervalMs else POLLING_RETRY_DELAY_MS).milliseconds)
         }
     } finally {

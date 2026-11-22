@@ -33,7 +33,10 @@ internal data class GitHubSettingsInfrastructure(
 
 internal data class GitLabSettingsInfrastructure(
     val secretStore: GitLabSecretStore = GitLabSecretStore(),
-    /** Protected in addition to the Eng Hub configuration path; the secret path must not alias any of them. */
+    /**
+     * Protected in addition to the Eng Hub configuration path and the tracked GitHub secret path; the secret path
+     * must not alias any of them.
+     */
     val protectedPaths: List<Path> = transactionPaths(gitHubConfigPath),
     val loadSecret: (Path) -> GitLabSecret? = { path -> loadGitLabSecretIfPresent(path) },
 )
@@ -65,11 +68,16 @@ internal fun loadEngHubDependencies(
     val viewModel = component.viewModel
     viewModel.initializeGitHubAccessReadiness(loadedGitHubConfig.isAccessReady())
     viewModel.updateGitLabAccess(loadedGitLabConfig.readyApiConfig())
+    val secretPaths = CrossProviderSecretPaths(
+        gitHubSecretPath = loadedGitHubConfig.config.tokenPath,
+        gitLabSecretPath = loadedGitLabConfig.tokenPath,
+    )
     val persistence = createSettingsPersistence(
         viewModel = viewModel,
         gitHubConfigFilePath = gitHubConfigFilePath,
         gitHubSettingsInfrastructure = infrastructure.gitHub,
         gitLabSettingsInfrastructure = infrastructure.gitLab,
+        secretPaths = secretPaths,
     )
     return LoadedEngHubDependencies(
         config = config,
@@ -89,20 +97,30 @@ private fun createSettingsPersistence(
     gitHubConfigFilePath: Path,
     gitHubSettingsInfrastructure: GitHubSettingsInfrastructure,
     gitLabSettingsInfrastructure: GitLabSettingsInfrastructure,
+    secretPaths: CrossProviderSecretPaths,
 ): EngHubSettingsPersistence {
     val gitHubConfigStore = gitHubSettingsInfrastructure.configStore
-    val protectedConfigPaths = gitHubSettingsInfrastructure.protectedPaths
     return EngHubSettingsPersistence(
         updateConfig = viewModel::updateConfig,
         gitHub = GitHubAccessPersistence(
             secretWriter = gitHubConfigStore,
             validateSecretPath = { secretPath ->
-                gitHubConfigStore.validateSecretPath(gitHubConfigFilePath, secretPath, protectedConfigPaths)
+                gitHubConfigStore.validateSecretPath(
+                    gitHubConfigFilePath,
+                    secretPath,
+                    gitHubSettingsInfrastructure.protectedPaths + secretPaths.protectedPathsForGitHubSecret(),
+                )
             },
             saveAccess = { secretPath, secret ->
-                gitHubConfigStore.saveAccess(gitHubConfigFilePath, secretPath, secret, protectedConfigPaths)
+                gitHubConfigStore.saveAccess(
+                    gitHubConfigFilePath,
+                    secretPath,
+                    secret,
+                    gitHubSettingsInfrastructure.protectedPaths + secretPaths.protectedPathsForGitHubSecret(),
+                )
             },
             onAccessCommitted = { loaded ->
+                secretPaths.updateGitHubSecretPath(loaded.config.tokenPath)
                 if (loaded.isAccessReady()) {
                     viewModel.updateGitHubAccess(
                         gitHubServices = createEngHubGitHubServices(loaded.toApiRestConfig()),
@@ -116,9 +134,14 @@ private fun createSettingsPersistence(
         gitLab = GitLabAccessPersistence(
             saveSecret = { secretPath, secret ->
                 gitLabSettingsInfrastructure.secretStore.save(secretPath, secret)
+                secretPaths.updateGitLabSecretPath(secretPath.toString())
             },
             validateSecretPath = { secretPath ->
-                validateGitLabSecretPath(gitHubConfigStore, secretPath, gitLabSettingsInfrastructure)
+                validateGitLabSecretPath(
+                    gitHubConfigStore,
+                    secretPath,
+                    gitLabSettingsInfrastructure.protectedPaths + secretPaths.protectedPathsForGitLabSecret(),
+                )
             },
             onAccessCommitted = viewModel.updateGitLabAccess,
             validateAccess = ::validateGitLabAccess,
@@ -143,10 +166,10 @@ private fun loadGitLabSettings(
 private fun validateGitLabSecretPath(
     gitHubConfigStore: GitHubConfigStore,
     secretPath: Path,
-    infrastructure: GitLabSettingsInfrastructure,
+    protectedPaths: List<Path>,
 ) {
     try {
-        gitHubConfigStore.validateSecretPath(engHubConfigPath, secretPath, infrastructure.protectedPaths)
+        gitHubConfigStore.validateSecretPath(engHubConfigPath, secretPath, protectedPaths)
     } catch (error: GitHubSecretWriteException) {
         throw GitLabSecretWriteException(error.message ?: "Invalid GitLab secret path: $secretPath", error)
     }
@@ -162,12 +185,6 @@ private suspend fun validateGitLabAccess(apiConfig: GitLabApiRestConfig): String
 }
 
 private fun LoadedGitLabConfig.readyApiConfig(): GitLabApiRestConfig? = if (isAccessReady()) toApiRestConfig() else null
-
-private fun transactionPaths(configPath: Path): List<Path> = listOf(
-    configPath,
-    Path("$configPath.new"),
-    Path("$configPath.bak"),
-)
 
 internal fun loadGitHubSettingsForEngHub(configPath: Path): LoadedGitHubConfig {
     val loadedSettings = loadGitHubSettingsIfPresent(configPath)

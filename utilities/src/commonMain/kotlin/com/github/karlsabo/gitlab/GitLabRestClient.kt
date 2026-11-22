@@ -13,8 +13,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 
-internal const val GITLAB_TOKEN_HEADER = "PRIVATE-TOKEN"
-
 internal class GitLabRestClient(
     private val config: GitLabApiRestConfig,
     private val clientOverride: HttpClient? = null,
@@ -39,7 +37,9 @@ internal class GitLabRestClient(
         operation: String,
     ): HttpResponse {
         val response = client.get(url) {
-            header(GITLAB_TOKEN_HEADER, config.token)
+            // Ktor's redirect handling strips Authorization on cross-authority hops, so the token cannot follow a
+            // redirect to a different host. A custom header would be forwarded.
+            header(HttpHeaders.Authorization, "Bearer ${config.token}")
             header(HttpHeaders.Accept, "application/json")
         }
         if (response.status.value !in gitLabSuccessStatusCodes) {

@@ -6,7 +6,7 @@ import com.github.karlsabo.devlake.enghub.EngHubConfig
 import com.github.karlsabo.devlake.enghub.state.ForceArchiveWorktreeUiState
 import com.github.karlsabo.devlake.enghub.state.LocalRepositoryUiState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
-import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestsResult
 import com.github.karlsabo.git.WorktreePath
 import com.github.karlsabo.git.WorktreeSetupHandle
 import com.github.karlsabo.git.WorktreeSetupStatus
@@ -237,7 +237,7 @@ class EngHubViewModel internal constructor(
         if (replacedServices !== gitHubServices) gitHubServiceActionTracker.retire(replacedServices)
     }
 
-    val pullRequests: StateFlow<Result<List<PullRequestUiState>>?> = pullRequestsStateFlow(
+    val pullRequests: StateFlow<PullRequestsResult?> = pullRequestsStateFlow(
         gitHubAccess = currentGitHubAccess,
         gitLabAccess = currentGitLabAccess,
         configs = state.config,

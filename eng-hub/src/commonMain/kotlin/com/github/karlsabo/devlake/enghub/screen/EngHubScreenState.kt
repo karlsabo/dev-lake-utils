@@ -15,7 +15,7 @@ import com.github.karlsabo.devlake.enghub.component.WorktreePanelState
 import com.github.karlsabo.devlake.enghub.component.createRepositoryWorktreeDialogState
 import com.github.karlsabo.devlake.enghub.state.EngHubSettingsUiState
 import com.github.karlsabo.devlake.enghub.state.NotificationUiState
-import com.github.karlsabo.devlake.enghub.state.PullRequestUiState
+import com.github.karlsabo.devlake.enghub.state.PullRequestsResult
 import com.github.karlsabo.devlake.enghub.viewmodel.ActionErrorUiState
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubSettingsViewModel
 import com.github.karlsabo.devlake.enghub.viewmodel.EngHubViewModel
@@ -147,7 +147,7 @@ internal fun collectEngHubScreenState(
             updatingWorktreePaths = worktreeMutations.updatingPaths,
             rebasingWorktreePaths = worktreeMutations.rebasingPaths,
             mergingWorktreePaths = worktreeMutations.mergingPaths,
-            authoredOpenPullRequests = activityResults.pullRequests?.getOrNull().orEmpty(),
+            authoredOpenPullRequests = activityResults.pullRequests?.pullRequests.orEmpty(),
             repositoryCreateWorktreeRequest = repositoryCreateWorktreeRequest?.let { request ->
                 createRepositoryWorktreeDialogState(
                     repoRootPath = request.repoRootPath,
@@ -164,7 +164,7 @@ internal fun collectEngHubScreenState(
 }
 
 private data class ActivityPaneResults(
-    val pullRequests: Result<List<PullRequestUiState>>?,
+    val pullRequests: PullRequestsResult?,
     val notifications: Result<List<NotificationUiState>>?,
 )
 

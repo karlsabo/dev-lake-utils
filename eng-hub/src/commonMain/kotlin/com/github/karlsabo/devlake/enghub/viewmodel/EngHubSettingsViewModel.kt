@@ -37,7 +37,7 @@ class EngHubSettingsViewModel(
     loadedAccessConfigs: LoadedAccessConfigs,
     directoryPicker: DirectoryPicker,
     filePicker: FilePicker,
-    persistence: EngHubSettingsPersistence,
+    internal val persistence: EngHubSettingsPersistence,
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
     private val mutableUiState = MutableStateFlow(

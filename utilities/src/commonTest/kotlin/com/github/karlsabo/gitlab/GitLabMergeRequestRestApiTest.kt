@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GitLabMergeRequestRestApiTest {
@@ -25,7 +26,7 @@ class GitLabMergeRequestRestApiTest {
         val client = HttpClient(
             MockEngine { request ->
                 requestedUrls += request.url.toString()
-                assertEquals(token, request.headers[GITLAB_TOKEN_HEADER])
+                assertEquals("Bearer $token", request.headers[HttpHeaders.Authorization])
                 assertEquals("/api/v4/merge_requests", request.url.encodedPath)
                 assertEquals("created_by_me", request.url.parameters["scope"])
                 assertEquals("opened", request.url.parameters["state"])
@@ -81,7 +82,7 @@ class GitLabMergeRequestRestApiTest {
         val client = HttpClient(
             MockEngine { request ->
                 assertEquals("/api/v4/user", request.url.encodedPath)
-                assertEquals(token, request.headers[GITLAB_TOKEN_HEADER])
+                assertEquals("Bearer $token", request.headers[HttpHeaders.Authorization])
                 respondJson("""{"id":7,"username":"atlas-user","name":"Atlas User"}""")
             },
         )
@@ -91,6 +92,36 @@ class GitLabMergeRequestRestApiTest {
 
         api.close()
         assertEquals("atlas-user", user.username)
+    }
+
+    @Test
+    fun crossAuthorityRedirectDoesNotForwardTheToken() = runBlocking {
+        val requestedHosts = mutableListOf<String>()
+        val client = HttpClient(
+            MockEngine { request ->
+                requestedHosts += request.url.host
+                if (request.url.host == instanceUrl.substringAfter("://")) {
+                    respond(
+                        content = "",
+                        status = HttpStatusCode.Found,
+                        headers = headersOf(
+                            HttpHeaders.Location to listOf("https://mirror.example/api/v4/merge_requests"),
+                        ),
+                    )
+                } else {
+                    assertNull(request.headers[HttpHeaders.Authorization])
+                    assertNull(request.headers["PRIVATE-TOKEN"])
+                    respondJson("[]")
+                }
+            },
+        )
+        val api = GitLabRestApi(GitLabApiRestConfig(instanceUrl, token), client)
+
+        val mergeRequests = api.getAuthoredOpenMergeRequests()
+
+        api.close()
+        assertEquals(emptyList(), mergeRequests)
+        assertEquals(listOf("gitlab.internal.example", "mirror.example"), requestedHosts)
     }
 
     @Test
