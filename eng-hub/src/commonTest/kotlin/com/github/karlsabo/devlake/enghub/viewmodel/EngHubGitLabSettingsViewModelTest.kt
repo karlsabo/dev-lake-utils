@@ -195,8 +195,8 @@ class EngHubGitLabSettingsViewModelTest {
             LoadedGitHubConfig(GitHubConfig(""), GitHubSecret("")),
             loadedGitLabConfig,
         ),
-        directoryPicker = NoopDirectoryPicker,
-        filePicker = NoopFilePicker,
+        directoryPicker = GitLabNoOpDirectoryPicker,
+        filePicker = GitLabNoOpFilePicker,
         persistence = EngHubSettingsPersistence(
             updateConfig = { transform ->
                 transform(currentConfig.value).also { updated ->
@@ -234,10 +234,10 @@ private class RecordingGitLabPersistence(
     }
 }
 
-private object NoopDirectoryPicker : DirectoryPicker {
+private object GitLabNoOpDirectoryPicker : DirectoryPicker {
     override suspend fun pickDirectory(title: String): String? = null
 }
 
-private object NoopFilePicker : FilePicker {
+private object GitLabNoOpFilePicker : FilePicker {
     override suspend fun pickFilePath(title: String): String? = null
 }
