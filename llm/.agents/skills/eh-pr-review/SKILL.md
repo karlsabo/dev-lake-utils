@@ -61,6 +61,16 @@ Assess risks relevant to the change:
 - **Tests:** whether claims and risky paths are verified at the appropriate level; tests that pass without asserting the behavior.
 - **Maintainability:** misleading abstractions, duplication of the same knowledge, unnecessary coupling, or dead code introduced by this change.
 
+### Required comment and docstring pass
+
+Inspect every added or edited source comment, docstring, and JSDoc, including in tests and configuration. Also check existing documentation made inaccurate by the diff. Flag clear violations as actionable even when behavior is correct:
+
+- **Delete** comments that restate code, names, test setup or assertions, or narrate the change. Move ticket history and rollout rationale to the PR or ticket.
+- **Trim** useful comments to the shortest explanation of the non-obvious reason, invariant, external constraint, or failure mode. Prefer one sentence when it suffices; preserve details needed to prevent misuse.
+- **Check docstrings** against the actual contract and repository conventions. Describe caller-visible guarantees, side effects, or failure conditions only where they aren't already clear from the signature or types.
+
+Anchor feedback to the exact text, explain what is redundant or missing, and suggest deletion or a concise replacement when clear. Don't flag untouched prose or personal wording preferences. Keep documentation findings below behavioral findings.
+
 Consolidate findings with the same root cause and order them by impact. Do not apply a comment quota or convert every checklist item into feedback.
 
 ## 3. Write the planned comments
