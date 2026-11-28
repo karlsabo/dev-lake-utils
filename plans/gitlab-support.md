@@ -5,8 +5,8 @@
 Eng Hub moved out of this monorepo (see [Eng Hub standalone plan, story 9](https://gitlab.nimblygames.com/NimblyGames/business/-/blob/master/NimblyGames/planning/eng-hub-standalone-repo.md)).
 This plan is preserved as history and its paths are updated for the new layout:
 
-- [Eng Hub repo](https://gitlab.nimblygames.com/NimblyGames/eng-hub) — paths beginning `src/` are relative to this
-  repo, and Eng Hub's package is now `com.nimblygames.enghub`.
+- [Eng Hub repo](https://gitlab.nimblygames.com/NimblyGames/eng-hub) — paths beginning `src/` are relative to the
+  Eng Hub repo, and Eng Hub's package is now `com.nimblygames.enghub`.
 - [Framework `GitLab` module](https://gitlab.nimblygames.com/nimblygamespublic/framework/-/tree/master/GitLab) —
   the live GitLab client for the standalone Eng Hub, which imports `com.nimblygames.gitlab` from this module.
 - The `utilities/src/commonMain/kotlin/com/github/karlsabo/gitlab/` sources remain in this repository but are
