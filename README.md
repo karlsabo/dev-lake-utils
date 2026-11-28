@@ -45,47 +45,6 @@ Detekt owns code-quality warnings that go beyond formatting. Run `./gradlew dete
 
 Add `-PtaskTiming=true` to any Gradle invocation to write task timing reports to `build/reports/task-timing.json` and `build/reports/task-timing.txt`. Timing is disabled by default and does not change the requested tasks or their behavior.
 
-## Set up MCP servers
-
-* [MCP Proxy](https://github.com/smart-mcp-proxy/mcpproxy-go)
-    * GitHub
-    * BuildKite
-    * Atlassian
-    * Linear
-    * Sentry
-    * Glean
-    * Whimsical
-    *
-
-## Auto start reviewing PRs
-
-* Auto kick off PR reviews when a notification comes in that requires it
-
-## Have multiple PR review styles
-
-* Use different PR review focuses, security, testing, mccabe complexity, architecture.
-* Use a directory for the reviews, each reviewing creates its own comment file
-* Consolidate the comments
-    * Probably ask the reviewers to use a JSON schema
-
-## Have an issues list
-
-* Show assigned issues
-* Show related issues that should be picked up next
-    * Maybe in the same Epic, or Project
-
-## Have a task list
-
-* Pull in tasks from multiple sources, Google Tasks etc.
-
-## Keep cli tools up to date
-
-* Run update scripts for claude code, codex cli, goose, OpenCode, etc
-
-## Notification panel
-
-* Have app notifications and logs for when it completes a task like pulling the latest git notifications, updating tools, etc.
-
 # Overview
 
 This project makes direct API calls to GitHub, Jira, Linear, and PagerDuty to collect data and create summaries of

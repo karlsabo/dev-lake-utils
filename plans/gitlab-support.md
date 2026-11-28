@@ -8,8 +8,10 @@ This plan is preserved as history and its paths are updated for the new layout:
 - [Eng Hub repo](https://gitlab.nimblygames.com/NimblyGames/eng-hub) — paths beginning `src/` are relative to this
   repo, and Eng Hub's package is now `com.nimblygames.enghub`.
 - [Framework `GitLab` module](https://gitlab.nimblygames.com/nimblygamespublic/framework/-/tree/master/GitLab) —
-  where the planned GitLab REST client landed instead of `utilities`.
-- Paths under `utilities/` still refer to this repository.
+  the live GitLab client for the standalone Eng Hub, which imports `com.nimblygames.gitlab` from this module.
+- The `utilities/src/commonMain/kotlin/com/github/karlsabo/gitlab/` sources remain in this repository but are
+  unreferenced legacy code, dead until the utilities migration follow-up. Treat that copy as retained history, not an
+  implementation target. Other `utilities/` paths still refer to this repository.
 
 The Eng Hub TODO backlog that lived in the root README, including its `img.png` screenshot, was not carried into the
 standalone repo or GitLab issues. It stays discoverable through these pinned permalinks without restoring the removed
@@ -71,7 +73,7 @@ The first slice is story 1. Story 17 tests coexistence explicitly rather than as
 
 ## Stories (proposed: one ticket and one PR each)
 
-Paths beginning `src/` are relative to the Eng Hub repo; paths under `utilities/` are relative to `/home/karl/git/dev-lake-utils/`. Each acceptance criterion is the same-numbered test above. GitLab API code should live under `utilities/src/commonMain/kotlin/com/github/karlsabo/gitlab/` (new); tests alongside the corresponding module's existing tests. All stories preserve GitHub behavior; feature-specific adapters can be introduced when needed rather than replacing GitHub interfaces wholesale.
+Paths beginning `src/` are relative to the Eng Hub repo; paths under `utilities/` are relative to `/home/karl/git/dev-lake-utils/`. Each acceptance criterion is the same-numbered test above. The live GitLab client is the framework `GitLab` module (`com.nimblygames.gitlab`); where a story below lists GitLab API work under `utilities/src/commonMain/kotlin/com/github/karlsabo/gitlab/`, that is the retained, unreferenced legacy copy, so implement API changes in the framework module instead of extending the orphaned copy. Put tests alongside the corresponding module's existing tests. All stories preserve GitHub behavior; feature-specific adapters can be introduced when needed rather than replacing GitHub interfaces wholesale.
 
 ### 1. See authored GitLab merge requests
 **Acceptance criteria:** Given an account on `gitlab.internal.example` that authored open `games/atlas!42`, when Eng Hub refreshes, then `!42` appears identified as GitLab.
