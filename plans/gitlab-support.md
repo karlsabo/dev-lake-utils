@@ -2,14 +2,21 @@
 
 ## Repository move
 
-Eng Hub moved out of this monorepo (see `planning/eng-hub-standalone-repo.md` story 9). This plan is preserved as
-history and its paths are updated for the new layout:
+Eng Hub moved out of this monorepo (see [Eng Hub standalone plan, story 9](https://gitlab.nimblygames.com/NimblyGames/business/-/blob/master/NimblyGames/planning/eng-hub-standalone-repo.md)).
+This plan is preserved as history and its paths are updated for the new layout:
 
 - [Eng Hub repo](https://gitlab.nimblygames.com/NimblyGames/eng-hub) — paths beginning `src/` are relative to this
   repo, and Eng Hub's package is now `com.nimblygames.enghub`.
 - [Framework `GitLab` module](https://gitlab.nimblygames.com/nimblygamespublic/framework/-/tree/master/GitLab) —
   where the planned GitLab REST client landed instead of `utilities`.
 - Paths under `utilities/` still refer to this repository.
+
+The Eng Hub TODO backlog that lived in the root README, including its `img.png` screenshot, was not carried into the
+standalone repo or GitLab issues. It stays discoverable through these pinned permalinks without restoring the removed
+app code:
+
+- [Historical Eng Hub TODO backlog](https://github.com/karlsabo/dev-lake-utils/blob/d3bc4800b623f91682abf798b9f1903b68942379/README.md#todo)
+- [Historical TODO screenshot](https://github.com/karlsabo/dev-lake-utils/blob/d3bc4800b623f91682abf798b9f1903b68942379/img.png)
 
 ## Goal
 
