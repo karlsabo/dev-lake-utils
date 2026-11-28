@@ -22,7 +22,3 @@ include("utilities")
 project(":utilities").buildFileName = "utilities.gradle.kts"
 include("user-metrics-publisher")
 project(":user-metrics-publisher").buildFileName = "user-metrics-publisher.gradle.kts"
-include("eng-hub")
-project(":eng-hub").buildFileName = "eng-hub.gradle.kts"
-include("shared-resources")
-project(":shared-resources").buildFileName = "shared-resources.gradle.kts"
